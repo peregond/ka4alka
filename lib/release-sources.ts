@@ -25,7 +25,68 @@ export function matches(media:Media,title:string,source:string) {
     return /^(?:s\d{1,2}(?:e\d{1,3})?|e\d{1,3}|season|сезон|серия|episode|complete|полный|все|web|hdtv|bdrip|bluray|remux|720p|1080p|2160p|4k|\d{4})\b/.test(tail);
   }));
   if(!hit)return false;
-  return media.section==="series"||source!=="RuTor"||media.year===0||new RegExp(`(^|\\D)${media.year}(\\D|$)`).test(title);
+  return media.section==="series"||!["RuTor","The Pirate Bay","Knaben"].includes(source)||media.year===0||new RegExp(`(^|\\D)${media.year}(\\D|$)`).test(title);
+}
+
+export async function knaben(media:Media):Promise<Release[]> {
+  const query=media.originalTitle||media.title;
+  const response=await fetch("https://api.knaben.org/v1",{
+    method:"POST",headers:{"Content-Type":"application/json","Accept":"application/json","User-Agent":"KachalkaIndex/0.2"},
+    body:JSON.stringify({query,search_field:"title",search_type:"100%",order_by:"seeders",order_direction:"desc",size:75,hide_unsafe:true,hide_xxx:true}),
+    signal:AbortSignal.timeout(9500),cache:"no-store"
+  });
+  if(!response.ok||Number(response.headers.get("content-length")??0)>2_000_000)throw new Error("Сводный индекс недоступен");
+  const body=await response.text();if(body.length>2_000_000)throw new Error("Ответ сводного индекса слишком большой");
+  const data=JSON.parse(body) as {hits?:{id?:string;title?:string;tracker?:string;category?:string;details?:string;link?:string;magnetUrl?:string;hash?:string;bytes?:number;seeders?:number}[]};
+  const results:Release[]=[];
+  for(const row of data.hits??[]) {
+    if(!row.title||!row.id||!matches(media,row.title,"Knaben")||!/(?:movie|tv|anime|video|film|кино|сериал)/i.test(row.category??""))continue;
+    const hash=/^[a-f0-9]{40}$/i.test(row.hash??"")?row.hash!.toUpperCase():hashFrom(row.magnetUrl??"");
+    let download:string|null=hash?`magnet:?xt=urn:btih:${hash}&dn=${encodeURIComponent(row.title)}&tr=${encodeURIComponent("udp://tracker.opentrackr.org:1337/announce")}`:null;
+    if(!download&&row.link){try{const url=new URL(row.link);if(url.protocol==="https:"&&["knaben.eu","knaben.org"].includes(url.hostname)&&url.pathname.startsWith("/live/dl/"))download=url.href;}catch{/* Ignore invalid links. */}}
+    let page:string|null=null;
+    if(row.details){try{const url=new URL(row.details);if(url.protocol==="https:")page=url.href;}catch{/* Ignore invalid links. */}}
+    if(!download&&!page)continue;
+    const source=(row.tracker||"Knaben").slice(0,40);
+    results.push(make(media,`${source} · Knaben`,row.id,row.title,page,download,Number(row.bytes)||null,Number(row.seeders)||0));
+  }
+  return results;
+}
+
+export async function pirateBay(media:Media):Promise<Release[]> {
+  const queries=[media.originalTitle,media.title].filter((value,index,all):value is string=>Boolean(value)&&all.indexOf(value)===index).slice(0,2);
+  const category=media.section==="movies"?"201,202,207":"205,208";
+  const responses=await Promise.allSettled(queries.map(async query=>JSON.parse(await read(`https://apibay.org/q.php?q=${encodeURIComponent(query)}&cat=${category}`,2_000_000)) as {id:string;name:string;info_hash:string;seeders:string;size:string;category:string}[]));
+  const results:Release[]=[];
+  for(const response of responses) {
+    if(response.status!=="fulfilled"||!Array.isArray(response.value))continue;
+    for(const row of response.value.slice(0,100)) {
+      if(!/^\d+$/.test(row.id)||! /^[a-f0-9]{40}$/i.test(row.info_hash)||!matches(media,row.name,"The Pirate Bay"))continue;
+      const hash=row.info_hash.toUpperCase();
+      const magnet=`magnet:?xt=urn:btih:${hash}&dn=${encodeURIComponent(row.name)}&tr=${encodeURIComponent("udp://tracker.opentrackr.org:1337/announce")}`;
+      results.push(make(media,"The Pirate Bay",hash,row.name,`https://thepiratebay.org/description.php?id=${row.id}`,magnet,Number(row.size)||null,Number(row.seeders)||0));
+    }
+  }
+  return results;
+}
+
+export async function yts(media:Media):Promise<Release[]> {
+  const query=media.originalTitle||media.title;
+  if(media.section!=="movies"||!query||/[\u0400-\u04ff]/.test(query))return [];
+  const response=JSON.parse(await read(`https://yts.gg/api/v2/list_movies.json?query_term=${encodeURIComponent(query)}&limit=50`,2_000_000)) as {status?:string;data?:{movies?:{title?:string;title_english?:string;year?:number;url?:string;torrents?:{hash?:string;quality?:string;type?:string;size_bytes?:number;seeds?:number}[]}[]}};
+  if(response.status!=="ok")return [];
+  const result:Release[]=[];
+  for(const movie of response.data?.movies??[]) {
+    if(![movie.title,movie.title_english].some(value=>value&&normalize(value)===normalize(query))||media.year&&Math.abs((movie.year??0)-media.year)>1)continue;
+    const pageUrl=movie.url?.startsWith("https://yts.gg/movies/")?movie.url:null;
+    for(const torrent of movie.torrents??[]) {
+      if(!torrent.hash||! /^[a-f0-9]{40}$/i.test(torrent.hash))continue;
+      const hash=torrent.hash.toUpperCase(),title=`${movie.title_english||movie.title} (${movie.year}) ${torrent.quality||""} ${torrent.type||""}`.trim();
+      const magnet=`magnet:?xt=urn:btih:${hash}&dn=${encodeURIComponent(title)}&tr=${encodeURIComponent("udp://tracker.opentrackr.org:1337/announce")}`;
+      result.push(make(media,"YTS",hash,title,pageUrl,magnet,Number(torrent.size_bytes)||null,Number(torrent.seeds)||0));
+    }
+  }
+  return result;
 }
 
 export async function rutor(media:Media):Promise<Release[]> {
@@ -96,8 +157,14 @@ export async function archive(media:Media):Promise<Release[]> {
 }
 
 export async function collectReleases(media:Media) {
-  const sources=[rutor(media),archive(media),...(media.section==="series"?[eztv(media),nyaa(media)]:[])];
+  const sources=[rutor(media),pirateBay(media),knaben(media),archive(media),...(media.section==="series"?[eztv(media),nyaa(media)]:[yts(media)])];
   const groups=await Promise.allSettled(sources);const rows=groups.flatMap(group=>group.status==="fulfilled"?group.value:[]);
-  return [...new Map(rows.map(item=>[(hashFrom(item.torrentUrl??"")??item.pageUrl??item.id).toUpperCase(),item])).values()]
-    .sort((a,b)=>(b.seeds??-1)-(a.seeds??-1)).slice(0,200);
+  const unique=new Map<string,Release>();
+  for(const item of rows){const key=(hashFrom(item.torrentUrl??"")??item.pageUrl??item.id).toUpperCase();if(!unique.has(key))unique.set(key,item);}
+  const bySource=new Map<string,Release[]>();
+  for(const item of unique.values()){const list=bySource.get(item.source)??[];list.push(item);bySource.set(item.source,list);}
+  const buckets=[...bySource.values()].map(list=>list.sort((a,b)=>(b.seeds??-1)-(a.seeds??-1)).slice(0,80));
+  const balanced:Release[]=[];
+  for(let index=0;balanced.length<200&&buckets.some(list=>list.length>index);index++)for(const list of buckets)if(list[index]&&balanced.length<200)balanced.push(list[index]);
+  return balanced;
 }

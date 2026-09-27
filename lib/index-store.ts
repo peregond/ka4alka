@@ -46,9 +46,13 @@ export async function markSynced(key:string) {
 }
 
 export async function readReleases(mediaId:string):Promise<Release[]> {
-  const result=await getIndexDb().prepare("SELECT * FROM releases WHERE media_id=? AND indexed_at>? ORDER BY CASE WHEN seeds IS NULL THEN 1 ELSE 0 END,seeds DESC,indexed_at DESC LIMIT 200")
+  const result=await getIndexDb().prepare("SELECT * FROM releases WHERE media_id=? AND indexed_at>? ORDER BY CASE WHEN seeds IS NULL THEN 1 ELSE 0 END,seeds DESC,indexed_at DESC LIMIT 600")
     .bind(mediaId,Date.now()-7*24*3600*1000).all<ReleaseRow>();
-  return result.results.map(asRelease);
+  const buckets=new Map<string,Release[]>();
+  for(const row of result.results){const item=asRelease(row),list=buckets.get(item.source)??[];list.push(item);buckets.set(item.source,list);}
+  const balanced:Release[]=[];
+  for(let index=0;balanced.length<200&&[...buckets.values()].some(list=>list.length>index);index++)for(const list of buckets.values())if(list[index]&&balanced.length<200)balanced.push(list[index]);
+  return balanced;
 }
 export async function upsertReleases(items:Release[]) {
   if(items.length===0)return;
