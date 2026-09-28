@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import { ArrowUpRight, Clapperboard, Film, Search, Tv } from "lucide-react";
+import { ArrowUpRight, Clapperboard, Film, PanelLeft, Search, Tv } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Sidebar, SidebarContent, SidebarHeader, SidebarInset, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { Sidebar, SidebarContent, SidebarHeader, SidebarInset, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider } from "@/components/ui/sidebar";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ReleaseList } from "@/components/release-list";
 import { normalize, type Media, type Section } from "@/lib/catalog-source";
@@ -41,6 +41,7 @@ export default function Home() {
   const [catalogState,setCatalogState] = useState("Сохранённая подборка");
   const [releases,setReleases] = useState<Release[]|null>(null);
   const [releaseError,setReleaseError] = useState<string|null>(null);
+  const [mobileNavOpen,setMobileNavOpen] = useState(false);
   const items = useMemo(() => {
     const words=normalize(query).split(" ").filter(Boolean);
     return pool.filter(item=>item.section===section&&words.every(word=>normalize(`${item.title} ${item.originalTitle??""} ${item.year}`).split(" ").some(part=>part.startsWith(word))));
@@ -81,18 +82,19 @@ export default function Home() {
   },[selectedId]);
 
   const openMedia=(item:Media)=>{setReleases(null);setReleaseError(null);setSelected(item)};
-  const goHome=()=>{setSection("movies");setQuery("");setPage(1);setSelected(null);window.scrollTo({top:0,behavior:"smooth"})};
+  const goHome=()=>{setSection("movies");setQuery("");setPage(1);setSelected(null);setMobileNavOpen(false);window.scrollTo({top:0,behavior:"smooth"})};
+  const switchSection=(next:Section)=>{setSection(next);setPage(1);setSelected(null);setMobileNavOpen(false);window.scrollTo({top:0,behavior:"smooth"})};
 
   return <SidebarProvider style={{"--sidebar-width":"14.5rem"} as CSSProperties}>
     <Sidebar collapsible="offcanvas" className="index-sidebar">
       <SidebarHeader className="brand-header"><button type="button" className="brand-home" onClick={goHome} aria-label="На главную — Ка4алка Онл@йн"><span className="brand-mark"><Clapperboard size={22}/></span><span className="brand-copy"><strong>Ка4алка</strong><span>Онл@йн</span></span></button></SidebarHeader>
       <SidebarContent className="nav-content"><p className="nav-caption">КАТАЛОГ</p><SidebarMenu>
-        <SidebarMenuItem><SidebarMenuButton isActive={section==="movies"} onClick={()=>{setSection("movies");setPage(1);setSelected(null)}}><Film size={19}/><span>Фильмы</span></SidebarMenuButton></SidebarMenuItem>
-        <SidebarMenuItem><SidebarMenuButton isActive={section==="series"} onClick={()=>{setSection("series");setPage(1);setSelected(null)}}><Tv size={19}/><span>Сериалы</span></SidebarMenuButton></SidebarMenuItem>
+        <SidebarMenuItem><SidebarMenuButton isActive={section==="movies"} onClick={()=>switchSection("movies")}><Film size={19}/><span>Фильмы</span></SidebarMenuButton></SidebarMenuItem>
+        <SidebarMenuItem><SidebarMenuButton isActive={section==="series"} onClick={()=>switchSection("series")}><Tv size={19}/><span>Сериалы</span></SidebarMenuButton></SidebarMenuItem>
       </SidebarMenu></SidebarContent>
     </Sidebar>
     <SidebarInset className="index-main">
-      <header className="topbar"><SidebarTrigger className="mobile-menu" aria-label="Открыть разделы"/><div className="topbar-name">Каталог <span>/</span> {section==="movies"?"Фильмы":"Сериалы"}</div><div className="topbar-state">{catalogBusy?"Обновляем каталог…":catalogState}</div></header>
+      <header className="topbar"><button type="button" className="mobile-menu" aria-label="Открыть разделы" aria-expanded={mobileNavOpen} aria-controls="mobile-navigation" onClick={()=>setMobileNavOpen(true)}><PanelLeft size={21}/></button><div className="topbar-name">Каталог <span>/</span> {section==="movies"?"Фильмы":"Сериалы"}</div><div className="topbar-state">{catalogBusy?"Обновляем каталог…":catalogState}</div></header>
       <div className="workspace"><div className="workspace-head"><div><p className="eyebrow">КИНОТЕКА</p><h1>{section==="movies"?"Фильмы":"Сериалы"}</h1><p className="lead">Найди, что посмотреть сегодня</p></div><div className="result-count">{countLabel(items.length,section)}</div></div>
         <div className="search-wrap"><Search size={20} aria-hidden="true"/><Input value={query} onChange={event=>{setQuery(event.target.value);setPage(1)}} placeholder={section==="movies"?"Название фильма, год…":"Название сериала, год…"} aria-label="Поиск по каталогу"/></div>
         <div className="content-label"><span>{query?"Результаты поиска":"Недавно добавлены"}</span><span className="hairline"/></div>
@@ -100,6 +102,7 @@ export default function Home() {
         {!query&&hasMore&&<button className="more-button catalog-more" onClick={()=>setPage(value=>value+1)} disabled={catalogBusy}>Показать ещё</button>}
       </div>
     </SidebarInset>
+    <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}><SheetContent id="mobile-navigation" className="mobile-nav-sheet" side="left"><SheetHeader><SheetTitle>Ка4алка Онл@йн</SheetTitle><SheetDescription>Каталог фильмов и сериалов</SheetDescription></SheetHeader><nav className="mobile-nav-list" aria-label="Разделы каталога"><button type="button" aria-current={section==="movies"?"page":undefined} onClick={()=>switchSection("movies")}><Film size={20}/>Фильмы</button><button type="button" aria-current={section==="series"?"page":undefined} onClick={()=>switchSection("series")}><Tv size={20}/>Сериалы</button></nav></SheetContent></Sheet>
     <Sheet open={selected!==null} onOpenChange={open=>{if(!open)setSelected(null)}}><SheetContent className="detail-sheet" side="right">{selected&&<div className="detail-scroll"><SheetHeader className="detail-header"><p className="eyebrow">{selected.section==="movies"?"ФИЛЬМ":"СЕРИАЛ"} · {selected.year}</p><SheetTitle>{selected.title}</SheetTitle><SheetDescription>{selected.originalTitle&&selected.originalTitle!==selected.title?selected.originalTitle:"Подробности"}</SheetDescription></SheetHeader><div className="detail-top"><PosterImage key={selected.poster??selected.id} item={selected} className="detail-poster"/><div className="detail-facts"><div className="rating">Кинопоиск <strong>{selected.kinopoisk||"—"}</strong></div><div className="rating">IMDb <strong>{selected.imdb||"—"}</strong></div></div></div><p className="detail-description">{selected.description||"Описание скоро появится."}</p><a className="source-link" href={selected.pageUrl} target="_blank" rel="noreferrer">Страница в каталоге <ArrowUpRight size={17}/></a><ReleaseList key={selected.id} items={releases} error={releaseError}/></div>}</SheetContent></Sheet>
   </SidebarProvider>;
 }
