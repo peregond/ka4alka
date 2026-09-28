@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Качалка — онлайн-индекс фильмов и сериалов",
+  title: "Ка4алка Онл@йн — фильмы, сериалы и раздачи",
   description: "Поиск фильмов, сериалов и вариантов загрузки в одном каталоге.",
   icons: {
     icon: "/favicon.svg",

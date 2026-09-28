@@ -48,10 +48,10 @@ export default function Home() {
     return ()=>{controller.abort();clearTimeout(timer)};
   },[section,query,page]);
 
+  const selectedId=selected?.id;
   useEffect(()=>{
-    if(!selected)return;
-    const id=selected.id,controller=new AbortController();
-    setReleases(null);setReleaseError(null);
+    if(!selectedId)return;
+    const id=selectedId,controller=new AbortController();
     void (async()=>{
       try {const response=await fetch(`/api/media?id=${encodeURIComponent(id)}`,{signal:controller.signal});if(response.ok){const data=await response.json() as {item:Media};if(!controller.signal.aborted)setSelected(current=>current?.id===id?{...current,...data.item}:current);}} catch {}
     })();
@@ -60,22 +60,24 @@ export default function Home() {
       catch {if(!controller.signal.aborted){setReleases([]);setReleaseError("Не удалось обновить варианты. Попробуй открыть карточку позже.");}}
     })();
     return ()=>controller.abort();
-  },[selected?.id]);
+  },[selectedId]);
+
+  const openMedia=(item:Media)=>{setReleases(null);setReleaseError(null);setSelected(item)};
 
   return <SidebarProvider style={{"--sidebar-width":"14.5rem"} as CSSProperties}>
     <Sidebar collapsible="offcanvas" className="index-sidebar">
-      <SidebarHeader className="brand-header"><div className="brand-mark"><Clapperboard size={21}/></div><div><strong>Качалка</strong><span>Онлайн-индекс</span></div></SidebarHeader>
+      <SidebarHeader className="brand-header"><div className="brand-mark"><Clapperboard size={21}/></div><div><strong>Ка4алка</strong><span>Онл@йн</span></div></SidebarHeader>
       <SidebarContent className="nav-content"><p className="nav-caption">КАТАЛОГ</p><SidebarMenu>
         <SidebarMenuItem><SidebarMenuButton isActive={section==="movies"} onClick={()=>{setSection("movies");setPage(1);setSelected(null)}}><Film size={19}/><span>Фильмы</span></SidebarMenuButton></SidebarMenuItem>
         <SidebarMenuItem><SidebarMenuButton isActive={section==="series"} onClick={()=>{setSection("series");setPage(1);setSelected(null)}}><Tv size={19}/><span>Сериалы</span></SidebarMenuButton></SidebarMenuItem>
       </SidebarMenu><div className="nav-note">Новые названия и варианты загрузки собираются в одном месте.</div></SidebarContent>
     </Sidebar>
     <SidebarInset className="index-main">
-      <header className="topbar"><SidebarTrigger className="mobile-menu" aria-label="Открыть разделы"/><div className="topbar-name">Качалка <span>/</span> {section==="movies"?"Фильмы":"Сериалы"}</div><div className="topbar-state"><span className="state-dot"/> {catalogBusy?"Обновляем каталог…":catalogState}</div></header>
+      <header className="topbar"><SidebarTrigger className="mobile-menu" aria-label="Открыть разделы"/><div className="topbar-name">Ка4алка Онл@йн <span>/</span> {section==="movies"?"Фильмы":"Сериалы"}</div><div className="topbar-state"><span className="state-dot"/> {catalogBusy?"Обновляем каталог…":catalogState}</div></header>
       <div className="workspace"><div className="workspace-head"><div><p className="eyebrow">КИНОТЕКА</p><h1>{section==="movies"?"Фильмы":"Сериалы"}</h1><p className="lead">Выбирай по постеру. Подробности и варианты — в карточке.</p></div><div className="result-count">{items.length} {section==="movies"?"фильмов":"сериалов"}</div></div>
         <div className="search-wrap"><Search size={20} aria-hidden="true"/><Input value={query} onChange={event=>{setQuery(event.target.value);setPage(1)}} placeholder={section==="movies"?"Название фильма, год…":"Название сериала, год…"} aria-label="Поиск по каталогу"/></div>
         <div className="content-label"><span>{query?"Результаты поиска":"Недавно добавлены"}</span><span className="hairline"/></div>
-        {items.length?<div className="poster-grid">{items.map(item=><button type="button" className="poster-card" key={item.id} onClick={()=>setSelected(item)} aria-label={`Открыть ${item.title}`}><span className="poster-frame">{item.poster?<img src={item.poster} alt="" loading="lazy" onError={event=>{event.currentTarget.style.display="none"}}/>:null}<span className="poster-fallback">Постер недоступен</span></span><span className="poster-title">{item.title}</span><span className="poster-meta">{item.year||"Год неизвестен"}{item.kinopoisk&&item.kinopoisk!=="—"?` · КП ${item.kinopoisk}`:""}</span></button>)}</div>:<div className="empty-state"><Search size={28}/><h2>Ничего не нашлось</h2><p>Попробуй другое название или убери год из запроса.</p></div>}
+        {items.length?<div className="poster-grid">{items.map(item=><button type="button" className="poster-card" key={item.id} onClick={()=>openMedia(item)} aria-label={`Открыть ${item.title}`}><span className="poster-frame">{item.poster?<img src={item.poster} alt="" loading="lazy" onError={event=>{event.currentTarget.style.display="none"}}/>:null}<span className="poster-fallback">Постер недоступен</span></span><span className="poster-title">{item.title}</span><span className="poster-meta">{item.year||"Год неизвестен"}{item.kinopoisk&&item.kinopoisk!=="—"?` · КП ${item.kinopoisk}`:""}</span></button>)}</div>:<div className="empty-state"><Search size={28}/><h2>Ничего не нашлось</h2><p>Попробуй другое название или убери год из запроса.</p></div>}
         {!query&&hasMore&&<button className="more-button catalog-more" onClick={()=>setPage(value=>value+1)} disabled={catalogBusy}>Показать ещё</button>}
       </div>
     </SidebarInset>

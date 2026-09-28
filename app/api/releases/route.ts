@@ -11,7 +11,7 @@ export async function GET(request:Request) {
     let item=await getMedia(id);
     if(!item){const found=(seed as Media[]).find(x=>x.id===id);if(found){await upsertMedia([found],null);item=found;}}
     if(!item)return Response.json({error:"Карточка не найдена."},{status:404});
-    const key=`releases:v3:${id}`;
+    const key=`releases:v4:${id}`;
     let updated=false;
     if(Date.now()-await lastSynced(key)>4*3600_000) {
       if(!item.originalTitle) {

@@ -8,6 +8,20 @@ async function read(url:string,max=4_000_000) {
   if(Number(response.headers.get("content-length")??0)>max)throw new Error("Ответ слишком большой");
   const body=await response.text();if(body.length>max)throw new Error("Ответ слишком большой");return body;
 }
+async function readWindows1251(url:string,max=2_000_000) {
+  const response=await fetch(url,{headers:{"Accept":"text/html","User-Agent":"KachalkaIndex/0.3"},signal:AbortSignal.timeout(8500),cache:"no-store"});
+  if(!response.ok||Number(response.headers.get("content-length")??0)>max)throw new Error("Источник недоступен");
+  const bytes=await response.arrayBuffer();if(bytes.byteLength>max)throw new Error("Ответ слишком большой");
+  return new TextDecoder("windows-1251").decode(bytes);
+}
+function encodeWindows1251(value:string) {
+  const extra:Record<string,number>={"Ё":0xA8,"ё":0xB8,"І":0xB2,"і":0xB3,"Ї":0xAF,"ї":0xBF,"Є":0xAA,"є":0xBA,"Ґ":0xA5,"ґ":0xB4};
+  return [...value].map(char=>{
+    const code=char.codePointAt(0)??0;
+    const byte=code>=0x410&&code<=0x44F?code-0x350:extra[char];
+    return byte===undefined?encodeURIComponent(char):`%${byte.toString(16).toUpperCase().padStart(2,"0")}`;
+  }).join("");
+}
 const hashFrom=(url:string)=>/urn:btih:([a-f0-9]{40})/i.exec(url)?.[1]?.toUpperCase()??null;
 const quality=(title:string)=>/2160|\b4k\b|\buhd\b/i.test(title)?"2160p":/1080|full.?hd/i.test(title)?"1080p":/720|hdtv/i.test(title)?"720p":null;
 const episode=(title:string)=>{const m=/\bS(\d{1,2})[. _-]*E(\d{1,3})\b/i.exec(title);if(m)return {season:Number(m[1]),episode:Number(m[2])};const s=/\b(?:season|сезон|сезона)\s*(\d{1,2})\b/i.exec(title);return {season:s?Number(s[1]):null,episode:null};};
@@ -25,7 +39,7 @@ export function matches(media:Media,title:string,source:string) {
     return /^(?:s\d{1,2}(?:e\d{1,3})?|e\d{1,3}|season|сезон|серия|episode|complete|полный|все|web|hdtv|bdrip|bluray|remux|720p|1080p|2160p|4k|\d{4})\b/.test(tail);
   }));
   if(!hit)return false;
-  return media.section==="series"||!["RuTor","The Pirate Bay","Knaben"].includes(source)||media.year===0||new RegExp(`(^|\\D)${media.year}(\\D|$)`).test(title);
+  return media.section==="series"||!["RuTor","NNM-Club","MegaPeer","The Pirate Bay","Knaben"].includes(source)||media.year===0||new RegExp(`(^|\\D)${media.year}(\\D|$)`).test(title);
 }
 
 export async function knaben(media:Media):Promise<Release[]> {
@@ -112,6 +126,52 @@ export async function rutor(media:Media):Promise<Release[]> {
   return results;
 }
 
+export async function nnmClub(media:Media):Promise<Release[]> {
+  const queries=[media.title,media.originalTitle].filter((value,index,all):value is string=>Boolean(value)&&all.indexOf(value)===index).slice(0,2);
+  const groups=await Promise.allSettled(queries.map(query=>readWindows1251(`https://nnmclub.to/forum/tracker.php?nm=${encodeURIComponent(query)}`)));
+  const results:Release[]=[];const seen=new Set<string>();
+  for(const group of groups) {
+    if(group.status!=="fulfilled")continue;
+    for(const match of group.value.matchAll(/<tr\b[^>]*class=["'][^"']*\bprow[12]\b[^"']*["'][^>]*>([\s\S]*?)<\/tr>/gi)) {
+      const row=match[1];
+      const topic=/<a\b(?=[^>]*\bclass=["'][^"']*\btopictitle\b)[^>]*\bhref=["']viewtopic\.php\?t=(\d+)[^"']*["'][^>]*>([\s\S]*?)<\/a>/i.exec(row);
+      const download=/href=["']download\.php\?id=(\d+)[^"']*["']/i.exec(row);
+      if(!topic||!download||seen.has(download[1]))continue;
+      const title=text(topic[2]);if(!matches(media,title,"NNM-Club"))continue;
+      const size=Number(/<u>(\d{1,15})<\/u>/i.exec(row)?.[1]??0)||null;
+      const seeds=Number(/<td\b[^>]*title=["']Seeders["'][^>]*>\s*(?:<b>)?\s*(\d+)/i.exec(row)?.[1]??0);
+      seen.add(download[1]);
+      results.push(make(media,"NNM-Club",download[1],title,`https://nnmclub.to/forum/viewtopic.php?t=${topic[1]}`,`https://nnmclub.to/forum/download.php?id=${download[1]}`,size,seeds));
+      if(results.length>=80)return results;
+    }
+  }
+  return results;
+}
+
+export async function megaPeer(media:Media):Promise<Release[]> {
+  const queries=[media.title,media.originalTitle].filter((value,index,all):value is string=>Boolean(value)&&all.indexOf(value)===index).slice(0,2);
+  const groups=await Promise.allSettled(queries.map(query=>readWindows1251(`https://megapeer.vip/browse.php?search=${encodeWindows1251(query)}&stype=0`)));
+  const results:Release[]=[];const seen=new Set<string>();
+  for(const group of groups) {
+    if(group.status!=="fulfilled")continue;
+    for(const match of group.value.matchAll(/<tr\b[^>]*class=["'][^"']*\btable_fon\b[^"']*["'][^>]*>([\s\S]*?)<\/tr>/gi)) {
+      const row=match[1];
+      const page=/<a\b[^>]*href=["'](\/torrent\/(\d+)\/[^"']+)["'][^>]*>([\s\S]*?)<\/a>/i.exec(row);
+      const download=/href=["']\/download\/(\d+)["']/i.exec(row);
+      if(!page||!download||page[2]!==download[1]||seen.has(download[1]))continue;
+      const title=text(page[3]);if(!matches(media,title,"MegaPeer"))continue;
+      const sizeMatch=/<td\b[^>]*align=["']right["'][^>]*>\s*(\d+(?:[.,]\d+)?)\s*(TB|GB|MB|KB|ТБ|ГБ|МБ|КБ)\s*<\/td>/i.exec(row);
+      const units:Record<string,number>={TB:1024**4,GB:1024**3,MB:1024**2,KB:1024,ТБ:1024**4,ГБ:1024**3,МБ:1024**2,КБ:1024};
+      const size=sizeMatch?Math.round(Number(sizeMatch[1].replace(",","."))*units[sizeMatch[2].toUpperCase()]):null;
+      const seeds=Number(/alt=["']S["'][\s\S]*?<font\b[^>]*>\s*(\d+)\s*<\/font>/i.exec(row)?.[1]??0);
+      seen.add(download[1]);
+      results.push(make(media,"MegaPeer",download[1],title,`https://megapeer.vip${decodeHtml(page[1])}`,`https://megapeer.vip/download/${download[1]}`,size,seeds));
+      if(results.length>=80)return results;
+    }
+  }
+  return results;
+}
+
 export async function eztv(media:Media):Promise<Release[]> {
   const original=media.originalTitle;if(!original||/[\u0400-\u04ff]/i.test(original))return [];
   const search=JSON.parse(await read(`https://api.tvmaze.com/search/shows?q=${encodeURIComponent(original)}`,1_000_000)) as {show:{name:string;premiered?:string;externals?:{imdb?:string}}}[];
@@ -157,7 +217,7 @@ export async function archive(media:Media):Promise<Release[]> {
 }
 
 export async function collectReleases(media:Media) {
-  const sources=[rutor(media),pirateBay(media),knaben(media),archive(media),...(media.section==="series"?[eztv(media),nyaa(media)]:[yts(media)])];
+  const sources=[rutor(media),nnmClub(media),megaPeer(media),pirateBay(media),knaben(media),archive(media),...(media.section==="series"?[eztv(media),nyaa(media)]:[yts(media)])];
   const groups=await Promise.allSettled(sources);const rows=groups.flatMap(group=>group.status==="fulfilled"?group.value:[]);
   const unique=new Map<string,Release>();
   for(const item of rows){const key=(hashFrom(item.torrentUrl??"")??item.pageUrl??item.id).toUpperCase();if(!unique.has(key))unique.set(key,item);}
