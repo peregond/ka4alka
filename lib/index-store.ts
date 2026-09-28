@@ -1,11 +1,11 @@
 import { getIndexDb } from "@/db";
 import { normalize, type Media, type Section } from "./catalog-source";
 
-export type Release = { id:string; mediaId:string; title:string; source:string; pageUrl:string|null; torrentUrl:string|null; size:number|null; seeds:number|null; quality:string|null; season:number|null; episode:number|null; indexedAt?:number };
+export type Release = { id:string; mediaId:string; title:string; source:string; via?:string|null; pageUrl:string|null; torrentUrl:string|null; size:number|null; seeds:number|null; quality:string|null; season:number|null; episode:number|null; indexedAt?:number };
 type MediaRow = {id:string;section:Section;title:string;title_search:string;original_title:string|null;original_search:string;year:number;poster:string|null;page_url:string;description:string|null;kinopoisk:string|null;imdb:string|null;catalog_rank:number|null;indexed_at:number};
 type ReleaseRow = {id:string;media_id:string;title:string;source:string;page_url:string|null;torrent_url:string|null;size:number|null;seeds:number|null;quality:string|null;season:number|null;episode:number|null;indexed_at:number};
 const asMedia=(row:MediaRow):Media=>({id:row.id,section:row.section,title:row.title,originalTitle:row.original_title,year:row.year,poster:row.poster,pageUrl:row.page_url,description:row.description,kinopoisk:row.kinopoisk,imdb:row.imdb});
-const asRelease=(row:ReleaseRow):Release=>({id:row.id,mediaId:row.media_id,title:row.title,source:row.source,pageUrl:row.page_url,torrentUrl:row.torrent_url,size:row.size,seeds:row.seeds,quality:row.quality,season:row.season,episode:row.episode,indexedAt:row.indexed_at});
+const asRelease=(row:ReleaseRow):Release=>{const via=row.source.endsWith(" · Knaben")?"Knaben":null;const label=via?row.source.slice(0,-" · Knaben".length):row.source;return {id:row.id,mediaId:row.media_id,title:row.title,source:/^RuTracker(?:\.org)?$/i.test(label)?"RuTracker":label,via,pageUrl:row.page_url,torrentUrl:row.torrent_url,size:row.size,seeds:row.seeds,quality:row.quality,season:row.season,episode:row.episode,indexedAt:row.indexed_at};};
 
 export async function readMedia(section:Section,query:string,page=1):Promise<Media[]> {
   const db=getIndexDb();const term=normalize(query);
@@ -48,8 +48,10 @@ export async function markSynced(key:string) {
 export async function readReleases(mediaId:string):Promise<Release[]> {
   const result=await getIndexDb().prepare("SELECT * FROM releases WHERE media_id=? AND indexed_at>? ORDER BY CASE WHEN seeds IS NULL THEN 1 ELSE 0 END,seeds DESC,indexed_at DESC LIMIT 600")
     .bind(mediaId,Date.now()-7*24*3600*1000).all<ReleaseRow>();
+  const unique=new Map<string,Release>();
+  for(const row of result.results){const item=asRelease(row),hash=/urn:btih:([a-f0-9]{40})/i.exec(item.torrentUrl??"")?.[1]?.toUpperCase(),key=hash??item.id;const prior=unique.get(key);if(!prior||prior.via&&!item.via)unique.set(key,item);}
   const buckets=new Map<string,Release[]>();
-  for(const row of result.results){const item=asRelease(row),list=buckets.get(item.source)??[];list.push(item);buckets.set(item.source,list);}
+  for(const item of unique.values()){const list=buckets.get(item.source)??[];list.push(item);buckets.set(item.source,list);}
   const balanced:Release[]=[];
   for(let index=0;balanced.length<200&&[...buckets.values()].some(list=>list.length>index);index++)for(const list of buckets.values())if(list[index]&&balanced.length<200)balanced.push(list[index]);
   return balanced;
