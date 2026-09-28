@@ -11,11 +11,22 @@ import type { Release } from "@/lib/index-store";
 import seed from "./data/seed.json";
 
 const initial = seed as Media[];
+const savedPosters = new Map(initial.filter(item=>item.poster?.startsWith("/posters/")).map(item=>[item.id,item.poster!]));
+const posterSrc = (item:Media) => savedPosters.get(item.id) ?? (item.poster?.startsWith("https://")?`/api/poster?src=${encodeURIComponent(item.poster)}`:null);
+const countLabel = (count:number, section:Section) => {
+  const forms = section === "movies" ? ["фильм", "фильма", "фильмов"] : ["сериал", "сериала", "сериалов"];
+  const form = count % 100 >= 11 && count % 100 <= 14 ? 2 : count % 10 === 1 ? 0 : count % 10 >= 2 && count % 10 <= 4 ? 1 : 2;
+  return `${count} ${forms[form]}`;
+};
 
-function PosterImage({src,className,lazy=false}:{src:string|null|undefined;className:string;lazy?:boolean}) {
-  const [failed,setFailed]=useState(false);
+function PosterImage({item,className,lazy=false,rating=false}:{item:Media;className:string;lazy?:boolean;rating?:boolean}) {
+  const [attempt,setAttempt]=useState(0);
+  const primary=posterSrc(item);
+  const secondary=item.poster?.startsWith("https://")?item.poster:null;
+  const src=attempt===0?primary:attempt===1&&secondary!==primary?secondary:null;
   return <span className={className}>
-    {src&&!failed?<img src={src} alt="" loading={lazy?"lazy":"eager"} referrerPolicy="no-referrer" onError={()=>setFailed(true)}/>:<span className="poster-fallback">Постер недоступен</span>}
+    {src?<img src={src} alt="" loading={lazy?"lazy":"eager"} referrerPolicy="no-referrer" onError={()=>setAttempt(value=>value+1)}/>:<span className="poster-fallback" aria-hidden="true"><Clapperboard size={24}/><span>Постер недоступен</span></span>}
+    {rating&&item.kinopoisk&&item.kinopoisk!=="—"?<span className="poster-rating">★ {item.kinopoisk}</span>:null}
   </span>;
 }
 
@@ -70,24 +81,25 @@ export default function Home() {
   },[selectedId]);
 
   const openMedia=(item:Media)=>{setReleases(null);setReleaseError(null);setSelected(item)};
+  const goHome=()=>{setSection("movies");setQuery("");setPage(1);setSelected(null);window.scrollTo({top:0,behavior:"smooth"})};
 
   return <SidebarProvider style={{"--sidebar-width":"14.5rem"} as CSSProperties}>
     <Sidebar collapsible="offcanvas" className="index-sidebar">
-      <SidebarHeader className="brand-header"><div className="brand-mark"><Clapperboard size={21}/></div><div><strong>Ка4алка</strong><span>Онл@йн</span></div></SidebarHeader>
+      <SidebarHeader className="brand-header"><button type="button" className="brand-home" onClick={goHome} aria-label="На главную — Ка4алка Онл@йн"><span className="brand-mark"><Clapperboard size={22}/></span><span className="brand-copy"><strong>Ка4алка</strong><span>Онл@йн</span></span></button></SidebarHeader>
       <SidebarContent className="nav-content"><p className="nav-caption">КАТАЛОГ</p><SidebarMenu>
         <SidebarMenuItem><SidebarMenuButton isActive={section==="movies"} onClick={()=>{setSection("movies");setPage(1);setSelected(null)}}><Film size={19}/><span>Фильмы</span></SidebarMenuButton></SidebarMenuItem>
         <SidebarMenuItem><SidebarMenuButton isActive={section==="series"} onClick={()=>{setSection("series");setPage(1);setSelected(null)}}><Tv size={19}/><span>Сериалы</span></SidebarMenuButton></SidebarMenuItem>
-      </SidebarMenu><div className="nav-note">Новые названия и варианты загрузки собираются в одном месте.</div></SidebarContent>
+      </SidebarMenu></SidebarContent>
     </Sidebar>
     <SidebarInset className="index-main">
-      <header className="topbar"><SidebarTrigger className="mobile-menu" aria-label="Открыть разделы"/><div className="topbar-name">Ка4алка Онл@йн <span>/</span> {section==="movies"?"Фильмы":"Сериалы"}</div><div className="topbar-state"><span className="state-dot"/> {catalogBusy?"Обновляем каталог…":catalogState}</div></header>
-      <div className="workspace"><div className="workspace-head"><div><p className="eyebrow">КИНОТЕКА</p><h1>{section==="movies"?"Фильмы":"Сериалы"}</h1><p className="lead">Выбирай по постеру. Подробности и варианты — в карточке.</p></div><div className="result-count">{items.length} {section==="movies"?"фильмов":"сериалов"}</div></div>
+      <header className="topbar"><SidebarTrigger className="mobile-menu" aria-label="Открыть разделы"/><div className="topbar-name">Каталог <span>/</span> {section==="movies"?"Фильмы":"Сериалы"}</div><div className="topbar-state">{catalogBusy?"Обновляем каталог…":catalogState}</div></header>
+      <div className="workspace"><div className="workspace-head"><div><p className="eyebrow">КИНОТЕКА</p><h1>{section==="movies"?"Фильмы":"Сериалы"}</h1><p className="lead">Найди, что посмотреть сегодня</p></div><div className="result-count">{countLabel(items.length,section)}</div></div>
         <div className="search-wrap"><Search size={20} aria-hidden="true"/><Input value={query} onChange={event=>{setQuery(event.target.value);setPage(1)}} placeholder={section==="movies"?"Название фильма, год…":"Название сериала, год…"} aria-label="Поиск по каталогу"/></div>
         <div className="content-label"><span>{query?"Результаты поиска":"Недавно добавлены"}</span><span className="hairline"/></div>
-        {items.length?<div className="poster-grid">{items.map(item=><button type="button" className="poster-card" key={item.id} onClick={()=>openMedia(item)} aria-label={`Открыть ${item.title}`}><PosterImage key={item.poster??item.id} src={item.poster} className="poster-frame" lazy/><span className="poster-title">{item.title}</span><span className="poster-meta">{item.year||"Год неизвестен"}{item.kinopoisk&&item.kinopoisk!=="—"?` · КП ${item.kinopoisk}`:""}</span></button>)}</div>:<div className="empty-state"><Search size={28}/><h2>Ничего не нашлось</h2><p>Попробуй другое название или убери год из запроса.</p></div>}
+        {items.length?<div className="poster-grid">{items.map(item=><button type="button" className="poster-card" key={item.id} onClick={()=>openMedia(item)} aria-label={`Открыть ${item.title}`}><PosterImage key={item.poster??item.id} item={item} className="poster-frame" lazy rating/><span className="poster-title">{item.title}</span><span className="poster-meta">{item.year||"Год неизвестен"}</span></button>)}</div>:<div className="empty-state"><Search size={28}/><h2>Ничего не нашлось</h2><p>Попробуй другое название или убери год из запроса.</p></div>}
         {!query&&hasMore&&<button className="more-button catalog-more" onClick={()=>setPage(value=>value+1)} disabled={catalogBusy}>Показать ещё</button>}
       </div>
     </SidebarInset>
-    <Sheet open={selected!==null} onOpenChange={open=>{if(!open)setSelected(null)}}><SheetContent className="detail-sheet" side="right">{selected&&<div className="detail-scroll"><SheetHeader className="detail-header"><p className="eyebrow">{selected.section==="movies"?"ФИЛЬМ":"СЕРИАЛ"} · {selected.year}</p><SheetTitle>{selected.title}</SheetTitle><SheetDescription>{selected.originalTitle&&selected.originalTitle!==selected.title?selected.originalTitle:"Подробности"}</SheetDescription></SheetHeader><div className="detail-top"><PosterImage key={selected.poster??selected.id} src={selected.poster} className="detail-poster"/><div className="detail-facts"><div className="rating">Кинопоиск <strong>{selected.kinopoisk||"—"}</strong></div><div className="rating">IMDb <strong>{selected.imdb||"—"}</strong></div></div></div><p className="detail-description">{selected.description||"Описание скоро появится."}</p><a className="source-link" href={selected.pageUrl} target="_blank" rel="noreferrer">Страница в каталоге <ArrowUpRight size={17}/></a><ReleaseList key={selected.id} items={releases} error={releaseError}/></div>}</SheetContent></Sheet>
+    <Sheet open={selected!==null} onOpenChange={open=>{if(!open)setSelected(null)}}><SheetContent className="detail-sheet" side="right">{selected&&<div className="detail-scroll"><SheetHeader className="detail-header"><p className="eyebrow">{selected.section==="movies"?"ФИЛЬМ":"СЕРИАЛ"} · {selected.year}</p><SheetTitle>{selected.title}</SheetTitle><SheetDescription>{selected.originalTitle&&selected.originalTitle!==selected.title?selected.originalTitle:"Подробности"}</SheetDescription></SheetHeader><div className="detail-top"><PosterImage key={selected.poster??selected.id} item={selected} className="detail-poster"/><div className="detail-facts"><div className="rating">Кинопоиск <strong>{selected.kinopoisk||"—"}</strong></div><div className="rating">IMDb <strong>{selected.imdb||"—"}</strong></div></div></div><p className="detail-description">{selected.description||"Описание скоро появится."}</p><a className="source-link" href={selected.pageUrl} target="_blank" rel="noreferrer">Страница в каталоге <ArrowUpRight size={17}/></a><ReleaseList key={selected.id} items={releases} error={releaseError}/></div>}</SheetContent></Sheet>
   </SidebarProvider>;
 }
