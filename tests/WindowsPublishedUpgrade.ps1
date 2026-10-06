@@ -10,9 +10,12 @@ $folder=Join-Path $env:KACHALKA_DATA 'downloads';New-Item -ItemType Directory -F
 @{Folder=$folder;FolderConfigured=$true;AutoResumeDownloads=$false;CheckForUpdates=$false;AutoUpdate=$false} | ConvertTo-Json | Set-Content (Join-Path $env:KACHALKA_DATA 'settings.json') -Encoding utf8NoBOM
 $setup=Join-Path $state 'previous-setup.exe'
 Invoke-WebRequest ('https://github.com/peregond/ka4alka/releases/download/v'+$FromVersion+'/Kachalka-Setup-'+$FromVersion+'.exe') -OutFile $setup -TimeoutSec 120
-$sums=(Invoke-WebRequest ('https://github.com/peregond/ka4alka/releases/download/v'+$FromVersion+'/SHA256SUMS.txt') -TimeoutSec 30).Content
+$sumsPath=Join-Path $state 'previous-checksums.txt'
+Invoke-WebRequest ('https://github.com/peregond/ka4alka/releases/download/v'+$FromVersion+'/SHA256SUMS.txt') -OutFile $sumsPath -TimeoutSec 30
+$sums=[System.IO.File]::ReadAllText($sumsPath)
 $expected=([regex]::Match($sums,'(?m)^([a-f0-9]{64})\s+Kachalka-Setup-'+[regex]::Escape($FromVersion)+'\.exe\s*$')).Groups[1].Value
-if($expected.Length -ne 64 -or (Get-FileHash $setup -Algorithm SHA256).Hash.ToLowerInvariant() -ne $expected){throw 'Published previous installer checksum mismatch'}
+$actual=(Get-FileHash $setup -Algorithm SHA256).Hash.ToLowerInvariant()
+if($expected.Length -ne 64 -or $actual -ne $expected){throw ('Published previous installer checksum mismatch; expected='+$expected+' actual='+$actual)}
 $installer=Start-Process $setup -ArgumentList '/S' -PassThru
 if(-not $installer.WaitForExit(60000) -or $installer.ExitCode -ne 0){throw 'Previous published installer failed'}
 $install=Join-Path $env:LOCALAPPDATA 'Programs/Kachalka'
