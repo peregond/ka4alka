@@ -24,7 +24,8 @@ try{
  $uninstall=Join-Path $root '.tools/uninstall-files.nsh'
  ./installer/write-uninstall.ps1 -ApplicationDirectory 'dist/Kachalka-0.19' -OutputPath $uninstall
  $setup=Join-Path $evidence 'Kachalka-Setup-0.19.0.exe'
- & 'C:/Program Files (x86)/NSIS/makensis.exe' '/V2' '/DVERSION=0.19.0' ('/DAPP_DIR='+$root+'/dist/Kachalka-0.19') ('/DUNINSTALL_SCRIPT='+$uninstall) ('/DOUTPUT='+$setup) installer/Kachalka.nsi
+ $appDirectory=[System.IO.Path]::GetFullPath((Join-Path $root 'dist/Kachalka-0.19'))
+ & 'C:/Program Files (x86)/NSIS/makensis.exe' '/V2' '/DVERSION=0.19.0' ('/DAPP_DIR='+$appDirectory) ('/DAPP_GLOB='+$appDirectory+'\*') ('/DUNINSTALL_SCRIPT='+$uninstall) ('/DOUTPUT='+$setup) installer/Kachalka.nsi
  if($LASTEXITCODE -ne 0){throw 'Installer failed'}
  $installer=Start-Process -FilePath $setup -ArgumentList '/S' -PassThru
  if(-not $installer.WaitForExit(60000) -or $installer.ExitCode -ne 0){throw 'Silent installation failed'}

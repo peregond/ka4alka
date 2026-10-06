@@ -22,7 +22,8 @@ if($LASTEXITCODE -ne 0){throw 'Release verification failed'}
 $release=Join-Path $PSScriptRoot ('dist/release-'+$Version)
 $uninstallScript=Join-Path $PSScriptRoot '.tools/uninstall-files.nsh'
 ./installer/write-uninstall.ps1 -ApplicationDirectory $output -OutputPath $uninstallScript
-& $MakeNsis ('/DVERSION='+$Version) ('/DAPP_DIR='+(Join-Path $PSScriptRoot $output)) ('/DUNINSTALL_SCRIPT='+$uninstallScript) ('/DOUTPUT='+(Join-Path $release ('Kachalka-Setup-'+$Version+'.exe'))) (Join-Path $PSScriptRoot 'installer/Kachalka.nsi')
+$appDirectory=[System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot $output))
+& $MakeNsis ('/DVERSION='+$Version) ('/DAPP_DIR='+$appDirectory) ('/DAPP_GLOB='+$appDirectory+'\*') ('/DUNINSTALL_SCRIPT='+$uninstallScript) ('/DOUTPUT='+(Join-Path $release ('Kachalka-Setup-'+$Version+'.exe'))) (Join-Path $PSScriptRoot 'installer/Kachalka.nsi')
 if($LASTEXITCODE -ne 0){throw 'Installer compilation failed'}
 $setup=Join-Path $release ('Kachalka-Setup-'+$Version+'.exe')
 ((Get-FileHash -LiteralPath $setup -Algorithm SHA256).Hash.ToLowerInvariant()+'  '+[System.IO.Path]::GetFileName($setup)) | Add-Content -LiteralPath (Join-Path $release 'SHA256SUMS.txt') -Encoding ascii
