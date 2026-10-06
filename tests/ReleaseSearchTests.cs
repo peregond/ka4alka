@@ -6,6 +6,16 @@ static class ReleaseSearchTests
     public static async Task Run()
     {
         void Check(bool value,string name){if(!value)throw new Exception(name);Console.WriteLine("PASS: "+name);}
+        var scheduler=new MetadataScheduler();
+        var hold=new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var background=new[]{scheduler.Run(false,()=>hold.Task),scheduler.Run(false,()=>hold.Task)};
+        var queued=scheduler.Run(false,()=>Task.FromResult("another rating"));
+        try
+        {
+            var originalTitle=await scheduler.Run(true,()=>Task.FromResult("Interstellar")).WaitAsync(TimeSpan.FromSeconds(2));
+            Check(originalTitle=="Interstellar"&&!queued.IsCompleted,"opened film metadata bypasses a full catalog ratings queue");
+        }
+        finally{hold.TrySetResult("rating");await Task.WhenAll(background);await queued;}
         var hash=new string('a',40);
         var row=new SourceEntry("fast","Moonrise (2026) WEB-DL 1080p","Fast","","magnet:?xt=urn:btih:"+hash,null,1024,5);
         var slow=new TaskCompletionSource<IReadOnlyList<SourceEntry>>(TaskCreationOptions.RunContinuationsAsynchronously);

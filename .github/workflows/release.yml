@@ -5,9 +5,9 @@ on:
       version:
         description: Version matching native/Kachalka.csproj
         required: true
-        default: '0.21.0'
+        default: '0.21.1'
   push:
-    branches: [codex/catalog-expand-0.21]
+    branches: [codex/catalog-fixes-0.21.1]
     paths: [.github/workflows/release.yml, 'native/**', 'tests/**', 'installer/**', build-release.ps1, package-release.ps1]
 permissions:
   contents: write
@@ -19,7 +19,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 25
     env:
-      RELEASE_VERSION: ${{ inputs.version || '0.21.0' }}
+      RELEASE_VERSION: ${{ inputs.version || '0.21.1' }}
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
     steps:
       - uses: actions/checkout@v4
@@ -48,7 +48,7 @@ jobs:
             [System.IO.File]::WriteAllText($key,$env:RELEASE_SIGNING_KEY)
             ./build-release.ps1 -Version $env:RELEASE_VERSION -SigningKeyPath $key -MakeNsis 'C:/Program Files (x86)/NSIS/makensis.exe'
           } finally { Remove-Item $key -ErrorAction SilentlyContinue }
-      - name: Verify upgrade from previously published 0.20.0
+      - name: Verify upgrade from previously published 0.21.0
         shell: pwsh
         run: ./tests/WindowsPublishedUpgrade.ps1 -ReleaseDirectory ('dist/release-'+$env:RELEASE_VERSION)
       - name: Upload verified files to draft GitHub Release
@@ -58,7 +58,8 @@ jobs:
         run: |
           $version=$env:RELEASE_VERSION
           $tag='v'+$version
-          $notes='distribution/RELEASE-NOTES-'+([Version]$version).ToString(2)+'.md'
+          $notes='distribution/RELEASE-NOTES-'+$version+'.md'
+          if(-not (Test-Path $notes)){$notes='distribution/RELEASE-NOTES-'+([Version]$version).ToString(2)+'.md'}
           $existing=gh release view $tag --json isDraft --jq '.isDraft' 2>$null
           if($LASTEXITCODE -ne 0){
             gh release create $tag --draft --target $env:GITHUB_SHA --title ('Качалка '+$version) --notes-file $notes

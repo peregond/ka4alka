@@ -55,6 +55,8 @@ public static class SourceTests
         var parsed=SourceClient.ParseTorznab(Encoding.UTF8.GetBytes(sample),"Test");Check(parsed.Count==1&&parsed[0].Seeds==7&&parsed[0].Size==42,"Torznab result parsing");
         var movie=new MediaItem(-1,"Мангуст","Фильмы","",2026,"—","—","#526B69");
         SourceEntry Result(string title)=>new(title,title,"RuTor","https://rutor.info/torrent/1","magnet:?xt=urn:btih:0123456789012345678901234567890123456789",null);
+        Check(Result("Film 720p").Quality=="HD Ready"&&Result("Film 1080p").Quality=="Full HD"&&Result("Film 2160p").Quality=="4K"&&Result("Film Full HD").Quality=="Full HD","release quality uses HD Ready, Full HD and 4K labels");
+        Check(Result("Film HDTV").Quality=="Не указано","HDTV alone does not invent a resolution");
         Check(LiveCatalog.Matches(movie,Result("Мангуст / Mongoose (2026) WEB-DL 1080p"))&&!LiveCatalog.Matches(movie,Result("Владимир Малыгин - Прыжок Мангуста (2026) MP3"))&&!LiveCatalog.Matches(movie,Result("Мангуст [01-12] (2003) DVDRip"))&&!LiveCatalog.Matches(movie,Result("Мангуст 2 (2026)")),"movie releases match title and year");
         const string knabenHash="0123456789abcdef0123456789abcdef01234567";
         var knabenHits=new{

@@ -1,7 +1,7 @@
 name: Windows release validation
 on:
   push:
-    branches: [codex/catalog-expand-0.21]
+    branches: [codex/catalog-fixes-0.21.1]
   pull_request:
   workflow_dispatch:
 permissions:
