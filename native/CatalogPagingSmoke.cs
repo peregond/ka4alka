@@ -26,14 +26,19 @@ public partial class MainWindow
         Button Page(int page)=>FindVisual<Button>(Body,b=>AutomationProperties.GetName(b)=="Страница "+page)??throw new Exception("Missing page "+page);
         void Choose(string name,string key)
         {
-            var combo=FindVisual<ComboBox>(FiltersPanel,x=>AutomationProperties.GetName(x)==name)??FindVisual<ComboBox>(PageHeader,x=>AutomationProperties.GetName(x)==name)??throw new Exception("Missing filter "+name);
-            combo.SelectedItem=((IEnumerable<CatalogChoice>)combo.ItemsSource).Single(x=>x.Key==key);
+            var button=FindVisual<Button>(PageHeader,x=>AutomationProperties.GetName(x)==name)??throw new Exception("Missing filter "+name);
+            var option=button.ContextMenu!.Items.OfType<MenuItem>().Single(x=>x.Tag?.ToString()==key);
+            option.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
         }
         // Exercise desktop layouts even on the hosted runner's smaller virtual monitor.
         MaxWidth=1800;MaxHeight=1000;MinWidth=1280;MinHeight=300;
         Width=1280;Height=800;Render();await Settle();
         Check(liveItems.Count==40&&catalogDisplay.Count==40,"one catalog page displays 40 cards");
-        Check(FiltersPanel.Visibility==Visibility.Visible,$"filters appear on the right at standard window width (actual={ActualWidth}, requested={Width}, min={MinWidth}, max={MaxWidth})");
+        Check(FiltersPanel.Visibility==Visibility.Collapsed&&inlineCatalogFilters!.Children.Contains(topSaved!),"filters share the top pill toolbar with All and Saved");
+        Check(!VisualElements<TextBlock>(PageHeader).Any(x=>x.Text=="Настроить подборку"),"no redundant selection heading");
+        var genreMenuButton=FindVisual<Button>(PageHeader,x=>AutomationProperties.GetName(x)=="Жанр")!;
+        genreMenuButton.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Task.Delay(100);
+        Check(genreMenuButton.ContextMenu is {IsOpen:true,ActualHeight:>0},"genre pill opens a visible dropdown menu");genreMenuButton.ContextMenu!.IsOpen=false;
         Check(!VisualElements<Button>(Body).Any(b=>b.Content?.ToString()?.Contains("Показать ещё")==true),"catalog has no load-more button");
         var scroll=FindVisual<ScrollViewer>(Body,_=>true)!;
         var first=liveItems.Select(x=>x.Id).ToArray();
@@ -56,8 +61,7 @@ public partial class MainWindow
         Choose("Порядок","По рейтингу");await Settle();Check(catalogDisplay.Select(x=>x.Id).SequenceEqual([2,3,1]),"saved cards sort by real rating");
         ResetCatalogFilters();topAll!.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Settle();Check(Page(2).IsEnabled&&catalogHasNext,"returning from saved cards restores catalog pagination");
         var bitmap=new RenderTargetBitmap((int)ActualWidth,(int)ActualHeight,96,96,PixelFormats.Pbgra32);bitmap.Render(this);var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(bitmap));using(var file=File.Create(Path.Combine(output,"catalog.png")))png.Save(file);
-        MinWidth=360;Width=680;Height=500;await Task.Delay(150);UpdateLayout();Check(FiltersPanel.Visibility==Visibility.Collapsed&&inlineFilterButton?.Visibility==Visibility.Visible,"narrow window exposes inline filters");
-        inlineFilterButton!.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));UpdateLayout();Check(inlineCatalogFilters?.Visibility==Visibility.Visible,"inline filters open on narrow screens");
+        MinWidth=360;Width=680;Height=500;await Task.Delay(150);UpdateLayout();Check(FiltersPanel.Visibility==Visibility.Collapsed&&inlineCatalogFilters?.Visibility==Visibility.Visible,"top filters remain available in narrow windows");
         Height=360;await Task.Delay(150);UpdateLayout();Check(inlineCatalogFilterScroll is {ScrollableHeight:>0}&&Body.ActualHeight>25,$"short window scrolls all filter choices and retains space for cards (window={ActualHeight}, filters={inlineCatalogFilterScroll?.ActualHeight}, scroll={inlineCatalogFilterScroll?.ScrollableHeight}, cards={Body.ActualHeight})");
         Close();
     }

@@ -32,7 +32,7 @@ export function parseCatalog(html:string,section:Section):Media[] {
     const rating=strip(/class=["']results-item-rating["'][^>]*>([\s\S]*?)<\/span>/i.exec(card)?.[1]??"");
     result.push({id:`${section}:${slug}`,section,title,year,poster:poster?.startsWith("https://")?poster:null,pageUrl:new URL(path,ZONA).href,kinopoisk:/^\d{1,2}([.,]\d)?$/.test(rating)?rating:null});
   }
-  return result.slice(0,40);
+  return result.slice(0,60);
 }
 
 export function parseDetail(html:string):Pick<Media,"originalTitle"|"description"|"kinopoisk"|"imdb"> {
@@ -53,8 +53,13 @@ async function sourceText(url:string,timeout=8000) {
 
 export async function fetchCatalog(section:Section,query:string,page:number):Promise<Media[]> {
   const path=section==="movies"?"movies":"tvseries";
-  const url=query?`${ZONA}/search-form?query=${encodeURIComponent(query)}`:`${ZONA}/${path}/filter/sort-date?page=${page}`;
-  return parseCatalog(await sourceText(url),section);
+  if(query)return parseCatalog(await sourceText(`${ZONA}/search-form?query=${encodeURIComponent(query)}`),section);
+  // Source pages contain 60 entries; API pages contain 40. Preserve every entry across the boundary.
+  const offset=(page-1)*40,sourcePage=Math.floor(offset/60)+1,within=offset%60;
+  const first=parseCatalog(await sourceText(`${ZONA}/${path}/filter/sort-date?page=${sourcePage}`),section);
+  let rows=first.slice(within);
+  if(rows.length<40&&first.length===60)rows=rows.concat(parseCatalog(await sourceText(`${ZONA}/${path}/filter/sort-date?page=${sourcePage+1}`),section));
+  return rows.slice(0,40);
 }
 
 export async function fetchDetail(media:Media) {

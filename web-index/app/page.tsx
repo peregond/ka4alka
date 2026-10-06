@@ -8,7 +8,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { ReleaseList } from "@/components/release-list";
 import { normalize, type Media, type Section } from "@/lib/catalog-source";
 import type { Release } from "@/lib/index-store";
-import seed from "./data/seed.json";
+import seed from "./data/starter.json";
 
 const initial = seed as Media[];
 const savedPosters = new Map(initial.filter(item=>item.poster?.startsWith("/posters/")).map(item=>[item.id,item.poster!]));
@@ -34,7 +34,7 @@ export default function Home() {
   const [section,setSection] = useState<Section>("movies");
   const [query,setQuery] = useState("");
   const [selected,setSelected] = useState<Media|null>(null);
-  const [pool,setPool] = useState<Media[]>(initial);
+  const [pool,setPool] = useState<Media[]>(initial.filter(x=>x.section==="movies").slice(0,40));
   const [page,setPage] = useState(1);
   const [hasMore,setHasMore] = useState(true);
   const [catalogBusy,setCatalogBusy] = useState(false);
@@ -54,11 +54,11 @@ export default function Home() {
       try {
         const response=await fetch(`/api/catalog?section=${section}&q=${encodeURIComponent(query)}&page=${page}`,{signal:controller.signal});
         if(!response.ok)throw new Error("Индекс временно недоступен");
-        const data=await response.json() as {items:Media[];sourceStatus:string};
+        const data=await response.json() as {items:Media[];sourceStatus:string;hasMore:boolean};
         if(!controller.signal.aborted){
           const incoming=Array.isArray(data.items)?data.items:[];
           setPool(previous=>{const merged=new Map(previous.map(item=>[item.id,item]));for(const item of incoming)merged.set(item.id,{...merged.get(item.id),...item});return [...merged.values()]});
-          setHasMore(incoming.length>=40);
+          setHasMore(data.hasMore);
           setCatalogState(data.sourceStatus==="updated"?"Каталог обновлён":"Сохранённая подборка");
         }
       } catch {if(!controller.signal.aborted)setCatalogState("Сохранённая подборка");}

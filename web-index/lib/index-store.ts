@@ -19,6 +19,11 @@ export async function readMedia(section:Section,query:string,page=1):Promise<Med
   return result.results.map(asMedia);
 }
 
+export async function countMedia(section:Section):Promise<number> {
+  const row=await getIndexDb().prepare("SELECT COUNT(*) AS total FROM media WHERE section=?").bind(section).first<{total:number}>();
+  return row?.total??0;
+}
+
 export async function getMedia(id:string):Promise<Media|null> {
   const row=await getIndexDb().prepare("SELECT * FROM media WHERE id=? LIMIT 1").bind(id).first<MediaRow>();
   return row?asMedia(row):null;
