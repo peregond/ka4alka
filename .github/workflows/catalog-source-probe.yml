@@ -20,7 +20,7 @@ jobs:
           $path=[regex]::Match($card,'href="(/movies/[^"]+)"').Groups[1].Value
           $detail=(Invoke-WebRequest ('https://w6.zona.plus'+$path) -TimeoutSec 30).Content
           [regex]::Matches($detail,'.{0,160}(?:genre|country|sort-|itemprop="[^"]+").{0,200}') | ForEach-Object {$_.Value} | Select-Object -First 70
-          foreach($filter in @('sort-popular','sort-rating','genre-komediia/country-rossiia/sort-rating','genre-komediia-country-rossiia-sort-rating','genre-komediia-year-2024-country-rossiia-rating-7-sort-rating')){
+          foreach($filter in @('rating-1/sort-rating','genre-komediia/year-2024/country-rossiia/rating-7/sort-rating','rating-8/sort-rating','genre-komediia','country-rossiia')){
             try{
               $r=Invoke-WebRequest ('https://w6.zona.plus/movies/filter/'+$filter) -TimeoutSec 30
               Write-Output ($filter+' '+$r.StatusCode+' '+$r.BaseResponse.RequestMessage.RequestUri.AbsoluteUri)
