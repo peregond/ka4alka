@@ -183,7 +183,7 @@ public partial class MainWindow
         var progress=new FrameworkElementFactory(typeof(ProgressBar));progress.SetValue(ProgressBar.MaximumProperty,100d);
         progress.SetValue(FrameworkElement.HeightProperty,4d);progress.SetValue(Control.BorderThicknessProperty,new Thickness(0));
         progress.SetResourceReference(Control.ForegroundProperty,"Accent");progress.SetResourceReference(Control.BackgroundProperty,"Edge");
-        progress.SetBinding(ProgressBar.ValueProperty,new Binding("Progress"));stack.AppendChild(progress);
+        progress.SetBinding(ProgressBar.ValueProperty,new Binding("Progress"){Mode=BindingMode.OneWay});stack.AppendChild(progress);
         var amount=Label("DownloadedText",11,"Muted");amount.SetValue(FrameworkElement.MarginProperty,new Thickness(0,4,0,0));stack.AppendChild(amount);
         template.VisualTree=frame;
         foreach(var stateName in new[]{"IsMouseOver","IsSelected"})
