@@ -149,7 +149,7 @@ public partial class MainWindow
                 var fileSearch=FindVisual<TextBox>(dialog,b=>AutomationProperties.GetName(b)=="Найти файл в раздаче")!;fileSearch.Text="02";dialog.UpdateLayout();check(files.Items.Count==1,"file details can filter a specific episode");fileSearch.Clear();dialog.UpdateLayout();check(files.Items.Count==2,"clearing the episode filter restores the full file list");
                 files.SelectedIndex=0;var selected=files.SelectedItem;await Task.Delay(2300);dialog.UpdateLayout();check(ReferenceEquals(files.SelectedItem,selected),"file details retain selection across live progress refreshes");
                 var episode=FindVisual<TextBlock>(files,t=>t.Text=="Серия 01.mkv")??throw new Exception("Realized episode filename is missing.");
-                DependencyObject? ancestor=episode;while(ancestor!=null&&ancestor is not Border{Name:"FileFrame"})ancestor=VisualTreeHelper.GetParent(ancestor);
+                DependencyObject? ancestor=episode;while(ancestor!=null&&ancestor is not Border)ancestor=VisualTreeHelper.GetParent(ancestor);
                 var fileFrame=ancestor as Border??throw new Exception("Episode row background is missing.");
                 var fileInk=((SolidColorBrush)FindResource("Text")).Color;check(episode.Foreground is SolidColorBrush filenameInk&&filenameInk.Color==fileInk,"dark file details use the readable theme color for episode names");
                 var amount=FindVisual<TextBlock>(fileFrame,t=>t.Text.Contains(" из "))??throw new Exception("Downloaded episode byte count is missing.");
