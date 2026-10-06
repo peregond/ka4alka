@@ -1,7 +1,7 @@
 name: Windows release validation
 on:
   push:
-    branches: [codex/github-updates-0.19]
+    branches: [codex/catalog-pages-0.20]
   pull_request:
   workflow_dispatch:
 permissions:
@@ -36,4 +36,5 @@ jobs:
           name: windows-update-evidence
           path: |
             test-output/windows-update/checks.txt
+            test-output/catalog-paging/*
             test-output/windows-update/data/updates/*/result.txt

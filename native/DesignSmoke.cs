@@ -115,12 +115,12 @@ public partial class MainWindow
         }
         try
         {
-            await Settle();liveKey="Фильмы||1";
+            await Settle();liveKey=CurrentCatalogKey;
             await Size(1760,950);
             Render();await Settle();
             var wheelScrolling=await CheckWheelScrolling();
             var searchSettings=await CheckSearchAndSettings(output);
-            Search.Text="";searchDelay.Stop();liveKey="Фильмы||1";
+            Search.Text="";searchDelay.Stop();liveKey=CurrentCatalogKey;
             prefs.Light=true;ApplyTheme();current=null;Render();await Settle();Shot("catalog-light");
             var catalogColumnsLight=catalogColumns;
             prefs.Light=false;ApplyTheme();Render();await Settle();Shot("catalog-dark");

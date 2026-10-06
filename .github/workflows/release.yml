@@ -5,10 +5,10 @@ on:
       version:
         description: Version matching native/Kachalka.csproj
         required: true
-        default: '0.19.0'
+        default: '0.20.0'
   push:
-    branches: [codex/github-updates-0.19]
-    paths: [.github/workflows/release.yml]
+    branches: [codex/catalog-pages-0.20]
+    paths: [.github/workflows/release.yml, 'native/**', 'tests/**', 'installer/**', build-release.ps1, package-release.ps1]
 permissions:
   contents: write
 concurrency:
@@ -19,7 +19,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 25
     env:
-      RELEASE_VERSION: ${{ inputs.version || '0.19.0' }}
+      RELEASE_VERSION: ${{ inputs.version || '0.20.0' }}
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
     steps:
       - uses: actions/checkout@v4
@@ -48,6 +48,9 @@ jobs:
             [System.IO.File]::WriteAllText($key,$env:RELEASE_SIGNING_KEY)
             ./build-release.ps1 -Version $env:RELEASE_VERSION -SigningKeyPath $key -MakeNsis 'C:/Program Files (x86)/NSIS/makensis.exe'
           } finally { Remove-Item $key -ErrorAction SilentlyContinue }
+      - name: Verify upgrade from previously published 0.19.0
+        shell: pwsh
+        run: ./tests/WindowsPublishedUpgrade.ps1 -ReleaseDirectory ('dist/release-'+$env:RELEASE_VERSION)
       - name: Upload verified files to draft GitHub Release
         shell: pwsh
         env:
@@ -84,4 +87,7 @@ jobs:
           name: production-windows-update-evidence
           path: |
             test-output/windows-update/checks.txt
+            test-output/catalog-paging/*
+            test-output/published-upgrade/checks.txt
+            test-output/published-upgrade/data/updates/*/result.txt
             test-output/windows-update/data/updates/*/result.txt

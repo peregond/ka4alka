@@ -37,6 +37,7 @@ public partial class MainWindow
                 {
                     item.SetScores(detail.Kinopoisk,detail.Imdb);detail.SetScores(detail.Kinopoisk,detail.Imdb);
                     liveItems=liveItems.Select(x=>x.Id==detail.Id?detail:x).ToArray();if(current?.Id==item.Id)current=detail;
+                    if(prefs.LiveFavorites.Any(x=>x.Id==detail.Id)){prefs.LiveFavorites=prefs.LiveFavorites.Select(x=>x.Id==detail.Id?detail:x).ToList();prefs.Save();}
                     try{await catalogIndex.AddAsync([detail],token);}catch(IOException){}catch(UnauthorizedAccessException){}
                     RefreshDetail(item.Id);
                 }

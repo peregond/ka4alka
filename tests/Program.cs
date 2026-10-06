@@ -44,6 +44,7 @@ if(args.Contains("--probe-public"))
 }
 DownloadTests.Run();
 await CatalogBatchTests.Run();
+CatalogPagingTests.Run();
 if(args.Contains("--catalog-only"))return;
 await ReleaseSearchTests.Run();
 await SourceTests.Run(args.Contains("--live-sources")||args.Contains("--all-live-sources"),args.Contains("--all-live-sources"));

@@ -10,13 +10,12 @@ public partial class MainWindow
     string liveKey="",liveError="";
     bool liveLoading;
     int livePage=1;
-    CatalogBatch browseBatch=CatalogBatch.Empty;
-    string browseBatchKey="";
     bool favoritesOnly;
     int? catalogYear;
     string catalogOrder="Сначала новые";
     Button? topAll,topSaved;
     WrapPanel? inlineCatalogFilters;
+    ScrollViewer? inlineCatalogFilterScroll;
     Button? inlineFilterButton;
     bool inlineFiltersOpen;
     Grid? detailHero;
@@ -45,7 +44,7 @@ public partial class MainWindow
                 MediaItem indexed;
                 try{indexed=await onlineIndex.Detail(item,CancellationToken.None);}
                 catch{return await new LiveCatalog(sourceClient).Detail(item,CancellationToken.None);}
-                if(!string.IsNullOrWhiteSpace(indexed.Description))return indexed;
+                if(!string.IsNullOrWhiteSpace(indexed.Description)&&indexed.GenreKeys.Length>0&&indexed.CountryKeys.Length>0)return indexed;
                 try
                 {
                     var direct=await new LiveCatalog(sourceClient).Detail(indexed,CancellationToken.None);
@@ -54,7 +53,8 @@ public partial class MainWindow
                         Description=string.IsNullOrWhiteSpace(direct.Description)?"Описание временно недоступно.":direct.Description,
                         Kinopoisk=direct.Kinopoisk=="—"?indexed.Kinopoisk:direct.Kinopoisk,
                         Imdb=direct.Imdb=="—"?indexed.Imdb:direct.Imdb,
-                        OriginalTitle=direct.OriginalTitle??indexed.OriginalTitle
+                        OriginalTitle=direct.OriginalTitle??indexed.OriginalTitle,
+                        Genre=direct.Genre,Country=direct.Country,GenreKeys=direct.GenreKeys,CountryKeys=direct.CountryKeys
                     };
                 }
                 catch{return indexed with{Description="Описание временно недоступно."};}
@@ -67,77 +67,109 @@ public partial class MainWindow
     {
         try{var data=await Metadata(item);if(!closed)item.SetScores(data.Kinopoisk,data.Imdb);}catch{cardMetadata.Remove(item.Id); /* A missing rating stays unavailable. */ }
     }
+    string catalogGenre="",catalogCountry="",catalogCollection="all";
+    int catalogRating;
+    bool catalogHasNext=true;
+    int? catalogLastPage;
+    CatalogChoice[] catalogGenres=CatalogChoices.Genres,catalogCountries=CatalogChoices.Countries;
+    readonly Dictionary<string,CatalogPage> catalogPages=[];
+    string CurrentCatalogKey=>section+"|"+Search.Text+"|"+livePage+"|"+CatalogSelection.Filter+"|"+CatalogSelection.Collection;
+    CatalogSelection CatalogSelection=>new(catalogGenre,catalogCountry,catalogYear,catalogRating,catalogOrder switch{"По рейтингу"=>"rating","По популярности"=>"popular",_=>"date"},catalogCollection);
+    void ResetCatalogFilters(){catalogYear=null;catalogGenre="";catalogCountry="";catalogRating=0;catalogOrder="Сначала новые";catalogCollection="all";catalogLastPage=null;}
+    void ChangeCatalogFilter(Action change)
+    {
+        if(Search.Text.Length>0){Search.Text="";searchDelay.Stop();}
+        change();livePage=1;catalogLastPage=null;liveKey="";Render();
+    }
+    void GoCatalogPage(int page)
+    {
+        if(liveLoading||page==livePage)return;
+        livePage=Math.Clamp(page,1,catalogLastPage??CatalogPaging.Limit);Render();UpdateLayout();
+        FindVisual<ScrollViewer>(Body,_=>true)?.ScrollToTop();
+    }
     void RenderLiveCatalog()
     {
-        var key=section+"|"+Search.Text+"|"+livePage;
+        var selection=CatalogSelection;
+        var key=CurrentCatalogKey;
         if(!favoritesOnly&&liveKey!=key){liveKey=key;_ = FetchCatalog(key,section,Search.Text,livePage);}
         var headingRow=new DockPanel{Margin=new(5,0,8,5)};
-        var count=Text(liveLoading?"Обновляем…":$"{(favoritesOnly?prefs.LiveFavorites.Count(x=>x.Section==section):liveItems.Count)} в подборке",11,true);count.VerticalAlignment=VerticalAlignment.Center;count.Margin=new(14,0,0,0);DockPanel.SetDock(count,Dock.Right);headingRow.Children.Add(count);
-        var heading=Text(favoritesOnly?"Сохранённое":Search.Text.Length>0?(section=="Фильмы"?"Поиск фильмов":"Поиск сериалов"):section=="Фильмы"?"Новые фильмы":"Новые сериалы",compactHeight?25:32);heading.FontWeight=FontWeights.SemiBold;heading.Margin=new(0);headingRow.Children.Add(heading);PageHeader.Children.Add(headingRow);
-        var subtitle=Text(favoritesOnly?"Кино, к которому хочется вернуться.":liveError.Length>0?liveError:Search.Text.Length>0?$"Результаты для «{Search.Text}».":"Выбирай историю на сегодня.",13,true);subtitle.Tag="CatalogSubtitle";subtitle.Margin=new(5,3,0,18);subtitle.Visibility=compactHeight?Visibility.Collapsed:Visibility.Visible;PageHeader.Children.Add(subtitle);
+        var count=Text(liveLoading?"Загружаем…":$"Страница {livePage}",11,true);count.VerticalAlignment=VerticalAlignment.Center;count.Margin=new(14,0,0,0);DockPanel.SetDock(count,Dock.Right);headingRow.Children.Add(count);
+        var title=favoritesOnly?"Сохранённое":Search.Text.Length>0?(section=="Фильмы"?"Поиск фильмов":"Поиск сериалов"):catalogCollection=="popular"?"Популярное":catalogCollection=="rated"?"Кино с высоким рейтингом":section=="Фильмы"?"Все фильмы":"Все сериалы";
+        var heading=Text(title,compactHeight?25:32);heading.FontWeight=FontWeights.SemiBold;heading.Margin=new(0);headingRow.Children.Add(heading);PageHeader.Children.Add(headingRow);
+        var subtitle=Text(liveError.Length>0?liveError:favoritesOnly?"Кино, к которому хочется вернуться.":Search.Text.Length>0?$"Результаты для «{Search.Text}».":catalogCollection!="all"?"Подборка Zona · обновляется из общего каталога.":"Выбирай историю на сегодня.",13,true);subtitle.Tag="CatalogSubtitle";subtitle.Margin=new(5,3,0,18);subtitle.Visibility=compactHeight?Visibility.Collapsed:Visibility.Visible;PageHeader.Children.Add(subtitle);
         var toolbar=new DockPanel{Margin=new(5,compactHeight?6:0,8,12)};
-        var paging=new StackPanel{Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Top};
         if(!favoritesOnly)
         {
-            var refresh=ActionButton("","IconRefresh",()=>{onlineIndex.RetryNow();livePage=1;liveKey="";Render();});refresh.ToolTip="Обновить каталог";System.Windows.Automation.AutomationProperties.SetName(refresh,"Обновить каталог");refresh.Padding=new(10);refresh.Margin=new(0);paging.Children.Add(refresh);
+            var refresh=ActionButton("","IconRefresh",()=>{onlineIndex.RetryNow();catalogPages.Clear();liveKey="";Render();});refresh.ToolTip="Обновить каталог";System.Windows.Automation.AutomationProperties.SetName(refresh,"Обновить каталог");refresh.Padding=new(10);refresh.Margin=new(0);DockPanel.SetDock(refresh,Dock.Right);toolbar.Children.Add(refresh);
         }
-        DockPanel.SetDock(paging,Dock.Right);toolbar.Children.Add(paging);
         var tabs=new WrapPanel();
-        topAll=Button("Все",()=>{favoritesOnly=false;Render();});topAll.Style=(Style)FindResource("PillButton");topAll.SetResourceReference(Control.BackgroundProperty,favoritesOnly?"Panel":"Selected");tabs.Children.Add(topAll);
-        topSaved=ActionButton("Сохранённое","IconHeart",()=>{favoritesOnly=true;Render();},"PillButton");topSaved.SetResourceReference(Control.BackgroundProperty,favoritesOnly?"Selected":"Panel");tabs.Children.Add(topSaved);
-        inlineFilterButton=ActionButton(catalogYear.HasValue?"Фильтры · 1":"Фильтры","IconFilter",()=>{inlineFiltersOpen=!inlineFiltersOpen;UpdateFilterRail();},"PillButton");tabs.Children.Add(inlineFilterButton);
+        topAll=Button("Все",()=>{favoritesOnly=false;catalogLastPage=null;livePage=1;Render();});topAll.Style=(Style)FindResource("PillButton");topAll.SetResourceReference(Control.BackgroundProperty,favoritesOnly?"Panel":"Selected");tabs.Children.Add(topAll);
+        topSaved=ActionButton("Сохранённое","IconHeart",()=>{liveRequest?.Cancel();liveLoading=false;liveError="";liveKey="";favoritesOnly=true;catalogCollection="all";if(catalogOrder=="По популярности")catalogOrder="Сначала новые";catalogLastPage=null;livePage=1;Render();},"PillButton");topSaved.SetResourceReference(Control.BackgroundProperty,favoritesOnly?"Selected":"Panel");tabs.Children.Add(topSaved);
+        var filters=new[]{catalogGenre.Length>0,catalogCountry.Length>0,catalogYear.HasValue,catalogRating>0,catalogOrder!="Сначала новые",catalogCollection!="all"}.Count(x=>x);
+        inlineFilterButton=ActionButton(filters>0?"Фильтры · "+filters:"Фильтры","IconFilter",()=>{inlineFiltersOpen=!inlineFiltersOpen;UpdateFilterRail();},"PillButton");tabs.Children.Add(inlineFilterButton);
         toolbar.Children.Add(tabs);PageHeader.Children.Add(toolbar);
-        inlineCatalogFilters=new WrapPanel{Margin=new(5,0,0,10)};AddCatalogFilters(inlineCatalogFilters,true);PageHeader.Children.Add(inlineCatalogFilters);
+        inlineCatalogFilters=new WrapPanel{Margin=new(5,0,0,10)};AddCatalogFilters(inlineCatalogFilters,true);
+        inlineCatalogFilterScroll=new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=inlineCatalogFilters,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};PageHeader.Children.Add(inlineCatalogFilterScroll);
         RenderCatalogFilterRail();UpdateFilterRail();
-        IEnumerable<MediaItem> shown=favoritesOnly?prefs.LiveFavorites.Where(x=>x.Section==section&&x.Title.Contains(Search.Text,StringComparison.CurrentCultureIgnoreCase)).DistinctBy(x=>x.Id):liveItems;
-        if(catalogYear.HasValue)shown=shown.Where(x=>x.Year==catalogYear.Value);
-        if(catalogOrder=="По названию")shown=shown.OrderBy(x=>x.Title,StringComparer.CurrentCultureIgnoreCase);
-        var cards=shown.ToArray();ShowCatalog(cards);
-        if(!favoritesOnly&&string.IsNullOrWhiteSpace(Search.Text)&&cards.Length>0)
+        IEnumerable<MediaItem> shown=favoritesOnly?prefs.LiveFavorites.Where(x=>x.Section==section&&x.Title.Contains(Search.Text,StringComparison.CurrentCultureIgnoreCase)).DistinctBy(x=>x.Id).Where(selection.Matches):liveItems;
+        if(favoritesOnly)shown=catalogOrder=="По рейтингу"?shown.OrderByDescending(CatalogPaging.Rating):shown.OrderByDescending(x=>x.Year);
+        var local=favoritesOnly||Search.Text.Length>0;
+        var all=shown.ToArray();
+        if(local){catalogLastPage=Math.Max(1,(all.Length+CatalogPaging.Size-1)/CatalogPaging.Size);livePage=Math.Min(livePage,catalogLastPage.Value);catalogHasNext=livePage<catalogLastPage;}
+        var cards=local?all.Skip((livePage-1)*CatalogPaging.Size).Take(CatalogPaging.Size).ToArray():all;
+        ShowCatalog(cards);
+        var list=catalogList!;
+        Body.Children.Remove(list);ScrollViewer.SetVerticalScrollBarVisibility(list,ScrollBarVisibility.Disabled);ScrollViewer.SetHorizontalScrollBarVisibility(list,ScrollBarVisibility.Disabled);WheelScroll.SetIsEnabled(list,false);
+        var content=new StackPanel();content.Children.Add(list);
+        if(cards.Length==0)
         {
-            Body.RowDefinitions.Add(new(){Height=new GridLength(1,GridUnitType.Star)});Body.RowDefinitions.Add(new(){Height=GridLength.Auto});
-            var footer=new StackPanel{HorizontalAlignment=HorizontalAlignment.Center,Margin=new(0,10,0,0)};Grid.SetRow(footer,1);Body.Children.Add(footer);
-            if(browseBatch.HasMore)
-            {
-                var more=ActionButton(liveLoading?"Загружаем…":browseBatch.Failed?"Повторить загрузку":"Показать ещё · 100","IconPlus",()=>{onlineIndex.RetryNow();livePage++;RenderCatalogKeepingPosition();});
-                more.IsEnabled=!liveLoading;more.Margin=new(0);more.ToolTip="Добавить к подборке до 100 новых карточек";System.Windows.Automation.AutomationProperties.SetName(more,"Показать ещё фильмы и сериалы");footer.Children.Add(more);
-            }
-            else footer.Children.Add(Text("Вся доступная подборка загружена",11,true));
+            var empty=new StackPanel{HorizontalAlignment=HorizontalAlignment.Center,MaxWidth=370,Margin=new(24)};
+            var label=Text(liveLoading?"Загружаем подборку…":liveError.Length>0?"Каталог пока недоступен":"Ничего не найдено",23);label.FontWeight=FontWeights.SemiBold;label.TextAlignment=TextAlignment.Center;empty.Children.Add(label);
+            var hint=Text(liveLoading?"Это займёт несколько секунд.":favoritesOnly?"Сохраняй фильмы и сериалы из карточки — они останутся под рукой.":"Попробуй другую страницу, запрос или сбрось фильтры.",13,true);hint.TextAlignment=TextAlignment.Center;empty.Children.Add(hint);
+            if(!liveLoading){var retry=ActionButton("Сбросить фильтры","IconRefresh",()=>ChangeCatalogFilter(ResetCatalogFilters));retry.HorizontalAlignment=HorizontalAlignment.Center;empty.Children.Add(retry);}
+            content.Children.Add(empty);
         }
-        if(cards.Length==0&&!liveLoading)
+        var footer=new StackPanel{HorizontalAlignment=HorizontalAlignment.Center,Margin=new(5,18,8,18)};
+        var numbers=new WrapPanel{HorizontalAlignment=HorizontalAlignment.Center};
+        void PageButton(string label,int page,bool enabled)
         {
-            Body.Children.Clear();catalogList=null;
-            var empty=new StackPanel{HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center,MaxWidth=370,Margin=new(24)};
-            var label=Text(favoritesOnly?"Здесь будет твоё кино":liveError.Length>0?"Каталог пока недоступен":"Ничего не найдено",23);label.FontWeight=FontWeights.SemiBold;label.TextAlignment=TextAlignment.Center;empty.Children.Add(label);
-            var hint=Text(favoritesOnly?"Сохраняй фильмы и сериалы из карточки — они останутся под рукой.":catalogYear.HasValue?"Попробуй другой год или сбрось фильтры.":"Попробуй другой запрос или обнови каталог.",13,true);hint.TextAlignment=TextAlignment.Center;hint.Margin=new(0,4,0,18);empty.Children.Add(hint);
-            var retry=ActionButton(catalogYear.HasValue?"Сбросить фильтры":"Обновить каталог","IconRefresh",()=>{catalogYear=null;onlineIndex.RetryNow();liveKey="";Render();});retry.HorizontalAlignment=HorizontalAlignment.Center;if(!favoritesOnly)empty.Children.Add(retry);
-            Body.Children.Add(new Border{Child=empty,Background=(Brush)FindResource("Panel"),CornerRadius=new(20),Margin=new(5,0,8,8)});
+            var button=Button(label,()=>GoCatalogPage(page));button.Style=(Style)FindResource("PillButton");button.IsEnabled=enabled&&!liveLoading;button.MinWidth=36;button.Padding=new(10,7,10,7);button.Margin=new(2);
+            if(page==livePage&&int.TryParse(label,out _)){button.SetResourceReference(Control.BackgroundProperty,"Selected");button.FontWeight=FontWeights.Bold;}
+            System.Windows.Automation.AutomationProperties.SetName(button,int.TryParse(label,out _)?"Страница "+page:label);numbers.Children.Add(button);
         }
+        PageButton("Назад",livePage-1,livePage>1);
+        if(CatalogPaging.Numbers(livePage,catalogLastPage)[0]>1){PageButton("1",1,true);numbers.Children.Add(Text("…",12,true));}
+        foreach(var number in CatalogPaging.Numbers(livePage,catalogLastPage))PageButton(number.ToString(),number,true);
+        PageButton("Далее",livePage+1,catalogHasNext&&livePage<CatalogPaging.Limit);
+        footer.Children.Add(numbers);
+        if(liveError.Length>0&&!favoritesOnly){var retry=Button("Повторить загрузку",()=>{onlineIndex.RetryNow();catalogPages.Clear();liveKey="";Render();});retry.Style=(Style)FindResource("QuietButton");footer.Children.Add(retry);}
+        content.Children.Add(footer);
+        Body.Children.Add(new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=content,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});
     }
     void AddCatalogFilters(Panel target,bool inline)
     {
-        StackPanel Field(string label)
+        void Choice(string label,IEnumerable<CatalogChoice> choices,string selected,Action<string> changed)
         {
-            var field=new StackPanel{Width=inline?165:double.NaN,Margin=inline?new(0,0,10,0):new(0,0,0,10)};var caption=Text(label,11,true);caption.Margin=new(0,0,0,6);field.Children.Add(caption);target.Children.Add(field);return field;
+            var field=new StackPanel{Width=inline?165:double.NaN,Margin=inline?new(0,0,10,0):new(0,0,0,10)};var caption=Text(label,11,true);caption.Margin=new(0,0,0,6);field.Children.Add(caption);target.Children.Add(field);
+            var items=choices.ToArray();var combo=new ComboBox{ItemsSource=items,SelectedItem=items.FirstOrDefault(x=>x.Key==selected)??items.FirstOrDefault(),HorizontalAlignment=HorizontalAlignment.Stretch,MinWidth=0,Margin=new(0,0,0,6)};
+            System.Windows.Automation.AutomationProperties.SetName(combo,label);
+            combo.SelectionChanged+=(_,_)=>{if(combo.SelectedItem is CatalogChoice next&&next.Key!=selected)ChangeCatalogFilter(()=>changed(next.Key));};field.Children.Add(combo);
         }
-        var available=favoritesOnly?prefs.LiveFavorites.Where(x=>x.Section==section):liveItems;
-        var years=new[]{"Любой год"}.Concat(available.Select(x=>x.Year).Append(catalogYear??0).Where(x=>x>0).Distinct().OrderDescending().Select(x=>x.ToString())).ToArray();
-        var year=new ComboBox{ItemsSource=years,SelectedItem=catalogYear?.ToString()??"Любой год",HorizontalAlignment=HorizontalAlignment.Stretch,MinWidth=0,Margin=new(0,0,0,6)};
-        System.Windows.Automation.AutomationProperties.SetName(year,"Год выхода");
-        year.SelectionChanged+=(_,_)=>{var next=int.TryParse(year.SelectedItem?.ToString(),out var number)?number:(int?)null;if(next==catalogYear)return;catalogYear=next;Render();};Field("Год выхода").Children.Add(year);
-        var order=new ComboBox{ItemsSource=new[]{"Сначала новые","По названию"},SelectedItem=catalogOrder,HorizontalAlignment=HorizontalAlignment.Stretch,MinWidth=0,Margin=new(0,0,0,6)};
-        System.Windows.Automation.AutomationProperties.SetName(order,"Порядок фильмов");
-        order.SelectionChanged+=(_,_)=>{var next=order.SelectedItem?.ToString()??"Сначала новые";if(next==catalogOrder)return;catalogOrder=next;Render();};Field("Порядок").Children.Add(order);
-        if(catalogYear.HasValue||catalogOrder!="Сначала новые"){var reset=Button("Сбросить",()=>{catalogYear=null;catalogOrder="Сначала новые";Render();});reset.Style=(Style)FindResource("QuietButton");reset.HorizontalAlignment=HorizontalAlignment.Left;reset.Margin=inline?new(0,19,0,0):new(0);target.Children.Add(reset);}
+        if(!favoritesOnly)Choice("Подборка",[new("all","Весь каталог"),new("popular","Популярное · Zona"),new("rated","Высокий рейтинг · Zona")],catalogCollection,v=>catalogCollection=v);
+        Choice("Жанр",new[]{new CatalogChoice("","Любой жанр")}.Concat(catalogGenres),catalogGenre,v=>catalogGenre=v);
+        Choice("Страна",new[]{new CatalogChoice("","Любая страна")}.Concat(catalogCountries),catalogCountry,v=>catalogCountry=v);
+        Choice("Рейтинг от",new[]{new CatalogChoice("0","Любой рейтинг")}.Concat(Enumerable.Range(1,9).Reverse().Select(x=>new CatalogChoice(x.ToString(),x+" и выше"))),catalogRating.ToString(),v=>catalogRating=int.Parse(v));
+        Choice("Год выхода",new[]{new CatalogChoice("","Любой год")}.Concat(Enumerable.Range(2010,DateTime.UtcNow.Year-2009).Reverse().Select(x=>new CatalogChoice(x.ToString(),x.ToString()))),catalogYear?.ToString()??"",v=>catalogYear=int.TryParse(v,out var y)?y:null);
+        var effectiveOrder=catalogCollection=="popular"?"По популярности":catalogCollection=="rated"?"По рейтингу":catalogOrder;
+        Choice("Порядок",favoritesOnly?[new("Сначала новые","Сначала новые"),new("По рейтингу","По рейтингу")]:[new("Сначала новые","Сначала новые"),new("По популярности","По популярности"),new("По рейтингу","По рейтингу")],effectiveOrder,v=>{catalogOrder=v;catalogCollection="all";});
+        if(!CatalogSelection.IsDefault){var reset=Button("Сбросить",()=>ChangeCatalogFilter(ResetCatalogFilters));reset.Style=(Style)FindResource("QuietButton");reset.HorizontalAlignment=HorizontalAlignment.Left;reset.Margin=inline?new(0,19,0,0):new(0);target.Children.Add(reset);}
     }
     void RenderCatalogFilterRail()
     {
-        FilterControls.Children.Clear();
-        var title=Text("Настроить подборку",16);title.FontWeight=FontWeights.SemiBold;title.Margin=new(0,0,0,23);FilterControls.Children.Add(title);
-        AddCatalogFilters(FilterControls,false);
+        FilterControls.Children.Clear();var title=Text("Настроить подборку",16);title.FontWeight=FontWeights.SemiBold;title.Margin=new(0,0,0,23);FilterControls.Children.Add(title);AddCatalogFilters(FilterControls,false);
         FilterControls.Children.Add(new Border{Height=1,Margin=new(0,12,0,18),Background=(Brush)FindResource("Edge")});
-        FilterControls.Children.Add(Text("Год и порядок применяются к загруженной подборке.",11,true));
-        var tip=Text("Качество и озвучка —\nв карточке фильма.",12,true);tip.Margin=new(0,12,0,0);FilterControls.Children.Add(tip);
+        FilterControls.Children.Add(Text(favoritesOnly?"Фильтры по сохранённым данным карточек.":"Подборки и фильтры — из каталога Zona. При выборе фильтра поиск очищается.",11,true));
+        var source=Button("Открыть источник",()=>System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(LiveCatalog.Base+(section=="Сериалы"?"/tvseries":"/movies")){UseShellExecute=true}));source.Style=(Style)FindResource("QuietButton");FilterControls.Children.Add(source);
     }
     void RenderCatalogKeepingPosition()
     {
@@ -147,48 +179,45 @@ public partial class MainWindow
     async Task FetchCatalog(string key,string category,string query,int page)
     {
         liveRequest?.Cancel();liveRequest?.Dispose();liveRequest=new();var token=liveRequest.Token;liveLoading=true;liveError="";
-        var request=liveRequest;
+        var request=liveRequest;var selection=CatalogSelection;
         bool IsCurrent()=>ReferenceEquals(liveRequest,request)&&!token.IsCancellationRequested&&liveKey==key&&Search.Text==query;
-        var batchKey=category+"|"+query;
-        var append=string.IsNullOrWhiteSpace(query)&&page>1&&browseBatchKey==batchKey;
-        var indexed=string.IsNullOrWhiteSpace(query)?catalogIndex.Recent(category,100):catalogIndex.Search(category,query);
-        if(!append){liveItems=indexed;browseBatch=CatalogBatch.Empty;browseBatchKey=batchKey;}
-        // Yield before progressive results can redraw the page that initiated this request.
+        liveItems=[];catalogHasNext=false;
+        var cacheKey=category+"|"+selection.Filter+"|"+page;
         await Task.Yield();
         try
         {
-            async Task<IReadOnlyList<MediaItem>> ReadPage(int sourcePage,CancellationToken ct)
-            {
-                return await CatalogBatches.ReadPage(t=>onlineIndex.Browse(category,query,sourcePage,t),
-                    t=>new LiveCatalog(sourceClient).Browse(category,query,sourcePage,t),string.IsNullOrWhiteSpace(query),ct);
-            }
             IReadOnlyList<MediaItem> items;
             if(string.IsNullOrWhiteSpace(query))
             {
-                var settled=false;
-                var progress=new Progress<CatalogBatch>(batch=>
+                CatalogPage result;
+                if(catalogPages.TryGetValue(cacheKey,out var cached))result=cached;
+                else
                 {
-                    if(!IsCurrent()||settled)return;
-                    browseBatch=batch;liveItems=CatalogBatches.Visible(batch,indexed,append,true);
-                    if(!closed&&current==null&&section==category)RenderCatalogKeepingPosition();
-                });
-                var batch=await CatalogBatches.Load(append?browseBatch:CatalogBatch.Empty,ReadPage,progress,token);settled=true;
+                    try{result=await new LiveCatalog(sourceClient).BrowsePage(category,page,selection,token);}
+                    catch(Exception) when(!token.IsCancellationRequested&&selection.IsDefault)
+                    {
+                        var indexed=await onlineIndex.Browse(category,"",page,token);
+                        result=new(indexed.Take(CatalogPaging.Size).ToArray(),indexed.Count>=CatalogPaging.Size&&page<CatalogPaging.Limit,[],[]);
+                    }
+                    if(catalogPages.Count>=80)catalogPages.Clear();catalogPages[cacheKey]=result;
+                }
                 if(!IsCurrent())return;
-                browseBatch=batch;items=batch.Items;
-                if(batch.Failed)liveError="Не удалось загрузить всю подборку. Уже найденные карточки сохранены; можно повторить загрузку.";
+                items=result.Items;catalogHasNext=result.HasNext;
+                if(!result.HasNext)catalogLastPage=page;
+                if(result.Genres.Length>0)catalogGenres=result.Genres;if(result.Countries.Length>0)catalogCountries=result.Countries;
             }
-            else items=await ReadPage(1,token);
-            try{await catalogIndex.AddAsync(items,token);}catch(IOException){}catch(UnauthorizedAccessException){}
-            if(IsCurrent())
+            else
             {
-                liveItems=string.IsNullOrWhiteSpace(query)?CatalogBatches.Visible(browseBatch,indexed,append,false):items.Concat(indexed).DistinctBy(x=>x.Id).Take(80).ToArray();
-                if(liveItems.Count==0&&liveError.Length==0)liveError="Ничего не найдено. Измени запрос или обнови каталог.";
-                else if(items.Count==0)liveError="Показаны результаты из локального индекса.";
+                var indexed=catalogIndex.Search(category,query);
+                items=await CatalogBatches.ReadPage(t=>onlineIndex.Browse(category,query,1,t),t=>new LiveCatalog(sourceClient).Browse(category,query,1,t),false,token);
+                items=items.Concat(indexed).DistinctBy(x=>x.Id).Take(80).ToArray();
             }
+            try{await catalogIndex.AddAsync(items,token);}catch(IOException){}catch(UnauthorizedAccessException){}
+            if(IsCurrent()){liveItems=items;if(items.Count==0)liveError="Ничего не найдено. Измени запрос или фильтры.";}
         }
-        catch(OperationCanceledException){if(IsCurrent())liveError="Каталог не ответил вовремя. Нажми «Обновить».";}
-        catch(Exception){if(IsCurrent())liveError=indexed.Count>0?"Показаны результаты из локального индекса; источник временно недоступен.":"Каталог временно недоступен. Нажми «Обновить».";}
-        finally{if(IsCurrent()){liveLoading=false;if(!closed&&current==null&&section==category){if(string.IsNullOrWhiteSpace(query))RenderCatalogKeepingPosition();else Render();}}}
+        catch(OperationCanceledException){}
+        catch(Exception){if(IsCurrent())liveError="Источник временно недоступен. Повтори загрузку или выбери другую страницу.";}
+        finally{if(IsCurrent()){liveLoading=false;if(!closed&&current==null&&section==category&&!favoritesOnly)Render();}}
     }
     void RenderLiveDetail(MediaItem item)
     {
@@ -211,7 +240,7 @@ public partial class MainWindow
         var posterGrid=new Grid();posterGrid.Children.Add(new TextBlock{Text="Постер\nнедоступен",Foreground=Brushes.White,Opacity=.75,TextAlignment=TextAlignment.Center,VerticalAlignment=VerticalAlignment.Center,FontSize=11});
         var image=new Image{DataContext=item,Stretch=Stretch.Uniform};image.Loaded+=SourceCover;posterGrid.Children.Add(image);detailPoster.Child=posterGrid;Grid.SetRowSpan(detailPoster,2);detailHero.Children.Add(detailPoster);
         var info=new StackPanel{VerticalAlignment=VerticalAlignment.Top};Grid.SetColumn(info,1);detailHero.Children.Add(info);
-        var meta=Text(string.Join("  ·  ",new[]{section,item.Year>0?item.Year.ToString():null,item.Genre}.Where(x=>!string.IsNullOrWhiteSpace(x))),12,true);meta.Margin=new(0,0,0,9);info.Children.Add(meta);
+        var meta=Text(string.Join("  ·  ",new[]{section,item.Year>0?item.Year.ToString():null,item.Genre,item.Country}.Where(x=>!string.IsNullOrWhiteSpace(x))),12,true);meta.Margin=new(0,0,0,9);info.Children.Add(meta);
         detailTitle=Text(item.Title,32);detailTitle.Name="DetailTitle";detailTitle.FontWeight=FontWeights.SemiBold;detailTitle.Margin=new(0,0,0,14);info.Children.Add(detailTitle);
         if(!string.IsNullOrWhiteSpace(item.OriginalTitle)&&!item.OriginalTitle.Equals(item.Title,StringComparison.OrdinalIgnoreCase)){var original=Text(item.OriginalTitle,13,true);original.Margin=new(0,0,0,12);info.Children.Add(original);}
         var scores=new WrapPanel{Margin=new(0,0,0,10)};

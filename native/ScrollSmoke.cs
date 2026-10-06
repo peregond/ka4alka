@@ -17,7 +17,7 @@ public partial class MainWindow
             var e=new MouseWheelEventArgs(Mouse.PrimaryDevice,Environment.TickCount,delta){RoutedEvent=Mouse.PreviewMouseWheelEvent};target.RaiseEvent(e);return e;
         }
         var catalog=catalogList??throw new Exception("Wheel scroll: catalog missing.");
-        var catalogViewer=FindVisual<ScrollViewer>(catalog,_=>true)??throw new Exception("Wheel scroll: catalog viewer missing.");
+        var catalogViewer=FindVisual<ScrollViewer>(Body,_=>true)??throw new Exception("Wheel scroll: catalog viewer missing.");
         Check(VirtualizingPanel.GetScrollUnit(catalog)==ScrollUnit.Pixel&&ScrollViewer.GetCanContentScroll(catalog),"catalog lost pixel scrolling or virtualization");
         catalogViewer.ScrollToTop();await Settle();
         var poster=VisualElements<Button>(catalog).First(x=>x.Tag is MediaItem);

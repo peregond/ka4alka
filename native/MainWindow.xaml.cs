@@ -36,13 +36,13 @@ public partial class MainWindow:Window
     static Button Button(string label,Action action){var b=new Button{Content=label};b.Click+=(_,_)=>action();return b;}
     static Button AsyncButton(string label,Func<Task> action){var b=new Button{Content=label};b.Click+=async(_,_)=>{b.IsEnabled=false;try{await action();}catch(Exception e){MessageBox.Show(e.Message,"Качалка");}finally{b.IsEnabled=true;}};return b;}
     void SyncTimer(){if(!closed&&(downloads.EngineCreated||section=="Загрузки"&&WindowState!=WindowState.Minimized))refresh.Start();else refresh.Stop();}
-    void SearchChanged(object sender,TextChangedEventArgs e){if(!ready)return;ClearSearchButton.Visibility=Search.Text.Length>0?Visibility.Visible:Visibility.Collapsed;searchDelay.Stop();if(section is "Фильмы" or "Сериалы"){catalogQueries[section]=Search.Text;lastCatalogSection=section;livePage=1;catalogYear=null;searchDelay.Start();}}
-    void ShowCatalogSection(string name){searchDelay.Stop();section=name;lastCatalogSection=name;current=null;genre="Все";livePage=1;favoritesOnly=false;catalogYear=null;Search.Text=catalogQueries.GetValueOrDefault(name,"");searchDelay.Stop();Render();}
+    void SearchChanged(object sender,TextChangedEventArgs e){if(!ready)return;ClearSearchButton.Visibility=Search.Text.Length>0?Visibility.Visible:Visibility.Collapsed;searchDelay.Stop();if(section is "Фильмы" or "Сериалы"){catalogQueries[section]=Search.Text;lastCatalogSection=section;livePage=1;ResetCatalogFilters();searchDelay.Start();}}
+    void ShowCatalogSection(string name){searchDelay.Stop();section=name;lastCatalogSection=name;current=null;genre="Все";livePage=1;favoritesOnly=false;ResetCatalogFilters();Search.Text=catalogQueries.GetValueOrDefault(name,"");searchDelay.Stop();Render();}
     void ShowDownloads(object sender,RoutedEventArgs e){searchDelay.Stop();section="Загрузки";current=null;Render();}
     void PosterResized(object sender,SizeChangedEventArgs e){if(sender is Border poster){if(e.WidthChanged&&e.NewSize.Width>0){var height=e.NewSize.Width*1.5;if(double.IsNaN(poster.Height)||Math.Abs(poster.Height-height)>1)poster.Height=height;}ClipPoster(poster);}}
     void Render()
     {
-        if(!ready)return;catalogList=null;detailHero=null;detailPoster=null;detailSynopsis=null;detailTitle=null;detailDescription=null;descriptionToggle=null;inlineCatalogFilters=null;inlineFilterButton=null;PageHeader.Children.Clear();Body.Children.Clear();Body.RowDefinitions.Clear();SyncTimer();UpdateFilterRail();
+        if(!ready)return;catalogList=null;detailHero=null;detailPoster=null;detailSynopsis=null;detailTitle=null;detailDescription=null;descriptionToggle=null;inlineCatalogFilters=null;inlineCatalogFilterScroll=null;inlineFilterButton=null;PageHeader.Children.Clear();Body.Children.Clear();Body.RowDefinitions.Clear();SyncTimer();UpdateFilterRail();
         SearchBar.Visibility=current==null&&(section is "Фильмы" or "Сериалы")?Visibility.Visible:Visibility.Collapsed;
         ContextLabel.Visibility=SearchBar.Visibility==Visibility.Visible?Visibility.Collapsed:Visibility.Visible;ContextLabel.Text=section;
         foreach(Button b in Navigation.Children){var selected=b.Tag?.ToString()==section;b.SetResourceReference(System.Windows.Controls.Button.BackgroundProperty,selected?"Selected":"Sidebar");b.SetResourceReference(Control.ForegroundProperty,selected?"Text":"Muted");b.FontWeight=selected?FontWeights.SemiBold:FontWeights.Normal;}
@@ -126,4 +126,3 @@ public partial class MainWindow:Window
         }
     }
 }
-

@@ -6,11 +6,29 @@ using HtmlAgilityPack;
 namespace Kachalka;
 public sealed class LiveCatalog(SourceClient client)
 {
-    record DetailSnapshot(string Kinopoisk,string Imdb,string Description,string? OriginalTitle=null);
+    record DetailSnapshot(string Kinopoisk,string Imdb,string Description,string? OriginalTitle=null,string Genre="",string Country="",string[]? GenreKeys=null,string[]? CountryKeys=null);
     public const string Base="https://w6.zona.plus";
     static HtmlDocument Html(byte[] b){var h=new HtmlDocument();h.LoadHtml(Encoding.UTF8.GetString(b));return h;}
     static string Text(HtmlNode? n)=>HtmlEntity.DeEntitize(n?.InnerText??"").Trim();
     static string Class(string value)=>"contains(concat(' ',normalize-space(@class),' '),' "+value+" ')";
+    public static CatalogPage ParsePage(byte[] bytes,string section,int page)
+    {
+        var html=Html(bytes);
+        CatalogChoice[] Choices(string prefix)=> (html.DocumentNode.SelectNodes("//option[starts-with(@value,'"+prefix+"-')]")??new HtmlNodeCollection(null))
+            .Select(n=>new CatalogChoice(n.GetAttributeValue("value","")[(prefix.Length+1)..],Text(n))).DistinctBy(x=>x.Key).ToArray();
+        var hasNext=(html.DocumentNode.SelectNodes("//a[@href]")??new HtmlNodeCollection(null)).Any(n=>Regex.IsMatch(HtmlEntity.DeEntitize(n.GetAttributeValue("href","")),@"[?&]page="+(page+1)+@"(?:&|$)"));
+        return new(Parse(bytes,section).DistinctBy(x=>x.Id).ToArray(),hasNext&&page<CatalogPaging.Limit,Choices("genre"),Choices("country"));
+    }
+    public async Task<CatalogPage> BrowsePage(string section,int page,CatalogSelection selection,CancellationToken ct)
+    {
+        var path=section=="Сериалы"?"/tvseries":"/movies";
+        var filter=selection.Filter;
+        var url=Base+path+(filter.Length>0?"/filter/"+filter:"")+"?page="+Math.Clamp(page,1,CatalogPaging.Limit);
+        var cache=System.IO.Path.Combine(Preferences.DataDir,"catalog",Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(url)))+".html");
+        byte[] bytes;
+        try{bytes=await client.Read(new Uri(url),4*1024*1024,ct);var parsed=ParsePage(bytes,section,page);if(parsed.Items.Length==0&&parsed.Genres.Length==0)throw new System.IO.InvalidDataException("Источник вернул страницу без каталога.");System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(cache)!);await System.IO.File.WriteAllBytesAsync(cache,bytes,ct);return parsed;}
+        catch(Exception) when(!ct.IsCancellationRequested&&System.IO.File.Exists(cache)){bytes=await System.IO.File.ReadAllBytesAsync(cache,ct);return ParsePage(bytes,section,page);}
+    }
     public static IReadOnlyList<MediaItem> Parse(byte[] bytes,string section)
     {
         var h=Html(bytes);var cards=h.DocumentNode.SelectNodes("//li["+Class("results-item-wrap")+"]");if(cards==null)return [];
@@ -38,14 +56,17 @@ public sealed class LiveCatalog(SourceClient client)
             var h=Html(await client.Read(SourceClient.WebUri(item.PageUrl!),4*1024*1024,ct));
             string Score(string name){var v=Text(h.DocumentNode.SelectSingleNode("//*["+Class(name)+"]"));return Regex.IsMatch(v,@"^\d{1,2}([.,]\d)?$")?v:"—";}
             var original=HtmlEntity.DeEntitize(h.DocumentNode.SelectSingleNode("//meta[@itemprop='alternativeHeadline']")?.GetAttributeValue("content","")??"").Trim();
-            var result=item with{Kinopoisk=Score("entity-rating-kp"),Imdb=Score("entity-rating-imdb"),Description=Text(h.DocumentNode.SelectSingleNode("//*[@itemprop='description' and not(self::meta)]")),OriginalTitle=original.Length==0?null:original};
-            try{System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(cache)!);await System.IO.File.WriteAllTextAsync(cache,JsonSerializer.Serialize(new DetailSnapshot(result.Kinopoisk,result.Imdb,result.Description??"",result.OriginalTitle)),ct);}catch(System.IO.IOException){}
+            var genres=(h.DocumentNode.SelectNodes("//*[@itemprop='genre']")??new HtmlNodeCollection(null)).Select(Text).Distinct().ToArray();
+            HtmlNode[] Links(string prefix)=>(h.DocumentNode.SelectNodes("//a[contains(@href,'/filter/"+prefix+"-')]")??new HtmlNodeCollection(null)).ToArray();
+            string[] Keys(string prefix)=>Links(prefix).Select(n=>n.GetAttributeValue("href","").Split("/filter/"+prefix+"-")[1]).Distinct().ToArray();
+            var result=item with{Kinopoisk=Score("entity-rating-kp"),Imdb=Score("entity-rating-imdb"),Description=Text(h.DocumentNode.SelectSingleNode("//*[@itemprop='description' and not(self::meta)]")),OriginalTitle=original.Length==0?null:original,Genre=string.Join(", ",genres),Country=string.Join(", ",Links("country").Select(Text).Distinct()),GenreKeys=Keys("genre"),CountryKeys=Keys("country")};
+            try{System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(cache)!);await System.IO.File.WriteAllTextAsync(cache,JsonSerializer.Serialize(new DetailSnapshot(result.Kinopoisk,result.Imdb,result.Description??"",result.OriginalTitle,result.Genre,result.Country,result.GenreKeys,result.CountryKeys)),ct);}catch(System.IO.IOException){}
             return result;
         }
         catch(Exception) when(!ct.IsCancellationRequested&&System.IO.File.Exists(cache))
         {
             var saved=JsonSerializer.Deserialize<DetailSnapshot>(await System.IO.File.ReadAllTextAsync(cache,ct))!;
-            return item with{Kinopoisk=saved.Kinopoisk,Imdb=saved.Imdb,Description=saved.Description,OriginalTitle=saved.OriginalTitle};
+            return item with{Kinopoisk=saved.Kinopoisk,Imdb=saved.Imdb,Description=saved.Description,OriginalTitle=saved.OriginalTitle,Genre=saved.Genre,Country=saved.Country,GenreKeys=saved.GenreKeys??[],CountryKeys=saved.CountryKeys??[]};
         }
     }
     public async Task<IReadOnlyList<SourceEntry>> Releases(string title,CancellationToken ct)

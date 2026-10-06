@@ -4,7 +4,7 @@ Unicode true
 !include "x64.nsh"
 !include "WinVer.nsh"
 !ifndef VERSION
-  !define VERSION "0.19.0"
+  !define VERSION "0.20.0"
 !endif
 !ifndef APP_DIR
   !error "Supply APP_DIR with the published application folder"
