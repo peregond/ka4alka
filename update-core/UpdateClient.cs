@@ -5,7 +5,7 @@ namespace Kachalka.Updates;
 
 public sealed record UpdateOffer(UpdateManifest Manifest, byte[] ManifestBytes, byte[] Signature);
 
-public sealed class UpdateClient : IDisposable
+public sealed partial class UpdateClient : IDisposable
 {
     readonly HttpClient client;
     readonly string publicKey;
@@ -20,13 +20,15 @@ public sealed class UpdateClient : IDisposable
         (uri.Host == "release-assets.githubusercontent.com" ||
          (uri.Host == "github.com" && uri.AbsolutePath.StartsWith("/" + UpdateManifest.Repository + "/releases/", StringComparison.Ordinal)));
 
-    async Task<HttpResponseMessage> OpenAsync(string url, CancellationToken cancellation)
+    async Task<HttpResponseMessage> OpenAsync(string url, CancellationToken cancellation, System.Net.Http.Headers.RangeHeaderValue? range=null)
     {
         var uri = new Uri(url);
         for (int redirects = 0; redirects <= 5; redirects++)
         {
             if (!AllowedUri(uri)) throw new InvalidDataException("Недопустимый адрес обновления.");
-            var response = await client.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, cancellation);
+            using var request=new HttpRequestMessage(HttpMethod.Get,uri);
+            request.Headers.Range=range;
+            var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellation);
             // Also reject a handler that followed a redirect without our validation.
             if (response.RequestMessage?.RequestUri is { } final && !AllowedUri(final))
             { response.Dispose(); throw new InvalidDataException("Недопустимое перенаправление обновления."); }

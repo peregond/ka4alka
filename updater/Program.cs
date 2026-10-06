@@ -13,7 +13,7 @@ try
 {
     var job = JsonSerializer.Deserialize<UpdateJob>(File.ReadAllText(jobPath)) ?? throw new InvalidDataException("Missing job");
     if (!Guid.TryParseExact(job.Id, "N", out _) || Path.GetFileName(work) != job.Id ||
-        new[] { job.ArchivePath, job.ManifestPath, job.SignaturePath }.Any(p => !UpdateArchive.Inside(p, work)))
+        new[] { job.ArchivePath, job.ManifestPath, job.SignaturePath,job.ComponentsPath,job.ComponentsDirectory }.Where(p=>p!=null).Any(p => !UpdateArchive.Inside(p!, work)))
         throw new InvalidDataException("Invalid update job");
     var install = Path.TrimEndingDirectorySeparator(Path.GetFullPath(job.InstallDirectory));
     if (Directory.GetParent(install) is null || UpdateArchive.Inside(AppContext.BaseDirectory, install) ||
@@ -34,7 +34,13 @@ try
     var parentDirectory = Path.GetDirectoryName(install)!;
     var candidate = Path.Combine(parentDirectory, ".kachalka-new-" + job.Id);
     var backup = Path.Combine(parentDirectory, ".kachalka-backup-" + job.Id);
-    UpdateArchive.ExtractVerified(job.ArchivePath, candidate, manifest);
+    if((job.ComponentsPath==null)!=(job.ComponentsDirectory==null))throw new InvalidDataException("Incomplete component job");
+    if(job.ComponentsPath!=null)
+    {
+        var catalog=ComponentCatalog.Verify(File.ReadAllBytes(job.ComponentsPath),manifest);
+        await UpdateComponents.AssembleAsync(install,job.ComponentsDirectory!,candidate,catalog,manifest,CancellationToken.None);
+    }
+    else UpdateArchive.ExtractVerified(job.ArchivePath,candidate,manifest);
     var marker = Path.Combine(work, "healthy");
     if (File.Exists(marker)) File.Delete(marker);
     await UpdateInstaller.ApplyAsync(install, candidate, backup, async () =>

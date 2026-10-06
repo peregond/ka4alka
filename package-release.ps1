@@ -1,6 +1,6 @@
 param(
- [string]$Version='0.21.1',
- [string]$ArchivePath='dist/Kachalka-0.21.zip',
+ [string]$Version='0.22.0',
+ [string]$ArchivePath='dist/Kachalka-0.22.zip',
  [string]$Repository='peregond/ka4alka',
  [string]$SigningKeyPath=$env:KACHALKA_SIGNING_KEY
 )
@@ -47,11 +47,17 @@ $packageFile=Join-Path $releaseDirectory 'Kachalka-win-x64.zip'
 Copy-Item -LiteralPath $archiveFile.FullName -Destination $packageFile -Force
 $hash=(Get-FileHash -LiteralPath $packageFile -Algorithm SHA256).Hash.ToLowerInvariant()
 $tag='v'+$Version
+$indexFile=Join-Path $releaseDirectory 'components.json'
+$sdk=Join-Path $PSScriptRoot '.tools/dotnet/dotnet.exe'
+if(-not(Test-Path -LiteralPath $sdk)){$sdk='dotnet'}
+& $sdk run --project (Join-Path $PSScriptRoot 'update-tests/Kachalka.UpdateTests.csproj') -c Release -- --create-component-index $packageFile $Version $indexFile
+if($LASTEXITCODE -ne 0){throw 'Component inventory generation failed'}
 $manifest=[ordered]@{
  schemaVersion=1;appId='kachalka';channel='stable';version=$Version;platform='win-x64';minimumWindows='10'
  package=[ordered]@{url=('https://github.com/'+$Repository+'/releases/download/'+$tag+'/Kachalka-win-x64.zip');fileName='Kachalka-win-x64.zip';size=(Get-Item -LiteralPath $packageFile).Length;sha256=$hash;format='portable-zip'}
  releaseNotesUrl=('https://github.com/'+$Repository+'/releases/tag/'+$tag)
  automaticInstallationAvailable=$true
+ components=[ordered]@{url=('https://github.com/'+$Repository+'/releases/download/'+$tag+'/components.json');size=(Get-Item -LiteralPath $indexFile).Length;sha256=(Get-FileHash -LiteralPath $indexFile -Algorithm SHA256).Hash.ToLowerInvariant()}
 }
 $manifest | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $releaseDirectory 'latest.json') -Encoding utf8NoBOM
 try{

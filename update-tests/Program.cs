@@ -14,9 +14,22 @@ if (args.Length == 2 && args[0] == "--verify-release")
         var release=Path.GetFullPath(args[1]);
         var manifest=UpdateManifest.Verify(File.ReadAllBytes(Path.Combine(release,"latest.json")),File.ReadAllBytes(Path.Combine(release,"latest.sig")),UpdateTrust.PublicKey);
         UpdateArchive.ExtractVerified(Path.Combine(release,"Kachalka-win-x64.zip"),Path.Combine(root,"release"),manifest);
+        if(manifest.Components!=null)
+        {
+            var catalog=ComponentCatalog.Verify(File.ReadAllBytes(Path.Combine(release,"components.json")),manifest);
+            var generated=ComponentCatalog.Create(Path.Combine(release,"Kachalka-win-x64.zip"),manifest.Version);
+            if(!catalog.Files.SequenceEqual(generated.Files))throw new InvalidDataException("Component offsets or hashes differ from signed archive");
+            Console.WriteLine("PASS: signed component index, ZIP offsets and all file hashes: "+catalog.Files.Length);
+        }
         Console.WriteLine("PASS: published package signature, size, SHA256, archive paths and assembly version "+manifest.Version);
         return 0;
     }
+    catch(Exception e){Console.Error.WriteLine(e);return 1;}
+    finally{Directory.Delete(root,true);}
+}
+if(args.Length>0 && args[0] is "--create-component-index" or "--prepare-components")
+{
+    try{return await ComponentTools.Run(args);}
     catch(Exception e){Console.Error.WriteLine(e);return 1;}
     finally{Directory.Delete(root,true);}
 }
@@ -108,6 +121,7 @@ try
         Check(File.ReadAllText(data)=="user queue", "queue outside installation preserved");
     }
     await Transaction(true);await Transaction(false);
+    checks+=await ComponentChecks.Run(root);
     Check(UpdateTrust.PublicKey.Contains("BEGIN PUBLIC KEY"), "publisher key embedded in shared core");
     Console.WriteLine($"All {checks} updater checks passed.");return 0;
 }
