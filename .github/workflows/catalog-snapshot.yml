@@ -1,0 +1,28 @@
+name: Refresh catalog snapshot
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/catalog-expand-0.21]
+    paths: [.github/workflows/catalog-snapshot.yml, scripts/collect-catalog.py]
+permissions:
+  contents: write
+jobs:
+  catalog:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+      - name: Fetch real catalog pages
+        run: python scripts/collect-catalog.py
+      - name: Save refreshed snapshot
+        shell: pwsh
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add web-index/app/data/seed.json
+          git diff --cached --quiet
+          if ($LASTEXITCODE -eq 0) { exit 0 }
+          git commit -m 'Refresh catalog snapshot with over 2000 real movies'
+          git push origin HEAD:${{ github.ref_name }}
