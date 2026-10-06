@@ -1,0 +1,21 @@
+name: Inspect public catalog metadata
+on:
+  push:
+    branches: [codex/catalog-pages-0.20]
+    paths: [.github/workflows/catalog-source-probe.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: windows-latest
+    steps:
+      - shell: pwsh
+        run: |
+          $html=(Invoke-WebRequest 'https://w6.zona.plus/movies/filter/sort-date' -TimeoutSec 30).Content
+          [regex]::Matches($html,'href="([^"]+)"') | ForEach-Object {$_.Groups[1].Value} | Where-Object {$_ -match 'filter|genre|country|collection'} | Select-Object -Unique -First 120
+          $card=[regex]::Match($html,'<li class="results-item-wrap"[\s\S]*?</li>').Value
+          Write-Output $card
+          $path=[regex]::Match($card,'href="(/movies/[^"]+)"').Groups[1].Value
+          $detail=(Invoke-WebRequest ('https://w6.zona.plus'+$path) -TimeoutSec 30).Content
+          [regex]::Matches($detail,'.{0,160}(?:genre|country|sort-|itemprop="[^"]+").{0,200}') | ForEach-Object {$_.Value} | Select-Object -First 70
