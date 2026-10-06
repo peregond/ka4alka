@@ -39,11 +39,11 @@ public partial class MainWindow
         var wheel=new MouseWheelEventArgs(Mouse.PrimaryDevice,Environment.TickCount,-120){RoutedEvent=Mouse.PreviewMouseWheelEvent};poster.RaiseEvent(wheel);await Task.Delay(250);UpdateLayout();
         Check(wheel.Handled&&scroll.VerticalOffset>0,"wheel scrolls cards within paged catalog");
         scroll.ScrollToEnd();await Task.Delay(100);UpdateLayout();
-        Check(Page(2).TransformToAncestor(scroll).Transform(new Point()).Y>=0,"page navigation is reachable below the cards");
-        Page(2).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await Settle();
+        Check(Page(2).TransformToAncestor(scroll).Transform(new Point()).Y>=0&&Page(2).TransformToAncestor(scroll).Transform(new Point()).Y<scroll.ViewportHeight,"page navigation is reachable below the cards");
+        Page(2).RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Settle();
         Check(livePage==2&&liveItems.Count==40&&!liveItems.Select(x=>x.Id).Intersect(first).Any(),"page 2 replaces page 1 without overlapping cards");
         Check(FindVisual<ScrollViewer>(Body,_=>true)!.VerticalOffset<1,"page change returns to top");
-        Page(1).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await Settle();Check(liveItems.Select(x=>x.Id).SequenceEqual(first),"returning to page 1 restores its cards");
+        Page(1).RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Settle();Check(liveItems.Select(x=>x.Id).SequenceEqual(first),"returning to page 1 restores its cards");
         Choose("Жанр","komediia");await Settle();Check(livePage==1&&liveItems.All(x=>x.GenreKeys.Contains("komediia")),"genre filter resets pagination and applies to source selection");
         Choose("Страна","ssha");await Settle();Check(liveItems.Count==40&&liveItems.All(x=>x.CountryKeys.Contains("ssha")),"country and genre filters combine");
         Choose("Рейтинг от","8");await Settle();Check(liveItems.Count==40&&catalogRating==8,"rating threshold combines with genre and country");
@@ -51,7 +51,7 @@ public partial class MainWindow
         Choose("Подборка","rated");await Settle();Check(CatalogSelection.Filter=="rating-8/sort-rating","high-rating collection uses source rating threshold");
         var bitmap=new RenderTargetBitmap((int)ActualWidth,(int)ActualHeight,96,96,PixelFormats.Pbgra32);bitmap.Render(this);var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(bitmap));using(var file=File.Create(Path.Combine(output,"catalog.png")))png.Save(file);
         Width=680;Height=500;await Task.Delay(150);UpdateLayout();Check(FiltersPanel.Visibility==Visibility.Collapsed&&inlineFilterButton?.Visibility==Visibility.Visible,"narrow window exposes inline filters");
-        inlineFilterButton!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));UpdateLayout();Check(inlineCatalogFilters?.Visibility==Visibility.Visible,"inline filters open on narrow screens");
+        inlineFilterButton!.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));UpdateLayout();Check(inlineCatalogFilters?.Visibility==Visibility.Visible,"inline filters open on narrow screens");
         Close();
     }
 }

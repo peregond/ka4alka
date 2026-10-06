@@ -48,6 +48,9 @@ jobs:
             [System.IO.File]::WriteAllText($key,$env:RELEASE_SIGNING_KEY)
             ./build-release.ps1 -Version $env:RELEASE_VERSION -SigningKeyPath $key -MakeNsis 'C:/Program Files (x86)/NSIS/makensis.exe'
           } finally { Remove-Item $key -ErrorAction SilentlyContinue }
+      - name: Verify upgrade from previously published 0.19.0
+        shell: pwsh
+        run: ./tests/WindowsPublishedUpgrade.ps1 -ReleaseDirectory ('dist/release-'+$env:RELEASE_VERSION)
       - name: Upload verified files to draft GitHub Release
         shell: pwsh
         env:
@@ -85,4 +88,6 @@ jobs:
           path: |
             test-output/windows-update/checks.txt
             test-output/catalog-paging/*
+            test-output/published-upgrade/checks.txt
+            test-output/published-upgrade/data/updates/*/result.txt
             test-output/windows-update/data/updates/*/result.txt
