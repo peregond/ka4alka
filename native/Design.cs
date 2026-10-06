@@ -13,6 +13,11 @@ public partial class MainWindow
         var row=new StackPanel{Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center};
         var icon=new System.Windows.Shapes.Path{Data=(Geometry)FindResource(geometry),Width=size,Height=size,Stretch=Stretch.Uniform,StrokeThickness=1.7,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,StrokeLineJoin=PenLineJoin.Round,Margin=new Thickness(0,0,label.Length>0?10:0,0),VerticalAlignment=VerticalAlignment.Center};
         icon.SetBinding(Shape.StrokeProperty,new Binding("Foreground"){RelativeSource=new RelativeSource(RelativeSourceMode.FindAncestor,typeof(Button),1)});
+        if(geometry=="IconHeartFilled")
+        {
+            System.Windows.Data.BindingOperations.ClearBinding(icon,Shape.StrokeProperty);
+            icon.Fill=new SolidColorBrush(Color.FromRgb(224,79,98));icon.Stroke=icon.Fill;
+        }
         row.Children.Add(icon);if(label.Length>0)row.Children.Add(new TextBlock{Text=label,VerticalAlignment=VerticalAlignment.Center});return row;
     }
     Button ActionButton(string label,string icon,Action action,string style="QuietButton")

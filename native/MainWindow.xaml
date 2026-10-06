@@ -7,6 +7,8 @@
   <Geometry x:Key="IconSearch">M10,3 A7,7 0 1 1 9.99,3 M15,15 L21,21</Geometry>
   <Geometry x:Key="IconPlus">M12,4 L12,20 M4,12 L20,12</Geometry>
   <Geometry x:Key="IconHeart">M12,21 C9,18 3,14 3,8 C3,2 10,2 12,7 C14,2 21,2 21,8 C21,14 15,18 12,21 Z</Geometry>
+  <Geometry x:Key="IconHeartFilled">M12,21 C9,18 3,14 3,8 C3,2 10,2 12,7 C14,2 21,2 21,8 C21,14 15,18 12,21 Z</Geometry>
+
   <Geometry x:Key="IconTheme">M12,3 A9,9 0 1 1 11.99,3 M12,3 L12,21</Geometry>
   <Geometry x:Key="IconBack">M20,12 L4,12 M10,6 L4,12 10,18</Geometry>
   <Geometry x:Key="IconRefresh">M20,8 A8,8 0 1 0 20,16 M20,3 L20,8 15,8</Geometry>

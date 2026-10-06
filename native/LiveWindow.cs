@@ -29,41 +29,47 @@ public partial class MainWindow
     readonly CatalogIndex catalogIndex=new(Preferences.DataDir);
     readonly HashSet<int> requestedDetails=[];
     readonly Dictionary<int,Task<MediaItem>> cardMetadata=[];
-    readonly SemaphoreSlim metadataSlots=new(2);
+    readonly MetadataScheduler metadataScheduler=new();
+    readonly HashSet<int> priorityMetadata=[];
     readonly OnlineIndexClient onlineIndex;
-    Task<MediaItem> Metadata(MediaItem item)
+    Task<MediaItem> Metadata(MediaItem item,bool priority=false)
     {
-        if(cardMetadata.TryGetValue(item.Id,out var task))return task;
+        if(cardMetadata.TryGetValue(item.Id,out var task)&&(!priority||task.IsCompletedSuccessfully&&!string.IsNullOrWhiteSpace(task.Result.OriginalTitle)||priorityMetadata.Contains(item.Id)))return task;
         async Task<MediaItem> Load()
         {
-            await metadataSlots.WaitAsync();
+            if(priority)priorityMetadata.Add(item.Id);
             try
             {
-                MediaItem indexed;
-                try{indexed=await onlineIndex.Detail(item,CancellationToken.None);}
-                catch{return await new LiveCatalog(sourceClient).Detail(item,CancellationToken.None);}
-                if(!string.IsNullOrWhiteSpace(indexed.Description)&&indexed.GenreKeys.Length>0&&indexed.CountryKeys.Length>0)return indexed;
-                try
+                return await metadataScheduler.Run(priority,async ()=>
                 {
-                    var direct=await new LiveCatalog(sourceClient).Detail(indexed,CancellationToken.None);
-                    return direct with
+                    MediaItem indexed;
+                    try{indexed=await onlineIndex.Detail(item,CancellationToken.None);}
+                    catch{return await new LiveCatalog(sourceClient).Detail(item,CancellationToken.None);}
+                    if(!string.IsNullOrWhiteSpace(indexed.Description)&&indexed.GenreKeys.Length>0&&indexed.CountryKeys.Length>0&&(!priority||!string.IsNullOrWhiteSpace(indexed.OriginalTitle)))return indexed;
+                    try
                     {
-                        Description=string.IsNullOrWhiteSpace(direct.Description)?"Описание временно недоступно.":direct.Description,
-                        Kinopoisk=direct.Kinopoisk=="—"?indexed.Kinopoisk:direct.Kinopoisk,
-                        Imdb=direct.Imdb=="—"?indexed.Imdb:direct.Imdb,
-                        OriginalTitle=direct.OriginalTitle??indexed.OriginalTitle,
-                        Genre=direct.Genre,Country=direct.Country,GenreKeys=direct.GenreKeys,CountryKeys=direct.CountryKeys
-                    };
-                }
-                catch{return indexed with{Description="Описание временно недоступно."};}
+                        var direct=await new LiveCatalog(sourceClient).Detail(indexed,CancellationToken.None);
+                        return direct with
+                        {
+                            Description=string.IsNullOrWhiteSpace(direct.Description)?"Описание временно недоступно.":direct.Description,
+                            Kinopoisk=direct.Kinopoisk=="—"?indexed.Kinopoisk:direct.Kinopoisk,
+                            Imdb=direct.Imdb=="—"?indexed.Imdb:direct.Imdb,
+                            OriginalTitle=direct.OriginalTitle??indexed.OriginalTitle,
+                            Genre=direct.Genre,Country=direct.Country,GenreKeys=direct.GenreKeys,CountryKeys=direct.CountryKeys
+                        };
+                    }
+                    catch{return indexed with{Description="Описание временно недоступно."};}
+                });
             }
-            finally{metadataSlots.Release();}
+            finally{if(priority)priorityMetadata.Remove(item.Id);}
         }
         task=Load();if(cardMetadata.Count>=100)cardMetadata.Remove(cardMetadata.Keys.First());cardMetadata[item.Id]=task;return task;
     }
     async Task UpdateCardRatings(MediaItem item)
     {
-        try{var data=await Metadata(item);if(!closed)item.SetScores(data.Kinopoisk,data.Imdb);}catch{cardMetadata.Remove(item.Id); /* A missing rating stays unavailable. */ }
+        var task=Metadata(item);
+        try{var data=await task;if(!closed)item.SetScores(data.Kinopoisk,data.Imdb);}
+        catch{if(cardMetadata.TryGetValue(item.Id,out var latest)&&ReferenceEquals(task,latest))cardMetadata.Remove(item.Id); /* A missing rating stays unavailable. */ }
     }
     string catalogGenre="",catalogCountry="",catalogCollection="all";
     int catalogRating;
@@ -102,7 +108,7 @@ public partial class MainWindow
         }
         var tabs=new WrapPanel();
         topAll=Button("Все",()=>{favoritesOnly=false;catalogLastPage=null;livePage=1;Render();});topAll.Style=(Style)FindResource("PillButton");topAll.SetResourceReference(Control.BackgroundProperty,favoritesOnly?"Panel":"Selected");tabs.Children.Add(topAll);
-        topSaved=ActionButton("Сохранённое","IconHeart",()=>{liveRequest?.Cancel();liveLoading=false;liveError="";liveKey="";favoritesOnly=true;catalogCollection="all";if(catalogOrder=="По популярности")catalogOrder="Сначала новые";catalogLastPage=null;livePage=1;Render();},"PillButton");topSaved.SetResourceReference(Control.BackgroundProperty,favoritesOnly?"Selected":"Panel");tabs.Children.Add(topSaved);
+        topSaved=ActionButton("Сохранённое",favoritesOnly?"IconHeartFilled":"IconHeart",()=>{liveRequest?.Cancel();liveLoading=false;liveError="";liveKey="";favoritesOnly=true;catalogCollection="all";if(catalogOrder=="По популярности")catalogOrder="Сначала новые";catalogLastPage=null;livePage=1;Render();},"PillButton");topSaved.SetResourceReference(Control.BackgroundProperty,favoritesOnly?"Selected":"Panel");tabs.Children.Add(topSaved);
         AddCatalogFilters(tabs);
         inlineCatalogFilters=tabs;
         inlineCatalogFilterScroll=new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=tabs,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};
@@ -123,7 +129,7 @@ public partial class MainWindow
             var empty=new StackPanel{HorizontalAlignment=HorizontalAlignment.Center,MaxWidth=370,Margin=new(24)};
             var label=Text(liveLoading?"Загружаем подборку…":liveError.Length>0?"Каталог пока недоступен":"Ничего не найдено",23);label.FontWeight=FontWeights.SemiBold;label.TextAlignment=TextAlignment.Center;empty.Children.Add(label);
             var hint=Text(liveLoading?"Это займёт несколько секунд.":favoritesOnly?"Сохраняй фильмы и сериалы из карточки — они останутся под рукой.":"Попробуй другую страницу, запрос или сбрось фильтры.",13,true);hint.TextAlignment=TextAlignment.Center;empty.Children.Add(hint);
-            if(!liveLoading){var retry=ActionButton("Сбросить фильтры","IconRefresh",()=>ChangeCatalogFilter(ResetCatalogFilters));retry.HorizontalAlignment=HorizontalAlignment.Center;empty.Children.Add(retry);}
+            if(!liveLoading){var retry=ActionButton("Сбросить фильтры","IconRefresh",()=>ChangeCatalogFilter(()=>{favoritesOnly=false;ResetCatalogFilters();}));retry.HorizontalAlignment=HorizontalAlignment.Center;empty.Children.Add(retry);}
             content.Children.Add(empty);
         }
         var footer=new StackPanel{HorizontalAlignment=HorizontalAlignment.Center,Margin=new(5,18,8,18)};
@@ -251,7 +257,7 @@ public partial class MainWindow
         var scores=new WrapPanel{Margin=new(0,0,0,10)};
         Border Rating(string name,string value){var label=new TextBlock{Text=name+"  ",Foreground=(Brush)FindResource("Muted"),FontSize=11,VerticalAlignment=VerticalAlignment.Center};var rating=new TextBlock{Text=value,FontSize=14,FontWeight=FontWeights.SemiBold,Foreground=(Brush)FindResource("Text")};var row=new StackPanel{Orientation=Orientation.Horizontal};row.Children.Add(label);row.Children.Add(rating);return new Border{Child=row,Padding=new(10,6,10,6),Background=(Brush)FindResource("Selected"),CornerRadius=new(8),Margin=new(0,0,8,7)};}
         scores.Children.Add(Rating("Кинопоиск",item.Kinopoisk));scores.Children.Add(Rating("IMDb",item.Imdb));info.Children.Add(scores);
-        var favorite=ActionButton(prefs.Favorites.Contains(item.Id)?"Сохранено":"Сохранить","IconHeart",()=>{if(prefs.Favorites.Add(item.Id)){prefs.LiveFavorites.RemoveAll(x=>x.Id==item.Id);prefs.LiveFavorites.Add(item);}else{prefs.Favorites.Remove(item.Id);prefs.LiveFavorites.RemoveAll(x=>x.Id==item.Id);}prefs.Save();Render();},"PillButton");favorite.HorizontalAlignment=HorizontalAlignment.Left;favorite.Margin=new(0,0,0,14);info.Children.Add(favorite);
+        var favorite=ActionButton(prefs.Favorites.Contains(item.Id)?"Сохранено":"Сохранить",prefs.Favorites.Contains(item.Id)?"IconHeartFilled":"IconHeart",()=>{if(prefs.Favorites.Add(item.Id)){prefs.LiveFavorites.RemoveAll(x=>x.Id==item.Id);prefs.LiveFavorites.Add(item);}else{prefs.Favorites.Remove(item.Id);prefs.LiveFavorites.RemoveAll(x=>x.Id==item.Id);}prefs.Save();Render();},"PillButton");favorite.HorizontalAlignment=HorizontalAlignment.Left;favorite.Margin=new(0,0,0,14);info.Children.Add(favorite);
         detailDescription=new StackPanel();Grid.SetColumn(detailDescription,1);Grid.SetRow(detailDescription,1);detailHero.Children.Add(detailDescription);
         detailSynopsis=Text(item.Description??"Загружаем описание…",13,true);detailSynopsis.Name="DetailSynopsis";detailSynopsis.LineHeight=20;detailSynopsis.MaxHeight=descriptionExpanded?double.PositiveInfinity:60;detailSynopsis.TextTrimming=TextTrimming.CharacterEllipsis;detailSynopsis.Margin=new(0);detailDescription.Children.Add(detailSynopsis);
         descriptionToggle=Button(descriptionExpanded?"Свернуть описание":"Читать дальше",()=>{descriptionExpanded=!descriptionExpanded;Render();});descriptionToggle.Name="DescriptionToggle";descriptionToggle.Style=(Style)FindResource("QuietButton");descriptionToggle.HorizontalAlignment=HorizontalAlignment.Left;descriptionToggle.Padding=new(0,5,0,5);descriptionToggle.Margin=new(0);descriptionToggle.MinHeight=26;descriptionToggle.Visibility=Visibility.Collapsed;detailDescription.Children.Add(descriptionToggle);

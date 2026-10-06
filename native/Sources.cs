@@ -10,7 +10,7 @@ public record SourceEntry(string Id,string Title,string Source,string PageUrl,st
 {
     public string? Via {get;init;}
     public SeriesReleaseInfo Series => SeriesReleaseInfo.Parse(Title);
-    public string Quality => System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(2160|4K|UHD)")?"2160p":System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(1080|FullHD)")?"1080p":System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(720|HDTV)")?"720p":"Не указано";
+    public string Quality => System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(2160[pi]?\b|\b4[ .-]?K\b|\bUHD\b)")?"4K":System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(1080[pi]?\b|\bFull[ .-]?HD\b)")?"Full HD":System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(720p?\b|HD[ .-]?Ready\b)")?"HD Ready":"Не указано";
     public string Type => System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(Blu.?Ray|BDRip|BDRemux)")?"BluRay":System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(WEB.?DL|WEBRip)")?"WEB-DL":"Не указано";
     public string Voice => System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(дубляж|дублирован|DUB)")?"Дубляж":System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(многоголос|MVO)")?"Многоголосая":System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(оригинал|Original|ENG)")?"Оригинал":"Не указано";
     public string Subs => System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(субтитр|subs|subbed)")?"Есть":"Не указано";

@@ -40,6 +40,13 @@ public partial class MainWindow
         genreMenuButton.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Task.Delay(100);
         Check(genreMenuButton.ContextMenu is {IsOpen:true,ActualHeight:>0},"genre pill opens a visible dropdown menu");genreMenuButton.ContextMenu!.IsOpen=false;
         Check(!VisualElements<Button>(Body).Any(b=>b.Content?.ToString()?.Contains("Показать ещё")==true),"catalog has no load-more button");
+        prefs.LiveFavorites=[];topSaved!.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Settle();
+        Check(favoritesOnly&&catalogDisplay.Count==0,"empty Saved section is shown without catalog rows");
+        Check(VisualElements<System.Windows.Shapes.Path>(topSaved!).Any(x=>x.Fill is SolidColorBrush brush&&brush.Color==Color.FromRgb(224,79,98)),"active Saved heart is filled red");
+        var emptyReset=FindVisual<Button>(Body,x=>AutomationProperties.GetName(x)=="Сбросить фильтры")??throw new Exception("Missing reset button in empty Saved");
+        emptyReset.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Settle();
+        Check(!favoritesOnly&&CatalogSelection.IsDefault&&livePage==1&&catalogDisplay.Count==40,"empty Saved reset returns to All with its first page");
+        Check(VisualElements<System.Windows.Shapes.Path>(topSaved!).All(x=>x.Fill==null),"Saved heart returns to outline in All");
         var scroll=FindVisual<ScrollViewer>(Body,_=>true)!;
         var first=liveItems.Select(x=>x.Id).ToArray();
         var poster=VisualElements<Button>(catalogList!).First(x=>x.Tag is MediaItem);
@@ -63,6 +70,19 @@ public partial class MainWindow
         var bitmap=new RenderTargetBitmap((int)ActualWidth,(int)ActualHeight,96,96,PixelFormats.Pbgra32);bitmap.Render(this);var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(bitmap));using(var file=File.Create(Path.Combine(output,"catalog.png")))png.Save(file);
         MinWidth=360;Width=680;Height=500;await Task.Delay(150);UpdateLayout();Check(FiltersPanel.Visibility==Visibility.Collapsed&&inlineCatalogFilters?.Visibility==Visibility.Visible,"top filters remain available in narrow windows");
         Height=360;await Task.Delay(150);UpdateLayout();Check(inlineCatalogFilterScroll is {ScrollableHeight:>0}&&Body.ActualHeight>25,$"short window scrolls all filter choices and retains space for cards (window={ActualHeight}, filters={inlineCatalogFilterScroll?.ActualHeight}, scroll={inlineCatalogFilterScroll?.ScrollableHeight}, cards={Body.ActualHeight})");
+        MinWidth=1280;Width=1280;Height=800;await Task.Delay(100);UpdateLayout();
+        current=rows[0] with{PageUrl=LiveCatalog.Base+"/movies/fixture-one"};requestedDetails.Add(current.Id);prefs.Favorites.Add(current.Id);
+        SourceEntry Release(string id,string resolution,int seeds)=>new(id,"Фильм 1 (2024) "+resolution,"Fixture","https://example.test/"+id,"magnet:?xt=urn:btih:"+new string(id[0],40),null,1024,seeds);
+        liveReleases[current.Id]=[Release("a","720p",100),Release("b","1080p",50),Release("c","2160p",1)];Render();UpdateLayout();
+        var qualityBox=FindVisual<ComboBox>(Body,x=>AutomationProperties.GetName(x)=="Раздачи: Качество")??throw new Exception("Missing release quality selector in movie detail");
+        Check(qualityBox.Items.Cast<string>().SequenceEqual(["Все","HD Ready","Full HD","4K"]),"release quality menu displays friendly resolution names");
+        var qualitySort=FindVisual<ComboBox>(Body,x=>AutomationProperties.GetName(x)=="Сортировка раздач")!;
+        qualitySort.SelectedItem="Выше качество";UpdateLayout();
+        Check(VisualElements<Button>(Body).Select(x=>x.Tag).OfType<SourceEntry>().Select(x=>x.Quality).SequenceEqual(["4K","Full HD","HD Ready"]),"friendly quality names still sort by actual resolution");
+        qualityBox.SelectedItem="Full HD";UpdateLayout();
+        Check(VisualElements<Button>(Body).Select(x=>x.Tag).OfType<SourceEntry>().Select(x=>x.Quality).SequenceEqual(["Full HD"]),"Full HD filter keeps only matching releases");
+        var savedFilm=FindVisual<Button>(PageHeader,x=>AutomationProperties.GetName(x)=="Сохранено")??FindVisual<Button>(Body,x=>AutomationProperties.GetName(x)=="Сохранено");
+        Check(savedFilm!=null&&VisualElements<System.Windows.Shapes.Path>(savedFilm).Any(x=>x.Fill!=null),"saved movie detail heart is filled too");
         Close();
     }
 }

@@ -15,7 +15,7 @@ public partial class MainWindow
     }
     readonly Dictionary<int,ReleasePickerState> releasePickerStates=[];
 
-    static int QualityRank(SourceEntry entry)=>entry.Quality switch{"2160p"=>3,"1080p"=>2,"720p"=>1,_=>0};
+    static int QualityRank(SourceEntry entry)=>entry.Quality switch{"4K"=>3,"Full HD"=>2,"HD Ready"=>1,_=>0};
     static int SeedRank(SourceEntry entry)=>entry.Seeds switch{>0=>entry.Seeds.Value,null=>0,_=>-1};
     static string VideoLabel(SourceEntry entry)
     {

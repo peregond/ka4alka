@@ -29,7 +29,7 @@ try{
  $catalogEvidence=Join-Path $root 'test-output/catalog-paging'
  $ui=Start-Process (Join-Path $root ('dist/Kachalka-'+$short+'/Kachalka.exe')) -ArgumentList @('--catalog-paging-smoke-test',('"'+$catalogEvidence+'"')) -PassThru
  if(-not $ui.WaitForExit(60000)){ $ui.Kill($true);throw 'Catalog UI smoke timed out' }
- if(Test-Path (Join-Path $catalogEvidence 'error.txt')){throw (Get-Content (Join-Path $catalogEvidence 'error.txt') -Raw)}
+ if(Test-Path (Join-Path $catalogEvidence 'error.txt')){if(Test-Path (Join-Path $catalogEvidence 'checks.txt')){Get-Content (Join-Path $catalogEvidence 'checks.txt') | Write-Output};throw (Get-Content (Join-Path $catalogEvidence 'error.txt') -Raw)}
  if(-not(Test-Path (Join-Path $catalogEvidence 'checks.txt'))){throw 'Catalog UI evidence missing'}
  Get-Content (Join-Path $catalogEvidence 'checks.txt')
  $uninstall=Join-Path $root '.tools/uninstall-files.nsh'

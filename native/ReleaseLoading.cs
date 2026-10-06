@@ -32,7 +32,7 @@ public partial class MainWindow
         {
             try
             {
-                var detail=await Metadata(item);
+                var detail=await Metadata(item,true);
                 if(IsCurrent())
                 {
                     item.SetScores(detail.Kinopoisk,detail.Imdb);detail.SetScores(detail.Kinopoisk,detail.Imdb);
@@ -66,7 +66,7 @@ public partial class MainWindow
             if(indexed.Items.Length==0||indexed.Items.All(x=>x.TorrentUrl==null))
             {
                 MediaItem resolved;
-                try{resolved=await detailTask.WaitAsync(TimeSpan.FromSeconds(3),token);}catch(TimeoutException){resolved=item;}
+                try{resolved=await detailTask.WaitAsync(TimeSpan.FromSeconds(8),token);}catch(TimeoutException){resolved=item;}
                 var api=new LiveCatalog(sourceClient);
                 var aliases=new[]{resolved.Title,resolved.OriginalTitle}.Where(x=>!string.IsNullOrWhiteSpace(x)).Cast<string>().Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
                 async Task<IReadOnlyList<SourceEntry>> Aliases(Func<string,CancellationToken,Task<IReadOnlyList<SourceEntry>>> search,CancellationToken ct)
