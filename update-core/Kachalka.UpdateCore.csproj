@@ -1,4 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><!-- Keep unchanged update components byte-stable across application-only commits. --><IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion><TargetFramework>net10.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
+  <!-- Release builds from tests must use the same settings as publication.
+       Portable PDB/SourceLink identities otherwise change with every commit. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+  </PropertyGroup>
   <ItemGroup><EmbeddedResource Include="update-public.pem" /></ItemGroup>
 </Project>
