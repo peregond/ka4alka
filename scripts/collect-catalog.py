@@ -41,4 +41,6 @@ for section, path, pages in [('movies', 'movies', 60), ('series', 'tvseries', 10
         time.sleep(.25)
 assert sum(x['section'] == 'movies' for x in items.values()) >= 2000, 'Need at least 2000 distinct real movies'
 (ROOT / 'web-index/app/data/seed.json').write_text(json.dumps(list(items.values()), ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+starter = [x for section in ['movies', 'series'] for x in [v for v in items.values() if v['section'] == section][:40]]
+(ROOT / 'web-index/app/data/starter.json').write_text(json.dumps(starter, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
 print('Saved', len(items), 'real entries', flush=True)

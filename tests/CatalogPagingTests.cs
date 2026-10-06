@@ -6,6 +6,11 @@ static class CatalogPagingTests
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken ct)
         {
+            if(request.RequestUri!.AbsolutePath=="/api/catalog")
+            {
+                var payload=System.Text.Json.JsonSerializer.Serialize(new{items=Enumerable.Range(1,40).Select(x=>new{id="movies:window-"+x,section="movies",title="Фильм "+x,year=2024,pageUrl="https://w6.zona.plus/movies/window-"+x}),hasMore=false});
+                return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK){Content=new StringContent(payload,Encoding.UTF8,"application/json")});
+            }
             var page=int.Parse(System.Text.RegularExpressions.Regex.Match(request.RequestUri!.Query,@"page=(\d+)").Groups[1].Value);
             var cards=string.Concat(Enumerable.Range((page-1)*60+1,60).Select(x=>$"<li class='results-item-wrap'><a itemprop='url' href='/movies/window-{x}'><span itemprop='name'>Фильм {x}</span></a></li>"));
             var next=page<3?$"<link rel='next' href='/movies/filter/sort-date?page={page+1}'>":"";
@@ -29,6 +34,8 @@ static class CatalogPagingTests
         Check(CatalogPaging.SourceWindow(1)==(1,0)&&CatalogPaging.SourceWindow(2)==(1,40)&&CatalogPaging.SourceWindow(3)==(2,20),"40-card pages cover 60-card source pages without skipping films");
         using(var client=new SourceClient(new SourcePages()))
         {
+            var apiPage=new OnlineIndexClient(client,new Uri("https://index.example.test/")).BrowsePage("Фильмы",1,CancellationToken.None).GetAwaiter().GetResult();
+            Check(apiPage.Items.Length==40&&!apiPage.HasNext,"native client respects backend hasMore=false even on a full last page");
             var catalog=new LiveCatalog(client);var all=new List<MediaItem>();
             for(var n=1;n<=5;n++)
             {

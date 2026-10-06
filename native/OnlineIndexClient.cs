@@ -88,6 +88,16 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null)
         return items.EnumerateArray().Take(80).Where(x=>x.ValueKind==JsonValueKind.Object).Select(x=>Media(x,section)).OfType<MediaItem>().DistinctBy(x=>x.Id).ToArray();
     }
 
+    public async Task<CatalogPage> BrowsePage(string section,int page,CancellationToken ct)
+    {
+        var key=SectionKey(section)??throw new ArgumentOutOfRangeException(nameof(section));
+        using var json=await Get("api/catalog?section="+key+"&page="+Math.Clamp(page,1,CatalogPaging.Limit),ct);
+        if(!json.RootElement.TryGetProperty("items",out var rows)||rows.ValueKind!=JsonValueKind.Array)throw new InvalidDataException("Онлайн-индекс вернул неверный каталог.");
+        var items=rows.EnumerateArray().Take(CatalogPaging.Size).Where(x=>x.ValueKind==JsonValueKind.Object).Select(x=>Media(x,section)).OfType<MediaItem>().DistinctBy(x=>x.Id).ToArray();
+        var hasNext=json.RootElement.TryGetProperty("hasMore",out var next)&&next.ValueKind is JsonValueKind.True or JsonValueKind.False?next.GetBoolean():items.Length==CatalogPaging.Size;
+        return new(items,hasNext&&page<CatalogPaging.Limit,[],[]);
+    }
+
     public async Task<MediaItem> Detail(MediaItem item,CancellationToken ct)
     {
         var id=IdFor(item)??throw new InvalidDataException("Карточка не связана с онлайн-индексом.");

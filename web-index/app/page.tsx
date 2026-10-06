@@ -8,7 +8,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { ReleaseList } from "@/components/release-list";
 import { normalize, type Media, type Section } from "@/lib/catalog-source";
 import type { Release } from "@/lib/index-store";
-import seed from "./data/seed.json";
+import seed from "./data/starter.json";
 
 const initial = seed as Media[];
 const savedPosters = new Map(initial.filter(item=>item.poster?.startsWith("/posters/")).map(item=>[item.id,item.poster!]));

@@ -197,8 +197,8 @@ public partial class MainWindow
                     {
                         try
                         {
-                            var indexed=await onlineIndex.Browse(category,"",page,token);
-                            result=indexed.Count>0?new(indexed.Take(CatalogPaging.Size).ToArray(),indexed.Count>=CatalogPaging.Size&&page<CatalogPaging.Limit,[],[]):BundledCatalog.Page(category,page);
+                            result=await onlineIndex.BrowsePage(category,page,token);
+                            if(result.Items.Length==0)result=BundledCatalog.Page(category,page);
                         }
                         catch(Exception) when(!token.IsCancellationRequested){result=BundledCatalog.Page(category,page);}
                         liveError="Сохранённый каталог · источник временно недоступен";
