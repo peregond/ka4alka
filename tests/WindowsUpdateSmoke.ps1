@@ -19,15 +19,24 @@ try{
 $folder=Join-Path $state 'downloads';New-Item -ItemType Directory -Force $folder | Out-Null
 @{Folder=$folder;FolderConfigured=$true;AutoResumeDownloads=$false;CheckForUpdates=$false;AutoUpdate=$false} | ConvertTo-Json | Set-Content (Join-Path $state 'settings.json') -Encoding utf8NoBOM
 $started=@()
+$version=([xml](Get-Content native/Kachalka.csproj)).Project.PropertyGroup.Version
+$nextVersion=([Version]$version).Major.ToString()+'.'+([Version]$version).Minor+'.'+(([Version]$version).Build+1)
+$short=([Version]$version).ToString(2)
 try{
  dotnet run --project update-tests/Kachalka.UpdateTests.csproj -c Release
  if($LASTEXITCODE -ne 0){throw 'Updater tests failed'}
- ./build.ps1 -Test -OutputDir 'dist/Kachalka-0.19'
+ ./build.ps1 -Test -OutputDir ('dist/Kachalka-'+$short)
+ $catalogEvidence=Join-Path $root 'test-output/catalog-paging'
+ $ui=Start-Process (Join-Path $root ('dist/Kachalka-'+$short+'/Kachalka.exe')) -ArgumentList @('--catalog-paging-smoke-test',('"'+$catalogEvidence+'"')) -PassThru
+ if(-not $ui.WaitForExit(60000)){ $ui.Kill($true);throw 'Catalog UI smoke timed out' }
+ if(Test-Path (Join-Path $catalogEvidence 'error.txt')){throw (Get-Content (Join-Path $catalogEvidence 'error.txt') -Raw)}
+ if(-not(Test-Path (Join-Path $catalogEvidence 'checks.txt'))){throw 'Catalog UI evidence missing'}
+ Get-Content (Join-Path $catalogEvidence 'checks.txt')
  $uninstall=Join-Path $root '.tools/uninstall-files.nsh'
- ./installer/write-uninstall.ps1 -ApplicationDirectory 'dist/Kachalka-0.19' -OutputPath $uninstall
- $setup=Join-Path $evidence 'Kachalka-Setup-0.19.0.exe'
- $appDirectory=[System.IO.Path]::GetFullPath((Join-Path $root 'dist/Kachalka-0.19'))
- & 'C:/Program Files (x86)/NSIS/makensis.exe' '/V2' '/INPUTCHARSET' 'UTF8' '/DVERSION=0.19.0' ('/DAPP_DIR='+$appDirectory) ('/DAPP_GLOB='+$appDirectory+'\*') ('/DUNINSTALL_SCRIPT='+$uninstall) ('/DOUTPUT='+$setup) installer/Kachalka.nsi
+ ./installer/write-uninstall.ps1 -ApplicationDirectory ('dist/Kachalka-'+$short) -OutputPath $uninstall
+ $setup=Join-Path $evidence ('Kachalka-Setup-'+$version+'.exe')
+ $appDirectory=[System.IO.Path]::GetFullPath((Join-Path $root ('dist/Kachalka-'+$short)))
+ & 'C:/Program Files (x86)/NSIS/makensis.exe' '/V2' '/INPUTCHARSET' 'UTF8' ('/DVERSION='+$version) ('/DAPP_DIR='+$appDirectory) ('/DAPP_GLOB='+$appDirectory+'\*') ('/DUNINSTALL_SCRIPT='+$uninstall) ('/DOUTPUT='+$setup) installer/Kachalka.nsi
  if($LASTEXITCODE -ne 0){throw 'Installer failed'}
  $installer=Start-Process -FilePath $setup -ArgumentList '/S' -PassThru
  if(-not $installer.WaitForExit(60000) -or $installer.ExitCode -ne 0){throw 'Silent installation failed'}
@@ -38,33 +47,33 @@ try{
    $observed=@(Get-ChildItem -LiteralPath $desktop -Filter '*.lnk' -ErrorAction SilentlyContinue | ForEach-Object {$_.Name}) -join ', '
    throw ('Desktop shortcut missing in '+$desktop+'; observed: '+$observed)
  }
- if((Get-ItemProperty 'HKCU:/Software/Microsoft/Windows/CurrentVersion/Uninstall/Kachalka').DisplayVersion -ne '0.19.0'){throw 'Wrong installed version'}
- 'PASS: EXE installation, shortcut, registered version 0.19.0' | Add-Content (Join-Path $evidence 'checks.txt')
+ if((Get-ItemProperty 'HKCU:/Software/Microsoft/Windows/CurrentVersion/Uninstall/Kachalka').DisplayVersion -ne $version){throw 'Wrong installed version'}
+ ('PASS: EXE installation, shortcut, registered version '+$version) | Add-Content (Join-Path $evidence 'checks.txt')
 
- dotnet publish native/Kachalka.csproj -c Release -r win-x64 --self-contained true -p:Version=0.19.1 -p:DebugType=None -p:DebugSymbols=false -o dist/Kachalka-0.19.1
+ dotnet publish native/Kachalka.csproj -c Release -r win-x64 --self-contained true ("-p:Version="+$nextVersion) -p:DebugType=None -p:DebugSymbols=false -o ("dist/Kachalka-"+$nextVersion)
  if($LASTEXITCODE -ne 0){throw 'Next-version fixture build failed'}
- Copy-Item '.tools/updater-publish/Kachalka.Updater.exe' 'dist/Kachalka-0.19.1/'
- Compress-Archive -LiteralPath dist/Kachalka-0.19.1 -DestinationPath dist/Kachalka-0.19.1.zip -Force
- ./package-release.ps1 -Version 0.19.1 -ArchivePath dist/Kachalka-0.19.1.zip -SigningKeyPath $keyPath
- dotnet run --project update-tests/Kachalka.UpdateTests.csproj -c Release -- --verify-release dist/release-0.19.1
+ Copy-Item '.tools/updater-publish/Kachalka.Updater.exe' ('dist/Kachalka-'+$nextVersion+'/')
+ Compress-Archive -LiteralPath ("dist/Kachalka-"+$nextVersion) -DestinationPath ("dist/Kachalka-"+$nextVersion+".zip") -Force
+ ./package-release.ps1 -Version $nextVersion -ArchivePath ("dist/Kachalka-"+$nextVersion+".zip") -SigningKeyPath $keyPath
+ dotnet run --project update-tests/Kachalka.UpdateTests.csproj -c Release -- --verify-release ("dist/release-"+$nextVersion)
  if($LASTEXITCODE -ne 0){throw 'Signed fixture verification failed'}
  $old=Start-Process (Join-Path $install 'Kachalka.exe') -PassThru;$started+= $old
  $limit=(Get-Date).AddSeconds(30)
  while(-not $old.HasExited -and $old.MainWindowHandle -eq 0 -and (Get-Date) -lt $limit){Start-Sleep -Milliseconds 250;$old.Refresh()}
  if($old.HasExited -or $old.MainWindowHandle -eq 0){throw 'Installed WPF window did not open'}
  $id=[Guid]::NewGuid().ToString('N');$work=Join-Path $state ('updates/'+$id);New-Item -ItemType Directory -Force $work | Out-Null
- Copy-Item dist/release-0.19.1/Kachalka-win-x64.zip (Join-Path $work 'package.zip')
- Copy-Item dist/release-0.19.1/latest.json $work;Copy-Item dist/release-0.19.1/latest.sig $work
+ Copy-Item ("dist/release-"+$nextVersion+"/Kachalka-win-x64.zip") (Join-Path $work 'package.zip')
+ Copy-Item ("dist/release-"+$nextVersion+"/latest.json") $work;Copy-Item ("dist/release-"+$nextVersion+"/latest.sig") $work
  Copy-Item (Join-Path $install 'Kachalka.Updater.exe') (Join-Path $work 'updater.exe')
  $job=Join-Path $work 'job.json'
  @{InstallDirectory=$install;ArchivePath=(Join-Path $work 'package.zip');ManifestPath=(Join-Path $work 'latest.json');SignaturePath=(Join-Path $work 'latest.sig');ParentPid=$old.Id;ParentStartTicks=$old.StartTime.ToUniversalTime().Ticks;Id=$id} | ConvertTo-Json | Set-Content $job -Encoding utf8NoBOM
  $helper=Start-Process (Join-Path $work 'updater.exe') -ArgumentList @('--job',('"'+$job+'"')) -PassThru;$started+=$helper
  if(-not $old.CloseMainWindow() -or -not $old.WaitForExit(30000)){throw 'Old application did not close cleanly'}
  if(-not $helper.WaitForExit(90000) -or $helper.ExitCode -ne 0){throw 'Real Windows update failed; see result.txt'}
- if((Get-Content (Join-Path $work 'healthy') -Raw) -ne '0.19.1'){throw 'New WPF window failed health check'}
- if((Get-ItemProperty 'HKCU:/Software/Microsoft/Windows/CurrentVersion/Uninstall/Kachalka').DisplayVersion -ne '0.19.1'){throw 'Registered version not updated'}
+ if((Get-Content (Join-Path $work 'healthy') -Raw) -ne $nextVersion){throw 'New WPF window failed health check'}
+ if((Get-ItemProperty 'HKCU:/Software/Microsoft/Windows/CurrentVersion/Uninstall/Kachalka').DisplayVersion -ne $nextVersion){throw 'Registered version not updated'}
  if(-not(Test-Path (Join-Path $state 'settings.json')) -or -not(Test-Path $folder)){throw 'User state lost'}
- 'PASS: signed 0.19.0 -> 0.19.1 update, WPF startup, registry version and settings preserved' | Add-Content (Join-Path $evidence 'checks.txt')
+ ('PASS: signed '+$version+' -> '+$nextVersion+' update, WPF startup, registry version and settings preserved') | Add-Content (Join-Path $evidence 'checks.txt')
  Get-Process Kachalka -ErrorAction SilentlyContinue | Where-Object {$_.Path -eq (Join-Path $install 'Kachalka.exe')} | ForEach-Object {if(-not $_.CloseMainWindow() -or -not $_.WaitForExit(30000)){throw 'Updated application did not close'}}
  $uninstaller=Start-Process (Join-Path $env:LOCALAPPDATA 'Kachalka/installation/Uninstall.exe') -ArgumentList '/S' -PassThru
  if(-not $uninstaller.WaitForExit(60000)){throw 'Uninstaller timeout'}

@@ -52,7 +52,7 @@ public static class WheelScroll
         for(var node=e.OriginalSource as DependencyObject;node!=null;node=Parent(node))
         {
             if(node is TextBoxBase or ComboBox or ScrollBar)return;
-            if(node is ScrollViewer inner&&inner!=viewer)return;
+            if(node is ScrollViewer inner&&inner!=viewer&&inner.ScrollableHeight>0)return;
             if(node==host)break;
         }
         if(viewer.GetValue(MotionProperty) is not Motion motion){motion=new(viewer);viewer.SetValue(MotionProperty,motion);}

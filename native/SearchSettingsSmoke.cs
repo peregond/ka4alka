@@ -40,7 +40,7 @@ public partial class MainWindow
             Search.Clear();Search.Focus();
             foreach(var letter in query)
             {
-                liveKey=section+"|"+Search.Text+letter+"|1";
+                liveKey=section+"|"+Search.Text+letter+"|1|"+CatalogSelection.Filter+"|"+CatalogSelection.Collection;
                 Search.SelectedText=letter.ToString();Search.CaretIndex=Search.Text.Length;
                 await Task.Delay(15);
             }

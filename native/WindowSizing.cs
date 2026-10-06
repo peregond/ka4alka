@@ -112,7 +112,7 @@ public partial class MainWindow
     }
     void UpdateFilterRail()
     {
-        var show=!demoCatalog&&current==null&&(section is "Фильмы" or "Сериалы")&&ActualWidth>=1400;
+        var show=!demoCatalog&&current==null&&(section is "Фильмы" or "Сериалы")&&ActualWidth>=1180;
         FilterColumn.Width=new GridLength(show?206:0);
         FiltersPanel.Visibility=show?Visibility.Visible:Visibility.Collapsed;
         CenterRegion.Margin=show?new Thickness(0,0,18,0):new Thickness(0);

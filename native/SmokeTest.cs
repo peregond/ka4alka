@@ -43,7 +43,7 @@ public partial class MainWindow
     {
         Directory.CreateDirectory(output);var limit=DateTime.UtcNow.AddSeconds(100);while(liveLoading&&DateTime.UtcNow<limit)await Task.Delay(200);
         if(liveItems.Count==0)throw new Exception("Default live catalog is empty: "+liveError);
-        if(liveLoading||liveItems.Count!=100)throw new Exception("Initial catalog did not reach 100 cards: "+liveItems.Count+" · "+liveError);
+        if(liveLoading||liveItems.Count!=40)throw new Exception("Initial catalog did not reach 40 cards: "+liveItems.Count+" · "+liveError);
         if(Navigation.Children.Count!=2)throw new Exception("Only film and series navigation should be visible.");
         await Task.Delay(2000);UpdateLayout();var wideColumns=catalogColumns;var wideFilters=FiltersPanel.Visibility==Visibility.Visible;var bmp=new RenderTargetBitmap((int)ActualWidth,(int)ActualHeight,96,96,PixelFormats.Pbgra32);bmp.Render(this);var enc=new PngBitmapEncoder();enc.Frames.Add(BitmapFrame.Create(bmp));using(var f=File.Create(Path.Combine(output,"live-catalog.png")))enc.Save(f);
         var oldWidth=Width;var oldHeight=Height;MinWidth=360;MinHeight=300;Width=680;Height=360;await Task.Delay(250);UpdateLayout();var smallColumns=catalogColumns;
@@ -51,10 +51,10 @@ public partial class MainWindow
         Width=oldWidth;Height=oldHeight;await Task.Delay(250);UpdateLayout();
         var count=liveItems.Count;var first=liveItems[0];var originalIds=liveItems.Select(x=>x.Id).ToArray();
         var catalogScroll=FindVisual<ScrollViewer>(Body,_=>true)!;catalogScroll.ScrollToVerticalOffset(120);await Task.Delay(100);UpdateLayout();var beforeMoreOffset=catalogScroll.VerticalOffset;
-        var more=FindVisual<Button>(Body,b=>System.Windows.Automation.AutomationProperties.GetName(b)=="Показать ещё фильмы и сериалы")??throw new Exception("Load-more action is missing.");
+        var more=FindVisual<Button>(Body,b=>System.Windows.Automation.AutomationProperties.GetName(b)=="Страница 2")??throw new Exception("Page navigation is missing.");
         more.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));limit=DateTime.UtcNow.AddSeconds(100);while(liveLoading&&DateTime.UtcNow<limit)await Task.Delay(200);UpdateLayout();
-        if(liveLoading||liveItems.Count!=200||!liveItems.Take(100).Select(x=>x.Id).SequenceEqual(originalIds))throw new Exception("Load more did not retain and append 100 unique cards: "+liveItems.Count+" · "+liveError);
-        await Task.Delay(100);var afterMoreOffset=FindVisual<ScrollViewer>(Body,_=>true)!.VerticalOffset;if(Math.Abs(afterMoreOffset-beforeMoreOffset)>2)throw new Exception("Load more lost scroll position.");
+        if(liveLoading||liveItems.Count!=40||liveItems.Select(x=>x.Id).Intersect(originalIds).Any())throw new Exception("Page 2 did not replace the first page: "+liveItems.Count+" · "+liveError);
+        await Task.Delay(100);var afterMoreOffset=FindVisual<ScrollViewer>(Body,_=>true)!.VerticalOffset;if(afterMoreOffset>2)throw new Exception("Page change did not scroll to top.");
         var afterMoreCount=liveItems.Count;
         current=first;Render();limit=DateTime.UtcNow.AddSeconds(60);while(releaseViews.TryGetValue(first.Id,out var searchingView)&&searchingView.Checking&&DateTime.UtcNow<limit)await Task.Delay(200);
         if(!releaseViews.TryGetValue(first.Id,out var sourceView)||sourceView.Checking)throw new Exception("Release source scan did not complete.");
@@ -64,8 +64,8 @@ public partial class MainWindow
         if(((ListBox)Body.Children[0]).Items.Count!=1)throw new Exception("Favorite view lost the saved movie.");
         section="Сериалы";favoritesOnly=false;livePage=1;Render();limit=DateTime.UtcNow.AddSeconds(100);while(liveLoading&&DateTime.UtcNow<limit)await Task.Delay(200);
         if(liveItems.Count==0)throw new Exception("Series view is empty: "+liveError);
-        if(liveLoading||liveItems.Count!=100)throw new Exception("Series selection did not reach 100 cards: "+liveItems.Count+" · "+liveError+" · "+System.Text.Json.JsonSerializer.Serialize(browseBatch with{Items=[],Pending=[]}));
-        File.WriteAllText(Path.Combine(output,"live.json"),JsonSerializer.Serialize(new{Movies=count,AfterLoadMore=afterMoreCount,LoadMoreRetainsOrder=true,LoadMorePreservesScroll=true,Series=liveItems.Count,First=first.Title,Releases=liveReleases.GetValueOrDefault(first.Id)?.Count,Sources=sourceView.Sources,SourceScanComplete=!sourceView.Checking,WideColumns=wideColumns,SmallColumns=smallColumns,WideFilters=wideFilters,OnlyCinemaSections=Navigation.Children.Count==2,FavoriteVisible=true,EngineCreated=downloads.EngineCreated}));Close();
+        if(liveLoading||liveItems.Count!=40)throw new Exception("Series selection did not reach 40 cards: "+liveItems.Count+" · "+liveError);
+        File.WriteAllText(Path.Combine(output,"live.json"),JsonSerializer.Serialize(new{Movies=count,SecondPage=afterMoreCount,PagesDoNotOverlap=true,PageChangeScrollsToTop=true,Series=liveItems.Count,First=first.Title,Releases=liveReleases.GetValueOrDefault(first.Id)?.Count,Sources=sourceView.Sources,SourceScanComplete=!sourceView.Checking,WideColumns=wideColumns,SmallColumns=smallColumns,WideFilters=wideFilters,OnlyCinemaSections=Navigation.Children.Count==2,FavoriteVisible=true,EngineCreated=downloads.EngineCreated}));Close();
     }
     public async Task SmokeTest(string output)
     {
