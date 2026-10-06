@@ -119,16 +119,18 @@ public partial class MainWindow
             string SortGuard()=>"mouse="+Queue().IsMouseOver+", keyboard="+Queue().IsKeyboardFocusWithin+", menu="+downloadMenus.Any(menu=>menu.IsOpen)+", timer="+refresh.IsEnabled+", state="+WindowState+", first="+((DownloadItem)Queue().Items[0]).Id;
             File.AppendAllText(Path.Combine(output,"checks.txt"),"INFO: speed sort before moving cursor: "+SortGuard()+Environment.NewLine);
             if(!GetCursorPos(out var cursor))throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error(),"Cannot preserve the smoke-test cursor position.");
+            var refreshTicks=0;EventHandler countRefresh=(_,_)=>refreshTicks++;refresh.Tick+=countRefresh;
             try
             {
                 var toolbar=Toolbar("Сортировка загрузок");var target=toolbar.PointToScreen(new Point(toolbar.ActualWidth/2,toolbar.ActualHeight/2));
                 if(!SetCursorPos((int)Math.Round(target.X),(int)Math.Round(target.Y)))throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error(),"Cannot move the smoke-test cursor outside the queue.");
                 Activate();toolbar.Focus();System.Windows.Input.Mouse.Synchronize();await SettleDownloads();
                 check(!Queue().IsMouseOver&&!Queue().IsKeyboardFocusWithin&&!downloadMenus.Any(menu=>menu.IsOpen)&&refresh.IsEnabled,"speed sort can refresh while the pointer and focus are on the toolbar: "+SortGuard());
-                fixtures[0].DownloadRate=9*1024*1024;fixtures[0].Refresh();await Task.Delay(2300);UpdateLayout();
-                check(Queue().Items[0]==fixtures[0],"speed sorting updates while transfer telemetry changes: "+SortGuard());
+                fixtures[0].DownloadRate=9*1024*1024;fixtures[0].Refresh();var until=DateTime.UtcNow.AddSeconds(6);
+                while((refreshTicks==0||Queue().Items[0]!=fixtures[0])&&DateTime.UtcNow<until)await Task.Delay(50);UpdateLayout();
+                check(refreshTicks>0&&Queue().Items[0]==fixtures[0],"speed sorting updates through the running refresh timer: ticks="+refreshTicks+", "+SortGuard());
             }
-            finally{SetCursorPos(cursor.X,cursor.Y);System.Windows.Input.Mouse.Synchronize();}
+            finally{refresh.Tick-=countRefresh;SetCursorPos(cursor.X,cursor.Y);System.Windows.Input.Mouse.Synchronize();}
             check(FindVisual<Image>(FirstRow(),i=>i.DataContext is DownloadItem)?.Source==null&&VisualElements<System.Windows.Shapes.Path>(FirstRow()).Any(),"torrent without a known poster keeps a visible native placeholder");
             SelectSort("newest");await SettleDownloads();prefs.Light=false;ApplyTheme();Render();await SettleDownloads();Shot(this,"downloads-redesign-dark");Shot(this,"downloads");
             var expectedInk=((SolidColorBrush)FindResource("Text")).Color;check(FindVisual<TextBlock>(FirstRow(),t=>t.Text==fixtures[^1].MediaTitle)?.Foreground is SolidColorBrush ink&&ink.Color==expectedInk,"download media title follows the dark theme");
@@ -153,7 +155,8 @@ public partial class MainWindow
                 var amount=FindVisual<TextBlock>(fileFrame,t=>t.Text.Contains(" из "))??throw new Exception("Downloaded episode byte count is missing.");
                 double Luminance(Color color){double Linear(byte value){var s=value/255d;return s<=.04045?s/12.92:Math.Pow((s+.055)/1.055,2.4);}return .2126*Linear(color.R)+.7152*Linear(color.G)+.0722*Linear(color.B);}
                 double Contrast(Brush foreground,Brush background){var first=Luminance(((SolidColorBrush)foreground).Color);var second=Luminance(((SolidColorBrush)background).Color);return (Math.Max(first,second)+.05)/(Math.Min(first,second)+.05);}
-                check(Contrast(episode.Foreground,fileFrame.Background)>=4.5&&Contrast(amount.Foreground,fileFrame.Background)>=4.5,"dark episode filename and downloaded byte count contrast clearly with their row background");
+                var nameContrast=Contrast(episode.Foreground,fileFrame.Background);var amountContrast=Contrast(amount.Foreground,fileFrame.Background);
+                check(nameContrast>=4.5&&amountContrast>=4.5,$"dark episode filename and downloaded byte count contrast clearly with their row background: {nameContrast:F1}:1 and {amountContrast:F1}:1");
                 check(VisualElements<System.Windows.Shapes.Path>(fileFrame).Any(icon=>icon.Data is{Bounds.IsEmpty:false}),"file details resolve the file icon geometry inside the owned dialog");Shot(dialog,"downloads-details-dark");
                 prefs.Light=true;ApplyTheme();dialog.UpdateLayout();Shot(dialog,"downloads-details-light");dialog.Width=360;dialog.Height=300;dialog.UpdateLayout();Shot(dialog,"downloads-details-minimum");check(files.ActualHeight>30,"file details remain usable in a minimum-size window");
             });
