@@ -43,7 +43,7 @@ public partial class MainWindow
         prefs.LiveFavorites=[];topSaved!.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Settle();
         Check(favoritesOnly&&catalogDisplay.Count==0,"empty Saved section is shown without catalog rows");
         Check(VisualElements<System.Windows.Shapes.Path>(topSaved!).Any(x=>x.Fill is SolidColorBrush brush&&brush.Color==Color.FromRgb(224,79,98)),"active Saved heart is filled red");
-        var emptyReset=FindVisual<Button>(Body,x=>AutomationProperties.GetName(x)=="Сбросить фильтры")!;
+        var emptyReset=FindVisual<Button>(Body,x=>AutomationProperties.GetName(x)=="Сбросить фильтры")??throw new Exception("Missing reset button in empty Saved");
         emptyReset.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Settle();
         Check(!favoritesOnly&&CatalogSelection.IsDefault&&livePage==1&&catalogDisplay.Count==40,"empty Saved reset returns to All with its first page");
         Check(VisualElements<System.Windows.Shapes.Path>(topSaved!).All(x=>x.Fill==null),"Saved heart returns to outline in All");
@@ -71,10 +71,10 @@ public partial class MainWindow
         MinWidth=360;Width=680;Height=500;await Task.Delay(150);UpdateLayout();Check(FiltersPanel.Visibility==Visibility.Collapsed&&inlineCatalogFilters?.Visibility==Visibility.Visible,"top filters remain available in narrow windows");
         Height=360;await Task.Delay(150);UpdateLayout();Check(inlineCatalogFilterScroll is {ScrollableHeight:>0}&&Body.ActualHeight>25,$"short window scrolls all filter choices and retains space for cards (window={ActualHeight}, filters={inlineCatalogFilterScroll?.ActualHeight}, scroll={inlineCatalogFilterScroll?.ScrollableHeight}, cards={Body.ActualHeight})");
         MinWidth=1280;Width=1280;Height=800;await Task.Delay(100);UpdateLayout();
-        current=rows[0];requestedDetails.Add(current.Id);prefs.Favorites.Add(current.Id);
+        current=rows[0] with{PageUrl=LiveCatalog.Base+"/movies/fixture-one"};requestedDetails.Add(current.Id);prefs.Favorites.Add(current.Id);
         SourceEntry Release(string id,string resolution,int seeds)=>new(id,"Фильм 1 (2024) "+resolution,"Fixture","https://example.test/"+id,"magnet:?xt=urn:btih:"+new string(id[0],40),null,1024,seeds);
         liveReleases[current.Id]=[Release("a","720p",100),Release("b","1080p",50),Release("c","2160p",1)];Render();UpdateLayout();
-        var qualityBox=FindVisual<ComboBox>(Body,x=>AutomationProperties.GetName(x)=="Раздачи: Качество")!;
+        var qualityBox=FindVisual<ComboBox>(Body,x=>AutomationProperties.GetName(x)=="Раздачи: Качество")??throw new Exception("Missing release quality selector in movie detail");
         Check(qualityBox.Items.Cast<string>().SequenceEqual(["Все","HD Ready","Full HD","4K"]),"release quality menu displays friendly resolution names");
         var qualitySort=FindVisual<ComboBox>(Body,x=>AutomationProperties.GetName(x)=="Сортировка раздач")!;
         qualitySort.SelectedItem="Выше качество";UpdateLayout();
