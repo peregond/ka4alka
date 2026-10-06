@@ -23,7 +23,14 @@ public sealed class DownloadService
         DownloadLimitKbps=Math.Clamp(downloadLimitKbps??settings?.MaximumDownloadRate/1024??0,0,int.MaxValue/1024);
         UploadLimitKbps=Math.Clamp(uploadLimitKbps??settings?.MaximumUploadRate/1024??0,0,int.MaxValue/1024);
         if(!File.Exists(queuePath))return;
-        foreach(var item in JsonSerializer.Deserialize<List<DownloadItem>>(File.ReadAllText(queuePath))??[]){if(!item.Paused)pendingResume.Add(item.Id);item.Paused=true;item.Busy=false;item.Status="На паузе";item.Stats=$"{item.Progress:F1}% · на паузе";item.Hint="";Items.Add(item);}
+        var restored=JsonSerializer.Deserialize<List<DownloadItem>>(File.ReadAllText(queuePath))??[];
+        if(DownloadOrdering.AssignMissingAddedUtc(restored,File.GetLastWriteTimeUtc(queuePath)))SaveQueue(restored);
+        foreach(var item in restored)
+        {
+            if(!item.Paused)pendingResume.Add(item.Id);
+            item.Paused=true;item.Busy=false;item.Status="На паузе";item.Stats=$"{item.Progress:F1}% · на паузе";item.Hint="";
+            item.DownloadRate=0;item.UploadRate=0;item.TotalBytes=KnownTotal(item.Files);Items.Add(item);
+        }
     }
     ClientEngine Engine
     {
@@ -55,10 +62,11 @@ public sealed class DownloadService
         foreach(var item in Items.ToArray().Where(x=>x.Completed==completed))if(!item.Busy&&item.Paused!=paused){await SetPausedAsync(item,paused);changed++;}
         return changed;
     }
-    public void Save()
+    public void Save()=>SaveQueue(Items);
+    void SaveQueue(IEnumerable<DownloadItem> items)
     {
         Directory.CreateDirectory(Preferences.DataDir);
-        File.WriteAllText(queuePath+".tmp",JsonSerializer.Serialize(Items));File.Move(queuePath+".tmp",queuePath,true);
+        File.WriteAllText(queuePath+".tmp",JsonSerializer.Serialize(items));File.Move(queuePath+".tmp",queuePath,true);
     }
     public int PendingResumeCount=>pendingResume.Count;
     public async Task<int> ResumePendingAsync()
@@ -90,7 +98,7 @@ public sealed class DownloadService
           : await Engine.AddAsync(item.Source,item.Folder,settings);
         managers[item.Id]=manager;meters[item.Id]=(new(),new());return manager;
     }
-    public async Task Add(string source,string folder)
+    public async Task Add(string source,string folder,MediaItem? media=null,string? imageUrl=null)
     {
         await gate.WaitAsync();
         try {
@@ -107,7 +115,7 @@ public sealed class DownloadService
             }
             if(Items.Any(x=>x.Source==source||identity.Length>0&&string.Equals(ExistingHash(x),identity,StringComparison.OrdinalIgnoreCase)))throw new InvalidOperationException("Эта раздача уже в очереди.");
             Directory.CreateDirectory(folder);
-            var item=new DownloadItem{Source=source,Folder=folder,Name=name,InfoHash=identity};
+            var item=new DownloadItem{Source=source,Folder=folder,Name=name,InfoHash=identity,AddedUtc=DateTime.UtcNow,ImageUrl=imageUrl??media?.ImageUrl,MediaTitle=media?.Title,MediaSection=media?.Section};
             TorrentManager? manager=null;
             try
             {
@@ -137,7 +145,7 @@ public sealed class DownloadService
             else{await StopManager(manager);item.Paused=true;}
             Update();Save();await ReleaseIdleEngine();
         }
-        catch(Exception error){item.Status="Ошибка: "+error.Message;item.Refresh();Save();throw;}
+        catch(Exception error){item.DownloadRate=0;item.UploadRate=0;item.Status="Ошибка: "+error.Message;item.Refresh();Save();throw;}
         finally{item.Busy=false;item.Refresh();gate.Release();}
     }
     public async Task Remove(DownloadItem item,bool deleteFiles=false)
@@ -146,7 +154,7 @@ public sealed class DownloadService
         try
         {
             pendingResume.Remove(item.Id);
-            if(managers.TryGetValue(item.Id,out var manager)){await StopManager(manager);item.Paused=true;SnapshotFiles(item,manager);await Engine.RemoveAsync(manager);managers.Remove(item.Id);meters.Remove(item.Id);}
+            if(managers.TryGetValue(item.Id,out var manager)){await StopManager(manager);item.Paused=true;SnapshotFiles(item,manager);item.DownloadRate=0;item.UploadRate=0;item.Remaining="";item.PeersText="";item.Indeterminate=false;item.Status="На паузе";await Engine.RemoveAsync(manager);managers.Remove(item.Id);meters.Remove(item.Id);}
             if(deleteFiles)
             {
                 var paths=item.Files.SelectMany(f=>new[]{f.FullPath,f.IncompletePath}).Where(p=>p.Length>0).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
@@ -177,6 +185,17 @@ public sealed class DownloadService
     static void SnapshotFiles(DownloadItem item,TorrentManager manager)
     {
         if(manager.Files.Count>0)item.Files=manager.Files.Select(f=>new DownloadFile(f.Path,f.DownloadCompleteFullPath,f.DownloadIncompleteFullPath,f.Length,f.BitField.PercentComplete)).ToList();
+    }
+    static long? KnownTotal(IReadOnlyList<DownloadFile> files)
+    {
+        if(files.Count==0)return null;
+        long total=0;
+        foreach(var file in files)
+        {
+            if(file.Size<0||total>long.MaxValue-file.Size)return null;
+            total+=file.Size;
+        }
+        return total;
     }
     static async Task StopManager(TorrentManager manager)
     {

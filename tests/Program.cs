@@ -44,6 +44,7 @@ if(args.Contains("--probe-public"))
  return;
 }
 DownloadTests.Run();
+DownloadOrderingTests.Run();
 await CatalogBatchTests.Run();
 CatalogPagingTests.Run();
 await UnifiedSearchTests.Run();
@@ -60,7 +61,11 @@ var port=FreePort();using var seed=new ClientEngine(Settings("seed-cache",port))
 var service=new DownloadService(Settings("download-cache",FreePort()));
 try {
  await service.SetLimitsAsync(1024,512);Check(!service.EngineCreated,"speed limits configured without creating idle engine");
- await service.Add(torrentPath,Path.Combine(root,"download"));Check(service.Items.Count==1,"torrent enters actual queue");
+ var media=new MediaItem(9901,"Передача в локальной сети","Сериалы","драма",2026,"8.0","8.0","#526B69"){ImageUrl="https://example.test/original-poster.jpg"};
+ var poster="https://example.test/download-poster.jpg";var beforeAdded=DateTime.UtcNow;
+ await service.Add(torrentPath,Path.Combine(root,"download"),media,poster);Check(service.Items.Count==1,"torrent enters actual queue");
+ var added=service.Items.Single().AddedUtc;
+ Check(added>=beforeAdded&&added<=DateTime.UtcNow&&service.Items[0].MediaTitle==media.Title&&service.Items[0].MediaSection==media.Section&&service.Items[0].ImageUrl==poster,"adding a torrent records its actual addition time and the selected media poster");
  var magnet="magnet:?xt=urn:btih:"+seedManager.InfoHashes.V1!.ToHex()+"&dn=test.bin";
  try{await service.Add(magnet,Path.Combine(root,"same-torrent"));throw new Exception("same torrent via magnet accepted");}catch(InvalidOperationException){Console.WriteLine("PASS: magnet and .torrent share duplicate identity");}
  Check(service.Items.Count==1,"duplicate did not alter queue");
@@ -87,8 +92,10 @@ try {
  var received=Directory.GetFiles(Path.Combine(root,"download"),"test.bin",SearchOption.AllDirectories).Single();Check(SHA256.HashData(await File.ReadAllBytesAsync(received)).SequenceEqual(SHA256.HashData(payload)),"download bytes match SHA256");
  try{await service.Add(torrentPath,Path.Combine(root,"download"));throw new Exception("duplicate accepted");}catch(InvalidOperationException){Console.WriteLine("PASS: duplicate rejected");}
  var restored=new DownloadService(Settings("restore-cache",FreePort()));Check(restored.Items.Count==1&&restored.Items[0].Paused,"queue restores paused without network");
+ Check(restored.Items[0].AddedUtc==added&&restored.Items[0].MediaTitle==media.Title&&restored.Items[0].MediaSection==media.Section&&restored.Items[0].ImageUrl==poster,"queue restore retains the original addition date, title, type and poster");
  Check(restored.Items[0].Files.Count==1&&restored.Items[0].Files[0].Progress==100,"saved file list and per-file progress survive restart");
  await service.Toggle(service.Items[0]);Check(!service.Items[0].Paused,"resume restarts torrent");
+ Check(service.Items[0].AddedUtc==added,"resuming a torrent does not change its addition order");
  await service.Remove(service.Items[0]);Check(File.Exists(received)&&service.Items.Count==0,"remove keeps downloaded files");
  await service.Add(magnet,Path.Combine(root,"magnet-download"));var magnetManager=map.Values.Single();await magnetManager.AddPeerAsync(new PeerInfo(new Uri($"ipv4://127.0.0.1:{port}")));
  await Until(()=>magnetManager.Progress==100,"magnet transfer reaches 100%");await service.Toggle(service.Items[0]);

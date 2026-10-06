@@ -25,7 +25,7 @@ public partial class MainWindow:Window
         EnableShortcuts();
         try{downloads=new(null,prefs.MaxDownloadKbps,prefs.MaxUploadKbps);}catch(Exception e){downloads=newEmpty(prefs.MaxDownloadKbps,prefs.MaxUploadKbps);Status.Text="Не удалось прочитать очередь: "+e.Message;}
         foreach(var name in new[]{"Фильмы","Сериалы"}) { var n=name;var b=ActionButton(n,n=="Фильмы"?"IconMovies":"IconSeries",()=>ShowCatalogSection(n),"NavButton");b.Tag=n;b.ToolTip=n;b.HorizontalContentAlignment=HorizontalAlignment.Left;b.Margin=new(0,0,0,5);Navigation.Children.Add(b); }
-        refresh.Tick+=(_,_)=>{downloads.Update();SyncTimer();};
+        refresh.Tick+=(_,_)=>{downloads.Update();RefreshDownloadView();SyncTimer();};
         ContentRendered+=async(_,_)=>{if(!prefs.AutoResumeDownloads||downloads.PendingResumeCount==0)return;Status.Text="Продолжаем загрузки…";var resumed=await downloads.ResumePendingAsync();Status.Text=resumed>0?$"Продолжено загрузок: {resumed}":"Не удалось продолжить загрузки. Проверь очередь.";if(!closed){SyncTimer();if(section=="Загрузки")Render();}};
         StateChanged+=(_,_)=>SyncTimer();searchDelay.Tick+=(_,_)=>{searchDelay.Stop();if(section is "Фильмы" or "Сериалы"){current=null;Render();}};
         Closing+=OnClosing;ready=true;ApplyTheme();ApplyCompactLayout();Render();
@@ -50,7 +50,8 @@ public partial class MainWindow:Window
     {
         if(!ready)return;try{catalogList=null;detailHero=null;detailPoster=null;detailSynopsis=null;detailTitle=null;detailDescription=null;descriptionToggle=null;inlineCatalogFilters=null;inlineCatalogFilterScroll=null;PageHeader.Children.Clear();Body.Children.Clear();Body.RowDefinitions.Clear();SyncTimer();UpdateFilterRail();
         SearchBar.Visibility=current==null&&(section is "Фильмы" or "Сериалы")?Visibility.Visible:Visibility.Collapsed;
-        ContextLabel.Visibility=SearchBar.Visibility==Visibility.Visible?Visibility.Collapsed:Visibility.Visible;ContextLabel.Text=section;
+        ContextLabel.Visibility=SearchBar.Visibility==Visibility.Visible||section=="Загрузки"?Visibility.Collapsed:Visibility.Visible;ContextLabel.Text=section;
+        downloadView=null;downloadList=null;
         foreach(Button b in Navigation.Children){var selected=!SearchActive&&b.Tag?.ToString()==section;b.SetResourceReference(System.Windows.Controls.Button.BackgroundProperty,selected?"Selected":"Sidebar");b.SetResourceReference(Control.ForegroundProperty,selected?"Text":"Muted");b.FontWeight=selected?FontWeights.SemiBold:FontWeights.Normal;}
         DownloadsButton.SetResourceReference(Control.BackgroundProperty,section=="Загрузки"?"Selected":"Sidebar");
         SettingsButton.SetResourceReference(Control.BackgroundProperty,section=="Настройки"?"Selected":"Sidebar");
@@ -61,8 +62,8 @@ public partial class MainWindow:Window
         if(!demoCatalog&&section is "Фильмы" or "Сериалы"){RenderLiveCatalog();return;}
         if(!demoCatalog&&section is "Музыка" or "Игры" or "Программы"){RenderArchive();return;}
         if(!demoCatalog&&section is "ТВ-каналы" or "Радио" or "Спорт"){RenderBroadcast();return;}
-        PageHeader.Children.Add(Text(section,25));
         if(section=="Загрузки"){RenderDownloads();return;}
+        PageHeader.Children.Add(Text(section,25));
         PageHeader.Children.Add(Text("Демо-каталог · названия, раздачи и оценки Кинопоиска / IMDb вымышлены",11,true));
         var filters=new WrapPanel();if(section is "Фильмы" or "Сериалы")foreach(var g in new[]{"Все","Фантастика","Триллер","Драма","Приключения"}){var value=g;var b=Button(g,()=>{genre=value;Render();});b.Opacity=g==genre?1:.6;filters.Children.Add(b);}
         var order=new ComboBox{ItemsSource=new[]{"По популярности","По году","По названию"},SelectedItem=sort};order.SelectionChanged+=(_,_)=>{sort=order.SelectedItem.ToString()!;Render();};filters.Children.Add(order);PageHeader.Children.Add(filters);
@@ -104,11 +105,17 @@ public partial class MainWindow:Window
         var start=AsyncButton("Начать загрузку",()=>Add(input.Text));start.Style=(Style)FindResource("PrimaryButton");start.IsDefault=true;actions.Children.Add(start);actions.Children.Add(AsyncButton("Выбрать .torrent",async()=>{var f=new OpenFileDialog{Filter="BitTorrent (*.torrent)|*.torrent"};if(f.ShowDialog(dialog)==true)await Add(f.FileName);}));p.Children.Add(actions);p.Children.Add(error);p.Children.Add(Text("После скачивания клиент продолжает раздачу. Нажми «Пауза», чтобы остановить её.",12,true));dialog.ShowDialog();
     }
     async void ToggleDownload(object sender,RoutedEventArgs e){try{await downloads.Toggle((DownloadItem)((Button)sender).Tag);}catch(Exception ex){Status.Text=ex.Message;}finally{SyncTimer();}}
-    async void RemoveDownload(object sender,RoutedEventArgs e){try{await downloads.Remove((DownloadItem)((Button)sender).Tag);Render();}catch(Exception ex){Status.Text=ex.Message;}}
+    async void RemoveDownload(object sender,RoutedEventArgs e)
+    {
+        var item=(DownloadItem)((FrameworkElement)sender).Tag;
+        if(item.Busy){Status.Text="Подожди завершения текущей операции с загрузкой.";return;}
+        try{await downloads.Remove(item);if(downloads.Items.Contains(item)){Status.Text="Загрузка ещё занята. Повтори удаление после завершения операции.";return;}Render();Status.Text="Загрузка удалена из очереди. Файлы сохранены.";}catch(Exception ex){Status.Text=ex.Message;}finally{SyncTimer();}
+    }
     void OpenFolder(object sender,RoutedEventArgs e){var d=(DownloadItem)((Button)sender).Tag;if(Directory.Exists(d.Folder))Process.Start(new ProcessStartInfo(d.Folder){UseShellExecute=true});}
     void ApplyTheme()
     {
         var values=prefs.Light?new[]{"#FAFBF8","#FFFFFF","#202522","#70786F","#E2E7DE","#E8EDE5","#287D59","#FFFFFF","#EFF2EB","#F0F3ED","#202522","#FFFFFF","#39423B","#E8F2EB"}:new[]{"#151917","#1D2420","#EDF2ED","#A0ADA3","#354138","#303D33","#93CDB0","#163522","#1A211C","#29352D","#EDF2ED","#182019","#FFFFFF","#293F32"};var keys=new[]{"Bg","Panel","Text","Muted","Edge","Selected","Accent","AccentInk","Sidebar","Hover","Primary","PrimaryInk","PrimaryHover","AccentSoft"};for(int i=0;i<keys.Length;i++){var brush=new SolidColorBrush((Color)ColorConverter.ConvertFromString(values[i]));brush.Freeze();Application.Current.Resources[keys[i]]=brush;}
+        Application.Current.Resources["Danger"]=new SolidColorBrush((Color)ColorConverter.ConvertFromString(prefs.Light?"#B43C43":"#F28C93"));
         SidePanel.SetResourceReference(Border.BackgroundProperty,"Sidebar");
     }
     bool closing;

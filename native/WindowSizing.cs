@@ -90,6 +90,7 @@ public partial class MainWindow
         var narrow=ActualWidth>0&&ActualWidth<950;
         var tiny=ActualWidth>0&&ActualWidth<780;
         var shortView=ActualHeight>0&&ActualHeight<560;
+        FitDownloadsToolbar();
         if(layoutInitialized&&narrow==compactWidth&&tiny==tinyWidth&&shortView==compactHeight){UpdateFilterRail();return;}
         layoutInitialized=true;compactWidth=narrow;tinyWidth=tiny;compactHeight=shortView;
         RootGrid.Margin=narrow?new Thickness(10):new Thickness(16);

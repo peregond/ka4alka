@@ -46,28 +46,28 @@ public partial class MainWindow
     }
     async void SourceDownload(object sender,RoutedEventArgs e)
     {
-        var button=(Button)sender;var item=(SourceEntry)button.Tag;button.IsEnabled=false;
+        var button=(Button)sender;var item=(SourceEntry)button.Tag;var media=current?.Cinema==true?current:null;button.IsEnabled=false;
         try{if(!EnsureDownloadFolder()){Status.Text="Папка для загрузок не выбрана. Её можно выбрать в настройках.";return;}
             Status.Text="Проверяем раздачу…";using var timeout=new CancellationTokenSource(TimeSpan.FromSeconds(30));var source=await sourceClient.TorrentFile(item,timeout.Token);
-            await downloads.Add(source,prefs.Folder);section="Загрузки";current=null;Render();Status.Text=item.Seeds==0?"Раздача добавлена, но источник показывает 0 сидов. Ждём участников.":"Раздача добавлена. Ищем участников.";
+            await downloads.Add(source,prefs.Folder,media,item.ImageUrl);section="Загрузки";current=null;Render();Status.Text=item.Seeds==0?"Раздача добавлена, но источник показывает 0 сидов. Ждём участников.":"Раздача добавлена. Ищем участников.";
         }catch(Exception error){var message=error is HttpRequestException?"Не удалось получить раздачу из источника.":error.Message;Status.Text=message;MessageBox.Show(this,message,"Не удалось начать загрузку",MessageBoxButton.OK,MessageBoxImage.Warning);}finally{button.IsEnabled=true;}
     }
     void SourcePage(object sender,RoutedEventArgs e){var item=(SourceEntry)((Button)sender).Tag;if(string.IsNullOrEmpty(item.PageUrl))return;System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(SourceClient.WebUri(item.PageUrl).AbsoluteUri){UseShellExecute=true});}
     async void SourceCover(object sender,RoutedEventArgs e)
     {
-        var image=(Image)sender;var item=image.DataContext;var url=item is SourceEntry entry?entry.ImageUrl:item is MediaItem media?media.ImageUrl:null;if(item is MediaItem card&&card.IsLive)_=UpdateCardRatings(card);if(string.IsNullOrEmpty(url))return;
+        var image=(Image)sender;var item=image.DataContext;var url=item is SourceEntry entry?entry.ImageUrl:item is MediaItem media?media.ImageUrl:item is DownloadItem download?download.ImageUrl:null;if(item is MediaItem card&&card.IsLive)_=UpdateCardRatings(card);if(string.IsNullOrEmpty(url))return;
         if(coverCache.TryGetValue(url,out var cached)){image.Source=cached;return;}
-        var token=item is MediaItem?CancellationToken.None:sourceRequest?.Token??CancellationToken.None;
+        var token=item is MediaItem or DownloadItem?CancellationToken.None:sourceRequest?.Token??CancellationToken.None;
         try
         {
             await coverSlots.WaitAsync(token);
             try
             {
                 if(!image.IsLoaded)return;
-                var cachePath=item is MediaItem?Path.Combine(Preferences.DataDir,"covers",Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(url)))+".img"):null;
+                var cachePath=item is MediaItem or DownloadItem?Path.Combine(Preferences.DataDir,"covers",Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(url)))+".img"):null;
                 var (bitmap,downloaded)=await CoverCache.Load(cachePath,1024*1024,
                     ct=>sourceClient.Read(SourceClient.WebUri(url),1024*1024,ct),
-                    bytes=>{using var stream=new MemoryStream(bytes);var result=new BitmapImage();result.BeginInit();result.CacheOption=BitmapCacheOption.OnLoad;result.DecodePixelWidth=item is MediaItem?280:100;result.StreamSource=stream;result.EndInit();result.Freeze();return result;},token);
+                    bytes=>{using var stream=new MemoryStream(bytes);var result=new BitmapImage();result.BeginInit();result.CacheOption=BitmapCacheOption.OnLoad;result.DecodePixelWidth=item is MediaItem or DownloadItem?280:100;result.StreamSource=stream;result.EndInit();result.Freeze();return result;},token);
                 if(coverCache.Count>=48)coverCache.Remove(coverCache.Keys.First());coverCache[url]=bitmap;
                 if(ReferenceEquals(image.DataContext,item))image.Source=bitmap;
                 if(downloaded&&cachePath!=null)try{if(++savedCovers%20==0)foreach(var old in new DirectoryInfo(Path.GetDirectoryName(cachePath)!).GetFiles("*.img").OrderByDescending(x=>x.LastWriteTimeUtc).Skip(200))old.Delete();}catch(IOException){}catch(UnauthorizedAccessException){}
