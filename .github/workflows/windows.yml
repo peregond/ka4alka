@@ -19,7 +19,13 @@ jobs:
         run: choco install nsis --yes --no-progress
       - name: Validate installer and signed update on Windows
         shell: pwsh
-        run: ./tests/WindowsUpdateSmoke.ps1
+        run: |
+          try { ./tests/WindowsUpdateSmoke.ps1 }
+          catch {
+            $message=$_.Exception.Message.Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A')
+            Write-Output "::error title=Windows update smoke::$message"
+            throw
+          }
       - name: Upload smoke-test evidence
         if: always()
         uses: actions/upload-artifact@v4

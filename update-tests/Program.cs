@@ -111,7 +111,13 @@ try
     Check(UpdateTrust.PublicKey.Contains("BEGIN PUBLIC KEY"), "publisher key embedded in shared core");
     Console.WriteLine($"All {checks} updater checks passed.");return 0;
 }
-catch(Exception e){Console.Error.WriteLine(e);return 1;}
+catch(Exception e)
+{
+    Console.Error.WriteLine(e);
+    if(Environment.GetEnvironmentVariable("GITHUB_ACTIONS")=="true")
+        Console.Error.WriteLine("::error title=Updater check::"+e.Message.Replace("%","%25").Replace("\r","%0D").Replace("\n","%0A"));
+    return 1;
+}
 finally { Directory.Delete(root,true); }
 
 sealed class FakeHandler(Func<HttpRequestMessage,HttpResponseMessage> respond):HttpMessageHandler
