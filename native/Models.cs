@@ -25,7 +25,7 @@ public record MediaItem(int Id, string Title, string Section, string Genre, int 
     [JsonIgnore] public string Scores => liveScores ?? (Cinema ? $"КП {Kinopoisk}   IMDb {Imdb}" : Section);
     public event PropertyChangedEventHandler? PropertyChanged;
     public void SetScores(string kp,string imdb){liveKp=kp;liveImdb=imdb;liveScores=$"КП {kp}   IMDb {imdb}";PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(null));}
-    [JsonIgnore] public string Subtitle => Cinema ? string.Join(" · ",new[]{Year>0?Year.ToString():null,Genre}.Where(x=>!string.IsNullOrWhiteSpace(x))) : "Демонстрационный каталог";
+    [JsonIgnore] public string Subtitle => Cinema ? string.Join(" · ",new[]{Section=="Сериалы"?"Сериал":"Фильм",Year>0?Year.ToString():null,Genre}.Where(x=>!string.IsNullOrWhiteSpace(x))) : "Демонстрационный каталог";
     [JsonIgnore] public Brush Cover { get { var b = new LinearGradientBrush((Color)ColorConverter.ConvertFromString(Color), (Color)ColorConverter.ConvertFromString("#20262E"), 75); b.Freeze(); return b; } }
 }
 public record CatalogRow(MediaItem[] Items,int Columns);
@@ -57,6 +57,8 @@ public class Preferences
     public string Folder { get;set; }=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),"Downloads","Качалка");
     public bool FolderConfigured {get;set;}
     public bool Light {get;set;}=true;
+    public int MaxDownloadKbps {get;set;}
+    public int MaxUploadKbps {get;set;}
     public bool Economy {get;set;}=true;
     public bool AutoResumeDownloads {get;set;}=true;
     public bool CheckForUpdates {get;set;}=true;
@@ -67,6 +69,10 @@ public class Preferences
     public static Preferences Load(){try{return JsonSerializer.Deserialize<Preferences>(File.ReadAllText(Path.Combine(DataDir,"settings.json")))??new();}catch{return new();}}
     public void Save(){Directory.CreateDirectory(DataDir);var p=Path.Combine(DataDir,"settings.json");File.WriteAllText(p+".tmp",JsonSerializer.Serialize(this));File.Move(p+".tmp",p,true);}
 }
+public record DownloadFile(string Name,string FullPath,string IncompletePath,long Size,double Progress)
+{
+    [JsonIgnore] public string Summary=>$"{Math.Clamp(Progress,0,100):F1}% · {DownloadService.FormatBytes(Size)}";
+}
 public class DownloadItem : INotifyPropertyChanged
 {
     public string Id {get;set;}=Guid.NewGuid().ToString("N");
@@ -76,6 +82,7 @@ public class DownloadItem : INotifyPropertyChanged
     public string Name {get;set;}="Получение метаданных…";
     public string Status {get;set;}="На паузе";
     public double Progress {get;set;}
+    public List<DownloadFile> Files {get;set;}=[];
     public string Stats {get;set;}="";
     public string Hint {get;set;}="";
     [JsonIgnore] public string PeersText {get;set;}="";
@@ -84,6 +91,7 @@ public class DownloadItem : INotifyPropertyChanged
     public DateTime LastStartedUtc {get;set;}
     public bool Busy {get;set;}
     public bool Paused {get;set;}=true;
+    [JsonIgnore] public bool Completed=>Progress>=100;
     public string Action => Paused?"Продолжить":"Пауза";
     public event PropertyChangedEventHandler? PropertyChanged;
     public void Refresh()=>PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(null));
