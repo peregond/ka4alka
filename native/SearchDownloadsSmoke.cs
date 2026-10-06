@@ -54,5 +54,11 @@ public partial class MainWindow
         };
         timer.Start();FindVisual<Button>(first,b=>b.Content?.ToString()=="Подробнее")!.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));timer.Stop();if(detailError!=null)throw detailError;
         downloads.Items.Clear();
+        check(SidebarUpdateButton.Visibility==Visibility.Collapsed,"sidebar update prompt stays hidden until a package is ready");
+        preparedUpdateJob="fixture";RefreshSidebarUpdate();UpdateLayout();
+        check(SidebarUpdateButton.Visibility==Visibility.Visible&&SidebarUpdateButton.IsEnabled&&SidebarUpdateButton.TransformToAncestor(SidebarFooter).Transform(new Point()).Y<DownloadsButton.TransformToAncestor(SidebarFooter).Transform(new Point()).Y,"ready update appears above Downloads in the sidebar");
+        check(!SystemParameters.ClientAreaAnimation||SidebarUpdateButton.HasAnimatedProperties,"ready update softly animates when system animations are enabled");
+        Width=680;await Task.Delay(100);UpdateLayout();check(SidebarUpdateButton.Visibility==Visibility.Visible&&SidebarUpdateButton.ActualWidth>0,"sidebar update remains available in narrow layout");
+        preparedUpdateJob=null;RefreshSidebarUpdate();Width=1280;
     }
 }

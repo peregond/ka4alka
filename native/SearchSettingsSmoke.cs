@@ -44,7 +44,7 @@ public partial class MainWindow
                 Search.SelectedText=letter.ToString();Search.CaretIndex=Search.Text.Length;
                 await Task.Delay(15);
             }
-            submittedQuery=query;searchCategory="";liveKey=CurrentCatalogKey;Render();await Task.Delay(450);await Settle();
+            submittedQuery=Search.Text.Trim();searchCategory="";liveKey=CurrentCatalogKey;Render();await Task.Delay(450);await Settle();
             Check(Search.CaretIndex==query.Length,"Updating results moved the search caret.");
         }
         try
@@ -57,7 +57,7 @@ public partial class MainWindow
             Width=360;await Settle();CheckText("Интерстеллар","minimum-width");Shot("search-minimum");Width=510;await Settle();
             var windowCount=Application.Current.Windows.Count;
             Search.Text="Интерстелла";Search.Text="Интерстеллар";
-            SettingsButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));submittedQuery=query;searchCategory="";liveKey=CurrentCatalogKey;Render();await Task.Delay(450);await Settle();
+            SettingsButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));submittedQuery=Search.Text.Trim();searchCategory="";liveKey=CurrentCatalogKey;Render();await Task.Delay(450);await Settle();
             Check(section=="Настройки"&&SearchBar.Visibility==Visibility.Collapsed,"Settings did not open as a page.");
             Check(Application.Current.Windows.Count==windowCount,"Settings opened another window.");
             Check(Search.Text=="Интерстеллар","Opening settings discarded the query.");

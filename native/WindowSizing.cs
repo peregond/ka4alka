@@ -108,7 +108,7 @@ public partial class MainWindow
         SearchBar.Margin=new Thickness(0,0,tiny?10:18,0);SearchBar.Height=shortView?40:44;
         foreach(var subtitle in PageHeader.Children.OfType<TextBlock>().Where(x=>Equals(x.Tag,"CatalogSubtitle")))subtitle.Visibility=shortView?Visibility.Collapsed:Visibility.Visible;
         UpdateFilterRail();
-        UpdateCatalogColumns();
+        UpdateCatalogColumns();RefreshSidebarUpdate();
     }
     void UpdateFilterRail()
     {
