@@ -56,14 +56,28 @@ public partial class MainWindow
         try
         {
             var archive = Path.Combine(work, "package.zip");
-            UpdateStatus("Скачиваем обновление…");
-            await updateClient.DownloadAsync(updateOffer, archive, new Progress<int>(p => UpdateStatus($"Скачиваем обновление: {p}%")), updateCancellation.Token);
+            string? componentsPath=null,componentsDirectory=null;
+            if(updateOffer.Manifest.Components!=null)
+            {
+                UpdateStatus("Сравниваем компоненты установленной и новой версии…");
+                var plan=await updateClient.PlanComponentsAsync(updateOffer,install,updateCancellation.Token);
+                var stage=Path.Combine(work,"components");
+                try
+                {
+                    await updateClient.DownloadComponentsAsync(updateOffer,plan,stage,new Progress<ComponentProgress>(p=>UpdateStatus($"Компонентов к обновлению: {p.ChangedFiles}. Скачано {p.Received/1048576d:F1} из {p.Total/1048576d:F1} МБ; без скачивания: {p.ReusedFiles}.")),updateCancellation.Token);
+                    componentsPath=Path.Combine(work,"components.json");componentsDirectory=stage;
+                    await File.WriteAllBytesAsync(componentsPath,plan.CatalogBytes,updateCancellation.Token);
+                }
+                catch(RangeNotSupportedException){UpdateStatus("Сервер не поддерживает компоненты. Скачиваем полный пакет…");}
+            }
+            if(componentsPath==null)
+                await updateClient.DownloadAsync(updateOffer,archive,new Progress<int>(p=>UpdateStatus($"Скачиваем обновление: {p}%")),updateCancellation.Token);
             var manifest = Path.Combine(work, "latest.json"); var signature = Path.Combine(work, "latest.sig");
             await File.WriteAllBytesAsync(manifest, updateOffer.ManifestBytes, updateCancellation.Token);
             await File.WriteAllBytesAsync(signature, updateOffer.Signature, updateCancellation.Token);
             File.Copy(Path.Combine(install, "Kachalka.Updater.exe"), Path.Combine(work, "updater.exe"));
             using var parent = Process.GetCurrentProcess();
-            var job = new UpdateJob(install, archive, manifest, signature, parent.Id, parent.StartTime.ToUniversalTime().Ticks, id);
+            var job = new UpdateJob(install, archive, manifest, signature, parent.Id, parent.StartTime.ToUniversalTime().Ticks, id,componentsPath,componentsDirectory);
             var path = Path.Combine(work, "job.json");
             await File.WriteAllTextAsync(path, JsonSerializer.Serialize(job), updateCancellation.Token);
             preparedUpdateJob = path;
@@ -104,7 +118,7 @@ public partial class MainWindow
         }
         Toggle("Проверять обновления при запуске", prefs.CheckForUpdates, v => prefs.CheckForUpdates = v);
         Toggle("Автоматически скачивать и устанавливать при выходе", prefs.AutoUpdate, v => prefs.AutoUpdate = v);
-        panel.Children.Add(Text("Обновление применяется после сохранения очереди. Настройки и загруженные файлы остаются на месте.", 12, true));
+        panel.Children.Add(Text("Обновление применяется после сохранения очереди. Неизменившиеся компоненты повторно не скачиваются. Настройки и загруженные файлы остаются на месте.", 12, true));
         updateStatusLabel = Text(updateStatus); panel.Children.Add(updateStatusLabel);
         var actions = new WrapPanel(); panel.Children.Add(actions);
         updateCheckButton = AsyncButton("Проверить обновления", () => CheckUpdatesAsync(true)); actions.Children.Add(updateCheckButton);

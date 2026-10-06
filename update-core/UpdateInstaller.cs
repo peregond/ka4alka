@@ -1,7 +1,7 @@
 namespace Kachalka.Updates;
 
 public sealed record UpdateJob(string InstallDirectory, string ArchivePath, string ManifestPath, string SignaturePath,
-    int ParentPid, long ParentStartTicks, string Id);
+    int ParentPid, long ParentStartTicks, string Id, string? ComponentsPath=null, string? ComponentsDirectory=null);
 
 public static class UpdateInstaller
 {

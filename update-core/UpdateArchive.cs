@@ -44,14 +44,18 @@ public static class UpdateArchive
                 if (entry.FullName.EndsWith('/')) Directory.CreateDirectory(file);
                 else { Directory.CreateDirectory(Path.GetDirectoryName(file)!); entry.ExtractToFile(file, false); }
             }
-            foreach (var file in new[] { "Kachalka.exe", "Kachalka.dll", "Kachalka.runtimeconfig.json", "Kachalka.Updater.exe" })
-                if (!File.Exists(Path.Combine(destination, file))) throw new InvalidDataException("В обновлении отсутствует " + file);
-            using var assembly = File.OpenRead(Path.Combine(destination, "Kachalka.dll"));
-            using var pe = new PEReader(assembly);
-            if (pe.GetMetadataReader().GetAssemblyDefinition().Version.ToString(3) != manifest.Version)
-                throw new InvalidDataException("Версия приложения не совпадает с описанием обновления.");
+            ValidateApplication(destination,manifest);
         }
         catch { Directory.Delete(destination, true); throw; }
+    }
+    public static void ValidateApplication(string destination,UpdateManifest manifest)
+    {
+        foreach (var file in new[] { "Kachalka.exe", "Kachalka.dll", "Kachalka.runtimeconfig.json", "Kachalka.Updater.exe" })
+            if (!File.Exists(Path.Combine(destination, file))) throw new InvalidDataException("В обновлении отсутствует " + file);
+        using var assembly = File.OpenRead(Path.Combine(destination, "Kachalka.dll"));
+        using var pe = new PEReader(assembly);
+        if (pe.GetMetadataReader().GetAssemblyDefinition().Version.ToString(3) != manifest.Version)
+            throw new InvalidDataException("Версия приложения не совпадает с описанием обновления.");
     }
     public static bool Inside(string path, string root) => Path.GetFullPath(path).StartsWith(Path.TrimEndingDirectorySeparator(Path.GetFullPath(root)) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
 }

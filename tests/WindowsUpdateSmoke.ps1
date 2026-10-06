@@ -62,14 +62,22 @@ try{
  while(-not $old.HasExited -and $old.MainWindowHandle -eq 0 -and (Get-Date) -lt $limit){Start-Sleep -Milliseconds 250;$old.Refresh()}
  if($old.HasExited -or $old.MainWindowHandle -eq 0){throw 'Installed WPF window did not open'}
  $id=[Guid]::NewGuid().ToString('N');$work=Join-Path $state ('updates/'+$id);New-Item -ItemType Directory -Force $work | Out-Null
- Copy-Item ("dist/release-"+$nextVersion+"/Kachalka-win-x64.zip") (Join-Path $work 'package.zip')
+ # Real component client with local HTTP Range fixture; never stage the full package.
+ [System.IO.File]::WriteAllText((Join-Path $install 'obsolete-component.txt'),'old component')
+ dotnet run --project update-tests/Kachalka.UpdateTests.csproj -c Release -- --prepare-components $install ("dist/release-"+$nextVersion) $work
+ if($LASTEXITCODE -ne 0){throw 'Component preparation failed'}
+ $metrics=Get-Content (Join-Path $work 'metrics.json') -Raw | ConvertFrom-Json
+ if($metrics.Downloaded -ge $metrics.Package/4 -or $metrics.Reused -lt 100){throw 'Unchanged components were downloaded'}
+ ('PASS: component download '+$metrics.Downloaded+' bytes vs full ZIP '+$metrics.Package+' bytes; '+$metrics.Reused+' files reused') | Add-Content (Join-Path $evidence 'checks.txt')
  Copy-Item ("dist/release-"+$nextVersion+"/latest.json") $work;Copy-Item ("dist/release-"+$nextVersion+"/latest.sig") $work
  Copy-Item (Join-Path $install 'Kachalka.Updater.exe') (Join-Path $work 'updater.exe')
  $job=Join-Path $work 'job.json'
- @{InstallDirectory=$install;ArchivePath=(Join-Path $work 'package.zip');ManifestPath=(Join-Path $work 'latest.json');SignaturePath=(Join-Path $work 'latest.sig');ParentPid=$old.Id;ParentStartTicks=$old.StartTime.ToUniversalTime().Ticks;Id=$id} | ConvertTo-Json | Set-Content $job -Encoding utf8NoBOM
+ @{InstallDirectory=$install;ArchivePath=(Join-Path $work 'package.zip');ManifestPath=(Join-Path $work 'latest.json');SignaturePath=(Join-Path $work 'latest.sig');ComponentsPath=(Join-Path $work 'components.json');ComponentsDirectory=(Join-Path $work 'components');ParentPid=$old.Id;ParentStartTicks=$old.StartTime.ToUniversalTime().Ticks;Id=$id} | ConvertTo-Json | Set-Content $job -Encoding utf8NoBOM
  $helper=Start-Process (Join-Path $work 'updater.exe') -ArgumentList @('--job',('"'+$job+'"')) -PassThru;$started+=$helper
  if(-not $old.CloseMainWindow() -or -not $old.WaitForExit(30000)){throw 'Old application did not close cleanly'}
  if(-not $helper.WaitForExit(90000) -or $helper.ExitCode -ne 0){throw 'Real Windows update failed; see result.txt'}
+ if(Test-Path (Join-Path $install 'obsolete-component.txt')){throw 'Obsolete component survived update'}
+ if(Test-Path (Join-Path $work 'package.zip')){throw 'Component update downloaded full archive'}
  if((Get-Content (Join-Path $work 'healthy') -Raw) -ne $nextVersion){throw 'New WPF window failed health check'}
  if((Get-ItemProperty 'HKCU:/Software/Microsoft/Windows/CurrentVersion/Uninstall/Kachalka').DisplayVersion -ne $nextVersion){throw 'Registered version not updated'}
  if(-not(Test-Path (Join-Path $state 'settings.json')) -or -not(Test-Path $folder)){throw 'User state lost'}
