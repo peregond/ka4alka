@@ -8,7 +8,7 @@ on:
         default: '0.20.0'
   push:
     branches: [codex/catalog-pages-0.20]
-    paths: [.github/workflows/release.yml]
+    paths: [.github/workflows/release.yml, 'native/**', 'tests/**', 'installer/**', build-release.ps1, package-release.ps1]
 permissions:
   contents: write
 concurrency:

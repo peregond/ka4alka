@@ -29,6 +29,8 @@ public partial class MainWindow
             var combo=FindVisual<ComboBox>(FiltersPanel,x=>AutomationProperties.GetName(x)==name)??FindVisual<ComboBox>(PageHeader,x=>AutomationProperties.GetName(x)==name)??throw new Exception("Missing filter "+name);
             combo.SelectedItem=((IEnumerable<CatalogChoice>)combo.ItemsSource).Single(x=>x.Key==key);
         }
+        // Exercise desktop layouts even on the hosted runner's smaller virtual monitor.
+        MaxWidth=1800;MaxHeight=1000;MinWidth=360;MinHeight=300;
         Width=1280;Height=800;Render();await Settle();
         Check(liveItems.Count==40&&catalogDisplay.Count==40,"one catalog page displays 40 cards");
         Check(FiltersPanel.Visibility==Visibility.Visible,"filters appear on the right at standard window width");
