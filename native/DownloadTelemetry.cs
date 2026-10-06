@@ -39,7 +39,7 @@ public static class DownloadPresentation
         var idle=now-(s.LastPayloadUtc??s.StartedUtc)>TimeSpan.FromSeconds(20);
         var down=s.State==TorrentState.Downloading&&!s.Paused?Math.Max(0,s.DownloadRate):0;
         var up=!s.Paused&&(s.State is TorrentState.Downloading or TorrentState.Seeding)?Math.Max(0,s.UploadRate):0;
-        item.Progress=progress;item.Remaining="";item.Hint="";
+        item.Progress=progress;item.DownloadRate=down;item.UploadRate=up;item.TotalBytes=total;item.Remaining="";item.Hint="";
         item.Indeterminate=!s.Paused&&(s.State is TorrentState.Metadata or TorrentState.Hashing);
         item.PeersText=s.Paused?"":$"Подключено: {Math.Max(0,s.Connections)} · сидов: {Math.Max(0,s.Seeds)}";
         var volume=total.HasValue?$"{DownloadService.FormatBytes(transferred)} из {DownloadService.FormatBytes(total.Value)}":"Размер станет известен после получения метаданных";

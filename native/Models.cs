@@ -59,6 +59,7 @@ public class Preferences
     public bool Light {get;set;}=true;
     public int MaxDownloadKbps {get;set;}
     public int MaxUploadKbps {get;set;}
+    public string DownloadSort {get;set;}="newest";
     public bool Economy {get;set;}=true;
     public bool AutoResumeDownloads {get;set;}=true;
     public bool CheckForUpdates {get;set;}=true;
@@ -80,6 +81,17 @@ public class DownloadItem : INotifyPropertyChanged
     public string? InfoHash {get;set;}
     public string Folder {get;set;}="";
     public string Name {get;set;}="Получение метаданных…";
+    public DateTime AddedUtc {get;set;}
+    public string? ImageUrl {get;set;}
+    public string? MediaTitle {get;set;}
+    public string? MediaSection {get;set;}
+    [JsonIgnore] public string DisplayName=>string.IsNullOrWhiteSpace(MediaTitle)?Name:MediaTitle;
+    [JsonIgnore] public long DownloadRate {get;set;}
+    [JsonIgnore] public long UploadRate {get;set;}
+    [JsonIgnore] public long? TotalBytes {get;set;}
+    [JsonIgnore] public string RateSummary=>$"↓ {DownloadService.FormatBytes(Math.Max(0,DownloadRate))}/с · ↑ {DownloadService.FormatBytes(Math.Max(0,UploadRate))}/с";
+    [JsonIgnore] public string SizeSummary=>TotalBytes.HasValue&&TotalBytes.Value>=0?DownloadService.FormatBytes(TotalBytes.Value):"Размер уточняется";
+    [JsonIgnore] public string CompletionLabel=>$"{(double.IsFinite(Progress)?Math.Clamp(Progress,0,100):0):F1}%";
     public string Status {get;set;}="На паузе";
     public double Progress {get;set;}
     public List<DownloadFile> Files {get;set;}=[];
