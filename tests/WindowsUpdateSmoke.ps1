@@ -8,11 +8,13 @@ New-Item -ItemType Directory -Force $state | Out-Null
 $env:KACHALKA_DATA=$state
 $env:DOTNET_CLI_TELEMETRY_OPTOUT='1'
 $keyPath=Join-Path $evidence 'test-private.pem'
+$publicKeyPath=Join-Path $root 'update-core/update-public.pem'
+$originalPublicKey=[System.IO.File]::ReadAllText($publicKeyPath)
 $rsa=[System.Security.Cryptography.RSA]::Create(3072)
 try{
  [System.IO.File]::WriteAllText($keyPath,$rsa.ExportPkcs8PrivateKeyPem())
  # CI-only key. Never publish these fixture binaries or private test keys.
- [System.IO.File]::WriteAllText((Join-Path $root 'update-core/update-public.pem'),$rsa.ExportSubjectPublicKeyInfoPem())
+ [System.IO.File]::WriteAllText($publicKeyPath,$rsa.ExportSubjectPublicKeyInfoPem())
 }finally{$rsa.Dispose()}
 $folder=Join-Path $state 'downloads';New-Item -ItemType Directory -Force $folder | Out-Null
 @{Folder=$folder;FolderConfigured=$true;AutoResumeDownloads=$false;CheckForUpdates=$false;AutoUpdate=$false} | ConvertTo-Json | Set-Content (Join-Path $state 'settings.json') -Encoding utf8NoBOM
@@ -25,13 +27,17 @@ try{
  ./installer/write-uninstall.ps1 -ApplicationDirectory 'dist/Kachalka-0.19' -OutputPath $uninstall
  $setup=Join-Path $evidence 'Kachalka-Setup-0.19.0.exe'
  $appDirectory=[System.IO.Path]::GetFullPath((Join-Path $root 'dist/Kachalka-0.19'))
- & 'C:/Program Files (x86)/NSIS/makensis.exe' '/V2' '/DVERSION=0.19.0' ('/DAPP_DIR='+$appDirectory) ('/DAPP_GLOB='+$appDirectory+'\*') ('/DUNINSTALL_SCRIPT='+$uninstall) ('/DOUTPUT='+$setup) installer/Kachalka.nsi
+ & 'C:/Program Files (x86)/NSIS/makensis.exe' '/V2' '/INPUTCHARSET' 'UTF8' '/DVERSION=0.19.0' ('/DAPP_DIR='+$appDirectory) ('/DAPP_GLOB='+$appDirectory+'\*') ('/DUNINSTALL_SCRIPT='+$uninstall) ('/DOUTPUT='+$setup) installer/Kachalka.nsi
  if($LASTEXITCODE -ne 0){throw 'Installer failed'}
  $installer=Start-Process -FilePath $setup -ArgumentList '/S' -PassThru
  if(-not $installer.WaitForExit(60000) -or $installer.ExitCode -ne 0){throw 'Silent installation failed'}
  $install=Join-Path $env:LOCALAPPDATA 'Programs/Kachalka'
  if(-not(Test-Path (Join-Path $install 'Kachalka.exe'))){throw 'Installation missing executable'}
- if(-not(Test-Path (Join-Path ([Environment]::GetFolderPath('Desktop')) 'Качалка.lnk'))){throw 'Desktop shortcut missing'}
+ $desktop=[Environment]::GetFolderPath('DesktopDirectory')
+ if(-not(Test-Path (Join-Path $desktop 'Качалка.lnk'))){
+   $observed=@(Get-ChildItem -LiteralPath $desktop -Filter '*.lnk' -ErrorAction SilentlyContinue | ForEach-Object {$_.Name}) -join ', '
+   throw ('Desktop shortcut missing in '+$desktop+'; observed: '+$observed)
+ }
  if((Get-ItemProperty 'HKCU:/Software/Microsoft/Windows/CurrentVersion/Uninstall/Kachalka').DisplayVersion -ne '0.19.0'){throw 'Wrong installed version'}
  'PASS: EXE installation, shortcut, registered version 0.19.0' | Add-Content (Join-Path $evidence 'checks.txt')
 
@@ -69,6 +75,7 @@ try{
  'PASS: uninstall removes executable and preserves user state' | Add-Content (Join-Path $evidence 'checks.txt')
  Get-Content (Join-Path $evidence 'checks.txt')
 }finally{
+ [System.IO.File]::WriteAllText($publicKeyPath,$originalPublicKey)
  foreach($p in $started){if(-not $p.HasExited){$p.Kill($true);$p.WaitForExit()};$p.Dispose()}
  Get-Process Kachalka -ErrorAction SilentlyContinue | Where-Object {$_.Path -eq (Join-Path $env:LOCALAPPDATA 'Programs/Kachalka/Kachalka.exe')} | Stop-Process
  Remove-Item $keyPath -ErrorAction SilentlyContinue

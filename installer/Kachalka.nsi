@@ -62,6 +62,7 @@ Section "Качалка"
   SetOutPath "$INSTDIR"
   File /r "${APP_GLOB}"
   CreateDirectory "$SMPROGRAMS\Качалка"
+  CreateDirectory "$DESKTOP"
   CreateShortcut "$SMPROGRAMS\Качалка\Качалка.lnk" "$INSTDIR\Kachalka.exe"
   CreateShortcut "$DESKTOP\Качалка.lnk" "$INSTDIR\Kachalka.exe"
   ; Keep uninstall infrastructure outside the directory swapped by the updater.
