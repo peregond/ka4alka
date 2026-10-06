@@ -1,0 +1,30 @@
+name: Windows release validation
+on:
+  push:
+    branches: [codex/github-updates-0.19]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Install NSIS
+        run: choco install nsis --yes --no-progress
+      - name: Validate installer and signed update on Windows
+        shell: pwsh
+        run: ./tests/WindowsUpdateSmoke.ps1
+      - name: Upload smoke-test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-update-evidence
+          path: |
+            test-output/windows-update/checks.txt
+            test-output/windows-update/data/updates/*/result.txt

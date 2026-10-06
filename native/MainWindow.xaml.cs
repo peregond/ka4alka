@@ -109,7 +109,21 @@ public partial class MainWindow:Window
         var values=prefs.Light?new[]{"#FAFBF8","#FFFFFF","#202522","#70786F","#E2E7DE","#E8EDE5","#287D59","#FFFFFF","#EFF2EB","#F0F3ED","#202522","#FFFFFF","#39423B","#E8F2EB"}:new[]{"#151917","#1D2420","#EDF2ED","#A0ADA3","#354138","#303D33","#93CDB0","#163522","#1A211C","#29352D","#EDF2ED","#182019","#FFFFFF","#293F32"};var keys=new[]{"Bg","Panel","Text","Muted","Edge","Selected","Accent","AccentInk","Sidebar","Hover","Primary","PrimaryInk","PrimaryHover","AccentSoft"};for(int i=0;i<keys.Length;i++){var brush=new SolidColorBrush((Color)ColorConverter.ConvertFromString(values[i]));brush.Freeze();Application.Current.Resources[keys[i]]=brush;}
         SidePanel.SetResourceReference(Border.BackgroundProperty,"Sidebar");
     }
-    async void OnClosing(object? sender,CancelEventArgs e){if(closed)return;e.Cancel=true;IsEnabled=false;refresh.Stop();searchDelay.Stop();liveRequest?.Cancel();sourceRequest?.Cancel();archiveRequest?.Cancel();broadcastRequest?.Cancel();foreach(var view in releaseViews.Values)view.Request?.Cancel();try{prefs.Save();await downloads.Close();}catch(Exception ex){MessageBox.Show(ex.Message,"Не удалось сохранить очередь");}finally{closed=true;sourceClient.Dispose();_ = Dispatcher.BeginInvoke(Close);}}
+    bool closing;
+    async void OnClosing(object? sender,CancelEventArgs e)
+    {
+        if(closed)return;e.Cancel=true;if(closing)return;closing=true;
+        IsEnabled=false;updateCancellation.Cancel();refresh.Stop();searchDelay.Stop();liveRequest?.Cancel();sourceRequest?.Cancel();archiveRequest?.Cancel();broadcastRequest?.Cancel();
+        foreach(var view in releaseViews.Values)view.Request?.Cancel();
+        bool saved=false;
+        try{prefs.Save();await downloads.Close();saved=true;}
+        catch(Exception ex){MessageBox.Show(ex.Message,"Не удалось сохранить очередь");}
+        finally
+        {
+            closed=true;
+            if(saved)try{LaunchPreparedUpdate();}catch(Exception ex){MessageBox.Show(ex.Message,"Обновление не установлено");}
+            sourceClient.Dispose();updateClient.Dispose();_ = Dispatcher.BeginInvoke(Close);
+        }
+    }
 }
-
 

@@ -56,6 +56,8 @@ public class Preferences
     public bool Light {get;set;}=true;
     public bool Economy {get;set;}=true;
     public bool AutoResumeDownloads {get;set;}=true;
+    public bool CheckForUpdates {get;set;}=true;
+    public bool AutoUpdate {get;set;}=true;
     public HashSet<int> Favorites {get;set;}=[];
     public List<MediaItem> LiveFavorites {get;set;}=[];
     public static string DataDir=>Environment.GetEnvironmentVariable("KACHALKA_DATA") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"Kachalka");

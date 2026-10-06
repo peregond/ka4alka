@@ -76,7 +76,8 @@ public partial class MainWindow
             catch(Exception error){prefs.AutoResumeDownloads=previous;resume.IsChecked=previous;Status.Text="Не удалось сохранить настройки: "+error.Message;}
         }
         resume.Click+=(_,_)=>SaveResume();startup.Children.Add(resume);startup.Children.Add(Text("Загрузки, которые ты поставил на паузу вручную, останутся на паузе.",12,true));
-        var about=Card("Качалка","Нативное приложение для Windows. Версия "+(typeof(MainWindow).Assembly.GetName().Version?.ToString(2)??""));
+        RenderUpdateSettings(Card("Обновления","Новые версии из официального репозитория GitHub."));
+        var about=Card("Качалка","Нативное приложение для Windows. Версия "+(typeof(MainWindow).Assembly.GetName().Version?.ToString(3)??""));
         about.Children.Add(Text("Постеры загружаются по мере просмотра. Торрент-движок работает, пока есть активные задачи, и освобождает ресурсы после их остановки.",12,true));
     }
 }

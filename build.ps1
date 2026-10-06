@@ -10,6 +10,9 @@ if($Test){& $sdk run --project tests/Kachalka.Tests.csproj -c Release; if($LASTE
 $publishPath=Join-Path $PSScriptRoot $OutputDir
 & $sdk publish native/Kachalka.csproj -c Release -r win-x64 --self-contained true -o $publishPath -p:DebugType=None -p:DebugSymbols=false
 if($LASTEXITCODE -ne 0){throw 'Publish failed'}
+& $sdk publish updater/Kachalka.Updater.csproj -c Release -r win-x64 --self-contained true -o (Join-Path $PSScriptRoot '.tools/updater-publish') -p:DebugType=None -p:DebugSymbols=false
+if($LASTEXITCODE -ne 0){throw 'Updater publish failed'}
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot '.tools/updater-publish/Kachalka.Updater.exe') -Destination $publishPath -Force
 New-Item -ItemType Directory -Force (Join-Path $publishPath 'licenses') | Out-Null
 foreach($package in @('monotorrent','mono.nat','reusabletasks','htmlagilitypack','microsoft.netcore.app.runtime.win-x64','microsoft.windowsdesktop.app.runtime.win-x64')){
  $packageRoot=Join-Path $env:NUGET_PACKAGES $package

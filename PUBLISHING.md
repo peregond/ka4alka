@@ -1,36 +1,35 @@
-# Публикация сборок «Качалки»
+# Публикация «Качалки» 0.19.0 и следующих версий
 
-Готовые сборки распространяются через отдельный публичный репозиторий `peregond/kachalka-releases`. Исходники приложения и локальные настройки туда не отправляются. Источник документации релизов — каталог `distribution/` в этом рабочем пространстве.
+Бинарные выпуски размещаются в peregond/ka4alka. До публикации проверьте, что этот репозиторий доступен вашей учётной записи. Файлы в dist/release-<VERSION> являются подготовленным локальным пакетом, а не опубликованным релизом.
 
-## Подготовка выпуска
+## Сборка на Windows
 
-1. Изменить версию в `native/Kachalka.csproj`.
-2. Выполнить необходимые проверки, собрать приложение и ZIP.
-3. Сформировать пакет публикации:
+Нужны .NET 10 SDK и NSIS 3.11 или новее. Закрытый ключ выпуска храните отдельно от Git; публичный ключ встроен из update-core/update-public.pem. Для первой 0.19 ключ создан в игнорируемом .tools/update-signing/private.pem текущей облачной рабочей папки. Сохраните его в защищённом хранилище для будущих выпусков; без этого же ключа подписанные обновления не будут приняты. Не коммитьте ключ и не добавляйте его в релиз. Другой публичный ключ требует отдельного плана смены доверия.
 
 ```powershell
-./package-release.ps1 -Version 0.18.0 -ArchivePath dist/Kachalka-0.18.zip
+./build-release.ps1 -Version 0.19.0 -SigningKeyPath <PRIVATE_PEM_PATH> -MakeNsis 'C:/Program Files (x86)/NSIS/makensis.exe'
 ```
 
-Скрипт проверяет структуру архива и версию DLL без её запуска, исключает случайное включение тестового EXE, копирует ZIP под постоянным именем и создаёт `latest.json` и `SHA256SUMS.txt`.
+Скрипт выполняет Windows-интеграционные проверки, публикует приложение и автономный установщик обновлений, запускает проверки ядра обновлений, создаёт ZIP, подписанные метаданные и EXE-установщик. Версия DLL должна совпадать с версией выпуска. Пакет нельзя публиковать, если проверки не прошли. Закрытый ключ проверяется на соответствие встроенному публичному до подписания.
 
-## Порядок размещения
-
-1. Подготовить описание выпуска, обновить документацию в `distribution/`.
-2. Отправить только эту документацию в репозиторий релизов.
-3. Создать черновик GitHub Release с тегом нужной версии и конкретным коммитом документации.
-4. Загрузить три файла: `Kachalka-win-x64.zip`, `latest.json`, `SHA256SUMS.txt`.
-5. Проверить размеры и SHA-256 загруженных файлов. Сохранённый черновик не является публичной версией.
-6. Опубликовать выпуск и пометить его последним. Проверить скачивание без авторизации и совпадение хеша.
-
-Пример для уже подготовленного и отправленного коммита:
+Для подготовленного ZIP отдельно:
 
 ```powershell
-gh release create v0.18.0 --repo peregond/kachalka-releases --target <COMMIT_SHA> --draft --title "Качалка 0.18" --notes-file distribution/RELEASE-NOTES-0.18.md
-gh release upload v0.18.0 --repo peregond/kachalka-releases dist/release-0.18.0/Kachalka-win-x64.zip dist/release-0.18.0/latest.json dist/release-0.18.0/SHA256SUMS.txt
-gh release edit v0.18.0 --repo peregond/kachalka-releases --draft=false --latest
+./package-release.ps1 -Version 0.19.0 -ArchivePath dist/Kachalka-0.19.zip -SigningKeyPath <PRIVATE_PEM_PATH>
+dotnet run --project update-tests/Kachalka.UpdateTests.csproj -c Release -- --verify-release dist/release-0.19.0
 ```
 
-Не заменять уже опубликованный архив под прежним номером версии. Следующий выпуск получает новый тег, а постоянные ссылки `releases/latest/download/...` переходят на него.
+## Выпуск на GitHub
 
-Формат будущего обновления и оставшиеся задачи описаны в `distribution/UPDATE_PROTOCOL.md`. Автоматического обновления клиента 0.18 пока нет.
+1. Проверьте на Windows установку/удаление и запуск приложения, кнопки обновления, сохранение очереди и обновление между двумя тестовыми версиями. Linux-кросс-компиляция этих проверок не заменяет.
+2. Создайте черновик релиза с тегом версии и загрузите Kachalka-Setup-<VERSION>.exe, Kachalka-win-x64.zip, latest.json, latest.sig, SHA256SUMS.txt.
+3. Проверьте загруженные файлы и подпись, затем опубликуйте релиз и отметьте его последним.
+4. Проверьте скачивание метаданных и архива без авторизации. Не меняйте байты JSON после подписания и не заменяйте выпущенный ZIP под старой версией.
+
+```powershell
+gh release create v0.19.0 --repo peregond/ka4alka --draft --title 'Качалка 0.19.0' --notes-file distribution/RELEASE-NOTES-0.19.md
+gh release upload v0.19.0 --repo peregond/ka4alka dist/release-0.19.0/Kachalka-Setup-0.19.0.exe dist/release-0.19.0/Kachalka-win-x64.zip dist/release-0.19.0/latest.json dist/release-0.19.0/latest.sig dist/release-0.19.0/SHA256SUMS.txt
+gh release edit v0.19.0 --repo peregond/ka4alka --draft=false --latest
+```
+
+Подпись метаданных защищает автообновления, но не заменяет Authenticode-подпись EXE для Windows SmartScreen. EXE 0.19.0 пока не имеет подписи издателя.

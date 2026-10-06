@@ -6,12 +6,12 @@
   "platform": "win-x64",
   "minimumWindows": "10",
   "package": {
-    "url": "https://github.com/peregond/kachalka-releases/releases/download/v0.18.0/Kachalka-win-x64.zip",
+    "url": "https://github.com/peregond/ka4alka/releases/download/v0.18.0/Kachalka-win-x64.zip",
     "fileName": "Kachalka-win-x64.zip",
     "size": 66082890,
     "sha256": "38a3bbd4fa86db5976ed4269edf56e22eff4e69d2431ee10129a0bfc7cc8e4fc",
     "format": "portable-zip"
   },
-  "releaseNotesUrl": "https://github.com/peregond/kachalka-releases/releases/tag/v0.18.0",
+  "releaseNotesUrl": "https://github.com/peregond/ka4alka/releases/tag/v0.18.0",
   "automaticInstallationAvailable": false
 }
