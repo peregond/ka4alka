@@ -61,7 +61,7 @@ public partial class MainWindow
             downloadList=new ListBox{ItemsSource=downloadView,ItemTemplate=(DataTemplate)FindResource("DownloadRow")};AutomationProperties.SetName(downloadList,"Очередь загрузок");Body.Children.Add(downloadList);return;
         }
         var empty=new StackPanel{HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center,MaxWidth=360};
-        var illustration=IconLabel("","IconDownload",32);illustration.HorizontalAlignment=HorizontalAlignment.Center;illustration.Margin=new(0,0,0,18);empty.Children.Add(illustration);
+        var illustration=IconLabel("","IconDownload",32);foreach(var path in VisualElements<Path>(illustration)){BindingOperations.ClearBinding(path,Shape.StrokeProperty);path.SetResourceReference(Shape.StrokeProperty,"Muted");}illustration.HorizontalAlignment=HorizontalAlignment.Center;illustration.Margin=new(0,0,0,18);empty.Children.Add(illustration);
         var caption=Text("Загрузок пока нет",22);caption.TextAlignment=TextAlignment.Center;empty.Children.Add(caption);
         var hint=Text("Выбери раздачу в карточке фильма или добавь magnet-ссылку либо .torrent-файл.",13,true);hint.TextAlignment=TextAlignment.Center;empty.Children.Add(hint);
         empty.Children.Add(ActionButton("Добавить торрент","IconPlus",()=>AddTorrent(this,new RoutedEventArgs()),"PrimaryButton"));Body.Children.Add(empty);
@@ -88,6 +88,8 @@ public partial class MainWindow
         if(downloadSort is not ("speed" or "progress" or "size"))return;
         // Keep the row under the pointer stable while the user chooses an action.
         if(downloadList?.IsMouseOver==true||downloadList?.IsKeyboardFocusWithin==true||downloadMenus.Any(menu=>menu.IsOpen))return;
+        var order=DownloadSortChoices.First(x=>x.Key==downloadSort).Sort;
+        if(downloadView.Cast<DownloadItem>().Select(x=>x.Id).SequenceEqual(DownloadOrdering.Sort(downloads.Items,order).Select(x=>x.Id)))return;
         var selected=downloadList?.SelectedItem;downloadView.Refresh();if(downloadList!=null&&selected!=null)downloadList.SelectedItem=selected;
     }
     ContextMenu Menu()
@@ -106,9 +108,14 @@ public partial class MainWindow
         var button=(Button)sender;var item=(DownloadItem)button.Tag;
         if(button.ContextMenu is {} old)downloadMenus.Remove(old);
         var menu=Menu();button.ContextMenu=menu;
-        var remove=MenuEntry("Удалить из загрузок","IconQueueRemove");remove.Tag=item;remove.SetResourceReference(Control.ForegroundProperty,"Muted");remove.ToolTip="Удалить из очереди, сохранив скачанные файлы";remove.Click+=RemoveDownload;menu.Items.Add(remove);
-        var delete=MenuEntry("Удалить файлы","IconTrash");delete.Tag=item;delete.SetResourceReference(Control.ForegroundProperty,"Danger");delete.ToolTip="Удалить загрузку вместе со скачанными и частичными файлами";delete.Click+=DeleteDownloadFiles;menu.Items.Add(delete);
+        var remove=MenuEntry("Удалить из загрузок","IconQueueRemove");remove.Tag=item;DisableBusy(remove,item);remove.SetResourceReference(Control.ForegroundProperty,"Muted");remove.ToolTip="Удалить из очереди, сохранив скачанные файлы";remove.Click+=RemoveDownload;menu.Items.Add(remove);
+        var delete=MenuEntry("Удалить файлы","IconTrash");delete.Tag=item;DisableBusy(delete,item);delete.SetResourceReference(Control.ForegroundProperty,"Danger");delete.ToolTip="Удалить загрузку вместе со скачанными и частичными файлами";delete.Click+=DeleteDownloadFiles;menu.Items.Add(delete);
         OpenDownloadMenu(button);
+    }
+    void DisableBusy(MenuItem action,DownloadItem item)
+    {
+        var style=new Style(typeof(MenuItem),(Style)FindResource(typeof(MenuItem)));
+        var busy=new DataTrigger{Binding=new Binding("Busy"){Source=item},Value=true};busy.Setters.Add(new Setter(UIElement.IsEnabledProperty,false));style.Triggers.Add(busy);action.Style=style;
     }
     void DownloadLimits()
     {
@@ -133,7 +140,9 @@ public partial class MainWindow
     async void DeleteDownloadFiles(object sender,RoutedEventArgs e)
     {
         var item=(DownloadItem)((FrameworkElement)sender).Tag;
+        if(item.Busy){Status.Text="Подожди завершения текущей операции с загрузкой.";return;}
         if(MessageBox.Show(this,"Удалить «"+item.DisplayName+"» из загрузок вместе со скачанными и частичными файлами?\n\nЭто действие нельзя отменить. Другие файлы в папке останутся.","Удалить загрузку и файлы",MessageBoxButton.YesNo,MessageBoxImage.Warning,MessageBoxResult.No)!=MessageBoxResult.Yes)return;
-        try{await downloads.Remove(item,true);Render();Status.Text="Загрузка и её файлы удалены.";}catch(Exception error){Status.Text="Не удалось удалить файлы: "+error.Message;}finally{SyncTimer();}
+        if(item.Busy){Status.Text="Загрузка ещё занята. Повтори удаление после завершения операции.";return;}
+        try{await downloads.Remove(item,true);if(downloads.Items.Contains(item)){Status.Text="Загрузка ещё занята. Повтори удаление после завершения операции.";return;}Render();Status.Text="Загрузка и её файлы удалены.";}catch(Exception error){Status.Text="Не удалось удалить файлы: "+error.Message;}finally{SyncTimer();}
     }
 }

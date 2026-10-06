@@ -105,7 +105,12 @@ public partial class MainWindow:Window
         var start=AsyncButton("Начать загрузку",()=>Add(input.Text));start.Style=(Style)FindResource("PrimaryButton");start.IsDefault=true;actions.Children.Add(start);actions.Children.Add(AsyncButton("Выбрать .torrent",async()=>{var f=new OpenFileDialog{Filter="BitTorrent (*.torrent)|*.torrent"};if(f.ShowDialog(dialog)==true)await Add(f.FileName);}));p.Children.Add(actions);p.Children.Add(error);p.Children.Add(Text("После скачивания клиент продолжает раздачу. Нажми «Пауза», чтобы остановить её.",12,true));dialog.ShowDialog();
     }
     async void ToggleDownload(object sender,RoutedEventArgs e){try{await downloads.Toggle((DownloadItem)((Button)sender).Tag);}catch(Exception ex){Status.Text=ex.Message;}finally{SyncTimer();}}
-    async void RemoveDownload(object sender,RoutedEventArgs e){try{await downloads.Remove((DownloadItem)((FrameworkElement)sender).Tag);Render();Status.Text="Загрузка удалена из очереди. Файлы сохранены.";}catch(Exception ex){Status.Text=ex.Message;}finally{SyncTimer();}}
+    async void RemoveDownload(object sender,RoutedEventArgs e)
+    {
+        var item=(DownloadItem)((FrameworkElement)sender).Tag;
+        if(item.Busy){Status.Text="Подожди завершения текущей операции с загрузкой.";return;}
+        try{await downloads.Remove(item);if(downloads.Items.Contains(item)){Status.Text="Загрузка ещё занята. Повтори удаление после завершения операции.";return;}Render();Status.Text="Загрузка удалена из очереди. Файлы сохранены.";}catch(Exception ex){Status.Text=ex.Message;}finally{SyncTimer();}
+    }
     void OpenFolder(object sender,RoutedEventArgs e){var d=(DownloadItem)((Button)sender).Tag;if(Directory.Exists(d.Folder))Process.Start(new ProcessStartInfo(d.Folder){UseShellExecute=true});}
     void ApplyTheme()
     {
