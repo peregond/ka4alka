@@ -29,13 +29,14 @@ public record CatalogSelection(string Genre="",string Country="",int? Year=null,
         if(Year.HasValue&&item.Year!=Year)return false;
         if(Genre.Length>0&&!item.GenreKeys.Contains(Genre))return false;
         if(Country.Length>0&&!item.CountryKeys.Contains(Country))return false;
-        return Rating==0||double.TryParse(item.Kinopoisk.Replace(',','.'),NumberStyles.Float,CultureInfo.InvariantCulture,out var score)&&score>=Rating;
+        return Rating==0||CatalogPaging.Rating(item)>=Rating;
     }
 }
 public record CatalogPage(MediaItem[] Items,bool HasNext,CatalogChoice[] Genres,CatalogChoice[] Countries);
 public static class CatalogPaging
 {
     public const int Size=40,Limit=40;
+    public static double Rating(MediaItem item)=>double.TryParse(item.Kinopoisk.Replace(',','.'),NumberStyles.Float,CultureInfo.InvariantCulture,out var value)&&value is >=0 and <=10?value:-1;
     public static int[] Numbers(int current,int? last=null)
     {
         current=Math.Clamp(current,1,Limit);var max=Math.Clamp(last??Math.Min(Limit,Math.Max(10,current+4)),1,Limit);

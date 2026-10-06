@@ -16,6 +16,6 @@ static class CatalogPagingTests
         Check(CatalogPaging.Numbers(1).SequenceEqual(Enumerable.Range(1,10))&&CatalogPaging.Numbers(12).Contains(12)&&CatalogPaging.Numbers(40).Max()==40,"page numbers cover current selection within source limits");
         Check(CatalogPaging.Numbers(3,3).SequenceEqual([1,2,3]),"known last page removes impossible numbered destinations");
         var item=new MediaItem(1,"Фильм","Фильмы","комедия",2024,"7,5","—","#526B69"){GenreKeys=["komediia"],CountryKeys=["rossiia"]};
-        Check(filtered.Matches(item)&&!filtered.Matches(item with{CountryKeys=["ssha"]})&&!filtered.Matches(item with{Kinopoisk="—"}),"saved filters combine country and genre and never interpret missing ratings as real scores");
+        Check(filtered.Matches(item)&&!filtered.Matches(item with{CountryKeys=["ssha"]})&&!filtered.Matches(item with{Kinopoisk="—"})&&!filtered.Matches(item with{Kinopoisk="99"}),"saved filters combine country and genre and reject missing or invalid ratings");
     }
 }

@@ -51,10 +51,14 @@ public partial class MainWindow
         Choose("Рейтинг от","8");await Settle();Check(liveItems.Count==40&&catalogRating==8,"rating threshold combines with genre and country");
         ResetCatalogFilters();liveKey="";Render();await Settle();Choose("Подборка","popular");await Settle();Check(catalogCollection=="popular"&&CatalogSelection.Filter=="","popular collection uses public source order");
         Choose("Подборка","rated");await Settle();Check(CatalogSelection.Filter=="rating-8/sort-rating","high-rating collection uses source rating threshold");
+        ResetCatalogFilters();prefs.LiveFavorites=[rows[0] with{Kinopoisk="6.0"},rows[1] with{Kinopoisk="9.0"},rows[2] with{Kinopoisk="8.0"}];
+        topSaved!.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Settle();
+        Choose("Порядок","По рейтингу");await Settle();Check(catalogDisplay.Select(x=>x.Id).SequenceEqual([2,3,1]),"saved cards sort by real rating");
+        ResetCatalogFilters();topAll!.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Settle();Check(Page(2).IsEnabled&&catalogHasNext,"returning from saved cards restores catalog pagination");
         var bitmap=new RenderTargetBitmap((int)ActualWidth,(int)ActualHeight,96,96,PixelFormats.Pbgra32);bitmap.Render(this);var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(bitmap));using(var file=File.Create(Path.Combine(output,"catalog.png")))png.Save(file);
         MinWidth=360;Width=680;Height=500;await Task.Delay(150);UpdateLayout();Check(FiltersPanel.Visibility==Visibility.Collapsed&&inlineFilterButton?.Visibility==Visibility.Visible,"narrow window exposes inline filters");
         inlineFilterButton!.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));UpdateLayout();Check(inlineCatalogFilters?.Visibility==Visibility.Visible,"inline filters open on narrow screens");
-        Height=360;await Task.Delay(150);UpdateLayout();Check(inlineCatalogFilterScroll is {ScrollableHeight:>0}&&inlineCatalogFilterScroll.ActualHeight<=116&&Body.ActualHeight>25,"short window scrolls all filter choices and retains space for cards");
+        Height=360;await Task.Delay(150);UpdateLayout();Check(inlineCatalogFilterScroll is {ScrollableHeight:>0}&&Body.ActualHeight>25,$"short window scrolls all filter choices and retains space for cards (window={ActualHeight}, filters={inlineCatalogFilterScroll?.ActualHeight}, scroll={inlineCatalogFilterScroll?.ScrollableHeight}, cards={Body.ActualHeight})");
         Close();
     }
 }

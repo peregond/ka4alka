@@ -94,7 +94,7 @@ public partial class MainWindow
         if(!favoritesOnly&&liveKey!=key){liveKey=key;_ = FetchCatalog(key,section,Search.Text,livePage);}
         var headingRow=new DockPanel{Margin=new(5,0,8,5)};
         var count=Text(liveLoading?"Загружаем…":$"Страница {livePage}",11,true);count.VerticalAlignment=VerticalAlignment.Center;count.Margin=new(14,0,0,0);DockPanel.SetDock(count,Dock.Right);headingRow.Children.Add(count);
-        var title=favoritesOnly?"Сохранённое":Search.Text.Length>0?(section=="Фильмы"?"Поиск фильмов":"Поиск сериалов"):catalogCollection=="popular"?"Популярное сегодня":catalogCollection=="rated"?"Кино с высоким рейтингом":section=="Фильмы"?"Все фильмы":"Все сериалы";
+        var title=favoritesOnly?"Сохранённое":Search.Text.Length>0?(section=="Фильмы"?"Поиск фильмов":"Поиск сериалов"):catalogCollection=="popular"?"Популярное":catalogCollection=="rated"?"Кино с высоким рейтингом":section=="Фильмы"?"Все фильмы":"Все сериалы";
         var heading=Text(title,compactHeight?25:32);heading.FontWeight=FontWeights.SemiBold;heading.Margin=new(0);headingRow.Children.Add(heading);PageHeader.Children.Add(headingRow);
         var subtitle=Text(liveError.Length>0?liveError:favoritesOnly?"Кино, к которому хочется вернуться.":Search.Text.Length>0?$"Результаты для «{Search.Text}».":catalogCollection!="all"?"Подборка Zona · обновляется из общего каталога.":"Выбирай историю на сегодня.",13,true);subtitle.Tag="CatalogSubtitle";subtitle.Margin=new(5,3,0,18);subtitle.Visibility=compactHeight?Visibility.Collapsed:Visibility.Visible;PageHeader.Children.Add(subtitle);
         var toolbar=new DockPanel{Margin=new(5,compactHeight?6:0,8,12)};
@@ -103,8 +103,8 @@ public partial class MainWindow
             var refresh=ActionButton("","IconRefresh",()=>{onlineIndex.RetryNow();catalogPages.Clear();liveKey="";Render();});refresh.ToolTip="Обновить каталог";System.Windows.Automation.AutomationProperties.SetName(refresh,"Обновить каталог");refresh.Padding=new(10);refresh.Margin=new(0);DockPanel.SetDock(refresh,Dock.Right);toolbar.Children.Add(refresh);
         }
         var tabs=new WrapPanel();
-        topAll=Button("Все",()=>{favoritesOnly=false;livePage=1;Render();});topAll.Style=(Style)FindResource("PillButton");topAll.SetResourceReference(Control.BackgroundProperty,favoritesOnly?"Panel":"Selected");tabs.Children.Add(topAll);
-        topSaved=ActionButton("Сохранённое","IconHeart",()=>{liveRequest?.Cancel();liveLoading=false;liveKey="";favoritesOnly=true;catalogCollection="all";livePage=1;Render();},"PillButton");topSaved.SetResourceReference(Control.BackgroundProperty,favoritesOnly?"Selected":"Panel");tabs.Children.Add(topSaved);
+        topAll=Button("Все",()=>{favoritesOnly=false;catalogLastPage=null;livePage=1;Render();});topAll.Style=(Style)FindResource("PillButton");topAll.SetResourceReference(Control.BackgroundProperty,favoritesOnly?"Panel":"Selected");tabs.Children.Add(topAll);
+        topSaved=ActionButton("Сохранённое","IconHeart",()=>{liveRequest?.Cancel();liveLoading=false;liveError="";liveKey="";favoritesOnly=true;catalogCollection="all";if(catalogOrder=="По популярности")catalogOrder="Сначала новые";catalogLastPage=null;livePage=1;Render();},"PillButton");topSaved.SetResourceReference(Control.BackgroundProperty,favoritesOnly?"Selected":"Panel");tabs.Children.Add(topSaved);
         var filters=new[]{catalogGenre.Length>0,catalogCountry.Length>0,catalogYear.HasValue,catalogRating>0,catalogOrder!="Сначала новые",catalogCollection!="all"}.Count(x=>x);
         inlineFilterButton=ActionButton(filters>0?"Фильтры · "+filters:"Фильтры","IconFilter",()=>{inlineFiltersOpen=!inlineFiltersOpen;UpdateFilterRail();},"PillButton");tabs.Children.Add(inlineFilterButton);
         toolbar.Children.Add(tabs);PageHeader.Children.Add(toolbar);
@@ -112,6 +112,7 @@ public partial class MainWindow
         inlineCatalogFilterScroll=new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=inlineCatalogFilters,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};PageHeader.Children.Add(inlineCatalogFilterScroll);
         RenderCatalogFilterRail();UpdateFilterRail();
         IEnumerable<MediaItem> shown=favoritesOnly?prefs.LiveFavorites.Where(x=>x.Section==section&&x.Title.Contains(Search.Text,StringComparison.CurrentCultureIgnoreCase)).DistinctBy(x=>x.Id).Where(selection.Matches):liveItems;
+        if(favoritesOnly)shown=catalogOrder=="По рейтингу"?shown.OrderByDescending(CatalogPaging.Rating):shown.OrderByDescending(x=>x.Year);
         var local=favoritesOnly||Search.Text.Length>0;
         var all=shown.ToArray();
         if(local){catalogLastPage=Math.Max(1,(all.Length+CatalogPaging.Size-1)/CatalogPaging.Size);livePage=Math.Min(livePage,catalogLastPage.Value);catalogHasNext=livePage<catalogLastPage;}
@@ -159,7 +160,8 @@ public partial class MainWindow
         Choice("Страна",new[]{new CatalogChoice("","Любая страна")}.Concat(catalogCountries),catalogCountry,v=>catalogCountry=v);
         Choice("Рейтинг от",new[]{new CatalogChoice("0","Любой рейтинг")}.Concat(Enumerable.Range(1,9).Reverse().Select(x=>new CatalogChoice(x.ToString(),x+" и выше"))),catalogRating.ToString(),v=>catalogRating=int.Parse(v));
         Choice("Год выхода",new[]{new CatalogChoice("","Любой год")}.Concat(Enumerable.Range(2010,DateTime.UtcNow.Year-2009).Reverse().Select(x=>new CatalogChoice(x.ToString(),x.ToString()))),catalogYear?.ToString()??"",v=>catalogYear=int.TryParse(v,out var y)?y:null);
-        Choice("Порядок",[new("Сначала новые","Сначала новые"),new("По популярности","По популярности"),new("По рейтингу","По рейтингу")],catalogOrder,v=>{catalogOrder=v;catalogCollection="all";});
+        var effectiveOrder=catalogCollection=="popular"?"По популярности":catalogCollection=="rated"?"По рейтингу":catalogOrder;
+        Choice("Порядок",favoritesOnly?[new("Сначала новые","Сначала новые"),new("По рейтингу","По рейтингу")]:[new("Сначала новые","Сначала новые"),new("По популярности","По популярности"),new("По рейтингу","По рейтингу")],effectiveOrder,v=>{catalogOrder=v;catalogCollection="all";});
         if(!CatalogSelection.IsDefault){var reset=Button("Сбросить",()=>ChangeCatalogFilter(ResetCatalogFilters));reset.Style=(Style)FindResource("QuietButton");reset.HorizontalAlignment=HorizontalAlignment.Left;reset.Margin=inline?new(0,19,0,0):new(0);target.Children.Add(reset);}
     }
     void RenderCatalogFilterRail()

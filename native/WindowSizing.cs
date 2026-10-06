@@ -44,7 +44,7 @@ public partial class MainWindow
         LocationChanged+=(_,_)=>QueueMonitorFit();
         StateChanged+=(_,_)=>QueueMonitorFit();
         SizeChanged+=(_,_)=>ApplyCompactLayout();
-        Body.SizeChanged+=(_,_)=>{UpdateCatalogColumns();UpdateDetailLayout();};
+        Body.SizeChanged+=(_,_)=>{UpdateCatalogColumns();UpdateDetailLayout();UpdateFilterRail();};
     }
     IntPtr WindowMessage(IntPtr hwnd,int message,IntPtr wParam,IntPtr lParam,ref bool handled)
     {
@@ -118,7 +118,13 @@ public partial class MainWindow
         CenterRegion.Margin=show?new Thickness(0,0,18,0):new Thickness(0);
         if(inlineFilterButton!=null)inlineFilterButton.Visibility=show?Visibility.Collapsed:Visibility.Visible;
         if(inlineCatalogFilters!=null)inlineCatalogFilters.Visibility=!show&&inlineFiltersOpen?Visibility.Visible:Visibility.Collapsed;
-        if(inlineCatalogFilterScroll!=null){inlineCatalogFilterScroll.Visibility=!show&&inlineFiltersOpen?Visibility.Visible:Visibility.Collapsed;inlineCatalogFilterScroll.MaxHeight=Math.Clamp(ActualHeight*.32,90,220);}
+        if(inlineCatalogFilterScroll!=null)
+        {
+            inlineCatalogFilterScroll.Visibility=!show&&inlineFiltersOpen?Visibility.Visible:Visibility.Collapsed;
+            var header=PageHeader.ActualHeight-inlineCatalogFilterScroll.ActualHeight;
+            var limit=Math.Clamp(CenterRegion.ActualHeight-header-72,45,220);
+            if(Math.Abs(inlineCatalogFilterScroll.MaxHeight-limit)>.5)inlineCatalogFilterScroll.MaxHeight=limit;
+        }
     }
     void ShowCatalog(IReadOnlyList<MediaItem> items)
     {
