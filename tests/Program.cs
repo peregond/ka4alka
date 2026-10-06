@@ -16,6 +16,7 @@ if(!File.ReadAllText(diagnosticPath).Contains("nested-detail"))throw new Excepti
 File.WriteAllText(diagnosticPath,new string('x',1024*1024+1));ErrorLog.Write(new Exception("after-rotation"));
 if(!File.Exists(diagnosticPath+".previous")||!File.ReadAllText(diagnosticPath).Contains("after-rotation"))throw new Exception("Diagnostic log rotation failed.");
 Console.WriteLine("PASS: exception diagnostics retain details and rotate oversized log");
+if(args.Contains("--probe-releases")){await ReleaseProbe.Run();return;}
 if(args.Contains("--probe-public"))
 {
  using var sourceClient=new SourceClient();
