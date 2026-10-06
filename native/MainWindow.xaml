@@ -59,7 +59,7 @@
         <Button Style="{StaticResource DownloadIconButton}" Tag="{Binding}" Click="OpenFolder" ToolTip="{Binding Folder}" AutomationProperties.Name="Открыть папку"><Path Data="{StaticResource IconFolder}" Stroke="{DynamicResource Muted}" StrokeThickness="1.6" StrokeLineJoin="Round" Width="15" Height="15" Stretch="Uniform"/></Button>
         <Button Style="{StaticResource DownloadIconButton}" Tag="{Binding}" Click="DownloadActions" ToolTip="Действия загрузки" AutomationProperties.Name="Действия загрузки"><Path Data="{StaticResource IconMore}" Stroke="{DynamicResource Muted}" StrokeThickness="1.6" Width="15" Height="3" Stretch="Uniform"/></Button>
        </StackPanel>
-       <TextBlock Text="{Binding Status}" FontSize="10" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding Hint}"/>
+       <TextBlock Text="{Binding Status}" FontSize="10" Foreground="{DynamicResource Text}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding Hint}"/>
       </DockPanel>
      </Grid>
     </Grid>

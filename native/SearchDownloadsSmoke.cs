@@ -1,4 +1,5 @@
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -10,6 +11,9 @@ using System.Windows.Threading;
 namespace Kachalka;
 public partial class MainWindow
 {
+    [StructLayout(LayoutKind.Sequential)] struct DownloadSmokePoint {public int X,Y;}
+    [DllImport("user32.dll",SetLastError=true)] static extern bool GetCursorPos(out DownloadSmokePoint point);
+    [DllImport("user32.dll",SetLastError=true)] static extern bool SetCursorPos(int x,int y);
     async Task SearchDownloadsSmoke(string output,Action<bool,string> check)
     {
         current=null;section="Фильмы";favoritesOnly=false;
@@ -96,15 +100,35 @@ public partial class MainWindow
             check(removal.ContextMenu is{IsOpen:true,ActualHeight:>0},"download removal actions open in a visible contextual menu");
             var keep=Option(removal.ContextMenu!,"Удалить из загрузок");var delete=Option(removal.ContextMenu!,"Удалить файлы");
             check(keep.Foreground is SolidColorBrush neutral&&Math.Abs(neutral.Color.R-neutral.Color.G)<35&&delete.Foreground is SolidColorBrush danger&&danger.Color.R>danger.Color.G+20,"keep-files removal is neutral gray and permanent file removal is red");
-            check(keep.ToolTip?.ToString()?.Contains("файл",StringComparison.OrdinalIgnoreCase)==true&&delete.ToolTip?.ToString()?.Contains("файл",StringComparison.OrdinalIgnoreCase)==true,"both removal actions explain their effect on downloaded files");removal.ContextMenu!.IsOpen=false;
+            check(keep.ToolTip?.ToString()?.Contains("файл",StringComparison.OrdinalIgnoreCase)==true&&delete.ToolTip?.ToString()?.Contains("файл",StringComparison.OrdinalIgnoreCase)==true,"both removal actions explain their effect on downloaded files");
+            var actionItem=(DownloadItem)Queue().Items[0];
+            try
+            {
+                actionItem.Busy=true;actionItem.Refresh();await SettleDownloads();
+                check(removal.ContextMenu!.IsOpen&&!keep.IsEnabled&&!delete.IsEnabled,"open removal menu disables both actions while its download is busy");
+            }
+            finally{actionItem.Busy=false;actionItem.Refresh();await SettleDownloads();}
+            check(removal.ContextMenu!.IsOpen&&keep.IsEnabled&&delete.IsEnabled,"open removal menu re-enables both actions when its download is ready");removal.ContextMenu.IsOpen=false;
             var sort=Toolbar("Сортировка загрузок");sort.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await SettleDownloads();check(sort.ContextMenu is{IsOpen:true,ActualHeight:>0},"download sorting is discoverable through a toolbar menu");
             check(sort.ContextMenu!.Items.OfType<MenuItem>().Select(x=>x.Tag?.ToString()).Order().SequenceEqual(new[]{"newest","name","speed","size","progress"}.Order()),"queue sorting offers addition date, title, speed, size and progress");sort.ContextMenu.IsOpen=false;
             foreach(var order in new[]{("name",DownloadSort.Name),("speed",DownloadSort.Speed),("size",DownloadSort.Size),("progress",DownloadSort.Progress),("newest",DownloadSort.Newest)})
             {
                 SelectSort(order.Item1);await SettleDownloads();check(Queue().Items.Cast<DownloadItem>().Select(x=>x.Id).SequenceEqual(DownloadOrdering.Sort(fixtures,order.Item2).Select(x=>x.Id)),"download sort menu applies "+order.Item1);
             }
-            SelectSort("speed");await SettleDownloads();Toolbar("Сортировка загрузок").Focus();fixtures[0].DownloadRate=9*1024*1024;fixtures[0].Refresh();await Task.Delay(2300);UpdateLayout();
-            check(Queue().Items[0]==fixtures[0],"speed sorting updates while transfer telemetry changes");
+            SelectSort("speed");await SettleDownloads();
+            string SortGuard()=>"mouse="+Queue().IsMouseOver+", keyboard="+Queue().IsKeyboardFocusWithin+", menu="+downloadMenus.Any(menu=>menu.IsOpen)+", timer="+refresh.IsEnabled+", state="+WindowState+", first="+((DownloadItem)Queue().Items[0]).Id;
+            File.AppendAllText(Path.Combine(output,"checks.txt"),"INFO: speed sort before moving cursor: "+SortGuard()+Environment.NewLine);
+            if(!GetCursorPos(out var cursor))throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error(),"Cannot preserve the smoke-test cursor position.");
+            try
+            {
+                var toolbar=Toolbar("Сортировка загрузок");var target=toolbar.PointToScreen(new Point(toolbar.ActualWidth/2,toolbar.ActualHeight/2));
+                if(!SetCursorPos((int)Math.Round(target.X),(int)Math.Round(target.Y)))throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error(),"Cannot move the smoke-test cursor outside the queue.");
+                Activate();toolbar.Focus();System.Windows.Input.Mouse.Synchronize();await SettleDownloads();
+                check(!Queue().IsMouseOver&&!Queue().IsKeyboardFocusWithin&&!downloadMenus.Any(menu=>menu.IsOpen)&&refresh.IsEnabled,"speed sort can refresh while the pointer and focus are on the toolbar: "+SortGuard());
+                fixtures[0].DownloadRate=9*1024*1024;fixtures[0].Refresh();await Task.Delay(2300);UpdateLayout();
+                check(Queue().Items[0]==fixtures[0],"speed sorting updates while transfer telemetry changes: "+SortGuard());
+            }
+            finally{SetCursorPos(cursor.X,cursor.Y);System.Windows.Input.Mouse.Synchronize();}
             check(FindVisual<Image>(FirstRow(),i=>i.DataContext is DownloadItem)?.Source==null&&VisualElements<System.Windows.Shapes.Path>(FirstRow()).Any(),"torrent without a known poster keeps a visible native placeholder");
             SelectSort("newest");await SettleDownloads();prefs.Light=false;ApplyTheme();Render();await SettleDownloads();Shot(this,"downloads-redesign-dark");Shot(this,"downloads");
             var expectedInk=((SolidColorBrush)FindResource("Text")).Color;check(FindVisual<TextBlock>(FirstRow(),t=>t.Text==fixtures[^1].MediaTitle)?.Foreground is SolidColorBrush ink&&ink.Color==expectedInk,"download media title follows the dark theme");
@@ -121,7 +145,16 @@ public partial class MainWindow
                 var files=FindVisual<ListBox>(dialog,b=>AutomationProperties.GetName(b)=="Файлы загрузки")!;
                 check(files.Items.Count==2&&VisualElements<TextBlock>(dialog).Any(t=>t.Text.Contains("Готово файлов: 1 из 2")),"details show episode names, individual progress and completed-file count");
                 var fileSearch=FindVisual<TextBox>(dialog,b=>AutomationProperties.GetName(b)=="Найти файл в раздаче")!;fileSearch.Text="02";dialog.UpdateLayout();check(files.Items.Count==1,"file details can filter a specific episode");fileSearch.Clear();dialog.UpdateLayout();check(files.Items.Count==2,"clearing the episode filter restores the full file list");
-                files.SelectedIndex=0;var selected=files.SelectedItem;await Task.Delay(2300);dialog.UpdateLayout();check(ReferenceEquals(files.SelectedItem,selected),"file details retain selection across live progress refreshes");Shot(dialog,"downloads-details-dark");
+                files.SelectedIndex=0;var selected=files.SelectedItem;await Task.Delay(2300);dialog.UpdateLayout();check(ReferenceEquals(files.SelectedItem,selected),"file details retain selection across live progress refreshes");
+                var episode=FindVisual<TextBlock>(files,t=>t.Text=="Серия 01.mkv")??throw new Exception("Realized episode filename is missing.");
+                DependencyObject? ancestor=episode;while(ancestor!=null&&ancestor is not Border{Name:"FileFrame"})ancestor=VisualTreeHelper.GetParent(ancestor);
+                var fileFrame=ancestor as Border??throw new Exception("Episode row background is missing.");
+                var fileInk=((SolidColorBrush)FindResource("Text")).Color;check(episode.Foreground is SolidColorBrush filenameInk&&filenameInk.Color==fileInk,"dark file details use the readable theme color for episode names");
+                var amount=FindVisual<TextBlock>(fileFrame,t=>t.Text.Contains(" из "))??throw new Exception("Downloaded episode byte count is missing.");
+                double Luminance(Color color){double Linear(byte value){var s=value/255d;return s<=.04045?s/12.92:Math.Pow((s+.055)/1.055,2.4);}return .2126*Linear(color.R)+.7152*Linear(color.G)+.0722*Linear(color.B);}
+                double Contrast(Brush foreground,Brush background){var first=Luminance(((SolidColorBrush)foreground).Color);var second=Luminance(((SolidColorBrush)background).Color);return (Math.Max(first,second)+.05)/(Math.Min(first,second)+.05);}
+                check(Contrast(episode.Foreground,fileFrame.Background)>=4.5&&Contrast(amount.Foreground,fileFrame.Background)>=4.5,"dark episode filename and downloaded byte count contrast clearly with their row background");
+                check(VisualElements<System.Windows.Shapes.Path>(fileFrame).Any(icon=>icon.Data is{Bounds.IsEmpty:false}),"file details resolve the file icon geometry inside the owned dialog");Shot(dialog,"downloads-details-dark");
                 prefs.Light=true;ApplyTheme();dialog.UpdateLayout();Shot(dialog,"downloads-details-light");dialog.Width=360;dialog.Height=300;dialog.UpdateLayout();Shot(dialog,"downloads-details-minimum");check(files.ActualHeight>30,"file details remain usable in a minimum-size window");
             });
             check(!downloads.EngineCreated,"download design and menu fixtures do not start a torrent engine");
