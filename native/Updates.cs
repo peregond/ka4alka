@@ -19,7 +19,7 @@ public partial class MainWindow
     static Version CurrentVersion => typeof(MainWindow).Assembly.GetName().Version ?? new(0, 19, 0);
     void UpdateStatus(string text)
     {
-        updateStatus = text;
+        updateStatus = text;RefreshSidebarUpdate();
         if (updateStatusLabel is not null) updateStatusLabel.Text = text;
         if (updateCheckButton is not null) updateCheckButton.IsEnabled = !checkingUpdate;
         if (updateInstallButton is not null) updateInstallButton.Visibility = updateOffer is not null ? Visibility.Visible : Visibility.Collapsed;

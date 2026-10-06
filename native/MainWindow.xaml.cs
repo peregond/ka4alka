@@ -14,7 +14,6 @@ public partial class MainWindow:Window
     readonly DispatcherTimer refresh=new(){Interval=TimeSpan.FromSeconds(2)};
     readonly DispatcherTimer searchDelay=new(){Interval=TimeSpan.FromMilliseconds(350)};
     string section="Фильмы",genre="Все",sort="По популярности";
-    readonly Dictionary<string,string> catalogQueries=[];
     string lastCatalogSection="Фильмы";
     bool ready,closed;
     MediaItem? current;
@@ -24,28 +23,35 @@ public partial class MainWindow:Window
         onlineIndex=new(sourceClient);
         EnableAdaptiveLayout();
         EnableShortcuts();
-        try{downloads=new();}catch(Exception e){downloads=newEmpty();Status.Text="Не удалось прочитать очередь: "+e.Message;}
+        try{downloads=new(null,prefs.MaxDownloadKbps,prefs.MaxUploadKbps);}catch(Exception e){downloads=newEmpty(prefs.MaxDownloadKbps,prefs.MaxUploadKbps);Status.Text="Не удалось прочитать очередь: "+e.Message;}
         foreach(var name in new[]{"Фильмы","Сериалы"}) { var n=name;var b=ActionButton(n,n=="Фильмы"?"IconMovies":"IconSeries",()=>ShowCatalogSection(n),"NavButton");b.Tag=n;b.ToolTip=n;b.HorizontalContentAlignment=HorizontalAlignment.Left;b.Margin=new(0,0,0,5);Navigation.Children.Add(b); }
         refresh.Tick+=(_,_)=>{downloads.Update();SyncTimer();};
         ContentRendered+=async(_,_)=>{if(!prefs.AutoResumeDownloads||downloads.PendingResumeCount==0)return;Status.Text="Продолжаем загрузки…";var resumed=await downloads.ResumePendingAsync();Status.Text=resumed>0?$"Продолжено загрузок: {resumed}":"Не удалось продолжить загрузки. Проверь очередь.";if(!closed){SyncTimer();if(section=="Загрузки")Render();}};
         StateChanged+=(_,_)=>SyncTimer();searchDelay.Tick+=(_,_)=>{searchDelay.Stop();if(section is "Фильмы" or "Сериалы"){current=null;Render();}};
         Closing+=OnClosing;ready=true;ApplyTheme();ApplyCompactLayout();Render();
     }
-    static DownloadService newEmpty(){var path=Path.Combine(Preferences.DataDir,"queue.json");if(File.Exists(path))File.Move(path,path+".unreadable-"+DateTime.Now.Ticks);return new();}
+    static DownloadService newEmpty(int down,int up){var path=Path.Combine(Preferences.DataDir,"queue.json");if(File.Exists(path))File.Move(path,path+".unreadable-"+DateTime.Now.Ticks);return new(null,down,up);}
     static TextBlock Text(string value,double size=13,bool muted=false){var t=new TextBlock{Text=value,FontSize=size,TextWrapping=TextWrapping.Wrap,Margin=new(0,0,0,8)};t.SetResourceReference(TextBlock.ForegroundProperty,muted?"Muted":"Text");return t;}
     static Button Button(string label,Action action){var b=new Button{Content=label};b.Click+=(_,_)=>action();return b;}
     static Button AsyncButton(string label,Func<Task> action){var b=new Button{Content=label};b.Click+=async(_,_)=>{b.IsEnabled=false;try{await action();}catch(Exception e){MessageBox.Show(e.Message,"Качалка");}finally{b.IsEnabled=true;}};return b;}
     void SyncTimer(){if(!closed&&(downloads.EngineCreated||section=="Загрузки"&&WindowState!=WindowState.Minimized))refresh.Start();else refresh.Stop();}
-    void SearchChanged(object sender,TextChangedEventArgs e){if(!ready)return;ClearSearchButton.Visibility=Search.Text.Length>0?Visibility.Visible:Visibility.Collapsed;searchDelay.Stop();if(section is "Фильмы" or "Сериалы"){catalogQueries[section]=Search.Text;lastCatalogSection=section;livePage=1;ResetCatalogFilters();searchDelay.Start();}}
-    void ShowCatalogSection(string name){searchDelay.Stop();section=name;lastCatalogSection=name;current=null;genre="Все";livePage=1;favoritesOnly=false;ResetCatalogFilters();Search.Text=catalogQueries.GetValueOrDefault(name,"");searchDelay.Stop();Render();}
+    void SearchChanged(object sender,TextChangedEventArgs e){if(!ready)return;ClearSearchButton.Visibility=Search.Text.Length>0?Visibility.Visible:Visibility.Collapsed;searchDelay.Stop();}
+    void ShowCatalogSection(string name)
+    {
+        var restore=SearchActive&&name==lastCatalogSection&&section is not ("Фильмы" or "Сериалы");
+        searchDelay.Stop();section=name;lastCatalogSection=name;current=null;
+        if(!restore){liveRequest?.Cancel();liveLoading=false;genre="Все";livePage=1;favoritesOnly=false;submittedQuery="";searchCategory="";ResetCatalogFilters();Search.Text="";liveKey="";}
+        else Search.Text=submittedQuery;
+        Render();
+    }
     void ShowDownloads(object sender,RoutedEventArgs e){searchDelay.Stop();section="Загрузки";current=null;Render();}
     void PosterResized(object sender,SizeChangedEventArgs e){if(sender is Border poster){if(e.WidthChanged&&e.NewSize.Width>0){var height=e.NewSize.Width*1.5;if(double.IsNaN(poster.Height)||Math.Abs(poster.Height-height)>1)poster.Height=height;}ClipPoster(poster);}}
     void Render()
     {
-        if(!ready)return;catalogList=null;detailHero=null;detailPoster=null;detailSynopsis=null;detailTitle=null;detailDescription=null;descriptionToggle=null;inlineCatalogFilters=null;inlineCatalogFilterScroll=null;PageHeader.Children.Clear();Body.Children.Clear();Body.RowDefinitions.Clear();SyncTimer();UpdateFilterRail();
+        if(!ready)return;try{catalogList=null;detailHero=null;detailPoster=null;detailSynopsis=null;detailTitle=null;detailDescription=null;descriptionToggle=null;inlineCatalogFilters=null;inlineCatalogFilterScroll=null;PageHeader.Children.Clear();Body.Children.Clear();Body.RowDefinitions.Clear();SyncTimer();UpdateFilterRail();
         SearchBar.Visibility=current==null&&(section is "Фильмы" or "Сериалы")?Visibility.Visible:Visibility.Collapsed;
         ContextLabel.Visibility=SearchBar.Visibility==Visibility.Visible?Visibility.Collapsed:Visibility.Visible;ContextLabel.Text=section;
-        foreach(Button b in Navigation.Children){var selected=b.Tag?.ToString()==section;b.SetResourceReference(System.Windows.Controls.Button.BackgroundProperty,selected?"Selected":"Sidebar");b.SetResourceReference(Control.ForegroundProperty,selected?"Text":"Muted");b.FontWeight=selected?FontWeights.SemiBold:FontWeights.Normal;}
+        foreach(Button b in Navigation.Children){var selected=!SearchActive&&b.Tag?.ToString()==section;b.SetResourceReference(System.Windows.Controls.Button.BackgroundProperty,selected?"Selected":"Sidebar");b.SetResourceReference(Control.ForegroundProperty,selected?"Text":"Muted");b.FontWeight=selected?FontWeights.SemiBold:FontWeights.Normal;}
         DownloadsButton.SetResourceReference(Control.BackgroundProperty,section=="Загрузки"?"Selected":"Sidebar");
         SettingsButton.SetResourceReference(Control.BackgroundProperty,section=="Настройки"?"Selected":"Sidebar");
         if(section=="Настройки"){RenderSettings();return;}
@@ -56,18 +62,14 @@ public partial class MainWindow:Window
         if(!demoCatalog&&section is "Музыка" or "Игры" or "Программы"){RenderArchive();return;}
         if(!demoCatalog&&section is "ТВ-каналы" or "Радио" or "Спорт"){RenderBroadcast();return;}
         PageHeader.Children.Add(Text(section,25));
-        if(section=="Загрузки"){
-            downloads.Update();var description=Text("Скорость показывает передачу файлов. Активные загрузки продолжаются после перезапуска.",12,true);description.Margin=new(0,0,0,20);PageHeader.Children.Add(description);
-            if(downloads.Items.Count==0){var empty=new StackPanel{HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center,MaxWidth=440};var symbol=Text("↓",38);symbol.HorizontalAlignment=HorizontalAlignment.Center;symbol.SetResourceReference(TextBlock.ForegroundProperty,"Accent");empty.Children.Add(symbol);var title=Text("Загрузок пока нет",22);title.FontWeight=FontWeights.SemiBold;title.HorizontalAlignment=HorizontalAlignment.Center;empty.Children.Add(title);var hint=Text("Выбери раздачу в карточке фильма или добавь magnet-ссылку и .torrent-файл.",13,true);hint.TextAlignment=TextAlignment.Center;hint.Margin=new(0,0,0,20);empty.Children.Add(hint);var add=Button("＋ Добавить торрент",()=>AddTorrent(this,new RoutedEventArgs()));add.Style=(Style)FindResource("PrimaryButton");add.HorizontalAlignment=HorizontalAlignment.Center;empty.Children.Add(add);Body.Children.Add(new Border{Child=empty,Background=(Brush)FindResource("Panel"),BorderBrush=(Brush)FindResource("Edge"),BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(18),Margin=new Thickness(0,0,0,12)});}
-            else Body.Children.Add(new ListBox{ItemsSource=downloads.Items,ItemTemplate=(DataTemplate)FindResource("DownloadRow")});
-            return;
-        }
+        if(section=="Загрузки"){RenderDownloads();return;}
         PageHeader.Children.Add(Text("Демо-каталог · названия, раздачи и оценки Кинопоиска / IMDb вымышлены",11,true));
         var filters=new WrapPanel();if(section is "Фильмы" or "Сериалы")foreach(var g in new[]{"Все","Фантастика","Триллер","Драма","Приключения"}){var value=g;var b=Button(g,()=>{genre=value;Render();});b.Opacity=g==genre?1:.6;filters.Children.Add(b);}
         var order=new ComboBox{ItemsSource=new[]{"По популярности","По году","По названию"},SelectedItem=sort};order.SelectionChanged+=(_,_)=>{sort=order.SelectedItem.ToString()!;Render();};filters.Children.Add(order);PageHeader.Children.Add(filters);
         IEnumerable<MediaItem> result=Catalog.Items.Concat(prefs.LiveFavorites).Where(x=>section=="Избранное"?prefs.Favorites.Contains(x.Id):x.Section==section).Where(x=>x.Title.Contains(Search.Text,StringComparison.CurrentCultureIgnoreCase)).Where(x=>genre=="Все"||x.Genre==genre);
         result=sort=="По году"?result.OrderByDescending(x=>x.Year):sort=="По названию"?result.OrderBy(x=>x.Title):result;
         var cards=result.ToArray();ShowCatalog(cards);if(cards.Length==0)PageHeader.Children.Add(Text("Ничего не найдено. Измени поиск или фильтры.",14,true));
+        }finally{RefreshLoadingIndicator();}
     }
     void OpenCard(object sender,RoutedEventArgs e){current=(MediaItem)((Button)sender).Tag;Render();}
     void Detail(MediaItem item)

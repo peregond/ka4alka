@@ -15,16 +15,46 @@ public sealed class DownloadService
     public ObservableCollection<DownloadItem> Items {get;}=[];
     public bool EngineCreated => engine!=null;
     readonly EngineSettings? customSettings;
-    public DownloadService(EngineSettings? settings=null)
+    public int DownloadLimitKbps {get;private set;}
+    public int UploadLimitKbps {get;private set;}
+    public DownloadService(EngineSettings? settings=null,int? downloadLimitKbps=null,int? uploadLimitKbps=null)
     {
         customSettings=settings;
+        DownloadLimitKbps=Math.Clamp(downloadLimitKbps??settings?.MaximumDownloadRate/1024??0,0,int.MaxValue/1024);
+        UploadLimitKbps=Math.Clamp(uploadLimitKbps??settings?.MaximumUploadRate/1024??0,0,int.MaxValue/1024);
         if(!File.Exists(queuePath))return;
         foreach(var item in JsonSerializer.Deserialize<List<DownloadItem>>(File.ReadAllText(queuePath))??[]){if(!item.Paused)pendingResume.Add(item.Id);item.Paused=true;item.Busy=false;item.Status="На паузе";item.Stats=$"{item.Progress:F1}% · на паузе";item.Hint="";Items.Add(item);}
     }
-    ClientEngine Engine => engine ??= new ClientEngine(customSettings ?? new EngineSettingsBuilder {
-        CacheDirectory=Path.Combine(Preferences.DataDir,"cache"), MaximumConnections=50, DiskCacheBytes=4*1024*1024,
-        AutoSaveLoadFastResume=true,AutoSaveLoadMagnetLinkMetadata=true,AllowPortForwarding=false
-    }.ToSettings());
+    ClientEngine Engine
+    {
+        get
+        {
+            if(engine!=null)return engine;
+            var builder=customSettings!=null?new EngineSettingsBuilder(customSettings):new EngineSettingsBuilder {
+                CacheDirectory=Path.Combine(Preferences.DataDir,"cache"), MaximumConnections=50, DiskCacheBytes=4*1024*1024,
+                AutoSaveLoadFastResume=true,AutoSaveLoadMagnetLinkMetadata=true,AllowPortForwarding=false
+            };
+            builder.MaximumDownloadRate=DownloadLimitKbps*1024;builder.MaximumUploadRate=UploadLimitKbps*1024;
+            return engine=new ClientEngine(builder.ToSettings());
+        }
+    }
+    public async Task SetLimitsAsync(int downloadKbps,int uploadKbps)
+    {
+        if(downloadKbps<0||uploadKbps<0||downloadKbps>int.MaxValue/1024||uploadKbps>int.MaxValue/1024)throw new ArgumentOutOfRangeException(nameof(downloadKbps),"Укажи скорость от 0 до 2097151 КБ/с.");
+        await gate.WaitAsync();
+        try
+        {
+            if(engine!=null){var builder=new EngineSettingsBuilder(engine.Settings){MaximumDownloadRate=downloadKbps*1024,MaximumUploadRate=uploadKbps*1024};await engine.UpdateSettingsAsync(builder.ToSettings());}
+            DownloadLimitKbps=downloadKbps;UploadLimitKbps=uploadKbps;
+        }
+        finally{gate.Release();}
+    }
+    public async Task<int> SetGroupAsync(bool completed,bool paused)
+    {
+        Update();int changed=0;
+        foreach(var item in Items.ToArray().Where(x=>x.Completed==completed))if(!item.Busy&&item.Paused!=paused){await SetPausedAsync(item,paused);changed++;}
+        return changed;
+    }
     public void Save()
     {
         Directory.CreateDirectory(Preferences.DataDir);
@@ -94,30 +124,59 @@ public sealed class DownloadService
             }
         }finally{gate.Release();}
     }
-    public async Task Toggle(DownloadItem item)
+    public Task Toggle(DownloadItem item)=>SetPausedAsync(item,!item.Paused);
+    async Task SetPausedAsync(DownloadItem item,bool paused)
     {
         if(item.Busy)return;pendingResume.Remove(item.Id);item.Busy=true;item.Refresh();
         await gate.WaitAsync();
-        try{var manager=await Manager(item);if(item.Paused){await manager.StartAsync();item.Paused=false;item.LastStartedUtc=DateTime.UtcNow;}else{await StopManager(manager);item.Paused=true;}Update();Save();await ReleaseIdleEngine();}
+        try
+        {
+            if(!Items.Contains(item)||item.Paused==paused)return;
+            var manager=await Manager(item);
+            if(!paused){await manager.StartAsync();item.Paused=false;item.LastStartedUtc=DateTime.UtcNow;}
+            else{await StopManager(manager);item.Paused=true;}
+            Update();Save();await ReleaseIdleEngine();
+        }
         catch(Exception error){item.Status="Ошибка: "+error.Message;item.Refresh();Save();throw;}
         finally{item.Busy=false;item.Refresh();gate.Release();}
     }
-    public async Task Remove(DownloadItem item)
+    public async Task Remove(DownloadItem item,bool deleteFiles=false)
     {
         if(item.Busy)return;item.Busy=true;item.Refresh();await gate.WaitAsync();
-        try{pendingResume.Remove(item.Id);if(managers.TryGetValue(item.Id,out var manager)){await StopManager(manager);await Engine.RemoveAsync(manager);managers.Remove(item.Id);meters.Remove(item.Id);}Items.Remove(item);Save();await ReleaseIdleEngine();}
+        try
+        {
+            pendingResume.Remove(item.Id);
+            if(managers.TryGetValue(item.Id,out var manager)){await StopManager(manager);item.Paused=true;SnapshotFiles(item,manager);await Engine.RemoveAsync(manager);managers.Remove(item.Id);meters.Remove(item.Id);}
+            if(deleteFiles)
+            {
+                var paths=item.Files.SelectMany(f=>new[]{f.FullPath,f.IncompletePath}).Where(p=>p.Length>0).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+                foreach(var path in paths)
+                {
+                    DownloadFiles.ValidatePath(item.Folder,path);
+                    if(Items.Where(x=>x!=item).SelectMany(x=>x.Files).Any(f=>string.Equals(f.FullPath,path,StringComparison.OrdinalIgnoreCase)||string.Equals(f.IncompletePath,path,StringComparison.OrdinalIgnoreCase)))throw new IOException("Файл используется другой задачей. Сначала убери её из очереди.");
+                }
+                foreach(var path in paths)File.Delete(path);
+                foreach(var path in paths)DownloadFiles.RemoveEmptyParents(item.Folder,path);
+            }
+            Items.Remove(item);Save();await ReleaseIdleEngine();
+        }
+        catch{Save();await ReleaseIdleEngine();throw;}
         finally{item.Busy=false;item.Refresh();gate.Release();}
     }
     public void Update()
     {
         var now=DateTime.UtcNow;
         foreach(var item in Items){if(!managers.TryGetValue(item.Id,out var m))continue;
-            item.Name=m.Torrent?.Name??item.Name;
+            item.Name=m.Torrent?.Name??item.Name;SnapshotFiles(item,m);
             var meter=meters[item.Id];var rate=meter.Down.Sample(now,item.LastStartedUtc,m.Monitor.DataBytesReceived);
             var upload=meter.Up.Sample(now,item.LastStartedUtc,m.Monitor.DataBytesSent);
             DownloadPresentation.Apply(item,new(m.State,item.Paused,m.Progress,m.Torrent?.Size,rate,upload,m.OpenConnections,m.Peers.Seeds,item.LastStartedUtc,meter.Down.LastPayloadUtc,m.Error?.Exception?.Message),now);
             item.Refresh();
         }
+    }
+    static void SnapshotFiles(DownloadItem item,TorrentManager manager)
+    {
+        if(manager.Files.Count>0)item.Files=manager.Files.Select(f=>new DownloadFile(f.Path,f.DownloadCompleteFullPath,f.DownloadIncompleteFullPath,f.Length,f.BitField.PercentComplete)).ToList();
     }
     static async Task StopManager(TorrentManager manager)
     {
