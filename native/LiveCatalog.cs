@@ -16,18 +16,33 @@ public sealed class LiveCatalog(SourceClient client)
         var html=Html(bytes);
         CatalogChoice[] Choices(string prefix)=> (html.DocumentNode.SelectNodes("//option[starts-with(@value,'"+prefix+"-')]")??new HtmlNodeCollection(null))
             .Select(n=>new CatalogChoice(n.GetAttributeValue("value","")[(prefix.Length+1)..],Text(n))).DistinctBy(x=>x.Key).ToArray();
-        var hasNext=(html.DocumentNode.SelectNodes("//a[@href]")??new HtmlNodeCollection(null)).Any(n=>Regex.IsMatch(HtmlEntity.DeEntitize(n.GetAttributeValue("href","")),@"[?&]page="+(page+1)+@"(?:&|$)"));
+        var hasNext=(html.DocumentNode.SelectNodes("//a[@href] | //link[@href and @rel='next']")??new HtmlNodeCollection(null)).Any(n=>Regex.IsMatch(HtmlEntity.DeEntitize(n.GetAttributeValue("href","")),@"[?&]page="+(page+1)+@"(?:&|$)"));
         return new(Parse(bytes,section).DistinctBy(x=>x.Id).ToArray(),hasNext&&page<CatalogPaging.Limit,Choices("genre"),Choices("country"));
     }
-    public async Task<CatalogPage> BrowsePage(string section,int page,CatalogSelection selection,CancellationToken ct)
+    public async Task<CatalogPage> BrowsePage(string section,int page,CatalogSelection selection,CancellationToken ct,bool forceRefresh=false)
     {
         var path=section=="Сериалы"?"/tvseries":"/movies";
         var filter=selection.Filter;
-        var url=Base+path+(filter.Length>0?"/filter/"+filter:"")+"?page="+Math.Clamp(page,1,CatalogPaging.Limit);
-        var cache=System.IO.Path.Combine(Preferences.DataDir,"catalog",Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(url)))+".html");
-        byte[] bytes;
-        try{bytes=await client.Read(new Uri(url),4*1024*1024,ct);var parsed=ParsePage(bytes,section,page);if(parsed.Items.Length==0&&parsed.Genres.Length==0)throw new System.IO.InvalidDataException("Источник вернул страницу без каталога.");System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(cache)!);await System.IO.File.WriteAllBytesAsync(cache,bytes,ct);return parsed;}
-        catch(Exception) when(!ct.IsCancellationRequested&&System.IO.File.Exists(cache)){bytes=await System.IO.File.ReadAllBytesAsync(cache,ct);return ParsePage(bytes,section,page);}
+        async Task<CatalogPage> SourcePage(int sourcePage)
+        {
+            var url=Base+path+(filter.Length>0?"/filter/"+filter:"")+"?page="+sourcePage;
+            var cache=System.IO.Path.Combine(Preferences.DataDir,"catalog",Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(url)))+".html");
+            if(!forceRefresh&&System.IO.File.Exists(cache)&&DateTime.UtcNow-System.IO.File.GetLastWriteTimeUtc(cache)<TimeSpan.FromMinutes(15))
+                return ParsePage(await System.IO.File.ReadAllBytesAsync(cache,ct),section,sourcePage);
+            try
+            {
+                var bytes=await client.Read(new Uri(url),4*1024*1024,ct);var parsed=ParsePage(bytes,section,sourcePage);
+                if(parsed.Items.Length==0&&parsed.Genres.Length==0)throw new System.IO.InvalidDataException("Источник вернул страницу без каталога.");
+                System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(cache)!);await System.IO.File.WriteAllBytesAsync(cache,bytes,ct);return parsed;
+            }
+            catch(Exception) when(!ct.IsCancellationRequested&&System.IO.File.Exists(cache)){return ParsePage(await System.IO.File.ReadAllBytesAsync(cache,ct),section,sourcePage);}
+        }
+        var window=CatalogPaging.SourceWindow(page);
+        var first=await SourcePage(window.Page);
+        var rows=first.Items.Skip(window.Offset).ToList();
+        var tail=first;
+        if(rows.Count<CatalogPaging.Size&&first.HasNext){tail=await SourcePage(window.Page+1);rows.AddRange(tail.Items);}
+        return new(rows.Take(CatalogPaging.Size).ToArray(),page<CatalogPaging.Limit&&(rows.Count>CatalogPaging.Size||tail.HasNext),first.Genres,first.Countries);
     }
     public static IReadOnlyList<MediaItem> Parse(byte[] bytes,string section)
     {
@@ -37,7 +52,7 @@ public sealed class LiveCatalog(SourceClient client)
             var url=new Uri(new Uri(Base),path).AbsoluteUri;var hash=System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(url));var id=-(BitConverter.ToInt32(hash,0)&int.MaxValue);
             int.TryParse(Text(n.SelectSingleNode(".//*["+Class("results-item-year")+"]")),out int year);
             return new MediaItem(id,title,section,"",year,"—","—","#526B69"){PageUrl=url,ImageUrl=n.SelectSingleNode(".//meta[@itemprop='image']")?.GetAttributeValue("content","")};
-        }).Where(x=>x!=null).Cast<MediaItem>().Take(40).ToArray();
+        }).Where(x=>x!=null).Cast<MediaItem>().Take(CatalogPaging.SourceSize).ToArray();
     }
     public async Task<IReadOnlyList<MediaItem>> Browse(string section,string query,int page,CancellationToken ct)
     {

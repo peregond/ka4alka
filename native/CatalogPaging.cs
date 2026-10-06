@@ -35,7 +35,12 @@ public record CatalogSelection(string Genre="",string Country="",int? Year=null,
 public record CatalogPage(MediaItem[] Items,bool HasNext,CatalogChoice[] Genres,CatalogChoice[] Countries);
 public static class CatalogPaging
 {
-    public const int Size=40,Limit=40;
+    public const int Size=40,SourceSize=60,Limit=250;
+    public static (int Page,int Offset) SourceWindow(int page)
+    {
+        var offset=(Math.Clamp(page,1,Limit)-1)*Size;
+        return (offset/SourceSize+1,offset%SourceSize);
+    }
     public static double Rating(MediaItem item)=>double.TryParse(item.Kinopoisk.Replace(',','.'),NumberStyles.Float,CultureInfo.InvariantCulture,out var value)&&value is >=0 and <=10?value:-1;
     public static int[] Numbers(int current,int? last=null)
     {

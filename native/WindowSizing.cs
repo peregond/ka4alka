@@ -112,17 +112,13 @@ public partial class MainWindow
     }
     void UpdateFilterRail()
     {
-        var show=!demoCatalog&&current==null&&(section is "Фильмы" or "Сериалы")&&ActualWidth>=1180;
-        FilterColumn.Width=new GridLength(show?206:0);
-        FiltersPanel.Visibility=show?Visibility.Visible:Visibility.Collapsed;
-        CenterRegion.Margin=show?new Thickness(0,0,18,0):new Thickness(0);
-        if(inlineFilterButton!=null)inlineFilterButton.Visibility=show?Visibility.Collapsed:Visibility.Visible;
-        if(inlineCatalogFilters!=null)inlineCatalogFilters.Visibility=!show&&inlineFiltersOpen?Visibility.Visible:Visibility.Collapsed;
+        FilterColumn.Width=new GridLength(0);
+        FiltersPanel.Visibility=Visibility.Collapsed;
+        CenterRegion.Margin=new Thickness(0);
         if(inlineCatalogFilterScroll!=null)
         {
-            inlineCatalogFilterScroll.Visibility=!show&&inlineFiltersOpen?Visibility.Visible:Visibility.Collapsed;
             var header=PageHeader.ActualHeight-inlineCatalogFilterScroll.ActualHeight;
-            var limit=Math.Clamp(CenterRegion.ActualHeight-header-72,45,220);
+            var limit=Math.Clamp(CenterRegion.ActualHeight-header-90,40,180);
             if(Math.Abs(inlineCatalogFilterScroll.MaxHeight-limit)>.5)inlineCatalogFilterScroll.MaxHeight=limit;
         }
     }
