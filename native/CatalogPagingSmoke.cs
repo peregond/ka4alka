@@ -30,10 +30,10 @@ public partial class MainWindow
             combo.SelectedItem=((IEnumerable<CatalogChoice>)combo.ItemsSource).Single(x=>x.Key==key);
         }
         // Exercise desktop layouts even on the hosted runner's smaller virtual monitor.
-        MaxWidth=1800;MaxHeight=1000;MinWidth=360;MinHeight=300;
+        MaxWidth=1800;MaxHeight=1000;MinWidth=1280;MinHeight=300;
         Width=1280;Height=800;Render();await Settle();
         Check(liveItems.Count==40&&catalogDisplay.Count==40,"one catalog page displays 40 cards");
-        Check(FiltersPanel.Visibility==Visibility.Visible,"filters appear on the right at standard window width");
+        Check(FiltersPanel.Visibility==Visibility.Visible,$"filters appear on the right at standard window width (actual={ActualWidth}, requested={Width}, min={MinWidth}, max={MaxWidth})");
         Check(!VisualElements<Button>(Body).Any(b=>b.Content?.ToString()?.Contains("Показать ещё")==true),"catalog has no load-more button");
         var scroll=FindVisual<ScrollViewer>(Body,_=>true)!;
         var first=liveItems.Select(x=>x.Id).ToArray();
@@ -52,7 +52,7 @@ public partial class MainWindow
         ResetCatalogFilters();liveKey="";Render();await Settle();Choose("Подборка","popular");await Settle();Check(catalogCollection=="popular"&&CatalogSelection.Filter=="","popular collection uses public source order");
         Choose("Подборка","rated");await Settle();Check(CatalogSelection.Filter=="rating-8/sort-rating","high-rating collection uses source rating threshold");
         var bitmap=new RenderTargetBitmap((int)ActualWidth,(int)ActualHeight,96,96,PixelFormats.Pbgra32);bitmap.Render(this);var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(bitmap));using(var file=File.Create(Path.Combine(output,"catalog.png")))png.Save(file);
-        Width=680;Height=500;await Task.Delay(150);UpdateLayout();Check(FiltersPanel.Visibility==Visibility.Collapsed&&inlineFilterButton?.Visibility==Visibility.Visible,"narrow window exposes inline filters");
+        MinWidth=360;Width=680;Height=500;await Task.Delay(150);UpdateLayout();Check(FiltersPanel.Visibility==Visibility.Collapsed&&inlineFilterButton?.Visibility==Visibility.Visible,"narrow window exposes inline filters");
         inlineFilterButton!.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));UpdateLayout();Check(inlineCatalogFilters?.Visibility==Visibility.Visible,"inline filters open on narrow screens");
         Close();
     }
