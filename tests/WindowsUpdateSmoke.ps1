@@ -25,6 +25,7 @@ $short=([Version]$version).ToString(2)
 try{
  dotnet run --project update-tests/Kachalka.UpdateTests.csproj -c Release
  if($LASTEXITCODE -ne 0){throw 'Updater tests failed'}
+ ./tests/StableUpdateComponents.ps1
  ./build.ps1 -Test -OutputDir ('dist/Kachalka-'+$short)
  $catalogEvidence=Join-Path $root 'test-output/catalog-paging'
  $ui=Start-Process (Join-Path $root ('dist/Kachalka-'+$short+'/Kachalka.exe')) -ArgumentList @('--catalog-paging-smoke-test',('"'+$catalogEvidence+'"')) -PassThru
