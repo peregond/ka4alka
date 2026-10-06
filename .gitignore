@@ -1,46 +1,46 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+node_modules/
+dist/
+.tools/
+test-output/
+*.log
+**/bin/
+**/obj/
 
-# dependencies
-/node_modules
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
-
-# testing
-/coverage
-
-# next.js
-/.next/
-/.vinext/
-/out/
-
-# misc
-.DS_Store
+# Secrets and local credentials
+.env
+.env.*
+!.env.example
+!.env.sample
+.dev.vars
+.dev.vars.*
 *.pem
+*.key
+*.pfx
+*.p12
+*.user
+*.suo
+.aws/
+.ssh/
 
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
+# Tool state, generated files and caches (at any project depth)
+.agents/
+.codex/
+.sites-runtime/
+.next/
+.vinext/
+.wrangler/
+.vercel/
+.cache/
+coverage/
+TestResults/
+*.tsbuildinfo
+*.tmp
+*.bak
+outputs/
+work/
 
-# env files (can opt-in for committing if needed)
-.env*
-
-# vercel
-.vercel
-
-# typescript
-next-env.d.ts
-/dist/
-/.wrangler/
-# Checkout-local execution profile and tool state; never publish them.
-/.sites-runtime/
-/.agents/
-/.codex/
-/outputs/
-/work/
+# Local release assets and test reports stay outside source control.
+*.zip
+*.tar
+*.tar.gz
+*.bundle

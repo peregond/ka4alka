@@ -1,134 +1,87 @@
-# Ка4алка Онл@йн
+# Качалка · 0.18
 
-Сайт показывает фильмы и сериалы из публичного веб-каталога Zona. Названия, постеры и описания сохраняются в D1; список обновляется при открытии раздела или поиске (не чаще одного раза в 15 минут на запрос). При открытии карточки сайт ищет раздачи в RuTor, NNM-Club, MegaPeer, The Pirate Bay, YTS (фильмы), EZTV и Nyaa (сериалы), Internet Archive и сводном индексе Knaben. Последний может вернуть записи RuTracker и других трекеров, но доступность зависит от его собственного индекса. Раздачи сохраняются в D1 и обновляются не чаще одного раза в четыре часа на карточку. Ссылки на torrent и magnet открываются в установленном на устройстве торрент-клиенте.
+Исходники: [peregond/ka4alka](https://github.com/peregond/ka4alka), ветка `main`. Инструкции для облачной среды — [CLOUD.md](CLOUD.md).
 
-Постеры стартовой подборки хранятся на сайте. Новые постеры загружаются через проверяемый серверный маршрут `/api/poster`; если он временно недоступен, браузер повторяет загрузку исходного изображения без заголовка Referer. Состояние ошибки сбрасывается при смене адреса постера.
+Нативное Windows-приложение на C# / WPF и MonoTorrent. Без Electron, Chromium, Node.js и WebView в поставке.
 
-Это расширенный набор проверяемых публичных источников, а не извлечённый внутренний список Zona: приложение Zona не публикует полный состав источников и не предоставляет открытый API раздач. Сайт не гарантирует наличие каждой раздачи и не подменяет недоступные источники вымышленными результатами.
+В 0.6 интерфейс получил единую боковую навигацию, векторные иконки, компактную верхнюю строку поиска, настоящие скругления постеров и двухстрочные названия. Светлая и тёмная темы переключаются кнопкой в шапке; Ctrl+K открывает поиск, Escape очищает запрос. На узком окне фильтры каталога раскрываются по кнопке, а раздачи превращаются в карточки с доступной кнопкой скачивания. Выбор фильтров раздач сохраняется при перерисовке и изменении размера.
 
-## Разработка и публикация
+В 0.7 появилась проверка состава `.torrent`-раздачи перед загрузкой. Тогда папку можно было выбрать для каждой задачи; с 0.14 используется один сохранённый путь для новых загрузок. Активные задачи автоматически продолжаются после следующего запуска, а вручную приостановленные остаются на паузе. Одну и ту же раздачу нельзя случайно добавить дважды через разные magnet и `.torrent`-ссылки.
 
-A clean full-stack starter running on [vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and Drizzle support.
+В 0.8 страница загрузок различает передачу данных и ожидание участников: показывает число подключений, текущую скорость и общий объём файлов. Если к раздаче никто не подключился, появляется понятная подсказка. Варианты с подтверждёнными сидами теперь идут раньше вариантов с неизвестным числом сидов, а варианты с нулём — в конце. Перед запуском раздачи с нулём сидов приложение предупреждает, что она может не скачаться.
 
-## Prerequisites
+В 0.9 улучшен поиск сериалов по русскому и оригинальному названию. На странице сериала раздачи из RuTor, Internet Archive, EZTV и Nyaa собираются автоматически, без выбора источника пользователем. Можно отфильтровать сезон и серию, сортировать по сезону и серии; результаты подгружаются порциями, чтобы длинный список не замедлял слабый ноутбук. TVMaze используется для сопоставления названия с IMDb ID, необходимого для поиска в EZTV.
 
-- Node.js `>=22.13.0`
-- Portable: Windows, macOS, or Linux; no Bash required
-- Managed Linux: managed Linux runtime with Bash, `flock`, `curl`, `sha256sum`, and GNU `timeout`
-- Git is required only for publishing
+В 0.10 добавлен собственный локальный индекс каталога и раздач. Карточки сохраняются после просмотра раздела или поиска; повторный поиск по русскому либо оригинальному названию сначала показывает результаты из индекса, а затем дополняется ответом веб-каталога. Найденные варианты раздач сохраняются на семь дней и видны при повторном открытии страницы, пока приложение проверяет источники. Это индекс просмотренных данных на данном компьютере, а не общий серверный каталог всего интернета.
 
-## Sites Lifecycle
+В 0.11 приложение подключено к [сайту «Ка4алка Онл@йн»](https://kachalka-index-2026.peregon.chatgpt.site): каталог, описание, оценки и варианты раздач запрашиваются у его API. Нативная загрузка по magnet и `.torrent` осталась в приложении. Сайт открыт для публичного чтения, поэтому каталог и раздачи появляются без входа и настройки источников. При недоступности сайта поиск переходит к прямым источникам; в этом режиме RuTracker находится через Knaben без учётной записи.
 
-The Sites initializer copies the shared starter and selects managed-linux only when `SITES_MANAGED_LINUX_CONTAINER=1`; otherwise it selects portable. It saves the selection only in ignored `.sites-runtime/execution-profile.json`. Both profiles copy/configure first, then use the plugin's separate `install-dependencies.mjs` step to measure installation independently. Edit source under `app/` and follow the Sites skill for installation, preview, builds, and publishing.
+В 0.12 к поиску сайта и резервному поиску приложения добавлены NNM-Club и MegaPeer. Их раздачи содержат прямые `.torrent`-ссылки, размер и число сидов. Русские запросы MegaPeer кодируются для поиска по названию; приложение принимает проверенные ссылки обоих источников и передаёт `.torrent` в обычный экран подтверждения загрузки. Запросы к Knaben ограничены по частоте.
 
-Run `node <plugin-root>/scripts/configure-execution-profile.mjs` only when the profile is unknown for the current checkout and environment. Profile changes do not alter tracked source or require reinstalling otherwise-valid dependencies; restart an existing preview to use the new selection. Do not commit or upload `.sites-runtime/`.
+В 0.13 повреждённый или неполный файл постера больше не остаётся в кэше: приложение проверяет его при чтении, удаляет ошибочную копию и повторно загружает обложку. Кэш записывается только после успешной проверки изображения. На сайте постеры сохраняются в сборке для стартового каталога; для остальных карточек предусмотрен запасной адрес, если прокси изображений временно не отвечает.
 
-This starter does not use `wrangler.jsonc`.
+В 0.14 папка загрузок выбирается один раз при первом запуске и сохраняется в настройках. Кнопка «Скачать» в карточке сразу добавляет выбранную раздачу в очередь — дополнительное окно подтверждения больше не появляется. Папку для будущих загрузок можно поменять в настройках; уже добавленные задачи сохраняют прежний путь.
 
-`install:ci` runs `npm ci` once against the shared lockfile, disables parent-workspace discovery, and includes required dev/optional dependencies despite production/omit settings. Sharp defaults to prebuilt binaries unless explicitly configured otherwise. Do not overlap installers.
+В 0.15 скорость загрузки и раздачи считается только по байтам файлов, без служебного обмена. Экран различает отсутствие подключений и ожидание данных от подключённых участников; отдельно показывает получение метаданных, проверку файлов и завершённую раздачу. Во время передачи видны подключённые сиды и приблизительное оставшееся время. На паузе и после завершения прежняя скорость скачивания не отображается, статистика переносится в узком окне. Измерение раз в две секунды работает и при просмотре каталога, пока торрент-движок активен.
 
-- **Portable:** Preserve host HOME, npm cache, registry, proxy, temporary paths, retry/concurrency settings, and lifecycle-script policy. Use `--prefer-offline --no-audit --no-fund`.
-- **Managed Linux:** Use the existing project-local HOME/cache/tmp setup and Linux install lock, tarball preflight, and timeout. Restore the image-seeded npm cache only when its lockfile hash matches; retain network fallback. Builds keep their existing timeout. These helpers are not invoked by the portable profile.
+В 0.16 исправлены двойные отступы полей ввода, из-за которых текст поиска обрезался и исчезал, особенно в низком окне. Запросы фильмов и сериалов запоминаются отдельно в течение работы приложения: переход в загрузки или настройки их не сбрасывает. Устаревший ответ поиска не перерисовывает новый запрос. Настройки открываются полноценной страницей с выбором темы, папки и продолжения загрузок при запуске; параметры сохраняются сразу. Кнопка «Вернуться» возвращает к прежнему каталогу или открытой карточке, Ctrl+K — к поиску последнего раздела.
 
-`scripts/sites-env.mjs` preserves the caller's HOME, npm cache, proxy, XDG, and temporary-directory configuration while defaulting Wrangler and Miniflare state to the checkout. If npm reports an unwritable cache, select a writable path with `npm_config_cache` for that install. The `dev` and `start` scripts also keep Wrangler logs inside the checkout. Generated `.sites-runtime/` and `.wrangler/` directories are disposable and ignored by Git.
+В 0.17 на карточке можно раскрыть состояние источников: успешный ответ, отсутствие подходящих раздач, тайм-аут или временная недоступность. У проверенного источника показывается дата последнего успешного ответа. Записи онлайн-индекса отмечаются отдельно: наличие записи не означает, что сам трекер проверен приложением. При прямом поиске быстрые ответы появляются до завершения остальных запросов; тайм-аут одного источника не убирает результаты других. «Обновить» повторяет проверку с сохранением найденных вариантов, выбранных фильтров и положения прокрутки. Свежий ответ заменяет старое число сидов; для фильмов уточнено сопоставление названия и явно указанного года.
 
-On portable, `npm run dev` uses `vinext dev` with HMR, starting at port 5173. Vinext records the running server in ignored `.vinext/` state, rejects an ordinary duplicate launch, and recovers stale state after a stopped process; exactly simultaneous starts can race. Pass `--port <port>` or `--hostname <host>` after `npm run dev --` when needed; keep portable previews on loopback.
+Ошибки интерфейса записываются с подробностями в `%LOCALAPPDATA%/Kachalka/error.log`; журнал ограничен ротацией. Ошибка теста сохраняется в `test-output/transfer-*/failure.txt` и завершает проверку с ненулевым кодом, без системного окна `Kachalka.Tests.exe`.
 
-For browser QA on managed Linux, use `sites-preview start`. The project's dev script runs Vite and accepts the supervisor's `--host 0.0.0.0 --port 4173 --strictPort` arguments. The internal browser uses `http://terminal.local:4173/`; it is not a user-facing URL. The supervisor owns the preview lifecycle. The ignored local profile survives the supervisor's cleared process environment.
+В 0.18 каталог начинается с подборки до 100 фильмов или сериалов. Кнопка «Показать ещё · 100» добавляет следующую порцию к текущему списку и сохраняет прокрутку; карточки не дублируются, остатки страниц источника не теряются. Первые результаты видны ещё до завершения всей подборки. При ошибке сети найденные карточки остаются, повторная попытка продолжает незавершённую порцию. Поиск и сохранённые карточки работают отдельно от этой подгрузки.
 
-The portable profile simulates ChatGPT sign-in only for loopback development requests. Visit `/signin-with-chatgpt?return_to=/` to sign in as `local_seedy` (`seedy@sites.test`, display name `Seedy`) and `/signout-with-chatgpt?return_to=/` to sign out. The development cookie preserves that identity across server restarts. Mock auth is disabled in the managed-linux profile and is not included in production builds; hosted authentication remains dispatch-owned.
+Колёсико прокручивает списки по пикселям вместо целых рядов постеров или карточек загрузок. При обычной настройке Windows шаг составляет 48 логических пикселей, небольшие движения колёсика учитываются пропорционально. Короткое сглаживание длится 120 мс, останавливается при смене страницы, нажатии клавиши навигации или мыши. Если Windows отключила анимацию интерфейса, применяется тот же небольшой шаг без сглаживания. Виртуализация и переиспользование строк сохранены; выпадающие списки и поля ввода обрабатывают колёсико самостоятельно.
 
-The Worker uses `vinext/server/fetch-handler`, including Vinext's config-aware image handling. After building, `npm start` runs that Worker locally through Wrangler on `127.0.0.1`, sharing `.wrangler/state` with dev preview and local D1 migrations; it does not deploy the site or simulate sign-in. Use the URL printed by the server. Pass `npm start -- --port <port>` to select a different built-preview port.
+## Запуск
 
-Local previews use Miniflare's placeholder `Request.cf` metadata without a network lookup. Set `CLOUDFLARE_CF_FETCH_ENABLED=true` to opt into fetching preview metadata; this setting does not change hosted request metadata.
+Открыть `Kachalka.exe` внутри распакованной папки сборки. Все файлы этой папки должны оставаться рядом с EXE. Автономная сборка включает .NET: отдельно устанавливать его не требуется. Целевая платформа — Windows 10/11 x64; на Windows 7/8 эта сборка не рассчитана.
 
-Local tool usage metrics are disabled by default. Set `WRANGLER_SEND_METRICS=true` to opt in.
+## Что работает
 
-## Included Shape
+- При запуске появляются новые фильмы и сериалы из общего онлайн-индекса, если сайт доступен приложению. При недоступности сайта используется открытый веб-каталог Zona и локальный кэш. В боковой панели временно оставлены только фильмы и сериалы; загрузки доступны отдельной кнопкой сверху. Остальные экспериментальные разделы скрыты до доработки.
+- Карточки показывают постер целиком в портретных пропорциях, а название, год и оценки находятся под изображением. Оценки Кинопоиска и IMDb загружаются по мере просмотра карточек, если Zona их публикует. «—» означает отсутствие данных. Поиск по локальному индексу и избранное работают без отдельной настройки.
+- Сетка подстраивается под ширину окна: 6–7 постеров на просторном экране, меньше на узком. На широком окне справа появляется панель с фильтром года и сортировкой. При смене системного масштаба и монитора окно ограничивается доступной рабочей областью.
+- Обновлённый интерфейс: светлая тема по умолчанию для новых установок, спокойная тёмная тема для ранее выбранных настроек, чёткое разделение основных и второстепенных действий, компактная карточка фильма и понятные пустые состояния. В таблице раздач часто используемые фильтры видны сразу, дополнительные раскрываются по кнопке.
+- На странице фильма и сериала варианты сначала запрашиваются у «Ка4алки Онл@йн» (RuTor, NNM-Club, MegaPeer, RuTracker через Knaben, The Pirate Bay, Internet Archive, EZTV, Nyaa и YTS по применимости). Если сайт недоступен или вернул только записи без прямой загрузки, приложение ищет напрямую в RuTor, NNM-Club, MegaPeer, RuTracker через Knaben и Internet Archive, а для сериалов также в EZTV и Nyaa. Таблица показывает раздачу, сиды, качество, видео, субтитры, озвучку и размер; заголовки сортируют результаты. Дополнительно есть фильтры по источнику, качеству, типу, озвучке, субтитрам, кодеку и HDR; для сериалов — по сезону и серии. Неизвестные параметры не придумываются.
+- Тёмная и светлая темы.
+- Реальные загрузки через magnet и `.torrent`, пауза, продолжение, открытие папки и удаление задачи без удаления файлов. Выбранная раздача добавляется сразу; папка для загрузок выбирается один раз при первом запуске и меняется в настройках. Состав magnet-раздачи становится известен после получения метаданных.
+- Очередь и настройки сохраняются в `%LOCALAPPDATA%/Kachalka`. Активные задачи продолжаются при следующем запуске; вручную остановленные остаются на паузе. Автопродолжение отключается в настройках.
+- Закончив загрузку, клиент продолжает раздачу, пока пользователь не нажмёт «Пауза» или не закроет приложение.
 
-- edit site code under `app/`
-- `app/chatgpt-auth.ts` provides optional dispatch-owned ChatGPT sign-in helpers
-- `.openai/hosting.json` declares optional Sites D1 and R2 bindings
-- `vite.config.ts` simulates declared bindings for local development
-- `db/index.ts` reads the D1 binding from the Cloudflare Worker environment
-- `db/schema.ts` starts intentionally empty
-- `@cloudflare/workers-types` provides Worker types; `cloudflare-env.d.ts` declares optional `DB`/`BUCKET` bindings—update these declarations if binding names change
-- `examples/d1/` contains an optional D1 example surface
-- `drizzle.config.ts` supports local migration generation when needed
+Если подходящих раздач нет, кнопка скачивания не появляется. Публичные веб-источники могут поменять формат или стать недоступны. Точный список внутренних источников Zona не опубликован, поэтому приложение использует проверяемые открытые источники и не заявляет полную совместимость с приватной сетью Zona. В кэше сохраняются последние успешно открытые страницы каталога, описания, оценки и уже загруженные постеры для повторного просмотра без сети.
 
-## Workspace Auth Headers
+## Ресурсы
 
-Signed-in visitors receive both `oai-authenticated-user-id` and `oai-authenticated-user-email`. Private Sites require every visitor to sign in; public Sites may also have anonymous visitors, for whom neither header is present.
+- Нет постоянной анимации, таймера обновления каталога, размытия или фонового веб-движка. Таймер сглаживания прокрутки работает только во время движения и сразу останавливается после него.
+- Нативная виртуализация строк каталога с переиспользованием контейнеров.
+- Торрент-движок создаётся по требованию и освобождается, когда все задачи остановлены.
+- До 50 соединений всего, 30 на раздачу; дисковый кэш 4 МБ.
+- Скорость передачи измеряется раз в две секунды, пока торрент-движок активен; экран загрузок обновляется при просмотре этого раздела в несвёрнутом окне.
+- Проверка раздач ограничена двумя карточками одновременно; каждый источник имеет собственный тайм-аут 25 секунд.
+- Обложки загружаются для видимых карточек, параллельно не более двух запросов; постер декодируется до ширины 280 пикселей, кэш в памяти ограничен 48 записями, на диске — 200. Рейтинги видимых карточек загружаются отдельно с ограничением параллельности.
 
-The user ID is stable for the same user on the same Site and different across Sites. Use it as the durable user key; use email and name for display or contact purposes.
+Проверки на конкретном слабом ноутбуке и длительные испытания больших очередей ещё нужны. Оформление построено на нативных элементах и лёгких поверхностях без размытия.
 
-SIWC-authenticated workspace sites may also receive `oai-authenticated-user-full-name` when the user's SIWC profile has a non-empty `name` claim. The full-name value is percent-encoded UTF-8 and is accompanied by `oai-authenticated-user-full-name-encoding: percent-encoded-utf-8`.
+## Разработка и проверки
 
-Treat the full name as optional and fall back to email when it is absent:
+Нужен .NET 10 SDK. Локальный SDK в `.tools/dotnet` используется автоматически, если присутствует.
 
-```tsx
-import { headers } from "next/headers";
-
-export default async function Home() {
-  const requestHeaders = await headers();
-  const userId = requestHeaders.get("oai-authenticated-user-id");
-  const email = requestHeaders.get("oai-authenticated-user-email");
-  const encodedFullName = requestHeaders.get("oai-authenticated-user-full-name");
-  const fullName =
-    encodedFullName &&
-    requestHeaders.get("oai-authenticated-user-full-name-encoding") ===
-      "percent-encoded-utf-8"
-      ? decodeURIComponent(encodedFullName)
-      : null;
-
-  const displayName = fullName ?? email;
-  // ...
-}
+```powershell
+./build.ps1 -Test
 ```
 
-## Optional Dispatch-Owned ChatGPT Sign-In
+Тесты создают случайный файл 256 КиБ и два локальных BitTorrent-узла. Проверяют `.torrent` и magnet-передачу, SHA-256, паузу, продолжение после перезапуска, сохранение очереди, дубликаты через разные типы ссылок, некорректные ссылки и файлы, а также сохранность файла при удалении задачи. Отдельные проверки `--live-sources` читают открытые каталоги и не скачивают фильмы:
 
-Import the ready-to-use helpers from `app/chatgpt-auth.ts` when the site needs optional or required ChatGPT sign-in:
-
-- Use `getChatGPTUser()` for optional signed-in UI.
-- Use the returned `userId` as the stable user key for user-owned records; do not use email as a durable identifier.
-- Use `requireChatGPTUser(returnTo)` for server-rendered pages that should send anonymous visitors through Sign in with ChatGPT.
-- In a Server Component, start sign-in with `<a href={chatGPTSignInPath(returnTo)} target="_top">`. The auth helper module is server-only; do not import it into a Client Component.
-- Do not use `fetch`, XHR, a client-side router, or a framework link that can prefetch the sign-in route. SIWC must start as a top-level navigation.
-- Never request the AuthAPI authorization endpoint directly. The dispatch-owned `/signin-with-chatgpt` route must start the SIWC flow.
-- Use `chatGPTSignOutPath(returnTo)` for browser sign-out links or actions.
-- Pass a same-origin relative `returnTo` path for the destination after sign-in or sign-out. The helper validates and safely encodes it.
-- Mark protected pages with `export const dynamic = "force-dynamic"` because they depend on per-request identity headers.
-
-Dispatch owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`, the OAuth cookies, and identity header injection. Do not implement app routes for those reserved paths. Routes that do not import and call the helper remain anonymous-compatible.
-
-SIWC establishes identity only; it does not prove workspace membership. Use the Sites hosting platform's access policy controls for workspace-wide restrictions, or enforce explicit server-side membership or allowlist checks.
-
-Use SIWC for account pages, user-specific dashboards, saved records, and write actions tied to the current ChatGPT user. Leave public content anonymous.
-
-## Local D1 migrations
-
-For a D1-backed local preview, generate SQL with `npm run db:generate`. Build once through the Sites skill's build entrypoint (or `npm run build` for standalone use) to generate `dist/server/wrangler.json`, rebuilding if bindings change. From the project root, apply each pending migration in order:
-
-```sh
-node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0000_example.sql
+```powershell
+$env:DOTNET_CLI_HOME="$PWD/.tools/dotnet-home"
+$env:NUGET_PACKAGES="$PWD/.tools/nuget"
+.tools/dotnet/dotnet.exe run --project tests/Kachalka.Tests.csproj -c Release -- --live-sources
 ```
 
-Replace the filename with the pending migration and `DB` with your D1 binding name if different. Use `.wrangler/state`, not `.wrangler/state/v3`; Wrangler adds the versioned directories. Do not replay migrations already applied locally. This updates only the preview database; publishing applies production migrations separately.
+UI-проверки: `Kachalka.exe --smoke-test <абсолютная папка>` для локальных экранов, `--layout-smoke-test` для разных размеров окна, `--live-smoke-test` для реального каталога и `--end-to-end-smoke-test` для пути от клика по карточке до запуска загрузки. Последняя проверка создаёт локальный тестовый `.torrent` на 256 КиБ и не скачивает фильм. `--design-smoke-test` проверяет обе темы, длинные названия, узкие карточки и сохранение фильтров, используя локальный кэш каталога и постеров. Задайте `KACHALKA_DATA` на тестовую папку, чтобы изолировать настройки. Проверки сохраняют PNG и JSON, затем закрываются. Замер после PNG включает память от снимков экрана; `StartupWorkingSetMB` снят до них. Это измерения на текущем ПК, не обещание для всех устройств.
 
-## Diagnostic Commands
+Структура: `native/` — приложение; `tests/` — локальные интеграционные проверки; `dist/Kachalka-0.18/` — автономная сборка. Прекращённая попытка Electron убрана в игнорируемый `.tools/electron-attempt` и в сборку не входит.
 
-- `npm run install:ci`: perform the one locked dependency install
-- `npm run dev`: start the Vite/Vinext development server
-- `npm run build`: build the deployable Sites artifact
-- `npm run start`: preview the built Worker locally with D1/R2 support
-- `npm run db:generate`: generate Drizzle migrations after schema changes
-
-When using the Sites plugin, follow its skill instructions for installation, builds, and publishing. These npm commands remain available for standalone use.
-
-The portable build runs Vinext directly without a host `timeout` command. The managed-linux build uses `scripts/build-verified.sh` and its existing `SITES_BUILD_TIMEOUT` setting.
-
-## Learn More
-
-- [vinext Documentation](https://github.com/cloudflare/vinext)
-- [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)
+Источники активных разделов: [«Ка4алка Онл@йн»](https://kachalka-index-2026.peregon.chatgpt.site), [публичный каталог Zona](https://w6.zona.plus/movies), [RuTor](https://rutor.info), [NNM-Club](https://nnmclub.to/), [MegaPeer](https://megapeer.vip/), [Knaben](https://knaben.org/api/v1/) (поиск записей RuTracker), [Internet Archive](https://archive.org), [EZTV](https://eztvx.to/api/), [Nyaa](https://nyaa.si/), [TVMaze](https://www.tvmaze.com/api) (только сопоставление названий). Приложение не содержит кода установщика Zona. Основа: [виртуализация WPF](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/advanced/optimizing-performance-controls), [MonoTorrent](https://github.com/alanmcgovern/monotorrent).
