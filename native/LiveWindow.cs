@@ -15,6 +15,7 @@ public partial class MainWindow
     string catalogOrder="Сначала новые";
     Button? topAll,topSaved;
     WrapPanel? inlineCatalogFilters;
+    ScrollViewer? inlineCatalogFilterScroll;
     Button? inlineFilterButton;
     bool inlineFiltersOpen;
     Grid? detailHero;
@@ -107,7 +108,8 @@ public partial class MainWindow
         var filters=new[]{catalogGenre.Length>0,catalogCountry.Length>0,catalogYear.HasValue,catalogRating>0,catalogOrder!="Сначала новые",catalogCollection!="all"}.Count(x=>x);
         inlineFilterButton=ActionButton(filters>0?"Фильтры · "+filters:"Фильтры","IconFilter",()=>{inlineFiltersOpen=!inlineFiltersOpen;UpdateFilterRail();},"PillButton");tabs.Children.Add(inlineFilterButton);
         toolbar.Children.Add(tabs);PageHeader.Children.Add(toolbar);
-        inlineCatalogFilters=new WrapPanel{Margin=new(5,0,0,10)};AddCatalogFilters(inlineCatalogFilters,true);PageHeader.Children.Add(inlineCatalogFilters);
+        inlineCatalogFilters=new WrapPanel{Margin=new(5,0,0,10)};AddCatalogFilters(inlineCatalogFilters,true);
+        inlineCatalogFilterScroll=new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=inlineCatalogFilters,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};PageHeader.Children.Add(inlineCatalogFilterScroll);
         RenderCatalogFilterRail();UpdateFilterRail();
         IEnumerable<MediaItem> shown=favoritesOnly?prefs.LiveFavorites.Where(x=>x.Section==section&&x.Title.Contains(Search.Text,StringComparison.CurrentCultureIgnoreCase)).DistinctBy(x=>x.Id).Where(selection.Matches):liveItems;
         var local=favoritesOnly||Search.Text.Length>0;

@@ -54,6 +54,7 @@ public partial class MainWindow
         var bitmap=new RenderTargetBitmap((int)ActualWidth,(int)ActualHeight,96,96,PixelFormats.Pbgra32);bitmap.Render(this);var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(bitmap));using(var file=File.Create(Path.Combine(output,"catalog.png")))png.Save(file);
         MinWidth=360;Width=680;Height=500;await Task.Delay(150);UpdateLayout();Check(FiltersPanel.Visibility==Visibility.Collapsed&&inlineFilterButton?.Visibility==Visibility.Visible,"narrow window exposes inline filters");
         inlineFilterButton!.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));UpdateLayout();Check(inlineCatalogFilters?.Visibility==Visibility.Visible,"inline filters open on narrow screens");
+        Height=360;await Task.Delay(150);UpdateLayout();Check(inlineCatalogFilterScroll is {ScrollableHeight:>0}&&inlineCatalogFilterScroll.ActualHeight<=116&&Body.ActualHeight>25,"short window scrolls all filter choices and retains space for cards");
         Close();
     }
 }

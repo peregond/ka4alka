@@ -118,6 +118,7 @@ public partial class MainWindow
         CenterRegion.Margin=show?new Thickness(0,0,18,0):new Thickness(0);
         if(inlineFilterButton!=null)inlineFilterButton.Visibility=show?Visibility.Collapsed:Visibility.Visible;
         if(inlineCatalogFilters!=null)inlineCatalogFilters.Visibility=!show&&inlineFiltersOpen?Visibility.Visible:Visibility.Collapsed;
+        if(inlineCatalogFilterScroll!=null){inlineCatalogFilterScroll.Visibility=!show&&inlineFiltersOpen?Visibility.Visible:Visibility.Collapsed;inlineCatalogFilterScroll.MaxHeight=Math.Clamp(ActualHeight*.32,90,220);}
     }
     void ShowCatalog(IReadOnlyList<MediaItem> items)
     {
