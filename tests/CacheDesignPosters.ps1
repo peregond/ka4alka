@@ -2,7 +2,7 @@ $ErrorActionPreference='Stop'
 $coverFolder=Join-Path $env:KACHALKA_DATA 'covers'
 New-Item -ItemType Directory -Force $coverFolder | Out-Null
 $rows=Get-Content (Join-Path $PSScriptRoot '../web-index/app/data/seed.json') -Raw | ConvertFrom-Json
-$posters=@($rows | Where-Object {$_.section -eq 'movies'} | Select-Object -First 40 | ForEach-Object {$_.poster} | Where-Object {$_} | Select-Object -Unique)
+$posters=@(@($rows | Where-Object {$_.section -eq 'movies'} | Select-Object -First 40) + @($rows | Where-Object {$_.section -eq 'series'} | Select-Object -First 20) | ForEach-Object {$_.poster} | Where-Object {$_} | Select-Object -Unique)
 $results=@($posters | ForEach-Object -Parallel {
  $url=$_
  $uri=[Uri]$url

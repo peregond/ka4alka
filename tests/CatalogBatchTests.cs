@@ -35,6 +35,25 @@ static class CatalogBatchTests
         Check(capped.Items.Length==20&&!capped.HasMore,"end of source page limit drains buffer without offering impossible requests");
         using var canceled=new CancellationTokenSource();canceled.Cancel();
         try{await CatalogBatches.Load(first,Fetch,ct:canceled.Token);throw new Exception("Canceled catalog batch ran");}catch(OperationCanceledException){Check(first.Items.Length==100,"cancellation leaves previous catalog intact");}
+        var missingGenre=new MediaItem(-502,"Сериал","Сериалы",null!,2025,"—","—","#526B69");
+        Check(missingGenre.CardGenre=="Сериал"&&missingGenre.Subtitle=="Сериал · 2025","old saved cards with a missing genre retain their category and layout");
+        var show=new MediaItem(-501,"Сериал","Сериалы","  боевик\r\n ,\n    криминал, \tдрама\u00a0 ",2025,"8.2","8.0","#526B69");
+        Check(show.CardGenre=="боевик, криминал, драма"&&!show.Subtitle.Contains('\n'),"multiline cached series genres stay on one compact metadata line");
+        show.SetScores("8.3","8.1","\nдетектив\n , \r\n триллер\n");
+        Check(show.CardGenre=="детектив, триллер","late series metadata cannot introduce line breaks into card layout");
+        Check((show with{Genre=""}).Subtitle=="Сериал · 2025","empty metadata does not add a dangling separator");
+        foreach(var rate in new[]{60,120})
+        {
+            var position=0d;var velocity=0d;var monotonic=true;
+            for(var frame=0;frame<rate;frame++)
+            {
+                var motion=WheelScroll.Advance(position,velocity,48,1d/rate);
+                monotonic&=motion.Position>=position&&motion.Position<=48;
+                if(frame==0)Check(motion.Position<5,"smooth wheel starts gently instead of jumping on its first frame");
+                position=motion.Position;velocity=motion.Velocity;
+            }
+            Check(monotonic&&Math.Abs(position-48)<.01,"smooth wheel stays within bounds and reaches the same distance at "+rate+" Hz");
+        }
         Check(WheelScroll.Distance(120,3,500)==48&&WheelScroll.Distance(30,3,500)==12,"wheel uses small pixel steps and preserves precision deltas");
         Check(WheelScroll.Distance(120,0,500)==0&&WheelScroll.Distance(120,-1,500)==425,"wheel respects disabled scrolling and system page preference");
         Check(WheelScroll.Destination(200,248,-48,1000,true)==152,"wheel reversal discards pending motion in old direction");

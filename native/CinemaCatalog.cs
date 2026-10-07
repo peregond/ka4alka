@@ -80,8 +80,8 @@ public partial class MainWindow
         grid.Children.Add(new Border{Background=new LinearGradientBrush(new GradientStopCollection{new(Color.FromArgb(0,7,12,29),0),new(Color.FromArgb(230,7,12,29),1)},90)});
         var content=new StackPanel{VerticalAlignment=VerticalAlignment.Bottom,Margin=new(20,18,20,18)};grid.Children.Add(content);
         var eyebrow=new TextBlock{Text=primary?"В ЦЕНТРЕ ВНИМАНИЯ":"СТОИТ ПОСМОТРЕТЬ",FontSize=10,FontWeight=FontWeights.SemiBold,Foreground=new SolidColorBrush(Color.FromRgb(185,200,255)),Margin=new(0,0,0,8)};content.Children.Add(eyebrow);
-        var title=new TextBlock{Text=item.Title,FontSize=primary?25:22,FontWeight=FontWeights.Bold,Foreground=Brushes.White,TextWrapping=TextWrapping.Wrap,TextTrimming=TextTrimming.CharacterEllipsis,MaxHeight=65,ToolTip=item.Title,Margin=new(0,0,0,6)};content.Children.Add(title);
-        content.Children.Add(new TextBlock{Text=string.Join(" · ",new[]{item.Year>0?item.Year.ToString():"",item.Genre}.Where(x=>x.Length>0)),Foreground=new SolidColorBrush(Color.FromRgb(202,212,237)),FontSize=12,TextTrimming=TextTrimming.CharacterEllipsis,Margin=new(0,0,0,12)});
+        var title=new TextBlock{Text=item.Title,FontSize=primary?25:22,FontWeight=FontWeights.SemiBold,Foreground=Brushes.White,TextWrapping=TextWrapping.Wrap,TextTrimming=TextTrimming.CharacterEllipsis,MaxHeight=65,ToolTip=item.Title,Margin=new(0,0,0,6)};content.Children.Add(title);
+        content.Children.Add(new TextBlock{Text=string.Join(" · ",new[]{item.Year>0?item.Year.ToString():"",item.CardGenre}.Where(x=>x.Length>0)),Foreground=new SolidColorBrush(Color.FromRgb(202,212,237)),FontSize=12,TextTrimming=TextTrimming.CharacterEllipsis,Margin=new(0,0,0,12)});
         var actions=new WrapPanel();content.Children.Add(actions);
         void Open(){current=item;Render();}
         var details=ActionButton(primary?"Выбрать раздачу":"Подробнее",primary?"IconDownload":"IconChevron",Open,primary?"PrimaryButton":"QuietButton");details.FontSize=12;details.Margin=new(0,0,8,0);details.Padding=new(12,9,12,9);details.MinHeight=36;

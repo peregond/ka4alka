@@ -10,7 +10,18 @@ public partial class MainWindow
 {
     async Task<object> CheckWheelScrolling()
     {
-        async Task Settle(int delay=170){await Task.Delay(delay);UpdateLayout();await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);UpdateLayout();}
+        var previous=WheelScroll.SmoothOverride;
+        try
+        {
+            WheelScroll.SmoothOverride=false;var immediate=await CheckWheelScrollingMode();
+            WheelScroll.SmoothOverride=true;var smooth=await CheckWheelScrollingMode();
+            return new{Immediate=immediate,Smooth=smooth};
+        }
+        finally{WheelScroll.SmoothOverride=previous;}
+    }
+    async Task<object> CheckWheelScrollingMode()
+    {
+        async Task Settle(int delay=500){await Task.Delay(delay);UpdateLayout();await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);UpdateLayout();}
         void Check(bool value,string reason){if(!value)throw new Exception("Wheel scroll: "+reason);}
         MouseWheelEventArgs Wheel(UIElement target,int delta)
         {
@@ -32,14 +43,20 @@ public partial class MainWindow
         var list=new ListBox{ItemsSource=Enumerable.Range(1,1000),ItemTemplate=new DataTemplate{VisualTree=row}};Body.Children.Add(list);await Settle();
         var viewer=FindVisual<ScrollViewer>(list,_=>true)??throw new Exception("Wheel scroll: fixture viewer missing.");
         viewer.ScrollToVerticalOffset(200);await Settle();var start=viewer.VerticalOffset;
+        var frames=new List<double>();
+        ScrollChangedEventHandler record=(_,_)=>frames.Add(viewer.VerticalOffset);
+        viewer.ScrollChanged+=record;
         Wheel(list,-30);await Settle();
+        viewer.ScrollChanged-=record;
+        if(WheelScroll.SmoothingEnabled)
+            Check(frames.Distinct().Count()>=3&&frames.Any(offset=>offset>start+.05&&offset<start+step/4-.05),"smooth wheel did not produce intermediate native scroll frames");
         Check(Math.Abs(viewer.VerticalOffset-start-step/4)<2,"precision wheel delta was rounded or amplified");
         viewer.ScrollToVerticalOffset(200);await Settle();start=viewer.VerticalOffset;
         Wheel(list,-120);Wheel(list,-120);Wheel(list,-120);await Settle();
         Check(Math.Abs(viewer.VerticalOffset-Math.Min(start+step*3,viewer.ScrollableHeight))<2,"rapid wheel input lost distance");
         viewer.ScrollToVerticalOffset(200);await Settle();start=viewer.VerticalOffset;
         Wheel(list,-120);Wheel(list,120);await Settle();
-        var expected=SystemParameters.ClientAreaAnimation?Math.Max(0,start-step):start;
+        var expected=WheelScroll.SmoothingEnabled?Math.Max(0,start-step):start;
         Check(Math.Abs(viewer.VerticalOffset-expected)<2,"direction reversal retained pending motion");
         Wheel(list,-120);
         list.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice,PresentationSource.FromVisual(this)!,Environment.TickCount,Key.Home){RoutedEvent=Keyboard.PreviewKeyDownEvent});
@@ -56,6 +73,6 @@ public partial class MainWindow
         Wheel(editor,-120);Wheel(nested,-120);await Settle();Check(page.VerticalOffset==0&&!WheelScroll.IsMoving(page),"nested input scrolled the outer page");
         Wheel(content,-120);await Settle();Check(Math.Abs(page.VerticalOffset-step)<2&&!WheelScroll.IsMoving(page),"detail/settings page has a different wheel step or an idle timer");
         Body.Children.Clear();Render();await Settle();
-        return new{CatalogStep=Math.Round(catalogStep,2),SystemWheelLines=SystemParameters.WheelScrollLines,SmoothingEnabled=SystemParameters.ClientAreaAnimation,PixelScrolling=true,PrecisionDelta=true,RapidInput=true,DirectionReversal=true,KeyboardInterrupt=true,NestedControlsPreserved=true,IdleTimerStopped=true,VirtualizedItems=1000,RealizedContainers=containers};
+        return new{CatalogStep=Math.Round(catalogStep,2),SystemWheelLines=SystemParameters.WheelScrollLines,SmoothingEnabled=WheelScroll.SmoothingEnabled,PixelScrolling=true,PrecisionDelta=true,RapidInput=true,DirectionReversal=true,KeyboardInterrupt=true,NestedControlsPreserved=true,IdleTimerStopped=true,VirtualizedItems=1000,RealizedContainers=containers};
     }
 }

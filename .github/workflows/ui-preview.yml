@@ -1,8 +1,8 @@
 name: Native UI preview
 on:
   push:
-    branches: [codex/modern-ui-0.29]
-    paths: ['native/**', 'tests/CacheDesignPosters.ps1', '.github/workflows/ui-preview.yml']
+    branches: [codex/ui-polish-0.29.1]
+    paths: ['native/**', 'tests/**', '.github/workflows/ui-preview.yml']
   workflow_dispatch:
 permissions:
   contents: write

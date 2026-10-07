@@ -42,6 +42,15 @@ public static class SourceTests
     public static async Task Run(bool live,bool allSections=false)
     {
         static void Check(bool value,string name){if(!value)throw new Exception(name);Console.WriteLine("PASS: "+name);}
+        var seriesFixture=new MediaItem(-58291,"Сериал","Сериалы","",2025,"—","—","#526B69"){PageUrl="https://w6.zona.plus/tvseries/metadata-layout-fixture"};
+        using(var seriesClient=new SourceClient(new FixtureHandler(Encoding.UTF8.GetBytes("<a itemprop='genre'>\n  боевик\n</a><a itemprop='genre'>\r\n криминал &nbsp;\n</a><a href='/tvseries/filter/country-rossiia'>\n Россия\n</a>"))))
+        {
+            var genreDetail=await new LiveCatalog(seriesClient).Detail(seriesFixture,CancellationToken.None);
+            Check(genreDetail.Genre=="боевик, криминал"&&genreDetail.Country=="Россия","source HTML indentation cannot become multiline series genres or country names");
+            using var offlineSeries=new SourceClient(new OfflineHandler());
+            var cachedDetail=await new LiveCatalog(offlineSeries).Detail(seriesFixture,CancellationToken.None);
+            Check(cachedDetail.Genre==genreDetail.Genre,"normalized series metadata remains usable from the offline cache");
+        }
         var mirrorHandler=new RutorMirrorHandler();using(var mirrorClient=new SourceClient(mirrorHandler))
         {
             var mirrored=await new LiveCatalog(mirrorClient).Releases("Film",CancellationToken.None);

@@ -155,7 +155,7 @@ public partial class MainWindow
         void PageButton(string label,int page,bool enabled)
         {
             var button=Button(label,()=>GoCatalogPage(page));button.Style=(Style)FindResource("PillButton");button.IsEnabled=enabled&&!liveLoading;button.MinWidth=36;button.Padding=new(10,7,10,7);button.Margin=new(2);
-            if(page==livePage&&int.TryParse(label,out _)){button.SetResourceReference(Control.BackgroundProperty,"Selected");button.FontWeight=FontWeights.Bold;}
+            if(page==livePage&&int.TryParse(label,out _)){button.SetResourceReference(Control.BackgroundProperty,"Selected");button.FontWeight=FontWeights.SemiBold;}
             System.Windows.Automation.AutomationProperties.SetName(button,int.TryParse(label,out _)?"Страница "+page:label);numbers.Children.Add(button);
         }
         PageButton("Назад",livePage-1,livePage>1);

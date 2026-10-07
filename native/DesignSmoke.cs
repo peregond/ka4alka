@@ -38,8 +38,7 @@ public partial class MainWindow
         }
         designCatalogFallback=cached.Count==0;
         if(designCatalogFallback)cached=BundledCatalog.Page("Фильмы",1).Items.Select(x=>x with{PageUrl="https://example.invalid/design/catalog/"+x.Id}).ToArray();
-        var cards=new List<MediaItem>();
-        foreach(var original in cached)
+        MediaItem CachePoster(MediaItem original)
         {
             var item=original;
             if(!string.IsNullOrWhiteSpace(item.ImageUrl))
@@ -58,11 +57,12 @@ public partial class MainWindow
                 }
                 if(!loaded)item=item with{ImageUrl=null};
             }
-            cardMetadata[item.Id]=Task.FromResult(item);requestedDetails.Add(item.Id);cards.Add(item);
+            cardMetadata[item.Id]=Task.FromResult(item);requestedDetails.Add(item.Id);return item;
         }
+        var cards=cached.Select(CachePoster).ToList();
         catalogPages["Фильмы|sort-date|1"]=new(cards.ToArray(),false,CatalogChoices.Genres,CatalogChoices.Countries);
         catalogPages["Фильмы||1"]=new(cards.OrderByDescending(CatalogScore).ToArray(),false,CatalogChoices.Genres,CatalogChoices.Countries);
-        var shows=BundledCatalog.Page("Сериалы",1).Items.Select(x=>x with{PageUrl="https://example.invalid/design/catalog/"+x.Id,ImageUrl=null}).ToArray();
+        var shows=BundledCatalog.Page("Сериалы",1).Items.Select((x,index)=>CachePoster(x with{PageUrl="https://example.invalid/design/catalog/"+x.Id,Genre=index%3==0?"\nбоевик\r\n, \n криминал, \n драма\n":index%3==1?"детектив":""})).ToArray();
         foreach(var show in shows){cardMetadata[show.Id]=Task.FromResult(show);requestedDetails.Add(show.Id);}
         catalogPages["Сериалы|sort-date|1"]=new(shows,false,CatalogChoices.Genres,CatalogChoices.Countries);
         catalogPages["Сериалы||1"]=new(shows,false,CatalogChoices.Genres,CatalogChoices.Countries);
@@ -89,10 +89,10 @@ public partial class MainWindow
             MinWidth=Math.Min(width,MaxWidth-24);MinHeight=Math.Min(height,MaxHeight-24);
             Width=MinWidth;Height=MinHeight;await Settle();
         }
-        void Shot(string name)
+        void Shot(string name,double rasterScale=1)
         {
             UpdateLayout();
-            var bitmap=new RenderTargetBitmap(Math.Max(1,(int)Math.Ceiling(ActualWidth)),Math.Max(1,(int)Math.Ceiling(ActualHeight)),96,96,PixelFormats.Pbgra32);bitmap.Render(this);
+            var bitmap=new RenderTargetBitmap(Math.Max(1,(int)Math.Ceiling(ActualWidth*rasterScale)),Math.Max(1,(int)Math.Ceiling(ActualHeight*rasterScale)),96*rasterScale,96*rasterScale,PixelFormats.Pbgra32);bitmap.Render(this);
             var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(bitmap));using var stream=File.Create(Path.Combine(output,name+".png"));png.Save(stream);
         }
         ComboBox QualityFilter()=>FindVisual<ComboBox>(Body,x=>AutomationProperties.GetName(x)=="Раздачи: Качество")??throw new Exception("Quality filter is missing.");
@@ -138,18 +138,47 @@ public partial class MainWindow
             await Settle();liveKey=CurrentCatalogKey;
             await Size(1760,950);
             Render();await Settle();
+            if(TextOptions.GetTextFormattingMode(this)!=TextFormattingMode.Ideal||TextOptions.GetTextRenderingMode(this)!=TextRenderingMode.Grayscale)throw new Exception("Text does not use smooth grayscale fractional metrics.");
             var wheelScrolling=await CheckWheelScrolling();
             MinWidth=360;MinHeight=300;
             var searchSettings=await CheckSearchAndSettings(output);
             await Size(1760,950);
             System.Windows.Input.Keyboard.ClearFocus();
             Search.Text="";searchDelay.Stop();liveKey=CurrentCatalogKey;
+            foreach(var (item,index) in liveItems.Take(2).Select((item,index)=>(item,index)))
+            {
+                liveReleases[item.Id]=[new("quality-preview-"+index,item.Title+(index==0?" WEB-DL 1080p":" WEB-DL 2160p"),"Preview fixture","","https://example.invalid/preview.torrent",null)];
+                releaseViews[item.Id]=new(){ReceivedUtc=DateTime.UtcNow};
+            }
             prefs.Light=true;ApplyTheme();current=null;Render();await Settle();Shot("catalog-light");
+            Shot("catalog-light-125",1.25);
             var catalogColumnsLight=catalogColumns;
             prefs.Light=false;ApplyTheme();Render();await Settle();Shot("catalog-dark");
+            foreach(var scale in new[]{1.2,1.25,1.5})Shot("catalog-dark-"+(int)(scale*100),scale);
+            foreach(var badge in VisualElements<Border>(Body).Where(x=>x.Name=="PosterQualityBadge"&&x.IsVisible))
+            {
+                if(badge.HorizontalAlignment!=HorizontalAlignment.Left||badge.VerticalAlignment!=VerticalAlignment.Top||badge.Parent is not Grid poster||poster.Children.OfType<Image>().Count()!=1)throw new Exception("Quality badge is not on the poster's top-left corner.");
+            }
+            if(!VisualElements<Border>(Body).Any(x=>x.Name=="PosterQualityBadge"&&x.IsVisible))throw new Exception("Known quality badge is missing.");
             if(ActualWidth<1700||ActualHeight<900||FiltersPanel.Visibility!=Visibility.Visible||inlineCatalogFilterScroll?.Parent!=FilterControls||discoveryHero is not {ActualHeight:>180}||discoveryHero.Children.Count!=2||discoveryShelf is not {ActualWidth:>500})throw new Exception($"Cinematic desktop catalog is missing its banners, curated row or right filters ({ActualWidth}x{ActualHeight}, rail={FiltersPanel.Visibility}, hero={discoveryHero?.ActualHeight}, shelf={discoveryShelf?.ActualWidth}).");
             if(VisualElements<UIElement>(Body).Any(x=>x.Effect!=null))throw new Exception("Cinematic catalog adds an expensive blur or shadow effect.");
             var featurePosterWidths=VisualElements<Image>(discoveryHero!).Select(x=>(x.Source as BitmapSource)?.PixelWidth??0).ToArray();
+            var movies=liveItems;
+            section="Сериалы";liveItems=catalogPages["Сериалы|sort-date|1"].Items;liveKey=CurrentCatalogKey;
+            Render();await Settle();
+            void CheckSeriesLayout()
+            {
+                var genres=VisualElements<TextBlock>(Body).Where(x=>x.Name=="CardGenreText"&&x.IsVisible).ToArray();
+                if(genres.Length==0||genres.Any(x=>x.Text.Contains('\n')||x.Text.Contains('\r')||x.ActualHeight>17))throw new Exception("Series genres create multiline poster cards.");
+                var posters=VisualElements<Border>(discoveryShelf!).Where(x=>x.Name=="CardPoster").Select(x=>x.TransformToAncestor(discoveryShelf!).TransformBounds(new Rect(new Point(),x.RenderSize))).ToArray();
+                if(posters.Length<2||posters.Max(x=>x.Top)-posters.Min(x=>x.Top)>1||posters.Max(x=>x.Height)-posters.Min(x=>x.Height)>1)throw new Exception("Series shelf posters are not aligned at the top.");
+            }
+            CheckSeriesLayout();
+            // Reproduce metadata arriving after the row was already measured.
+            foreach(var item in liveItems.Take(8))item.SetScores(item.Kinopoisk,item.Imdb,"\nбоевик\r\n, \n криминал, \n драма\n");
+            await Settle();CheckSeriesLayout();Shot("series-catalog-dark");
+            prefs.Light=true;ApplyTheme();Render();await Settle();CheckSeriesLayout();Shot("series-catalog-light");
+            section="Фильмы";liveItems=movies;liveKey=CurrentCatalogKey;prefs.Light=false;ApplyTheme();Render();await Settle();
             var preview=liveItems.FirstOrDefault(x=>x.ImageUrl!=null)?.ImageUrl;
             var movie=new MediaItem(-987654320,"За пределами тишины: невероятное путешествие через время, которое начинается с одного случайного письма","Фильмы","Приключения · Драма",2026,"8,7","8,5","#526B69")
             {
@@ -268,6 +297,7 @@ public partial class MainWindow
                 ExternalSourcesRequired=false,FixtureHasCachedPoster=preview!=null,FeaturePosterWidths=featurePosterWidths,FilterPersistedAfterRender=true,FilterPersistedAfterResize=true,DownloadStarted=false,EngineCreated=downloads.EngineCreated,
                 ShortDescriptionLength=shortDescription.Length,ShortDescriptionExpanded=true,ShortDescriptionExpandedHeight=shortDescriptionExpandedHeight,SeriesSeasonFilter=true,
                 DownloadTelemetryFitsNarrowWindow=true,DownloadTextFollowsTheme=true,
+                TextRendering="Grayscale",TextFormatting="Ideal",FractionalRasterScales=new[]{1.2,1.25,1.5},QualityBadgeOnPoster=true,SeriesPosterAlignment=true,MultilineSeriesMetadataContained=true,
                 SearchAndSettings=searchSettings,
                 WheelScrolling=wheelScrolling,
                 SourceFailureVisible=true,SourceProgressPreservesOpenFilter=true,SourceProgressPreservesScroll=true,SourceRetryState=true,
