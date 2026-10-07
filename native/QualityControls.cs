@@ -40,7 +40,7 @@ public partial class MainWindow
         var minimum=Button((QualityMinimum==1080?"Full HD":"HD Ready")+" ▾",()=>{});minimum.Style=(Style)FindResource("PillButton");
         minimum.ToolTip="Минимальное качество: экранки скрываются при любом разрешении. Неизвестное качество остаётся видимым.";
         AutomationProperties.SetName(minimum,"Минимальное качество");
-        var menu=new ContextMenu{PlacementTarget=minimum,Placement=System.Windows.Controls.Primitives.PlacementMode.Bottom};
+        var menu=new ToggleContextMenu{PlacementTarget=minimum,Placement=System.Windows.Controls.Primitives.PlacementMode.Bottom};
         foreach(var choice in new[]{(Height:720,Label:"HD Ready · от 720p"),(Height:1080,Label:"Full HD · от 1080p")})
         {
             var option=new MenuItem{Header=choice.Label,Tag=choice.Height,IsCheckable=true,IsChecked=QualityMinimum==choice.Height};

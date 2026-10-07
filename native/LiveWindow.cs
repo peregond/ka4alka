@@ -177,7 +177,7 @@ public partial class MainWindow
             var button=Button((label=="Порядок"?current.Label:selected==items[0].Key?label:current.Label)+" ▾",()=>{});button.Style=(Style)FindResource("PillButton");
             button.SetResourceReference(Control.BackgroundProperty,selected==items[0].Key?"Panel":"Selected");
             button.ToolTip=label;System.Windows.Automation.AutomationProperties.SetName(button,label);
-            var menu=new ContextMenu{PlacementTarget=button,Placement=System.Windows.Controls.Primitives.PlacementMode.Bottom,MaxHeight=360};
+            var menu=new ToggleContextMenu{PlacementTarget=button,Placement=System.Windows.Controls.Primitives.PlacementMode.Bottom,MaxHeight=360};
             menu.SetResourceReference(Control.BackgroundProperty,"Panel");menu.SetResourceReference(Control.ForegroundProperty,"Text");
             foreach(var item in items)
             {

@@ -16,7 +16,7 @@ public partial class MainWindow
         panel.Children.Add(Text(prefs.Folder,13));
         panel.Children.Add(Text("Брандмауэр",16));
         panel.Children.Add(Text("Разреши Качалке принимать подключения от участников раздачи. Это может помочь торрентам находить больше участников и начинать загрузку.",13,true));
-        panel.Children.Add(Text("Добавим исключение только для Качалки: TCP и UDP в частных сетях. Windows попросит права администратора. Это не гарантирует наличие доступных участников раздачи.",12,true));
+        panel.Children.Add(Text("Добавим исключение только для Качалки: TCP и UDP в частных сетях. Windows попросит права администратора.",12,true));
         var notice=Text("",12,true);panel.Children.Add(notice);
         var firewall=AsyncButton("Разрешить в брандмауэре",async()=>
         {

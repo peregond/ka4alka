@@ -38,11 +38,13 @@ public partial class MainWindow
         {
             MinWidth=1000;MinHeight=720;Width=1000;Height=720;Left=0;Top=0;
             section="Фильмы";current=null;Search.Clear();submittedQuery="";searchCategory="";favoritesOnly=false;ResetCatalogFilters();liveKey=CurrentCatalogKey;Render();await Task.Delay(200);UpdateLayout();
+            foreach(var popupAnimation in new[]{PopupAnimation.None,PopupAnimation.Fade})
             foreach(var label in new[]{"Подборка","Жанр","Страна","Рейтинг от","Год выхода","Порядок","Минимальное качество"})
             {
                 var owner=FindVisual<Button>(RootGrid,b=>AutomationProperties.GetName(b)==label)??throw new Exception("Missing menu "+label);
                 owner.BringIntoView();await Task.Delay(80);UpdateLayout();
                 await ClickWithMouse(owner);Check(owner.ContextMenu?.IsOpen==true,label+": first mouse click did not open the menu.");
+                var popup=owner.ContextMenu!.Parent as Popup??throw new Exception("Menu popup parent is missing.");popup.PopupAnimation=popupAnimation;
                 await ClickWithMouse(owner);Check(owner.ContextMenu?.IsOpen==false,label+": second mouse click reopened the menu.");
                 await ClickWithMouse(owner);Check(owner.ContextMenu?.IsOpen==true,label+": third mouse click did not reopen the menu.");
                 await ClickWithMouse(Search);Check(owner.ContextMenu?.IsOpen==false,label+": outside click did not dismiss the menu.");
@@ -85,7 +87,7 @@ public partial class MainWindow
                 Check(VisualElements<Button>(setup).Any(b=>AutomationProperties.GetName(b)=="Разрешить Качалку в брандмауэре"),"First-run setup is missing its explicit firewall action.");
                 Check(VisualElements<TextBlock>(setup).Any(b=>b.Text==prefs.Folder),"First-run setup does not show the chosen download folder.");Shot(setup,"first-run-dark");
             }
-            return new{NativeMouseMenuToggle=true,MenuOutsideDismiss=true,KeyboardMenuToggle=true,WholeBannerOpensCard=true,KeyboardBanner=true,SingleUpdateAction=true,UpdateRetry=true,ReadyStatePreserved=true,FirstRunFirewallOptIn=true,StartupSwitchWorks=true};
+            return new{NativeMouseMenuToggle=true,MenuDismissAnimations=new[]{"None","Fade"},MenuOutsideDismiss=true,KeyboardMenuToggle=true,WholeBannerOpensCard=true,KeyboardBanner=true,SingleUpdateAction=true,UpdateRetry=true,ReadyStatePreserved=true,FirstRunFirewallOptIn=true,StartupSwitchWorks=true};
         }
         finally
         {
