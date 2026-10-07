@@ -32,7 +32,7 @@ jobs:
         shell: pwsh
         run: ./tests/PublishedSiteProbe.ps1
       - name: Install NSIS
-        run: choco install nsis --yes --no-progress
+        run: ./scripts/install-nsis.ps1
       - name: Validate Windows installation and update
         shell: pwsh
         run: |
