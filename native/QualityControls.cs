@@ -53,6 +53,7 @@ public partial class MainWindow
     {
         var controls=new WrapPanel{Margin=new(0,0,0,4),VerticalAlignment=VerticalAlignment.Center};
         var hide=new CheckBox{Content="Скрыть плохое качество",IsChecked=prefs.HidePoorQuality,VerticalAlignment=VerticalAlignment.Center,Margin=new(4,6,12,6),ToolTip="Скрывать экранки и видео ниже выбранного минимума. Неизвестное качество остаётся видимым."};
+        hide.SetResourceReference(Control.ForegroundProperty,"Text");
         AutomationProperties.SetName(hide,"Скрыть плохое качество");controls.Children.Add(hide);
         var caption=Text("Минимум",11,true);caption.VerticalAlignment=VerticalAlignment.Center;caption.Margin=new(0,0,6,0);controls.Children.Add(caption);
         var minimum=new ComboBox{ItemsSource=new[]{"HD Ready","Full HD"},SelectedIndex=QualityMinimum==1080?1:0,Width=112,MinWidth=0,Margin=new(0,0,8,0),ToolTip="HD Ready — от 720p, Full HD — от 1080p. Экранки считаются плохими при любом разрешении."};

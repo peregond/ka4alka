@@ -96,8 +96,15 @@ public partial class MainWindow
             var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(bitmap));using var stream=File.Create(Path.Combine(output,name+".png"));png.Save(stream);
         }
         ComboBox QualityFilter()=>FindVisual<ComboBox>(Body,x=>AutomationProperties.GetName(x)=="Раздачи: Качество")??throw new Exception("Quality filter is missing.");
+        void CheckQualityInk()
+        {
+            var hide=FindVisual<CheckBox>(Body,x=>AutomationProperties.GetName(x)=="Скрыть плохое качество")??throw new Exception("Poor quality toggle is missing.");
+            if(hide.Foreground is not SolidColorBrush ink||ink.Color!=((SolidColorBrush)FindResource("Text")).Color)
+                throw new Exception("Poor quality toggle does not follow the current theme.");
+        }
         void CheckFilter(string stage)
         {
+            CheckQualityInk();
             var filter=QualityFilter();
             if(filter.SelectedItem?.ToString()!="Full HD")throw new Exception(stage+": selected Full HD filter was lost.");
             if(!filter.IsVisible||filter.ActualWidth<=0)throw new Exception(stage+": quality filter is not visible.");
@@ -155,8 +162,8 @@ public partial class MainWindow
             requestedDetails.Add(movie.Id);cardMetadata[movie.Id]=Task.FromResult(movie);liveReleases[movie.Id]=[release,ultra,small];
             var sourceView=new ReleaseView{Saved=true,SavedUtc=DateTime.UtcNow.AddDays(-1),ReceivedUtc=DateTime.UtcNow, Sources=[new("RuTor",SourceState.Ready,3,DateTime.UtcNow,DateTime.UtcNow),new("NNM-Club",SourceState.Empty,0,DateTime.UtcNow,DateTime.UtcNow),new("MegaPeer",SourceState.TimedOut,0,DateTime.UtcNow,DateTime.UtcNow.AddDays(-2)),new("Онлайн-индекс",SourceState.Unavailable)]};
             releaseViews[movie.Id]=sourceView;
-            current=movie;Render();await Settle();Shot("detail-wide-dark");
-            prefs.Light=true;ApplyTheme();Render();await Settle();Shot("detail-wide-light");
+            current=movie;Render();await Settle();CheckQualityInk();Shot("detail-wide-dark");
+            prefs.Light=true;ApplyTheme();Render();await Settle();CheckQualityInk();Shot("detail-wide-light");
             QualityFilter().SelectedItem="Full HD";await Settle();CheckFilter("selected");
             Render();await Settle();CheckFilter("rendered");
             var sourceToggle=FindVisual<Button>(Body,b=>AutomationProperties.GetName(b)=="Показать состояние источников")??throw new Exception("Source status toggle missing.");
