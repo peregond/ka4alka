@@ -101,6 +101,7 @@ public partial class MainWindow
         var known=prefs.LiveFavorites.Concat(catalogIndex.Recent("Фильмы",200)).Concat(catalogIndex.Recent("Сериалы",200)).Concat(Catalog.Items).ToArray();
         var identity=System.Text.Json.JsonSerializer.Serialize(new
         {
+            CatalogRevision=catalogIndex.Revision,
             Queue=downloads.Items.Select(item=>new{item.Id,item.Name,item.InfoHash,item.MediaTitle,item.MediaSection,item.MediaYear,item.ImageUrl,item.MediaPageUrl,item.ReleaseTitle,item.ReleaseId,item.ReleaseSource,item.ReleasePageUrl,item.ReleaseUrl}),
             Catalog=known.Select(item=>new{item.Id,item.Title,item.OriginalTitle,item.Year,item.Section,item.ImageUrl,item.PageUrl})
         });

@@ -72,6 +72,11 @@ static class DownloadOrderingTests
         Check(DownloadMetadata.Associate(byHash,[media,remake],candidate=>candidate.Id==media.Id?[cachedRelease]:[])&&byHash.MediaTitle==media.Title,"cached release hash restores the correct card for an unrecognizable legacy torrent name");
         var conflictingHash=new DownloadItem{Name="Unrelated.Tracker.Release.1080p",InfoHash=hash};
         Check(!DownloadMetadata.Associate(conflictingHash,[media,remake],_=>[cachedRelease])&&conflictingHash.ImageUrl==null,"conflicting cached release identities cannot silently choose an unrelated cover");
+        var localRelease=cachedRelease with{TorrentUrl="http://localhost:9696/download?id=1"};
+        var otherIndexer=new DownloadItem{Name="Unrecognizable.Tracker.Release",Source="http://localhost:9117/download?id=1"};
+        Check(!DownloadMetadata.Associate(otherIndexer,[media],_=>[localRelease]),"different Torznab ports cannot associate an unrelated release poster");
+        var sameIndexer=new DownloadItem{Name=otherIndexer.Name,Source=localRelease.TorrentUrl!};
+        Check(DownloadMetadata.Associate(sameIndexer,[media],_=>[localRelease])&&sameIndexer.MediaTitle==media.Title,"an exact Torznab URL still restores its own card metadata");
         var persisted=JsonSerializer.Deserialize<DownloadItem>(JsonSerializer.Serialize(old))!;
         Check(persisted.AddedUtc==old.AddedUtc&&persisted.MediaTitle==old.MediaTitle,"addition dates and associated media titles survive queue serialization");
         Check(persisted.DownloadRate==0&&persisted.UploadRate==0,"live rates are not restored as stale network activity");
@@ -80,6 +85,9 @@ static class DownloadOrderingTests
         try
         {
             var legacyData=Path.Combine(Preferences.DataDir,"legacy-queue-tests");Directory.CreateDirectory(legacyData);Environment.SetEnvironmentVariable("KACHALKA_DATA",legacyData);
+            var cacheIndex=new CatalogIndex(legacyData);var cacheMedia=media with{PageUrl="https://zona.plus/tvseries/northern-lights-fixture"};var revision=cacheIndex.Revision;
+            await cacheIndex.CacheReleasesAsync(cacheMedia,[cachedRelease]);
+            Check(cacheIndex.Revision>revision&&cacheIndex.CachedReleases(cacheMedia).Count==1,"saving new release identities signals metadata repair even when the catalog card is unchanged");
             File.WriteAllText(Path.Combine(legacyData,"queue.json"),JsonSerializer.Serialize(new[]{new DownloadItem{Id="first",Name="First"},new DownloadItem{Id="second",Name="Second"}}));
             var migrated=new DownloadService();var migratedDates=migrated.Items.Select(x=>x.AddedUtc).ToArray();
             Check(migratedDates.All(x=>x!=default)&&migratedDates[0]<migratedDates[1]&&!migrated.EngineCreated,"restoring an old queue assigns addition dates without starting the torrent engine");

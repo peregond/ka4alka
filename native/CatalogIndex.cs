@@ -17,6 +17,7 @@ public sealed class CatalogIndex
     readonly SemaphoreSlim writer=new(1,1);
     readonly string path;
     const int Limit=3000;
+    public long Revision {get;private set;}
 
     public CatalogIndex(string dataDir)
     {
@@ -76,6 +77,7 @@ public sealed class CatalogIndex
             var temp=file+".tmp";
             await File.WriteAllTextAsync(temp,JsonSerializer.Serialize(new ReleaseCache(DateTime.UtcNow,releases.Take(300).ToArray(),sources?.ToArray()),new JsonSerializerOptions{IgnoreReadOnlyProperties=true}));
             File.Move(temp,file,true);
+            Revision++;
         }
         finally{writer.Release();}
     }
@@ -125,6 +127,7 @@ public sealed class CatalogIndex
             var temp=path+".tmp";
             await File.WriteAllTextAsync(temp,JsonSerializer.Serialize(entries.Values.ToArray()),Encoding.UTF8,ct);
             File.Move(temp,path,true);
+            Revision++;
         }
         finally{writer.Release();}
     }

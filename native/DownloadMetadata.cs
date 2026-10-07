@@ -112,7 +112,8 @@ public static class DownloadMetadata
     }
     static bool SamePage(string? left,string? right)=>!string.IsNullOrWhiteSpace(left)&&!string.IsNullOrWhiteSpace(right)&&
         Uri.TryCreate(left,UriKind.Absolute,out var a)&&Uri.TryCreate(right,UriKind.Absolute,out var b)&&
-        a.Scheme is "http" or "https"&&b.Scheme is "http" or "https"&&a.Host.Equals(b.Host,StringComparison.OrdinalIgnoreCase)&&a.PathAndQuery.TrimEnd('/')==b.PathAndQuery.TrimEnd('/');
+        a.Scheme is "http" or "https"&&b.Scheme is "http" or "https"&&a.Host.Equals(b.Host,StringComparison.OrdinalIgnoreCase)&&
+        (a.Port==b.Port||a.IsDefaultPort&&b.IsDefaultPort)&&a.PathAndQuery.TrimEnd('/')==b.PathAndQuery.TrimEnd('/');
     static bool SameRelease(DownloadItem item,string? hash,SourceEntry release)=>
         hash!=null&&hash==MagnetHash(release.TorrentUrl)||
         SamePage(item.Source,release.TorrentUrl)||SamePage(item.ReleaseUrl,release.TorrentUrl)||
