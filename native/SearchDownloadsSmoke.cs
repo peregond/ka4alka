@@ -37,12 +37,26 @@ public partial class MainWindow
         ShowCatalogSection("Фильмы");await Task.Delay(150);UpdateLayout();
         check(!SearchActive&&Search.Text==""&&CatalogSelection.IsDefault,"repeated active catalog navigation clears query and filters");searchProvider=null;
 
+        var releaseMovie=new MediaItem(99023,"Карточка с поиском раздач","Фильмы","драма",2025,"8.0","8.0","#526B69"){PageUrl=LiveCatalog.Base+"/movies/loading-fixture",Description="Описание уже загружено."};
+        requestedDetails.Add(releaseMovie.Id);cardMetadata[releaseMovie.Id]=Task.FromResult(releaseMovie);
+        liveReleases[releaseMovie.Id]=[new("loading-release","Карточка с поиском раздач (2025) 1080p","Fixture","https://example.test/release","magnet:?xt=urn:btih:"+new string('a',40),null,1024,5)];
+        releaseViews[releaseMovie.Id]=new(){Checking=true,Sources=[new("RuTor",SourceState.Searching)]};current=releaseMovie;Render();await Task.Delay(150);UpdateLayout();
+        var releaseLoading=FindVisual<Border>(Body,b=>AutomationProperties.GetName(b)=="Поиск раздач")??throw new Exception("Localized release loading indicator is missing.");
+        check(releaseLoading.Visibility==Visibility.Visible&&FindVisual<TextBlock>(releaseLoading,t=>t.Text=="Ищем раздачи…")!=null&&FindVisual<ProgressBar>(releaseLoading,p=>p.IsIndeterminate)!=null&&LoadingIndicator.Visibility==Visibility.Collapsed,"release search shows its animated indicator inside the releases section");
+        var qualityFilter=FindVisual<ComboBox>(Body,b=>AutomationProperties.GetName(b)=="Раздачи: Качество")??throw new Exception("Release loading hid the quality filter.");qualityFilter.IsDropDownOpen=true;await Task.Delay(100);
+        releaseViews[releaseMovie.Id].Checking=false;RefreshDetail(releaseMovie.Id);UpdateLayout();
+        check(releaseLoading.Visibility==Visibility.Collapsed&&qualityFilter.IsDropDownOpen,"finished release search hides its local indicator while preserving an open filter");qualityFilter.IsDropDownOpen=false;await Task.Delay(100);current=null;Render();UpdateLayout();
+
         var folder=Path.Combine(Preferences.DataDir,"details-fixture");Directory.CreateDirectory(folder);
         var posterUrl="https://example.test/downloads-cached-poster.png";
-        var cover=new RenderTargetBitmap(56,84,96,96,PixelFormats.Pbgra32);var coverVisual=new DrawingVisual();
-        using(var drawing=coverVisual.RenderOpen()){drawing.DrawRectangle(new SolidColorBrush(Color.FromRgb(54,100,118)),null,new Rect(0,0,56,84));drawing.DrawEllipse(new SolidColorBrush(Color.FromRgb(197,176,123)),null,new Point(28,32),18,18);}
-        cover.Render(coverVisual);var coverEncoder=new PngBitmapEncoder();coverEncoder.Frames.Add(BitmapFrame.Create(cover));
-        var coverPath=Path.Combine(Preferences.DataDir,"covers",Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(posterUrl)))+".img");Directory.CreateDirectory(Path.GetDirectoryName(coverPath)!);using(var file=File.Create(coverPath))coverEncoder.Save(file);
+        void CachePoster(string url,Color color)
+        {
+            var cover=new RenderTargetBitmap(56,84,96,96,PixelFormats.Pbgra32);var visual=new DrawingVisual();
+            using(var drawing=visual.RenderOpen()){drawing.DrawRectangle(new SolidColorBrush(color),null,new Rect(0,0,56,84));drawing.DrawEllipse(new SolidColorBrush(Color.FromRgb(197,176,123)),null,new Point(28,32),18,18);}
+            cover.Render(visual);var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(cover));
+            var path=Path.Combine(Preferences.DataDir,"covers",Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(url)))+".img");Directory.CreateDirectory(Path.GetDirectoryName(path)!);using(var file=File.Create(path))encoder.Save(file);
+        }
+        var repairedPosterUrl="https://example.test/downloads-repaired-poster.png";CachePoster(posterUrl,Color.FromRgb(54,100,118));CachePoster(repairedPosterUrl,Color.FromRgb(89,119,77));
         downloads.Items.Clear();var added=DateTime.UtcNow.AddHours(-1);
         var fixtures=Enumerable.Range(0,6).Select(i=>new DownloadItem{Id="redesign-"+i,Name="Series.Season."+(i+1)+".FullHD.WEB-DL.mkv",MediaTitle="Сериал · сезон "+(i+1),MediaSection="Сериалы",ImageUrl=i==0?null:posterUrl,AddedUtc=added.AddMinutes(i),Folder=folder,Progress=20+i*10,Paused=true,DownloadRate=i*1024,TotalBytes=(6-i)*1024L*1024*1024,Stats="50% · 1.0 ГБ из 2.0 ГБ · ↓ 0 КБ/с",Files=[new("Сезон 1/Серия 01.mkv",Path.Combine(folder,"episode1.mkv"),Path.Combine(folder,"episode1.mkv"),1024*1024,100),new("Сезон 1/Серия 02.mkv",Path.Combine(folder,"episode2.mkv"),Path.Combine(folder,"episode2.mkv"),1024*1024,35)]}).ToArray();
         foreach(var fixture in fixtures)downloads.Items.Add(fixture);
@@ -89,26 +103,31 @@ public partial class MainWindow
                 FindVisual<Button>(dialog,b=>AutomationProperties.GetName(b)=="Применить лимиты")!.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await Task.Delay(150);
                 check(downloads.DownloadLimitKbps==512&&downloads.UploadLimitKbps==128&&Preferences.Load().MaxUploadKbps==128,"speed-limit dialog applies and persists both rates");
             });
-            await SettleDownloads();var first=FirstRow();check(first.ActualHeight<=105&&first.ActualHeight>0,"download rows fit within 105 pixels at desktop width");
+            await SettleDownloads();var first=FirstRow();check(first.ActualHeight<=120&&first.ActualHeight>0,"download rows fit within 120 pixels with both media and release titles");
             var poster=FindVisual<Image>(first,i=>i.DataContext is DownloadItem);check(poster?.Source!=null&&poster.ActualWidth>0&&poster.ActualWidth<90,"download row displays its cached media poster on the left");
+            var originalPoster=poster!.Source;fixtures[^1].ImageUrl=repairedPosterUrl;fixtures[^1].Refresh();await SettleDownloads();
+            check(poster.Source!=null&&!ReferenceEquals(poster.Source,originalPoster)&&ReferenceEquals(FirstRow(),first),"metadata repair repaints the existing poster without rebuilding its download row");
+            fixtures[^1].ImageUrl=null;fixtures[^1].Refresh();await SettleDownloads();check(poster.Source==null,"clearing a repaired poster removes the stale image from its existing row");
+            fixtures[^1].ImageUrl=posterUrl;fixtures[^1].Refresh();await SettleDownloads();check(poster.Source!=null,"existing download row restores its poster after a later metadata update");
             var title=FindVisual<TextBlock>(first,t=>t.Text==fixtures[^1].MediaTitle);check(title!=null&&poster!.TransformToAncestor(first).Transform(new Point()).X<title.TransformToAncestor(first).Transform(new Point()).X,"associated media title follows its poster");
-            foreach(var label in new[]{"Подробнее","Открыть папку","Действия загрузки"})
+            var releaseTitle=FindVisual<TextBlock>(first,t=>t.Text==fixtures[^1].Name);check(releaseTitle is{IsVisible:true}&&releaseTitle.FontSize<title!.FontSize&&releaseTitle.TransformToAncestor(first).Transform(new Point()).Y>title.TransformToAncestor(first).Transform(new Point()).Y,"download row displays its raw release name as a smaller secondary line below the Russian media title");
+            var toggle=FindVisual<Button>(first,b=>AutomationProperties.GetName(b)==fixtures[^1].Action);check(toggle!=null&&FindVisual<TextBlock>(toggle,t=>t.Text==fixtures[^1].Action)!=null,"pause or continue action displays a readable text label");
+            foreach(var label in new[]{"Подробнее","Открыть папку","Удалить из загрузок","Удалить файлы"})
             {
                 var action=FindVisual<Button>(first,b=>AutomationProperties.GetName(b)==label);check(action!=null&&VisualElements<System.Windows.Shapes.Path>(action).Any(),"download action has an accessible label and recognizable icon: "+label);
             }
-            var removal=FindVisual<Button>(first,b=>AutomationProperties.GetName(b)=="Действия загрузки")!;removal.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await SettleDownloads();
-            check(removal.ContextMenu is{IsOpen:true,ActualHeight:>0},"download removal actions open in a visible contextual menu");
-            var keep=Option(removal.ContextMenu!,"Удалить из загрузок");var delete=Option(removal.ContextMenu!,"Удалить файлы");
+            check(!VisualElements<Button>(first).Any(b=>AutomationProperties.GetName(b)=="Действия загрузки"),"download removal actions are directly available without an ellipsis submenu");
+            var keep=FindVisual<Button>(first,b=>AutomationProperties.GetName(b)=="Удалить из загрузок")!;var delete=FindVisual<Button>(first,b=>AutomationProperties.GetName(b)=="Удалить файлы")!;
             check(keep.Foreground is SolidColorBrush neutral&&Math.Abs(neutral.Color.R-neutral.Color.G)<35&&delete.Foreground is SolidColorBrush danger&&danger.Color.R>danger.Color.G+20,"keep-files removal is neutral gray and permanent file removal is red");
             check(keep.ToolTip?.ToString()?.Contains("файл",StringComparison.OrdinalIgnoreCase)==true&&delete.ToolTip?.ToString()?.Contains("файл",StringComparison.OrdinalIgnoreCase)==true,"both removal actions explain their effect on downloaded files");
             var actionItem=(DownloadItem)Queue().Items[0];
             try
             {
                 actionItem.Busy=true;actionItem.Refresh();await SettleDownloads();
-                check(removal.ContextMenu!.IsOpen&&!keep.IsEnabled&&!delete.IsEnabled,"open removal menu disables both actions while its download is busy");
+                check(!keep.IsEnabled&&!delete.IsEnabled&&!toggle!.IsEnabled,"direct row actions disable removal and pause controls while their download is busy");
             }
             finally{actionItem.Busy=false;actionItem.Refresh();await SettleDownloads();}
-            check(removal.ContextMenu!.IsOpen&&keep.IsEnabled&&delete.IsEnabled,"open removal menu re-enables both actions when its download is ready");removal.ContextMenu.IsOpen=false;
+            check(keep.IsEnabled&&delete.IsEnabled&&toggle!.IsEnabled,"direct row actions re-enable their controls when the download is ready");
             var sort=Toolbar("Сортировка загрузок");sort.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await SettleDownloads();check(sort.ContextMenu is{IsOpen:true,ActualHeight:>0},"download sorting is discoverable through a toolbar menu");
             check(sort.ContextMenu!.Items.OfType<MenuItem>().Select(x=>x.Tag?.ToString()).Order().SequenceEqual(new[]{"newest","name","speed","size","progress"}.Order()),"queue sorting offers addition date, title, speed, size and progress");sort.ContextMenu.IsOpen=false;
             foreach(var order in new[]{("name",DownloadSort.Name),("speed",DownloadSort.Speed),("size",DownloadSort.Size),("progress",DownloadSort.Progress),("newest",DownloadSort.Newest)})

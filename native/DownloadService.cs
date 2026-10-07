@@ -98,7 +98,7 @@ public sealed class DownloadService
           : await Engine.AddAsync(item.Source,item.Folder,settings);
         managers[item.Id]=manager;meters[item.Id]=(new(),new());return manager;
     }
-    public async Task Add(string source,string folder,MediaItem? media=null,string? imageUrl=null)
+    public async Task Add(string source,string folder,MediaItem? media=null,string? imageUrl=null,SourceEntry? release=null)
     {
         await gate.WaitAsync();
         try {
@@ -115,7 +115,13 @@ public sealed class DownloadService
             }
             if(Items.Any(x=>x.Source==source||identity.Length>0&&string.Equals(ExistingHash(x),identity,StringComparison.OrdinalIgnoreCase)))throw new InvalidOperationException("Эта раздача уже в очереди.");
             Directory.CreateDirectory(folder);
-            var item=new DownloadItem{Source=source,Folder=folder,Name=name,InfoHash=identity,AddedUtc=DateTime.UtcNow,ImageUrl=imageUrl??media?.ImageUrl,MediaTitle=media?.Title,MediaSection=media?.Section};
+            var item=new DownloadItem
+            {
+                Source=source,Folder=folder,Name=name,InfoHash=identity,AddedUtc=DateTime.UtcNow,
+                ImageUrl=!string.IsNullOrWhiteSpace(media?.ImageUrl)?media.ImageUrl:!string.IsNullOrWhiteSpace(imageUrl)?imageUrl:null,
+                MediaTitle=media?.Title,MediaSection=media?.Section,MediaPageUrl=media?.PageUrl,MediaYear=media?.Year??0,
+                ReleaseTitle=release?.Title,ReleaseSource=release?.Source,ReleaseId=release?.Id,ReleasePageUrl=release?.PageUrl,ReleaseUrl=release?.TorrentUrl
+            };
             TorrentManager? manager=null;
             try
             {

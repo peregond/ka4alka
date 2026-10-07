@@ -85,6 +85,13 @@ public class DownloadItem : INotifyPropertyChanged
     public string? ImageUrl {get;set;}
     public string? MediaTitle {get;set;}
     public string? MediaSection {get;set;}
+    public string? MediaPageUrl {get;set;}
+    public int MediaYear {get;set;}
+    public string? ReleaseTitle {get;set;}
+    public string? ReleaseSource {get;set;}
+    public string? ReleaseId {get;set;}
+    public string? ReleasePageUrl {get;set;}
+    public string? ReleaseUrl {get;set;}
     [JsonIgnore] public string DisplayName=>string.IsNullOrWhiteSpace(MediaTitle)?Name:MediaTitle;
     [JsonIgnore] public long DownloadRate {get;set;}
     [JsonIgnore] public long UploadRate {get;set;}

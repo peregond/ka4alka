@@ -3,7 +3,7 @@ using Kachalka;
 
 static class DownloadOrderingTests
 {
-    public static void Run()
+    public static async Task Run()
     {
         void Check(bool value,string message){if(!value)throw new Exception(message);Console.WriteLine("PASS: "+message);}
         var start=new DateTime(2026,10,7,12,0,0,DateTimeKind.Utc);
@@ -35,7 +35,7 @@ static class DownloadOrderingTests
         Check(DownloadOrdering.Sort(legacy,DownloadSort.Newest).Select(x=>x.Id).SequenceEqual(["known","legacy-new","legacy-old"]),"newest-first order also works for migrated legacy queues");
 
         var media=new MediaItem(42,"Северное сияние","Сериалы","драма",2025,"8.1","8.0","#526B69")
-            {OriginalTitle="Northern Lights",ImageUrl="https://example.test/northern-lights.jpg"};
+            {OriginalTitle="Northern Lights",ImageUrl="https://example.test/northern-lights.jpg",PageUrl="https://example.test/series/northern-lights"};
         var matched=new DownloadItem{Name="northern lights"};
         Check(DownloadOrdering.AssociateMedia(matched,[media])&&matched.MediaTitle==media.Title&&matched.MediaSection==media.Section&&matched.ImageUrl==media.ImageUrl,"legacy download can recover a poster through an exact original-title match");
         var shortMatch=new DownloadItem{Name="Northern"};
@@ -45,6 +45,33 @@ static class DownloadOrderingTests
         var existing=new DownloadItem{Name=media.Title,MediaTitle="Собственная карточка",MediaSection="Фильмы",ImageUrl="https://example.test/preserved.jpg"};
         DownloadOrdering.AssociateMedia(existing,[media]);
         Check(existing.ImageUrl=="https://example.test/preserved.jpg"&&existing.MediaTitle=="Собственная карточка","a legacy lookup preserves explicit download metadata");
+        var releaseName="Northern.Lights.2025.S01E02.1080p.WEB-DL.mkv";
+        var tagged=new DownloadItem{Name=releaseName};
+        Check(DownloadMetadata.Associate(tagged,[media])&&tagged.MediaTitle==media.Title&&tagged.MediaSection==media.Section&&tagged.MediaYear==media.Year&&tagged.ImageUrl==media.ImageUrl,"legacy torrent title and year recover Russian card metadata despite episode and quality tags");
+        Check(tagged.Name==releaseName,"metadata repair retains the original torrent release filename");
+        var wrongYear=new DownloadItem{Name="Northern.Lights.2024.S01E02.1080p.WEB-DL.mkv"};
+        Check(!DownloadMetadata.Associate(wrongYear,[media])&&wrongYear.ImageUrl==null,"a mismatching release year cannot acquire another work's poster");
+        var remake=media with{Id=44,Year=2020,PageUrl="https://example.test/series/northern-lights-2020"};
+        var undated=new DownloadItem{Name="Northern.Lights.1080p.WEB-DL.mkv"};
+        Check(!DownloadMetadata.Associate(undated,[media,remake])&&undated.MediaTitle==null,"an undated release keeps its placeholder when remakes share a title");
+        var dated=new DownloadItem{Name=releaseName};
+        Check(DownloadMetadata.Associate(dated,[remake,media])&&dated.MediaYear==2025,"the release year disambiguates identically named works");
+        var solaris=new MediaItem(50,"Солярис","Фильмы","фантастика",1972,"8.0","8.0","#526B69"){OriginalTitle="Solaris",ImageUrl="https://example.test/solaris-1972.jpg"};
+        var solarisRemake=solaris with{Id=51,Year=2002,ImageUrl="https://example.test/solaris-2002.jpg"};
+        var bilingual=new DownloadItem{Name="Solaris / Солярис (2002) 1080p"};
+        Check(!DownloadMetadata.Associate(bilingual,[solaris])&&bilingual.ImageUrl==null,"a bare original-title alias cannot bypass the remake year in a bilingual release name");
+        Check(DownloadMetadata.Associate(bilingual,[solaris,solarisRemake])&&bilingual.MediaYear==2002&&bilingual.ImageUrl==solarisRemake.ImageUrl,"bilingual release names select the correct remake using their stated year");
+        var numbered=new MediaItem(52,"Бегущий по лезвию 2049","Фильмы","фантастика",2017,"8.0","8.0","#526B69"){OriginalTitle="Blade Runner 2049",ImageUrl="https://example.test/blade-runner.jpg"};
+        Check(DownloadMetadata.Associate(new DownloadItem{Name="Blade.Runner.2049.2017.1080p.WEB-DL.mkv"},[numbered]),"a year-like number inside the actual title is preserved during release matching");
+        var partial=media with{Title="Northern Lights",ImageUrl="",OriginalTitle=null};var enriched=DownloadMetadata.EnrichMedia(partial,[partial,media]);
+        Check(enriched.Title==media.Title&&enriched.ImageUrl==media.ImageUrl,"selected card identity enriches an English title and missing poster from its Russian catalog entry");
+        var byPage=new DownloadItem{Name="Unrelated.Tracker.Release.1080p",MediaPageUrl=media.PageUrl};
+        Check(DownloadMetadata.Associate(byPage,[media,remake])&&byPage.MediaTitle==media.Title&&byPage.ImageUrl==media.ImageUrl,"persisted card identity restores metadata even when torrent naming is unrelated");
+        var hash=new string('e',40);var cachedRelease=new SourceEntry("cache-release","Northern Lights (2025) 1080p","Fixture","https://example.test/source/release","magnet:?xt=urn:btih:"+hash,null);
+        var byHash=new DownloadItem{Name="Unrelated.Tracker.Release.1080p",InfoHash=hash};
+        Check(DownloadMetadata.Associate(byHash,[media,remake],candidate=>candidate.Id==media.Id?[cachedRelease]:[])&&byHash.MediaTitle==media.Title,"cached release hash restores the correct card for an unrecognizable legacy torrent name");
+        var conflictingHash=new DownloadItem{Name="Unrelated.Tracker.Release.1080p",InfoHash=hash};
+        Check(!DownloadMetadata.Associate(conflictingHash,[media,remake],_=>[cachedRelease])&&conflictingHash.ImageUrl==null,"conflicting cached release identities cannot silently choose an unrelated cover");
         var persisted=JsonSerializer.Deserialize<DownloadItem>(JsonSerializer.Serialize(old))!;
         Check(persisted.AddedUtc==old.AddedUtc&&persisted.MediaTitle==old.MediaTitle,"addition dates and associated media titles survive queue serialization");
         Check(persisted.DownloadRate==0&&persisted.UploadRate==0,"live rates are not restored as stale network activity");
@@ -59,6 +86,15 @@ static class DownloadOrderingTests
             var reopened=new DownloadService();
             Check(reopened.Items.Select(x=>x.AddedUtc).SequenceEqual(migratedDates),"legacy queue addition dates are persisted once and retained after restart");
             Check(DownloadOrdering.Sort(reopened.Items,DownloadSort.Newest).First().Id=="second","restored legacy queue presents its latest addition first");
+            var releaseIndex=Path.Combine(legacyData,"release-index");Directory.CreateDirectory(releaseIndex);
+            var cacheKey=Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(media.Section+"|"+media.PageUrl)));
+            File.WriteAllText(Path.Combine(releaseIndex,cacheKey+".json"),JsonSerializer.Serialize(new ReleaseCache(DateTime.UtcNow.AddDays(-90),[cachedRelease])));
+            File.WriteAllText(Path.Combine(legacyData,"queue.json"),JsonSerializer.Serialize(new[]{new DownloadItem{Id="restored-release",Name=releaseName,Paused=true},new DownloadItem{Id="restored-hash",Name="Unrecognizable.Tracker.Release.1080p",InfoHash=hash,Paused=true}}));
+            var legacyQueue=new DownloadService();var legacyAdded=legacyQueue.Items.ToDictionary(x=>x.Id,x=>x.AddedUtc);
+            Check(await DownloadMetadata.RepairAsync(legacyQueue,[media])==2&&legacyQueue.Items.All(x=>x.MediaTitle==media.Title&&x.ImageUrl==media.ImageUrl)&&!legacyQueue.EngineCreated,"background metadata repair updates an actual restored queue using release titles and historical cached torrent identity");
+            var repairedQueue=new DownloadService();
+            Check(repairedQueue.Items.All(x=>x.MediaTitle==media.Title&&x.ImageUrl==media.ImageUrl&&x.AddedUtc==legacyAdded[x.Id])&&repairedQueue.Items.Single(x=>x.Id=="restored-release").Name==releaseName,"restored queue metadata repair persists its cover and Russian title while keeping release name and order");
+            Check(await DownloadMetadata.RepairAsync(repairedQueue,[media])==0,"metadata repair is stable after a repaired queue is reopened");
         }
         finally{Environment.SetEnvironmentVariable("KACHALKA_DATA",originalData);}
     }

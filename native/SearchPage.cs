@@ -25,9 +25,11 @@ public partial class MainWindow
     }
     void RefreshLoadingIndicator()
     {
-        var details=current!=null&&releaseViews.TryGetValue(current.Id,out var view)&&view.Checking;
+        RefreshReleaseLoadingIndicator();
+        // Release searches have their own indicator beside the release results.
+        var details=current?.IsLive==true&&string.IsNullOrWhiteSpace(current.Description)&&cardMetadata.TryGetValue(current.Id,out var metadata)&&!metadata.IsCompleted;
         var loading=current!=null?details:section is "Фильмы" or "Сериалы"?liveLoading&&!favoritesOnly:section=="Источники"?searching:section is "Музыка" or "Игры" or "Программы"?archiveLoading:section is "ТВ-каналы" or "Радио" or "Спорт"?broadcastLoading:false;
         LoadingIndicator.Visibility=loading?Visibility.Visible:Visibility.Collapsed;
-        LoadingLabel.Text=details?"Ищем раздачи…":SearchActive?"Ищем фильмы и сериалы…":"Загружаем страницу…";
+        LoadingLabel.Text=details?"Загружаем информацию…":SearchActive&&(section is "Фильмы" or "Сериалы")?"Ищем фильмы и сериалы…":"Загружаем страницу…";
     }
 }
