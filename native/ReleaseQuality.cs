@@ -3,7 +3,7 @@ namespace Kachalka;
 
 public static class ReleaseQuality
 {
-    static readonly Regex Screen=new(@"(?i)(?<![\p{L}\p{N}])(?:hd[ ._-]?)?(?:cam(?:rip)?|ts|tc|telesync|telecine|screener|dvd[ ._-]?scr|scr)(?![\p{L}\p{N}])|экранк|съемк[аи]|съёмк[аи]",RegexOptions.CultureInvariant|RegexOptions.Compiled);
+    static readonly Regex Screen=new(@"(?i)(?<![\p{L}\p{N}])(?:hd[ ._-]?)?(?:cam(?:rip)?|ts|tc|telesync|telecine|screener|dvd[ ._-]?scr|scr)(?![\p{L}\p{N}])(?!\s*[\[(]?\s*(?:19|20)\d{2}(?:\D|$))|экранк|съемк[аи]|съёмк[аи]",RegexOptions.CultureInvariant|RegexOptions.Compiled);
     static readonly Regex Pixels=new(@"(?i)(?<!\d)(\d{3,4})[pi]\b",RegexOptions.CultureInvariant|RegexOptions.Compiled);
     static readonly Regex Dimensions=new(@"(?i)(?<!\d)\d{3,4}[xх×](\d{3,4})(?!\d)",RegexOptions.CultureInvariant|RegexOptions.Compiled);
     static readonly Regex StandardDefinition=new(@"(?i)\b(?:dvd(?:rip|5|9)?|vcd|svcd|tv[ ._-]?rip|sat[ ._-]?rip)\b",RegexOptions.CultureInvariant|RegexOptions.Compiled);
