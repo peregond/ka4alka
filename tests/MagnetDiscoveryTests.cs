@@ -24,6 +24,13 @@ static class MagnetDiscoveryTests
             while(!ready()&&DateTime.UtcNow<deadline)await Task.Delay(100);
             Check(ready(),message);
         }
+        static async Task<byte[]> ReadLiveFile(string path)
+        {
+            // The real engine may keep its writer open while seeding. Permit that
+            // writer while still verifying every byte against the original payload.
+            await using var stream=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.ReadWrite|FileShare.Delete,81920,FileOptions.Asynchronous|FileOptions.SequentialScan);
+            using var buffer=new MemoryStream();await stream.CopyToAsync(buffer);return buffer.ToArray();
+        }
         var data=Environment.GetEnvironmentVariable("KACHALKA_DATA");
         Environment.SetEnvironmentVariable("KACHALKA_DATA",Path.Combine(root,"discovery-state"));
         var folder=Path.Combine(root,"discovery-seed");Directory.CreateDirectory(folder);
@@ -47,7 +54,7 @@ static class MagnetDiscoveryTests
             await Until(()=>manager.HasMetadata,"magnet obtains file metadata through HTTP while its UDP tracker never responds");
             await Until(()=>manager.Progress==100,"tracker-discovered peer transfers the real payload without injected peers or DHT");
             var received=Directory.GetFiles(service.Items.Single().Folder,"discovery.bin",SearchOption.AllDirectories).Single();
-            Check(SHA256.HashData(await File.ReadAllBytesAsync(received)).SequenceEqual(SHA256.HashData(payload)),"fallback discovery transfers bytes matching SHA256");
+            Check(SHA256.HashData(await ReadLiveFile(received)).SequenceEqual(SHA256.HashData(payload)),"fallback discovery transfers bytes matching SHA256");
             Check(http.GoodAnnounces>0&&http.FailedAnnounces>0,"a failed HTTP tracker does not prevent another independent tier from finding a peer");
             Check(manager.TrackerManager.Tiers.SelectMany(t=>t.Trackers).Count()==3,"fallback tracker deduplication retains the original tracker");
             Check(manager.InfoHashes.V1!.ToHex()==hash,"discovery keeps the exact selected infohash");
@@ -70,7 +77,7 @@ static class MagnetDiscoveryTests
             var publicManager=managers.Values.Single();
             await Until(()=>publicManager.Progress==100,"public .torrent transfer discovers its seed through fallback trackers without an injected peer");
             var publicFile=Directory.GetFiles(service.Items.Single().Folder,"discovery.bin",SearchOption.AllDirectories).Single();
-            Check(SHA256.HashData(await File.ReadAllBytesAsync(publicFile)).SequenceEqual(SHA256.HashData(payload)),"public source .torrent fallback preserves the selected payload bytes");
+            Check(SHA256.HashData(await ReadLiveFile(publicFile)).SequenceEqual(SHA256.HashData(payload)),"public source .torrent fallback preserves the selected payload bytes");
             var privateCreator=new TorrentCreator{Private=true};
             var privatePath=Path.Combine(root,"private-discovery.torrent");await privateCreator.CreateAsync(new TorrentFileSource(file),privatePath);
             using var privateEngine=new ClientEngine(Settings("private-discovery-cache",FreePort()));

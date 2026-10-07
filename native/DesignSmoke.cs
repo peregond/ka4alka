@@ -135,6 +135,7 @@ public partial class MainWindow
             MinWidth=360;MinHeight=300;
             var searchSettings=await CheckSearchAndSettings(output);
             await Size(1760,950);
+            System.Windows.Input.Keyboard.ClearFocus();
             Search.Text="";searchDelay.Stop();liveKey=CurrentCatalogKey;
             prefs.Light=true;ApplyTheme();current=null;Render();await Settle();Shot("catalog-light");
             var catalogColumnsLight=catalogColumns;
@@ -213,7 +214,10 @@ public partial class MainWindow
             DownloadItem VisualDownload(string name,int index)
             {
                 var card=downloadCards.ElementAtOrDefault(index);
-                return new(){Name=name,Folder=@"C:\Downloads\Качалка",Paused=false,AddedUtc=fixtureNow.AddSeconds(-index),MediaTitle=card?.Title,MediaSection=card?.Section,MediaYear=card?.Year??0,ImageUrl=card?.ImageUrl,MediaPageUrl=card?.PageUrl};
+                var slug=card?.OnlineId?.Split(':').ElementAtOrDefault(1);
+                var page=slug==null?card?.PageUrl:LiveCatalog.Base+(card!.Section=="Сериалы"?"/tvseries/":"/movies/")+slug;
+                var source=card==null?name:$"{card.OriginalTitle??card.Title} ({card.Year}) WEB-DL {(name.Contains("2160p")?"2160p":"1080p")}";
+                return new(){Name=source,Folder=@"C:\Downloads\Качалка",Paused=false,AddedUtc=fixtureNow.AddSeconds(-index),MediaTitle=card?.Title,MediaSection=card?.Section,MediaYear=card?.Year??0,ImageUrl=card?.ImageUrl,MediaPageUrl=page};
             }
             var activeDownload=VisualDownload("Big Buck Bunny · 1080p",0);
             DownloadPresentation.Apply(activeDownload,new(MonoTorrent.Client.TorrentState.Downloading,false,42,2L*1024*1024*1024,1800*1024,128*1024,12,5,fixtureNow.AddMinutes(-3),fixtureNow),fixtureNow);

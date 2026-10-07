@@ -106,6 +106,16 @@
   </Style>
   <Style x:Key="NavButton" TargetType="Button" BasedOn="{StaticResource QuietButton}">
    <Setter Property="MinHeight" Value="42"/><Setter Property="Padding" Value="12,9"/><Setter Property="Margin" Value="0,0,0,4"/><Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="FontSize" Value="14"/><Setter Property="FontWeight" Value="Normal"/>
+   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Grid>
+    <Border x:Name="Frame" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="11" Padding="{TemplateBinding Padding}"><ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}" TextElement.Foreground="{TemplateBinding Foreground}"/></Border>
+    <Border x:Name="HoverShade" Background="{DynamicResource Accent}" CornerRadius="11" Opacity="0" IsHitTestVisible="False"/>
+    <Border x:Name="FocusRing" BorderBrush="{DynamicResource Accent}" BorderThickness="1.5" CornerRadius="11" Visibility="Collapsed" IsHitTestVisible="False"/>
+   </Grid><ControlTemplate.Triggers>
+    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="HoverShade" Property="Opacity" Value="0.08"/></Trigger>
+    <Trigger Property="IsPressed" Value="True"><Setter TargetName="HoverShade" Property="Opacity" Value="0.14"/></Trigger>
+    <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="FocusRing" Property="Visibility" Value="Visible"/></Trigger>
+    <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Frame" Property="Opacity" Value="0.42"/></Trigger>
+   </ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
   </Style>
 
   <Style TargetType="TextBox">
