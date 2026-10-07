@@ -101,7 +101,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $names=@('catalog-dark','catalog-light','detail-wide-dark','detail-wide-light','settings-dark','settings-light','downloads-dark','downloads-light')
+          $names=@('catalog-dark','catalog-light','detail-wide-dark','detail-wide-light','settings-dark','settings-light','downloads-dark','downloads-light','installer-finish')
           $previews=@()
           foreach($name in $names){
             $source=Join-Path 'test-output/design-modern' ($name+'.png')
