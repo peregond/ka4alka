@@ -13,6 +13,7 @@ namespace Kachalka;
 public partial class MainWindow
 {
     bool designCatalogFallback;
+    bool designFixedViewport;
     int designCachedPosters;
     string? designCatalogFile;
 
@@ -21,6 +22,7 @@ public partial class MainWindow
         if(string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("KACHALKA_DATA")))
             throw new InvalidOperationException("Design smoke needs an isolated KACHALKA_DATA directory.");
         if(downloads.Items.Count!=0)throw new InvalidOperationException("Design smoke needs an empty test download queue.");
+        designFixedViewport=true;
         // Prevent completion of the startup request from replacing the local fixture.
         liveKey="design-smoke-preparing";liveRequest?.Cancel();searchDelay.Stop();
         var folder=Path.Combine(Preferences.DataDir,"catalog");

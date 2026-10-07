@@ -45,11 +45,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $files=@(Get-ChildItem 'test-output/ui-preview/render' -Filter '*.png' -ErrorAction SilentlyContinue | ForEach-Object {$_.FullName})
+          # Keep review asset names portable across GitHub upload clients.
+          $files=@(Get-ChildItem 'test-output/ui-preview/render' -Filter '*.png' -ErrorAction SilentlyContinue | Where-Object {$_.Name -match '^[a-z0-9.-]+$'} | ForEach-Object {$_.FullName})
           if($files.Count -gt 0){
             $tag='ui-preview-${{ github.run_id }}'
-            gh release create $tag --draft --target '${{ github.sha }}' --title 'Temporary native UI preview' --notes 'Rendered UI evidence for review; not an application release.'
-            if($LASTEXITCODE -ne 0){throw 'Could not save UI preview draft'}
-            gh release upload $tag @files
+            $existing=gh release view $tag --json isDraft --jq '.isDraft' 2>$null
+            if($LASTEXITCODE -ne 0){
+              gh release create $tag --draft --target '${{ github.sha }}' --title 'Temporary native UI preview' --notes 'Rendered UI evidence for review; not an application release.'
+              if($LASTEXITCODE -ne 0){throw 'Could not save UI preview draft'}
+            } elseif($existing -ne 'true'){throw 'Refusing to overwrite a published preview'}
+            gh release upload $tag @files --clobber
             if($LASTEXITCODE -ne 0){throw 'Could not upload UI preview images'}
           }

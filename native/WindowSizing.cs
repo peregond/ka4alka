@@ -58,12 +58,14 @@ public partial class MainWindow
     }
     void QueueMonitorFit()
     {
-        if(sizingQueued||closed)return;
+        if(designFixedViewport||sizingQueued||closed)return;
         sizingQueued=true;
         Dispatcher.BeginInvoke(DispatcherPriority.Background,new Action(()=>{sizingQueued=false;FitToMonitor(false);}));
     }
     void FitToMonitor(bool first)
     {
+        // Isolated design captures choose their own viewport after the initial fit.
+        if(designFixedViewport&&!first)return;
         var handle=new WindowInteropHelper(this).Handle;
         if(handle==IntPtr.Zero)return;
         var monitor=MonitorFromWindow(handle,MonitorDefaultNearest);
