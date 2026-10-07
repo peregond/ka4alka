@@ -31,20 +31,24 @@ public sealed class SharedCatalog(SourceClient client)
     }
     public IReadOnlyList<MediaItem> Search(string section,string query)
     {
-        static string Normalize(string value)=>System.Text.RegularExpressions.Regex.Replace(value.Replace('ё','е').Replace('Ё','Е').ToLowerInvariant(),@"[^\p{L}\p{N}]+"," ").Trim();
+        CacheFiles.Touch(path);static string Normalize(string value)=>System.Text.RegularExpressions.Regex.Replace(value.Replace('ё','е').Replace('Ё','Е').ToLowerInvariant(),@"[^\p{L}\p{N}]+"," ").Trim();
         var words=Normalize(query).Split(' ',StringSplitOptions.RemoveEmptyEntries);
         return (items??[]).Where(item=>item.Section==section&&words.All(word=>Normalize(item.Title+" "+item.OriginalTitle+" "+item.Year).Split(' ').Any(part=>part.StartsWith(word,StringComparison.Ordinal)))).Take(80).ToArray();
     }
+    public async Task ClearMemoryAsync()
+    {
+        await reader.WaitAsync();try{items=null;restored=false;generatedUtc=default;retryAfterUtc=default;}finally{reader.Release();}
+    }
     public async Task<CatalogPage?> PageAsync(string section,int page,CancellationToken ct,bool force=false)
     {
-        await reader.WaitAsync(ct);
+        CacheFiles.Touch(path);await reader.WaitAsync(ct);
         try
         {
             var now=DateTime.UtcNow;
             if(!restored)
             {
                 restored=true;
-                try{if(File.Exists(path)&&new FileInfo(path).Length<=4*1024*1024){var saved=Parse(await File.ReadAllBytesAsync(path,ct),now);items=saved.Items;generatedUtc=saved.GeneratedUtc;}}
+                try{if(File.Exists(path)&&new FileInfo(path).Length<=4*1024*1024){var saved=Parse(await CacheFiles.ReadAllBytesAsync(path,ct),now);items=saved.Items;generatedUtc=saved.GeneratedUtc;}}
                 catch(Exception error)when(error is IOException or InvalidDataException or JsonException or InvalidOperationException or KeyNotFoundException or UnauthorizedAccessException){}
             }
             if(force||generatedUtc<BoundaryUtc(now)&&now>=retryAfterUtc)
@@ -57,7 +61,7 @@ public sealed class SharedCatalog(SourceClient client)
                     if(fresh.GeneratedUtc>=generatedUtc)
                     {
                         items=fresh.Items;generatedUtc=fresh.GeneratedUtc;
-                        try{Directory.CreateDirectory(Path.GetDirectoryName(path)!);var temp=path+".tmp";await File.WriteAllBytesAsync(temp,bytes,ct);File.Move(temp,path,true);}catch(IOException){}catch(UnauthorizedAccessException){}
+                        try{Directory.CreateDirectory(Path.GetDirectoryName(path)!);await CacheFiles.WriteAllBytesAsync(path,bytes,ct);}catch(IOException){}catch(UnauthorizedAccessException){}
                     }
                 }
                 catch(Exception)when(!ct.IsCancellationRequested){}

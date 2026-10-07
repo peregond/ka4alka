@@ -29,14 +29,14 @@ public sealed class LiveCatalog(SourceClient client)
             var url=Base+path+(filter.Length>0?"/filter/"+filter:"")+"?page="+sourcePage;
             var cache=System.IO.Path.Combine(Preferences.DataDir,"catalog",Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(url)))+".html");
             if(!forceRefresh&&System.IO.File.Exists(cache)&&DateTime.UtcNow-System.IO.File.GetLastWriteTimeUtc(cache)<TimeSpan.FromMinutes(15))
-                return ParsePage(await System.IO.File.ReadAllBytesAsync(cache,ct),section,sourcePage);
+                return ParsePage(await CacheFiles.ReadAllBytesAsync(cache,ct),section,sourcePage);
             try
             {
                 var bytes=await client.Read(new Uri(url),4*1024*1024,ct);var parsed=ParsePage(bytes,section,sourcePage);
                 if(parsed.Items.Length==0&&parsed.Genres.Length==0)throw new System.IO.InvalidDataException("Источник вернул страницу без каталога.");
-                System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(cache)!);await System.IO.File.WriteAllBytesAsync(cache,bytes,ct);return parsed;
+                System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(cache)!);await CacheFiles.WriteAllBytesAsync(cache,bytes,ct);return parsed;
             }
-            catch(Exception) when(!ct.IsCancellationRequested&&System.IO.File.Exists(cache)){return ParsePage(await System.IO.File.ReadAllBytesAsync(cache,ct),section,sourcePage);}
+            catch(Exception) when(!ct.IsCancellationRequested&&System.IO.File.Exists(cache)){return ParsePage(await CacheFiles.ReadAllBytesAsync(cache,ct),section,sourcePage);}
         }
         var window=CatalogPaging.SourceWindow(page);
         var first=await SourcePage(window.Page);
@@ -60,8 +60,8 @@ public sealed class LiveCatalog(SourceClient client)
         var path=section=="Сериалы"?"/tvseries":"/movies";
         var url=string.IsNullOrWhiteSpace(query)?Base+path+"/filter/sort-date?page="+page:Base+"/search-form?query="+Uri.EscapeDataString(query);
         var cache=System.IO.Path.Combine(Preferences.DataDir,"catalog",Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(url)))+".html");
-        try{var bytes=await client.Read(new Uri(url),4*1024*1024,ct);var parsed=Parse(bytes,section);if(parsed.Count>0){System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(cache)!);await System.IO.File.WriteAllBytesAsync(cache,bytes,ct);}return parsed;}
-        catch(Exception) when(!ct.IsCancellationRequested&&System.IO.File.Exists(cache)){return Parse(await System.IO.File.ReadAllBytesAsync(cache,ct),section);}
+        try{var bytes=await client.Read(new Uri(url),4*1024*1024,ct);var parsed=Parse(bytes,section);if(parsed.Count>0){System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(cache)!);await CacheFiles.WriteAllBytesAsync(cache,bytes,ct);}return parsed;}
+        catch(Exception) when(!ct.IsCancellationRequested&&System.IO.File.Exists(cache)){return Parse(await CacheFiles.ReadAllBytesAsync(cache,ct),section);}
     }
     public async Task<MediaItem> Detail(MediaItem item,CancellationToken ct)
     {
@@ -79,12 +79,12 @@ public sealed class LiveCatalog(SourceClient client)
             HtmlNode[] Links(string prefix)=>(h.DocumentNode.SelectNodes("//a[contains(@href,'/filter/"+prefix+"-')]")??new HtmlNodeCollection(null)).ToArray();
             string[] Keys(string prefix)=>Links(prefix).Select(n=>n.GetAttributeValue("href","").Split("/filter/"+prefix+"-")[1]).Distinct().ToArray();
             var result=item with{Kinopoisk=Score("entity-rating-kp"),Imdb=Score("entity-rating-imdb"),Description=Text(h.DocumentNode.SelectSingleNode("//*[@itemprop='description' and not(self::meta)]")),OriginalTitle=original.Length==0?null:original,Genre=string.Join(", ",genres),Country=string.Join(", ",Links("country").Select(InlineText).Where(x=>x.Length>0).Distinct()),GenreKeys=Keys("genre"),CountryKeys=Keys("country"),People=CinemaMetadata.People(bytes),Collections=CinemaMetadata.Collections(bytes)};
-            try{System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(cache)!);await System.IO.File.WriteAllTextAsync(cache,JsonSerializer.Serialize(new DetailSnapshot(result.Kinopoisk,result.Imdb,result.Description??"",result.OriginalTitle,result.Genre,result.Country,result.GenreKeys,result.CountryKeys,result.People,result.Collections)),ct);}catch(System.IO.IOException){}
+            try{System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(cache)!);await CacheFiles.WriteAllTextAsync(cache,JsonSerializer.Serialize(new DetailSnapshot(result.Kinopoisk,result.Imdb,result.Description??"",result.OriginalTitle,result.Genre,result.Country,result.GenreKeys,result.CountryKeys,result.People,result.Collections)),ct);}catch(System.IO.IOException){}
             return result;
         }
         catch(Exception) when(!ct.IsCancellationRequested&&System.IO.File.Exists(cache))
         {
-            var saved=JsonSerializer.Deserialize<DetailSnapshot>(await System.IO.File.ReadAllTextAsync(cache,ct))!;
+            var saved=JsonSerializer.Deserialize<DetailSnapshot>(await CacheFiles.ReadAllTextAsync(cache,ct))!;
             return item with{Kinopoisk=ValidScore(saved.Kinopoisk)=="—"?item.Kinopoisk:saved.Kinopoisk,Imdb=ValidScore(saved.Imdb)=="—"?item.Imdb:saved.Imdb,Description=saved.Description,OriginalTitle=saved.OriginalTitle??item.OriginalTitle,Genre=saved.Genre,Country=saved.Country,GenreKeys=saved.GenreKeys??[],CountryKeys=saved.CountryKeys??[],People=saved.People??item.People,Collections=saved.Collections??item.Collections};
         }
     }
@@ -99,10 +99,10 @@ public sealed class LiveCatalog(SourceClient client)
             var bytes=await client.Read(new Uri(url),4*1024*1024,ct);
             var result=CinemaMetadata.Person(bytes,person);
             if(result.Description.Length==0&&result.Filmography.Length==0)throw new System.IO.InvalidDataException("Источник не вернул сведения о человеке.");
-            try{System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(cache)!);await System.IO.File.WriteAllBytesAsync(cache,bytes,ct);}catch(System.IO.IOException){}
+            try{System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(cache)!);await CacheFiles.WriteAllBytesAsync(cache,bytes,ct);}catch(System.IO.IOException){}
             return result;
         }
-        catch(Exception) when(!ct.IsCancellationRequested&&System.IO.File.Exists(cache)){return CinemaMetadata.Person(await System.IO.File.ReadAllBytesAsync(cache,ct),person);}
+        catch(Exception) when(!ct.IsCancellationRequested&&System.IO.File.Exists(cache)){return CinemaMetadata.Person(await CacheFiles.ReadAllBytesAsync(cache,ct),person);}
     }
     public async Task<IReadOnlyList<SourceEntry>> Releases(string title,CancellationToken ct)
     {

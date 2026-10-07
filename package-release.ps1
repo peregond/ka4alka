@@ -1,6 +1,6 @@
 param(
- [string]$Version='0.30.0',
- [string]$ArchivePath='dist/Kachalka-0.30.zip',
+ [string]$Version='0.31.0',
+ [string]$ArchivePath='dist/Kachalka-0.31.zip',
  [string]$Repository='peregond/ka4alka',
  [string]$SigningKeyPath=$env:KACHALKA_SIGNING_KEY
 )

@@ -27,12 +27,12 @@ try{
  if($LASTEXITCODE -ne 0){throw 'Updater tests failed'}
  ./tests/StableUpdateComponents.ps1
  ./build.ps1 -Test -OutputDir ('dist/Kachalka-'+$short)
- foreach($scenario in @('dpi','close')){
+ foreach($scenario in @('dpi','close','cache')){
    $scenarioEvidence=Join-Path $root ('test-output/'+$scenario+'-reliability')
    $scenarioUi=Start-Process (Join-Path $root ('dist/Kachalka-'+$short+'/Kachalka.exe')) -ArgumentList @('--'+$scenario+'-smoke-test',('"'+$scenarioEvidence+'"')) -PassThru
    if(-not $scenarioUi.WaitForExit(45000)){$scenarioUi.Kill($true);throw ($scenario+' UI smoke timed out')}
    if(Test-Path (Join-Path $scenarioEvidence 'error.txt')){throw (Get-Content (Join-Path $scenarioEvidence 'error.txt') -Raw)}
-   $scenarioFile=if($scenario -eq 'dpi'){'dpi-viewports.json'}else{'closed.json'}
+   $scenarioFile=if($scenario -eq 'dpi'){'dpi-viewports.json'}elseif($scenario -eq 'cache'){'checks.json'}else{'closed.json'}
    if(-not(Test-Path (Join-Path $scenarioEvidence $scenarioFile))){throw ($scenario+' UI evidence missing')}
    if($scenario -eq 'close'){
      $closeResult=Get-Content (Join-Path $scenarioEvidence $scenarioFile) -Raw | ConvertFrom-Json

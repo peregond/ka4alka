@@ -173,7 +173,7 @@ public static class DownloadMetadata
             var path=Path.Combine(dataDir,"catalog-index.json");
             if(File.Exists(path)&&new FileInfo(path).Length<=12*1024*1024)
             {
-                using var saved=JsonDocument.Parse(File.ReadAllBytes(path));
+                using var saved=JsonDocument.Parse(CacheFiles.ReadAllBytes(path));
                 if(saved.RootElement.ValueKind==JsonValueKind.Array)
                     foreach(var entry in saved.RootElement.EnumerateArray().Take(3000))
                         if(entry.TryGetProperty("Item",out var row)&&row.Deserialize<MediaItem>(Json) is {} media&&media.Cinema)rows.Add(media);
@@ -206,7 +206,7 @@ public static class DownloadMetadata
                     if(length is >0 and <=3*1024*1024&&length<=remaining)
                     {
                         remaining-=length;
-                        var cache=JsonSerializer.Deserialize<ReleaseCache>(File.ReadAllBytes(path),Json);
+                        var cache=JsonSerializer.Deserialize<ReleaseCache>(CacheFiles.ReadAllBytes(path),Json);
                         result=cache?.Items?.Take(300).ToArray()??[];
                     }
                 }

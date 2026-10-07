@@ -46,7 +46,7 @@ public sealed class CinemaPeople(SourceClient client)
         try
         {
             if(File.Exists(path)&&DateTime.UtcNow-File.GetLastWriteTimeUtc(path)<TimeSpan.FromDays(7))
-                return PhotoUrl(JsonSerializer.Deserialize<string>(await File.ReadAllTextAsync(path,ct)));
+                return PhotoUrl(JsonSerializer.Deserialize<string>(await CacheFiles.ReadAllTextAsync(path,ct)));
             await portraitSlots.WaitAsync(ct);
             try
             {
@@ -56,7 +56,7 @@ public sealed class CinemaPeople(SourceClient client)
                 string? photo=null;
                 if(page.ValueKind==JsonValueKind.Object&&!(page.TryGetProperty("pageprops",out var props)&&props.TryGetProperty("disambiguation",out _))&&page.TryGetProperty("extract",out var extract)&&Regex.IsMatch(extract.GetString()??"",@"(?i)акт[её]р|актрис|режисс[её]р|оператор|кинематограф")&&page.TryGetProperty("thumbnail",out var thumbnail))
                     photo=PhotoUrl(thumbnail.GetProperty("source").GetString());
-                Directory.CreateDirectory(Path.GetDirectoryName(path)!);await File.WriteAllTextAsync(path,JsonSerializer.Serialize(photo),ct);return photo;
+                Directory.CreateDirectory(Path.GetDirectoryName(path)!);await CacheFiles.WriteAllTextAsync(path,JsonSerializer.Serialize(photo),ct);return photo;
             }
             finally{portraitSlots.Release();}
         }
@@ -68,7 +68,7 @@ public sealed class CinemaPeople(SourceClient client)
         var key=Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(person.Name+"|"+person.Role)));
         var cache=Path.Combine(Preferences.DataDir,"people",key+".json");
         PersonProfile? saved=null;
-        try{if(File.Exists(cache))saved=JsonSerializer.Deserialize<PersonProfile>(await File.ReadAllTextAsync(cache,ct));}catch(IOException){}catch(JsonException){}
+        try{if(File.Exists(cache))saved=JsonSerializer.Deserialize<PersonProfile>(await CacheFiles.ReadAllTextAsync(cache,ct));}catch(IOException){}catch(JsonException){}
         bool Matches(MediaItem film)=>film.People.Any(x=>Normalize(x.Name)==Normalize(person.Name)&&x.Role==person.Role);
         var films=known.Concat(saved?.Filmography??[]).Concat(origin==null?[]:[origin]).Where(Matches).DistinctBy(x=>x.Id).ToList();
         if(saved is {Description.Length:>0,Filmography.Length:>1}&&DateTime.UtcNow-File.GetLastWriteTimeUtc(cache)<TimeSpan.FromDays(7))return saved with{Person=person,Filmography=films.ToArray()};
@@ -116,7 +116,7 @@ public sealed class CinemaPeople(SourceClient client)
         var result=new PersonProfile(person,biography,films.DistinctBy(x=>x.Id).ToArray(),source.Length>0?source:null);
         if(result.Description.Length>0||result.Filmography.Length>0)
         {
-            try{Directory.CreateDirectory(Path.GetDirectoryName(cache)!);await File.WriteAllTextAsync(cache,JsonSerializer.Serialize(result),ct);}catch(IOException){}catch(UnauthorizedAccessException){}
+            try{Directory.CreateDirectory(Path.GetDirectoryName(cache)!);await CacheFiles.WriteAllTextAsync(cache,JsonSerializer.Serialize(result),ct);}catch(IOException){}catch(UnauthorizedAccessException){}
         }
         return result;
     }

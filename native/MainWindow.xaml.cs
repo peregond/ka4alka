@@ -26,13 +26,14 @@ public partial class MainWindow:Window
         catalogRefreshTimer.Tick+=(_,_)=>
         {
             if(closed)return;
-            var expired=ExpireCatalogPages();
+            _=MaintainCacheAsync();var expired=ExpireCatalogPages();
             if(current==null&&(section is "Фильмы" or "Сериалы")&&!SearchActive&&!favoritesOnly&&(expired||CatalogSelection.IsDefault&&sharedCatalog.RefreshDue))
             {
                 catalogPages.Clear();catalogLastPage=null;liveKey="";Render();
             }
         };
         catalogRefreshTimer.Start();
+        ContentRendered+=(_,_)=>{_=MaintainCacheAsync();};
         EnableAdaptiveLayout();
         EnableShortcuts();
         try{downloads=new(null,prefs.MaxDownloadKbps,prefs.MaxUploadKbps);}catch(Exception e){downloads=newEmpty(prefs.MaxDownloadKbps,prefs.MaxUploadKbps);Status.Text="Не удалось прочитать очередь: "+e.Message;}

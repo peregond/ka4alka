@@ -35,6 +35,7 @@ jobs:
         with:
           name: windows-update-evidence
           path: |
+            test-output/cache-reliability/*
             test-output/cinema-ui/*
             test-output/windows-update/checks.txt
             test-output/dpi-reliability/*

@@ -25,7 +25,6 @@ public partial class MainWindow
         public CancellationTokenSource? Request;
         public DateTime RetryAfterUtc;
     }
-    int savedCovers;
     IReadOnlyList<SourceEntry> sourceResults=[];
     string sourceQuery="",sourceCategory="Фильмы";
     int sourceIndex,sourcePage=1;
@@ -80,7 +79,7 @@ public partial class MainWindow
         if(same&&(state.Request!=null||image.Source!=null||DateTime.UtcNow<state.RetryAfterUtc))return;
         CancelCover(state);state.Context=item;state.Url=url;state.RetryAfterUtc=default;
         if(!same)image.Source=null;
-        if(coverCache.TryGetValue(url,out var cached)){image.Source=cached;return;}
+        if(coverCache.TryGetValue(url,out var cached)){CacheFiles.Touch(Path.Combine(Preferences.DataDir,"covers",Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(url)))+".img"));image.Source=cached;return;}
         var sourceToken=item is MediaItem or DownloadItem?CancellationToken.None:sourceRequest?.Token??CancellationToken.None;
         var request=state.Request=CancellationTokenSource.CreateLinkedTokenSource(sourceToken);request.CancelAfter(TimeSpan.FromSeconds(30));var token=request.Token;
         try
@@ -95,7 +94,6 @@ public partial class MainWindow
                     bytes=>{using var stream=new MemoryStream(bytes);var result=new BitmapImage();result.BeginInit();result.CacheOption=BitmapCacheOption.OnLoad;result.DecodePixelWidth=item is MediaItem or DownloadItem?280:100;result.StreamSource=stream;result.EndInit();result.Freeze();return result;},token);
                 if(coverCache.Count>=48)coverCache.Remove(coverCache.Keys.First());coverCache[url]=bitmap;
                 if(image.IsLoaded&&ReferenceEquals(image.DataContext,item)&&CoverUrl(image.DataContext)==url&&ReferenceEquals(state.Request,request))image.Source=bitmap;
-                if(downloaded&&cachePath!=null)try{if(++savedCovers%20==0)foreach(var old in new DirectoryInfo(Path.GetDirectoryName(cachePath)!).GetFiles("*.img").OrderByDescending(x=>x.LastWriteTimeUtc).Skip(200))old.Delete();}catch(IOException){}catch(UnauthorizedAccessException){}
             }
             finally{coverSlots.Release();}
         }

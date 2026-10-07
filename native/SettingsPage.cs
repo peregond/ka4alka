@@ -137,6 +137,18 @@ public partial class MainWindow
         });
         AutomationProperties.SetName(firewall,"Разрешить Качалку в брандмауэре");firewall.HorizontalAlignment=HorizontalAlignment.Left;system.Children.Add(firewall);
         RenderUpdateSettings(Card("Обновления","Приложение всегда под рукой в актуальной версии.","IconRefresh"));
+        var cache=Card("Кэш","Постеры, фотографии и данные каталога: до 1 ГБ. Раз в неделю удаляем данные, не использованные за последние семь дней. При заполнении — самые давно не открывавшиеся.","IconRefresh");
+        var cacheSize=Text("Подсчитываем размер…",13);cacheSize.Name="SettingsCacheSize";cache.Children.Add(cacheSize);
+        var cacheNotice=Notice(cache);
+        var clearCache=AsyncButton("Очистить кэш",async()=>
+        {
+            var result=await ClearCacheAsync();
+            cacheSize.Text="Занято "+CacheSize(result.Bytes)+" из 1 ГБ";
+            Feedback(cacheNotice,"Освобождено "+CacheSize(result.FreedBytes)+(result.Failed>0?". Некоторые файлы заняты — очистка повторится автоматически.":"."));
+        });
+        clearCache.Name="ClearCacheButton";AutomationProperties.SetName(clearCache,"Очистить кэш");clearCache.HorizontalAlignment=HorizontalAlignment.Left;cache.Children.Add(clearCache);
+        cache.Children.Add(Text("Скачанные файлы, очередь загрузок, избранное и настройки сохраняются.",12,true));
+        _=ShowCacheSizeAsync(cacheSize);
         var diagnostics=Card("Помощь и диагностика","Отчёт поможет разобраться с ошибкой. Пути к личным папкам и ключи доступа скрываются.","IconInfo");
         var diagnosticActions=new WrapPanel();diagnostics.Children.Add(diagnosticActions);
         var diagnosticNotice=Notice(diagnostics);

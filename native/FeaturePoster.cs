@@ -57,9 +57,9 @@ public partial class MainWindow
             await coverSlots.WaitAsync(timeout.Token);
             try
             {
+                var path=Path.Combine(Preferences.DataDir,"covers",Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(url)))+".img");CacheFiles.Touch(path);
                 if(!coverCache.TryGetValue(url,out var bitmap))
                 {
-                    var path=Path.Combine(Preferences.DataDir,"covers",Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(url)))+".img");
                     (bitmap,_)=await CoverCache.Load(path,1024*1024,ct=>sourceClient.Read(new Uri(url),1024*1024,ct),bytes=>
                     {
                         using var stream=new MemoryStream(bytes);var result=new BitmapImage();result.BeginInit();result.CacheOption=BitmapCacheOption.OnLoad;result.DecodePixelWidth=900;result.StreamSource=stream;result.EndInit();result.Freeze();return result;
