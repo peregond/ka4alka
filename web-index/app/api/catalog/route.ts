@@ -1,3 +1,4 @@
+import { sharedCatalogPage } from "@/lib/shared-catalog";
 import { fetchCatalog, normalize } from "@/lib/catalog-source";
 import { snapshotPage, PAGE_LIMIT } from "@/lib/catalog-snapshot";
 import { lastSynced, markSynced, readMedia, upsertMedia, countMedia } from "@/lib/index-store";
@@ -12,6 +13,13 @@ export async function GET(request:Request) {
   const key=`catalog:${section}:${page}:${normalize(query)}`;
   const snapshot=snapshotPage(section,query,page);
   const respond=(items:typeof snapshot.items,sourceStatus:string,indexCount:number,hasMore:boolean)=>Response.json({items,sourceStatus,indexCount,hasMore,page},{headers:{"Cache-Control":"no-store"}});
+  try {
+    const shared=await sharedCatalogPage(section,query,page);
+    if(shared) {
+      try{await upsertMedia(shared.items,query?null:page);}catch{}
+      return Response.json({...shared,page,sourceStatus:"updated"},{headers:{"Cache-Control":"no-store"}});
+    }
+  } catch { /* The shared feed cannot replace existing offline fallbacks with an error. */ }
   try {
     const cached=await readMedia(section,query,page);
     const fresh=Date.now()-await lastSynced(key)<15*60_000;

@@ -11,6 +11,8 @@ public partial class MainWindow:Window
 {
     readonly Preferences prefs=Preferences.Load();
     readonly DownloadService downloads;
+    readonly SharedCatalog sharedCatalog;
+    readonly DispatcherTimer catalogRefreshTimer=new(){Interval=TimeSpan.FromMinutes(5)};
     readonly DispatcherTimer refresh=new(){Interval=TimeSpan.FromSeconds(2)};
     readonly DispatcherTimer searchDelay=new(){Interval=TimeSpan.FromMilliseconds(350)};
     string section="Фильмы",genre="Все",sort="По популярности";
@@ -20,7 +22,17 @@ public partial class MainWindow:Window
     public MainWindow()
     {
         InitializeComponent();
-        onlineIndex=new(sourceClient);
+        onlineIndex=new(sourceClient);sharedCatalog=new(sourceClient);
+        catalogRefreshTimer.Tick+=(_,_)=>
+        {
+            if(closed)return;
+            var expired=ExpireCatalogPages();
+            if(current==null&&(section is "Фильмы" or "Сериалы")&&!SearchActive&&!favoritesOnly&&(expired||sharedCatalog.RefreshDue))
+            {
+                catalogPages.Clear();catalogLastPage=null;liveKey="";Render();
+            }
+        };
+        catalogRefreshTimer.Start();
         EnableAdaptiveLayout();
         EnableShortcuts();
         try{downloads=new(null,prefs.MaxDownloadKbps,prefs.MaxUploadKbps);}catch(Exception e){downloads=newEmpty(prefs.MaxDownloadKbps,prefs.MaxUploadKbps);Status.Text="Не удалось прочитать очередь: "+e.Message;}
@@ -114,15 +126,15 @@ public partial class MainWindow:Window
     void OpenFolder(object sender,RoutedEventArgs e){var d=(DownloadItem)((Button)sender).Tag;if(Directory.Exists(d.Folder))Process.Start(new ProcessStartInfo(d.Folder){UseShellExecute=true});}
     void ApplyTheme()
     {
-        var values=prefs.Light?new[]{"#FAFBF8","#FFFFFF","#202522","#70786F","#E2E7DE","#E8EDE5","#287D59","#FFFFFF","#EFF2EB","#F0F3ED","#202522","#FFFFFF","#39423B","#E8F2EB"}:new[]{"#151917","#1D2420","#EDF2ED","#A0ADA3","#354138","#303D33","#93CDB0","#163522","#1A211C","#29352D","#EDF2ED","#182019","#FFFFFF","#293F32"};var keys=new[]{"Bg","Panel","Text","Muted","Edge","Selected","Accent","AccentInk","Sidebar","Hover","Primary","PrimaryInk","PrimaryHover","AccentSoft"};for(int i=0;i<keys.Length;i++){var brush=new SolidColorBrush((Color)ColorConverter.ConvertFromString(values[i]));brush.Freeze();Application.Current.Resources[keys[i]]=brush;}
-        Application.Current.Resources["Danger"]=new SolidColorBrush((Color)ColorConverter.ConvertFromString(prefs.Light?"#B43C43":"#F28C93"));
+        var values=prefs.Light?new[]{"#EFF3F2","#FFFFFF","#15231F","#4F625B","#B4C4BC","#D3E7DE","#08784E","#FFFFFF","#DDE6E0","#E2EEE8","#173C2D","#FFFFFF","#215A40","#D9EFE4"}:new[]{"#0D1411","#192720","#F5FFF9","#B5CABE","#4A6657","#2B4B3A","#63E5A3","#052616","#121E17","#244031","#63E5A3","#052616","#87F0BA","#203D2D"};var keys=new[]{"Bg","Panel","Text","Muted","Edge","Selected","Accent","AccentInk","Sidebar","Hover","Primary","PrimaryInk","PrimaryHover","AccentSoft"};for(int i=0;i<keys.Length;i++){var brush=new SolidColorBrush((Color)ColorConverter.ConvertFromString(values[i]));brush.Freeze();Application.Current.Resources[keys[i]]=brush;}
+        Application.Current.Resources["Danger"]=new SolidColorBrush((Color)ColorConverter.ConvertFromString(prefs.Light?"#B42335":"#FF9AA5"));
         SidePanel.SetResourceReference(Border.BackgroundProperty,"Sidebar");
     }
     bool closing;
     async void OnClosing(object? sender,CancelEventArgs e)
     {
         if(closed)return;e.Cancel=true;if(closing)return;closing=true;
-        IsEnabled=false;updateCancellation.Cancel();refresh.Stop();searchDelay.Stop();liveRequest?.Cancel();sourceRequest?.Cancel();archiveRequest?.Cancel();broadcastRequest?.Cancel();
+        IsEnabled=false;updateCancellation.Cancel();catalogRefreshTimer.Stop();refresh.Stop();searchDelay.Stop();liveRequest?.Cancel();sourceRequest?.Cancel();archiveRequest?.Cancel();broadcastRequest?.Cancel();
         foreach(var view in releaseViews.Values)view.Request?.Cancel();
         bool saved=false;
         try{prefs.Save();await downloads.Close();saved=true;}

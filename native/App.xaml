@@ -1,12 +1,12 @@
 <Application x:Class="Kachalka.App" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:Kachalka">
  <Application.Resources>
-  <SolidColorBrush x:Key="Bg" Color="#F8F9F7"/><SolidColorBrush x:Key="Panel" Color="#FFFFFF"/><SolidColorBrush x:Key="Text" Color="#202421"/><SolidColorBrush x:Key="Muted" Color="#69736D"/><SolidColorBrush x:Key="Edge" Color="#E3E8E3"/><SolidColorBrush x:Key="Selected" Color="#E8EFE9"/><SolidColorBrush x:Key="Accent" Color="#16834B"/><SolidColorBrush x:Key="AccentInk" Color="#FFFFFF"/><SolidColorBrush x:Key="Sidebar" Color="#F0F3F0"/><SolidColorBrush x:Key="Hover" Color="#F2F5F2"/>
-  <SolidColorBrush x:Key="Primary" Color="#202522"/><SolidColorBrush x:Key="PrimaryInk" Color="#FFFFFF"/><SolidColorBrush x:Key="PrimaryHover" Color="#343B36"/><SolidColorBrush x:Key="AccentSoft" Color="#E9F4EE"/>
+  <SolidColorBrush x:Key="Bg" Color="#EFF3F2"/><SolidColorBrush x:Key="Panel" Color="#FFFFFF"/><SolidColorBrush x:Key="Text" Color="#15231F"/><SolidColorBrush x:Key="Muted" Color="#4F625B"/><SolidColorBrush x:Key="Edge" Color="#B4C4BC"/><SolidColorBrush x:Key="Selected" Color="#D3E7DE"/><SolidColorBrush x:Key="Accent" Color="#08784E"/><SolidColorBrush x:Key="AccentInk" Color="#FFFFFF"/><SolidColorBrush x:Key="Sidebar" Color="#DDE6E0"/><SolidColorBrush x:Key="Hover" Color="#E2EEE8"/>
+  <SolidColorBrush x:Key="Primary" Color="#173C2D"/><SolidColorBrush x:Key="PrimaryInk" Color="#FFFFFF"/><SolidColorBrush x:Key="PrimaryHover" Color="#215A40"/><SolidColorBrush x:Key="AccentSoft" Color="#D9EFE4"/>
   <Style TargetType="Window">
    <Setter Property="Background" Value="{DynamicResource Bg}"/><Setter Property="Foreground" Value="{DynamicResource Text}"/><Setter Property="FontFamily" Value="Segoe UI"/><Setter Property="FontSize" Value="13"/><Setter Property="UseLayoutRounding" Value="True"/><Setter Property="TextOptions.TextFormattingMode" Value="Display"/>
   </Style>
 
-  <SolidColorBrush x:Key="Danger" Color="#B43C43"/>
+  <SolidColorBrush x:Key="Danger" Color="#B42335"/>
   <Style TargetType="ContextMenu">
    <Setter Property="Background" Value="{DynamicResource Panel}"/><Setter Property="Foreground" Value="{DynamicResource Text}"/><Setter Property="BorderBrush" Value="{DynamicResource Edge}"/><Setter Property="Padding" Value="5"/><Setter Property="MaxHeight" Value="450"/>
    <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ContextMenu"><Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="11" Padding="{TemplateBinding Padding}"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" CanContentScroll="True"><StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle"/></ScrollViewer></Border></ControlTemplate></Setter.Value></Setter>

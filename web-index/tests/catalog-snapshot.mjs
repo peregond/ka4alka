@@ -25,7 +25,7 @@ const failures={readMedia:async()=>{throw new Error('D1 unavailable')}};
 let indexed=[];
 const available={readMedia:async()=>[],lastSynced:async()=>0,upsertMedia:async rows=>{indexed=rows},countMedia:async()=>0,markSynced:async()=>{}};
 for(const store of [failures,available]) {
-  const route=load('../app/api/catalog/route.ts',{'@/lib/catalog-source':{...source,fetchCatalog:async()=>{throw new Error('Source unavailable')}},'@/lib/catalog-snapshot':snapshot,'@/lib/index-store':store});
+  const route=load('../app/api/catalog/route.ts',{'@/lib/catalog-source':{...source,fetchCatalog:async()=>{throw new Error('Source unavailable')}},'@/lib/catalog-snapshot':snapshot,'@/lib/index-store':store,'@/lib/shared-catalog':{sharedCatalogPage:async()=>null}});
   const get=async page=>{const response=await route.GET(new Request('https://example.com/api/catalog?section=movies&page='+page));assert.equal(response.status,200);return response.json()};
   const first=await get(1),fiftieth=await get(50);
   assert.equal(first.items.length,40);assert.equal(fiftieth.items.length,40);assert(first.hasMore);assert(fiftieth.indexCount>=2000);

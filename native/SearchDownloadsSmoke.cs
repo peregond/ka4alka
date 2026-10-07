@@ -17,6 +17,8 @@ public partial class MainWindow
     async Task SearchDownloadsSmoke(string output,Action<bool,string> check)
     {
         current=null;section="Фильмы";favoritesOnly=false;
+        catalogMemoryBoundary=SharedCatalog.BoundaryUtc(DateTime.UtcNow).AddDays(-1);liveKey="expired-page";
+        check(ExpireCatalogPages()&&catalogPages.Count==0&&liveKey==""&&!ExpireCatalogPages(),"crossing the daily refresh boundary expires in-memory catalog pages once");
         var films=Enumerable.Range(1,45).Select(id=>new MediaItem(1300+id,"Поисковая искра · фильм "+id,"Фильмы","драма",2024,"8.0","8.0","#526B69")).ToArray();
         var series=Enumerable.Range(1,5).Select(id=>new MediaItem(2300+id,"Поисковая искра · сериал "+id,"Сериалы","драма",2024,"8.0","8.0","#526B69")).ToArray();
         foreach(var item in films.Concat(series))cardMetadata[item.Id]=Task.FromResult(item);
@@ -116,6 +118,10 @@ public partial class MainWindow
             {
                 var action=FindVisual<Button>(first,b=>AutomationProperties.GetName(b)==label);check(action!=null&&VisualElements<System.Windows.Shapes.Path>(action).Any(),"download action has an accessible label and recognizable icon: "+label);
             }
+            var infoButton=FindVisual<Button>(first,b=>AutomationProperties.GetName(b)=="Подробнее")!;
+            var infoPath=VisualElements<System.Windows.Shapes.Path>(infoButton).Single();
+            var glyphBox=infoPath.TransformToAncestor(infoButton).TransformBounds(new Rect(infoPath.RenderSize));
+            check(glyphBox.Top>=infoButton.BorderThickness.Top+infoButton.Padding.Top-1&&glyphBox.Bottom<=infoButton.ActualHeight-infoButton.BorderThickness.Bottom-infoButton.Padding.Bottom+1,"information icon fits inside its button padding without clipping its lower edge");
             check(!VisualElements<Button>(first).Any(b=>AutomationProperties.GetName(b)=="Действия загрузки"),"download removal actions are directly available without an ellipsis submenu");
             var keep=FindVisual<Button>(first,b=>AutomationProperties.GetName(b)=="Удалить из загрузок")!;var delete=FindVisual<Button>(first,b=>AutomationProperties.GetName(b)=="Удалить файлы")!;
             check(keep.Foreground is SolidColorBrush neutral&&Math.Abs(neutral.Color.R-neutral.Color.G)<35&&delete.Foreground is SolidColorBrush danger&&danger.Color.R>danger.Color.G+20,"keep-files removal is neutral gray and permanent file removal is red");
@@ -154,6 +160,15 @@ public partial class MainWindow
             SelectSort("newest");await SettleDownloads();prefs.Light=false;ApplyTheme();Render();await SettleDownloads();Shot(this,"downloads-redesign-dark");Shot(this,"downloads");
             var expectedInk=((SolidColorBrush)FindResource("Text")).Color;check(FindVisual<TextBlock>(FirstRow(),t=>t.Text==fixtures[^1].MediaTitle)?.Foreground is SolidColorBrush ink&&ink.Color==expectedInk,"download media title follows the dark theme");
             prefs.Light=true;ApplyTheme();Render();await SettleDownloads();Shot(this,"downloads-redesign-light");
+            foreach(var light in new[]{true,false})
+            {
+                prefs.Light=light;ApplyTheme();UpdateLayout();
+                double Brightness(string key){var c=((SolidColorBrush)FindResource(key)).Color;double Linear(byte v){var s=v/255d;return s<=.04045?s/12.92:Math.Pow((s+.055)/1.055,2.4);}return .2126*Linear(c.R)+.7152*Linear(c.G)+.0722*Linear(c.B);}
+                double Ratio(string foreground,string background){var a=Brightness(foreground);var b=Brightness(background);return (Math.Max(a,b)+.05)/(Math.Min(a,b)+.05);}
+                check(new[]{"Bg","Panel","Sidebar","Selected","Hover"}.All(surface=>Ratio("Text",surface)>=7&&Ratio("Muted",surface)>=4.5),$"{(light?"light":"dark")} theme keeps primary and secondary text legible on every main surface");
+                check(Ratio("Accent","AccentSoft")>=4.5&&Ratio("PrimaryInk","Primary")>=4.5,$"{(light?"light":"dark")} theme keeps accent actions and primary buttons readable");
+            }
+            prefs.Light=true;ApplyTheme();
             MinWidth=360;Width=510;Height=600;await SettleDownloads();Shot(this,"downloads-redesign-narrow");
             foreach(var button in VisualElements<Button>(FirstRow()).Where(b=>b.IsVisible))
             {

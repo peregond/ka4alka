@@ -44,3 +44,6 @@ work/
 *.tar
 *.tar.gz
 *.bundle
+
+__pycache__/
+*.pyc

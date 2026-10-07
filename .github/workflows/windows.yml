@@ -1,7 +1,7 @@
 name: Windows release validation
 on:
   push:
-    branches: [codex/download-actions-covers-0.25]
+    branches: [codex/contrast-catalog-0.26]
   pull_request:
   workflow_dispatch:
 permissions:
