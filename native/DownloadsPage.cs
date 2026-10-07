@@ -21,7 +21,7 @@ public partial class MainWindow
     DownloadItem? downloadReturnItem;
     TextBlock? downloadSummary;
     TextBlock? downloadHeading;
-    FrameworkElement? downloadHeadingHost,downloadToolbar;
+    FrameworkElement? downloadHeadingRow,downloadHeadingHost,downloadToolbar;
     Button? downloadControls,downloadOrder;
     string downloadSort="newest";
     bool downloadCommandBusy;
@@ -35,10 +35,11 @@ public partial class MainWindow
         foreach(var item in downloads.Items){item.MinimumQualityHeight=QualityMinimum;item.Refresh();}
         RepairDownloadMetadata();
         downloadSort=DownloadSortChoices.Any(x=>x.Key==prefs.DownloadSort)?prefs.DownloadSort:"newest";
-        var heading=new DockPanel{Margin=new(0,0,8,8)};downloadHeadingHost=heading;
-        var title=Text("Очередь",25);downloadHeading=title;title.FontWeight=FontWeights.SemiBold;title.Margin=new(0);heading.Children.Add(title);PageHeader.Children.Add(heading);
-        var toolbar=new WrapPanel{Margin=new(0,4,0,10)};downloadToolbar=toolbar;PageHeader.Children.Add(toolbar);
-        var controls=ActionButton("Управление","IconSettings",()=>{},"QuietButton");downloadControls=controls;controls.Margin=new(0,0,8,4);controls.Padding=new(10,6,10,6);controls.ToolTip="Управление загрузками и раздачами";AutomationProperties.SetName(controls,"Управление загрузками");
+        var heading=new DockPanel{Margin=new(0,0,0,6)};downloadHeadingRow=heading;PageHeader.Children.Add(heading);
+        var toolbar=new WrapPanel{HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Center};downloadToolbar=toolbar;DockPanel.SetDock(toolbar,Dock.Right);heading.Children.Add(toolbar);
+        var title=Text("Очередь",25);downloadHeading=title;downloadHeadingHost=title;title.FontWeight=FontWeights.SemiBold;title.Margin=new(0,0,16,0);title.VerticalAlignment=VerticalAlignment.Center;heading.Children.Add(title);
+        var controls=ActionButton("Управление","IconSettings",()=>{},"QuietButton");downloadControls=controls;controls.Margin=new(0,0,6,0);controls.Padding=new(11,7,11,7);controls.MinHeight=34;controls.ToolTip="Управление загрузками и раздачами";
+        controls.SetResourceReference(Control.BackgroundProperty,"PanelAlt");controls.SetResourceReference(Control.BorderBrushProperty,"EdgeSoft");controls.BorderThickness=new(1);AutomationProperties.SetName(controls,"Управление загрузками");
         var commands=Menu();controls.ContextMenu=commands;
         foreach(var command in new[]{("Начать загрузки",false,false,"IconPlay"),("Остановить загрузки",false,true,"IconPause"),("Запустить раздачи",true,false,"IconPlay"),("Остановить раздачи",true,true,"IconPause")})
         {
@@ -52,7 +53,7 @@ public partial class MainWindow
             };commands.Items.Add(choice);
         }
         commands.Items.Add(new Separator());var limits=MenuEntry("Лимиты скорости…","IconSettings");limits.Click+=(_,_)=>DownloadLimits();commands.Items.Add(limits);controls.Click+=(_,_)=>OpenDownloadMenu(controls);toolbar.Children.Add(controls);
-        var order=ActionButton(DownloadSortChoices.First(x=>x.Key==downloadSort).Label,"IconFilter",()=>{},"QuietButton");downloadOrder=order;order.Padding=new(10,6,10,6);order.Margin=new(0,0,8,4);AutomationProperties.SetName(order,"Сортировка загрузок");order.ContextMenu=Menu();
+        var order=ActionButton(DownloadSortChoices.First(x=>x.Key==downloadSort).Label,"IconFilter",()=>{},"QuietButton");downloadOrder=order;order.Padding=new(11,7,11,7);order.Margin=new(0);order.MinHeight=34;AutomationProperties.SetName(order,"Сортировка загрузок");order.ContextMenu=Menu();
         foreach(var entry in DownloadSortChoices)
         {
             var choice=MenuEntry(entry.Label);choice.Tag=entry.Key;choice.IsCheckable=true;choice.IsChecked=downloadSort==entry.Key;
@@ -65,7 +66,7 @@ public partial class MainWindow
             };order.ContextMenu.Items.Add(choice);
         }
         order.Click+=(_,_)=>OpenDownloadMenu(order);toolbar.Children.Add(order);
-        downloadSummary=Text("",12,true);downloadSummary.TextWrapping=TextWrapping.NoWrap;downloadSummary.TextTrimming=TextTrimming.CharacterEllipsis;downloadSummary.Margin=new(0,0,0,12);PageHeader.Children.Add(downloadSummary);UpdateDownloadSummary();FitDownloadsToolbar();
+        downloadSummary=Text("",12,true);downloadSummary.TextWrapping=TextWrapping.NoWrap;downloadSummary.TextTrimming=TextTrimming.CharacterEllipsis;downloadSummary.Margin=new(0,0,0,14);PageHeader.Children.Add(downloadSummary);UpdateDownloadSummary();FitDownloadsToolbar();
         if(downloads.Items.Count>0)
         {
             downloadView=new ListCollectionView(downloads.Items){CustomSort=DownloadOrdering.Comparer(DownloadSortChoices.First(x=>x.Key==downloadSort).Sort)};
@@ -92,14 +93,15 @@ public partial class MainWindow
         downloadOrder.Content=IconLabel(tiny?"":label,"IconFilter");downloadOrder.ToolTip="Сортировка: "+label;
         if(downloadHeading!=null)downloadHeading.FontSize=shortView?20:25;
         if(downloadHeadingHost!=null)downloadHeadingHost.Visibility=veryShort?Visibility.Collapsed:Visibility.Visible;
-        if(downloadToolbar!=null)downloadToolbar.Margin=new(0,veryShort?0:4,0,veryShort?2:10);
-        if(downloadSummary!=null)downloadSummary.Margin=new(0,0,0,veryShort?4:shortView?8:12);
+        if(downloadHeadingRow!=null)downloadHeadingRow.Margin=new(0,0,0,veryShort?2:6);
+        if(downloadToolbar!=null)downloadToolbar.Margin=new(0);
+        if(downloadSummary!=null)downloadSummary.Margin=new(0,0,0,veryShort?4:shortView?8:14);
     }
     void UpdateDownloadSummary()
     {
         if(downloadSummary==null)return;
         var active=downloads.Items.Count(x=>!x.Paused&&!x.Completed);var seeding=downloads.Items.Count(x=>!x.Paused&&x.Completed);
-        downloadSummary.Text=$"Всего: {downloads.Items.Count} · Загружается: {active} · Раздаётся: {seeding}";
+        downloadSummary.Text=$"Всего: {downloads.Items.Count} · Загружается: {active} · Раздаётся: {seeding}";downloadSummary.ToolTip=downloadSummary.Text;
     }
     void RefreshDownloadView()
     {
@@ -152,7 +154,7 @@ public partial class MainWindow
     void DownloadLimits()
     {
         var dialog=new Window{Title="Лимиты скорости",Owner=this,Width=Math.Min(440,Math.Max(320,ActualWidth-32)),MaxHeight=Math.Max(260,SystemParameters.WorkArea.Height-40),SizeToContent=SizeToContent.Height,WindowStartupLocation=WindowStartupLocation.CenterOwner,ResizeMode=ResizeMode.NoResize};
-        var panel=new StackPanel{Margin=new(22)};dialog.Content=new ScrollViewer{Content=panel,Style=(Style)FindResource("PageScroll"),VerticalScrollBarVisibility=ScrollBarVisibility.Auto};
+        var panel=new StackPanel{Margin=new(24)};dialog.Content=new ScrollViewer{Content=panel,Style=(Style)FindResource("PageScroll"),VerticalScrollBarVisibility=ScrollBarVisibility.Auto};
         var title=Text("Скорость передачи",22);title.FontWeight=FontWeights.SemiBold;panel.Children.Add(title);panel.Children.Add(Text("Общий лимит для всей очереди. 0 — без ограничения.",12,true));
         TextBox Field(string label,int value){panel.Children.Add(Text(label,12));var field=new TextBox{Text=value.ToString(),Margin=new(0,0,0,14)};AutomationProperties.SetName(field,label);panel.Children.Add(field);return field;}
         var down=Field("Загрузка, КБ/с",downloads.DownloadLimitKbps);var up=Field("Отдача, КБ/с",downloads.UploadLimitKbps);var error=Text("",12);error.SetResourceReference(TextBlock.ForegroundProperty,"Danger");panel.Children.Add(error);

@@ -13,6 +13,7 @@ namespace Kachalka;
 public partial class MainWindow
 {
     bool designCatalogFallback;
+    bool designFixedViewport;
     int designCachedPosters;
     string? designCatalogFile;
 
@@ -21,6 +22,7 @@ public partial class MainWindow
         if(string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("KACHALKA_DATA")))
             throw new InvalidOperationException("Design smoke needs an isolated KACHALKA_DATA directory.");
         if(downloads.Items.Count!=0)throw new InvalidOperationException("Design smoke needs an empty test download queue.");
+        designFixedViewport=true;
         // Prevent completion of the startup request from replacing the local fixture.
         liveKey="design-smoke-preparing";liveRequest?.Cancel();searchDelay.Stop();
         var folder=Path.Combine(Preferences.DataDir,"catalog");
@@ -35,7 +37,7 @@ public partial class MainWindow
             }
         }
         designCatalogFallback=cached.Count==0;
-        if(designCatalogFallback)cached=Catalog.Items.Where(x=>x.Section=="Фильмы").Select(x=>x with{PageUrl="https://example.invalid/design/catalog/"+x.Id}).ToArray();
+        if(designCatalogFallback)cached=BundledCatalog.Page("Фильмы",1).Items.Select(x=>x with{PageUrl="https://example.invalid/design/catalog/"+x.Id}).ToArray();
         var cards=new List<MediaItem>();
         foreach(var original in cached)
         {
@@ -58,7 +60,14 @@ public partial class MainWindow
             }
             cardMetadata[item.Id]=Task.FromResult(item);requestedDetails.Add(item.Id);cards.Add(item);
         }
-        section="Фильмы";current=null;favoritesOnly=false;catalogYear=null;livePage=1;Search.Text="";searchDelay.Stop();
+        catalogPages["Фильмы|sort-date|1"]=new(cards.ToArray(),false,CatalogChoices.Genres,CatalogChoices.Countries);
+        catalogPages["Фильмы||1"]=new(cards.OrderByDescending(CatalogScore).ToArray(),false,CatalogChoices.Genres,CatalogChoices.Countries);
+        var shows=BundledCatalog.Page("Сериалы",1).Items.Select(x=>x with{PageUrl="https://example.invalid/design/catalog/"+x.Id,ImageUrl=null}).ToArray();
+        foreach(var show in shows){cardMetadata[show.Id]=Task.FromResult(show);requestedDetails.Add(show.Id);}
+        catalogPages["Сериалы|sort-date|1"]=new(shows,false,CatalogChoices.Genres,CatalogChoices.Countries);
+        catalogPages["Сериалы||1"]=new(shows,false,CatalogChoices.Genres,CatalogChoices.Countries);
+        searchProvider=(kind,_,_)=>Task.FromResult<IReadOnlyList<MediaItem>>(kind=="Фильмы"?cards:shows);
+        section="Фильмы";current=null;favoritesOnly=false;ResetCatalogFilters();livePage=1;Search.Text="";searchDelay.Stop();submittedQuery="";searchCategory="";
         liveItems=cards;liveKey="design-smoke-prepared";liveLoading=false;liveError="";
     }
 
@@ -67,14 +76,18 @@ public partial class MainWindow
         Directory.CreateDirectory(output);
         var originalLight=prefs.Light;
         var checks=new List<object>();
-        MinWidth=360;MinHeight=300;
+        // Render a full desktop viewport even when the hosted runner's monitor is smaller.
+        MaxWidth=1800;MaxHeight=1000;MinWidth=360;MinHeight=300;
         async Task Settle()
         {
             UpdateLayout();await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);await Task.Delay(90);UpdateLayout();
         }
         async Task Size(double width,double height)
         {
-            Width=Math.Min(width,MaxWidth-24);Height=Math.Min(height,MaxHeight-24);await Settle();
+            // Windows Server's virtual monitor also limits native max-track size.
+            // A fixture minimum forces this specific viewport without changing app defaults.
+            MinWidth=Math.Min(width,MaxWidth-24);MinHeight=Math.Min(height,MaxHeight-24);
+            Width=MinWidth;Height=MinHeight;await Settle();
         }
         void Shot(string name)
         {
@@ -83,13 +96,20 @@ public partial class MainWindow
             var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(bitmap));using var stream=File.Create(Path.Combine(output,name+".png"));png.Save(stream);
         }
         ComboBox QualityFilter()=>FindVisual<ComboBox>(Body,x=>AutomationProperties.GetName(x)=="Раздачи: Качество")??throw new Exception("Quality filter is missing.");
+        void CheckQualityInk()
+        {
+            var hide=FindVisual<CheckBox>(Body,x=>AutomationProperties.GetName(x)=="Скрыть плохое качество")??throw new Exception("Poor quality toggle is missing.");
+            if(hide.Foreground is not SolidColorBrush ink||ink.Color!=((SolidColorBrush)FindResource("Text")).Color)
+                throw new Exception("Poor quality toggle does not follow the current theme.");
+        }
         void CheckFilter(string stage)
         {
+            CheckQualityInk();
             var filter=QualityFilter();
-            if(filter.SelectedItem?.ToString()!="1080p")throw new Exception(stage+": selected 1080p filter was lost.");
+            if(filter.SelectedItem?.ToString()!="Full HD")throw new Exception(stage+": selected Full HD filter was lost.");
             if(!filter.IsVisible||filter.ActualWidth<=0)throw new Exception(stage+": quality filter is not visible.");
             var buttons=VisualElements<Button>(Body).Where(x=>x.Tag is SourceEntry).ToArray();
-            if(buttons.Length!=1||buttons[0].Tag is not SourceEntry entry||entry.Quality!="1080p")throw new Exception(stage+": quality filter did not leave exactly the 1080p release.");
+            if(buttons.Length!=1||buttons[0].Tag is not SourceEntry entry||entry.Quality!="Full HD")throw new Exception(stage+": quality filter did not leave exactly the Full HD release.");
             if(!buttons[0].IsVisible||buttons[0].ActualWidth<=0)throw new Exception(stage+": download action is not visible.");
         }
         void CheckHero(string stage)
@@ -102,7 +122,7 @@ public partial class MainWindow
                 if(element.ActualWidth<=0||element.ActualWidth>Body.ActualWidth+1||origin.X<-.5||origin.X+element.ActualWidth>Body.ActualWidth+1)
                     throw new Exception($"{stage}: {name} overflows body ({origin.X:F1}+{element.ActualWidth:F1}>{Body.ActualWidth:F1}).");
             }
-            checks.Add(new{Stage=stage,WindowWidth=Math.Round(ActualWidth),BodyWidth=Math.Round(Body.ActualWidth),TitleWidth=Math.Round(title.ActualWidth),SynopsisWidth=Math.Round(synopsis.ActualWidth),Filter="1080p",DownloadActionVisible=true});
+            checks.Add(new{Stage=stage,WindowWidth=Math.Round(ActualWidth),BodyWidth=Math.Round(Body.ActualWidth),TitleWidth=Math.Round(title.ActualWidth),SynopsisWidth=Math.Round(synopsis.ActualWidth),Filter="Full HD",DownloadActionVisible=true});
         }
         async Task RevealDownload(string name)
         {
@@ -119,11 +139,17 @@ public partial class MainWindow
             await Size(1760,950);
             Render();await Settle();
             var wheelScrolling=await CheckWheelScrolling();
+            MinWidth=360;MinHeight=300;
             var searchSettings=await CheckSearchAndSettings(output);
+            await Size(1760,950);
+            System.Windows.Input.Keyboard.ClearFocus();
             Search.Text="";searchDelay.Stop();liveKey=CurrentCatalogKey;
             prefs.Light=true;ApplyTheme();current=null;Render();await Settle();Shot("catalog-light");
             var catalogColumnsLight=catalogColumns;
             prefs.Light=false;ApplyTheme();Render();await Settle();Shot("catalog-dark");
+            if(ActualWidth<1700||ActualHeight<900||FiltersPanel.Visibility!=Visibility.Visible||inlineCatalogFilterScroll?.Parent!=FilterControls||discoveryHero is not {ActualHeight:>180}||discoveryHero.Children.Count!=2||discoveryShelf is not {ActualWidth:>500})throw new Exception($"Cinematic desktop catalog is missing its banners, curated row or right filters ({ActualWidth}x{ActualHeight}, rail={FiltersPanel.Visibility}, hero={discoveryHero?.ActualHeight}, shelf={discoveryShelf?.ActualWidth}).");
+            if(VisualElements<UIElement>(Body).Any(x=>x.Effect!=null))throw new Exception("Cinematic catalog adds an expensive blur or shadow effect.");
+            var featurePosterWidths=VisualElements<Image>(discoveryHero!).Select(x=>(x.Source as BitmapSource)?.PixelWidth??0).ToArray();
             var preview=liveItems.FirstOrDefault(x=>x.ImageUrl!=null)?.ImageUrl;
             var movie=new MediaItem(-987654320,"За пределами тишины: невероятное путешествие через время, которое начинается с одного случайного письма","Фильмы","Приключения · Драма",2026,"8,7","8,5","#526B69")
             {
@@ -136,9 +162,9 @@ public partial class MainWindow
             requestedDetails.Add(movie.Id);cardMetadata[movie.Id]=Task.FromResult(movie);liveReleases[movie.Id]=[release,ultra,small];
             var sourceView=new ReleaseView{Saved=true,SavedUtc=DateTime.UtcNow.AddDays(-1),ReceivedUtc=DateTime.UtcNow, Sources=[new("RuTor",SourceState.Ready,3,DateTime.UtcNow,DateTime.UtcNow),new("NNM-Club",SourceState.Empty,0,DateTime.UtcNow,DateTime.UtcNow),new("MegaPeer",SourceState.TimedOut,0,DateTime.UtcNow,DateTime.UtcNow.AddDays(-2)),new("Онлайн-индекс",SourceState.Unavailable)]};
             releaseViews[movie.Id]=sourceView;
-            current=movie;Render();await Settle();Shot("detail-wide-dark");
-            prefs.Light=true;ApplyTheme();Render();await Settle();Shot("detail-wide-light");
-            QualityFilter().SelectedItem="1080p";await Settle();CheckFilter("selected");
+            current=movie;Render();await Settle();CheckQualityInk();Shot("detail-wide-dark");
+            prefs.Light=true;ApplyTheme();Render();await Settle();CheckQualityInk();Shot("detail-wide-light");
+            QualityFilter().SelectedItem="Full HD";await Settle();CheckFilter("selected");
             Render();await Settle();CheckFilter("rendered");
             var sourceToggle=FindVisual<Button>(Body,b=>AutomationProperties.GetName(b)=="Показать состояние источников")??throw new Exception("Source status toggle missing.");
             sourceToggle.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Settle();
@@ -191,42 +217,71 @@ public partial class MainWindow
             if(downloads.Items.Count!=0||downloads.EngineCreated)throw new Exception("Design smoke unexpectedly created a download.");
             Shot("downloads-empty");
             var fixtureNow=DateTime.UtcNow;
-            var activeDownload=new DownloadItem{Name="Big Buck Bunny · 1080p",Folder=@"C:\Downloads\Качалка",Paused=false};
+            var downloadCards=liveItems.Where(x=>x.ImageUrl!=null&&coverCache.ContainsKey(x.ImageUrl)).Concat(liveItems).DistinctBy(x=>x.Id).Take(3).ToArray();
+            DownloadItem VisualDownload(string name,int index)
+            {
+                var card=downloadCards.ElementAtOrDefault(index);
+                var slug=card?.OnlineId?.Split(':').ElementAtOrDefault(1);
+                var page=slug==null?card?.PageUrl:LiveCatalog.Base+(card!.Section=="Сериалы"?"/tvseries/":"/movies/")+slug;
+                var source=card==null?name:$"{card.OriginalTitle??card.Title} ({card.Year}) WEB-DL {(name.Contains("2160p")?"2160p":"1080p")}";
+                return new(){Name=source,Folder=@"C:\Downloads\Качалка",Paused=false,AddedUtc=fixtureNow.AddSeconds(-index),MediaTitle=card?.Title,MediaSection=card?.Section,MediaYear=card?.Year??0,ImageUrl=card?.ImageUrl,MediaPageUrl=page};
+            }
+            var activeDownload=VisualDownload("Big Buck Bunny · 1080p",0);
             DownloadPresentation.Apply(activeDownload,new(MonoTorrent.Client.TorrentState.Downloading,false,42,2L*1024*1024*1024,1800*1024,128*1024,12,5,fixtureNow.AddMinutes(-3),fixtureNow),fixtureNow);
-            var waitingDownload=new DownloadItem{Name="Sintel · 2160p",Folder=activeDownload.Folder,Paused=false};
+            var waitingDownload=VisualDownload("Sintel · 2160p",1);
             DownloadPresentation.Apply(waitingDownload,new(MonoTorrent.Client.TorrentState.Downloading,false,8,4L*1024*1024*1024,0,0,3,0,fixtureNow.AddMinutes(-2),null),fixtureNow);
-            var completedDownload=new DownloadItem{Name="Tears of Steel · 1080p",Folder=activeDownload.Folder,Paused=false};
+            var completedDownload=VisualDownload("Tears of Steel · 1080p",2);
             DownloadPresentation.Apply(completedDownload,new(MonoTorrent.Client.TorrentState.Seeding,false,100,1024L*1024*1024,0,256*1024,2,0,fixtureNow.AddMinutes(-20),fixtureNow),fixtureNow);
             downloads.Items.Add(activeDownload);downloads.Items.Add(waitingDownload);downloads.Items.Add(completedDownload);
             prefs.Light=true;ApplyTheme();Render();await Settle();Shot("downloads-light");
             prefs.Light=false;ApplyTheme();Render();await Settle();
             var expectedInk=((SolidColorBrush)FindResource("Text")).Color;
-            foreach(var block in VisualElements<TextBlock>(Body).Where(x=>x.Text==activeDownload.Name||x.Text==activeDownload.Status))
+            foreach(var block in VisualElements<TextBlock>(Body).Where(x=>x.Text==activeDownload.DisplayName||x.Text==activeDownload.Status))
                 if(block.Foreground is not SolidColorBrush ink||ink.Color!=expectedInk)throw new Exception("Download text does not follow dark theme.");
+            var releaseInk=((SolidColorBrush)FindResource("Muted")).Color;
+            foreach(var block in VisualElements<TextBlock>(Body).Where(x=>x.Text==activeDownload.Name&&AutomationProperties.GetName(x)=="Название раздачи"))
+                if(block.Foreground is not SolidColorBrush ink||ink.Color!=releaseInk)throw new Exception("Secondary release name does not follow dark theme.");
             Shot("downloads-dark");
-            await Size(510,820);Render();await Settle();Shot("downloads-510");
-            var downloadStats=VisualElements<TextBlock>(Body).Where(x=>x.Text==activeDownload.Stats||x.Text==waitingDownload.Stats).ToArray();
-            if(downloadStats.Length==0)throw new Exception("Download telemetry is not visible.");
-            foreach(var block in downloadStats)
+            foreach(var width in new[]{510d,360d})
             {
-                var origin=block.TransformToAncestor(Body).Transform(new Point());
-                if(origin.X<-.5||origin.X+block.ActualWidth>Body.ActualWidth+1)throw new Exception("Download telemetry overflows narrow window.");
+                await Size(width,820);Render();await Settle();Shot("downloads-"+width);
+                var downloadStats=VisualElements<TextBlock>(Body).Where(x=>x.Text==activeDownload.Stats||x.Text==waitingDownload.Stats).ToArray();
+                if(downloadStats.Length==0)throw new Exception("Download telemetry is not visible.");
+                foreach(var block in downloadStats)
+                {
+                    var origin=block.TransformToAncestor(Body).Transform(new Point());
+                    if(origin.X<-.5||origin.X+block.ActualWidth>Body.ActualWidth+1)throw new Exception($"Download telemetry overflows {width} px window.");
+                }
+                var actions=VisualElements<Button>(Body).Where(x=>x.IsVisible&&x.Tag is DownloadItem&&AutomationProperties.GetName(x) is "Пауза" or "Подробнее" or "Открыть папку" or "Удалить из загрузок" or "Удалить файлы").ToArray();
+                if(actions.Length<5)throw new Exception("Download row actions are missing.");
+                foreach(var action in actions)
+                {
+                    var bounds=action.TransformToAncestor(Body).TransformBounds(new Rect(new Point(),action.RenderSize));
+                    if(bounds.Width<=0||bounds.Left<-.5||bounds.Right>Body.ActualWidth+1)throw new Exception($"Download action overflows {width} px window: "+AutomationProperties.GetName(action));
+                }
             }
             if(downloads.EngineCreated)throw new Exception("Download visual fixtures unexpectedly started an engine.");
             downloads.Items.Clear();
             File.WriteAllText(Path.Combine(output,"design.json"),JsonSerializer.Serialize(new
             {
                 CatalogFallback=designCatalogFallback,CatalogCacheFile=designCatalogFile,CatalogCount=liveItems.Count,CachedPosters=designCachedPosters,CatalogColumns=catalogColumnsLight,
-                ExternalSourcesRequired=false,FixtureHasCachedPoster=preview!=null,FilterPersistedAfterRender=true,FilterPersistedAfterResize=true,DownloadStarted=false,EngineCreated=downloads.EngineCreated,
+                ExternalSourcesRequired=false,FixtureHasCachedPoster=preview!=null,FeaturePosterWidths=featurePosterWidths,FilterPersistedAfterRender=true,FilterPersistedAfterResize=true,DownloadStarted=false,EngineCreated=downloads.EngineCreated,
                 ShortDescriptionLength=shortDescription.Length,ShortDescriptionExpanded=true,ShortDescriptionExpandedHeight=shortDescriptionExpandedHeight,SeriesSeasonFilter=true,
                 DownloadTelemetryFitsNarrowWindow=true,DownloadTextFollowsTheme=true,
                 SearchAndSettings=searchSettings,
                 WheelScrolling=wheelScrolling,
                 SourceFailureVisible=true,SourceProgressPreservesOpenFilter=true,SourceProgressPreservesScroll=true,SourceRetryState=true,
-                WidthChecks=checks,Screens=new[]{"sources-light","sources-dark","sources-510","search-light","search-dark","search-small","search-minimum","settings-light","settings-dark","settings-small","settings-minimum","catalog-light","catalog-dark","detail-wide-light","detail-wide-dark","detail-720","release-720","detail-510","release-510","short-description-expanded","series-season-filter","downloads-empty","downloads-light","downloads-dark","downloads-510"}
+                WidthChecks=checks,Screens=new[]{"sources-light","sources-dark","sources-510","search-light","search-dark","search-small","search-minimum","settings-light","settings-dark","settings-small","settings-minimum","catalog-light","catalog-dark","detail-wide-light","detail-wide-dark","detail-720","release-720","detail-510","release-510","short-description-expanded","series-season-filter","downloads-empty","downloads-light","downloads-dark","downloads-510","downloads-360"}
             },new JsonSerializerOptions{WriteIndented=true}));
         }
-        finally{prefs.Light=originalLight;Close();}
+        catch(Exception error)
+        {
+            // Closing the final WPF window can end the dispatcher before the outer
+            // startup handler resumes, so retain the actual assertion first.
+            File.WriteAllText(Path.Combine(output,"error.txt"),error.ToString());
+            throw;
+        }
+        finally{prefs.Light=originalLight;searchProvider=null;Close();}
     }
 
 }

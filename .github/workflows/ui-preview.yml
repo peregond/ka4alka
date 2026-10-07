@@ -1,0 +1,59 @@
+name: Native UI preview
+on:
+  push:
+    branches: [codex/modern-ui-0.29]
+    paths: ['native/**', 'tests/CacheDesignPosters.ps1', '.github/workflows/ui-preview.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: ui-preview-${{ github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  preview:
+    runs-on: windows-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build native preview
+        shell: pwsh
+        run: ./build.ps1 -OutputDir dist/ui-preview
+      - name: Render and validate interface
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $env:KACHALKA_DATA=Join-Path $PWD 'test-output/ui-preview/data'
+          $folder=Join-Path $env:KACHALKA_DATA 'downloads'
+          New-Item -ItemType Directory -Force $folder | Out-Null
+          @{Folder=$folder;FolderConfigured=$true;AutoResumeDownloads=$false;CheckForUpdates=$false;AutoUpdate=$false} | ConvertTo-Json | Set-Content (Join-Path $env:KACHALKA_DATA 'settings.json') -Encoding utf8NoBOM
+          ./tests/CacheDesignPosters.ps1
+          $output=Join-Path $PWD 'test-output/ui-preview/render'
+          $app=Start-Process (Join-Path $PWD 'dist/ui-preview/Kachalka.exe') -ArgumentList @('--design-smoke-test',('"'+$output+'"')) -PassThru
+          if(-not $app.WaitForExit(120000)){$app.Kill($true);throw 'Native UI preview timed out'}
+          if(Test-Path (Join-Path $output 'error.txt')){throw (Get-Content (Join-Path $output 'error.txt') -Raw)}
+          if(-not(Test-Path (Join-Path $output 'design.json'))){
+            if(Test-Path (Join-Path $env:KACHALKA_DATA 'error.log')){Get-Content (Join-Path $env:KACHALKA_DATA 'error.log')}
+            throw ('Native UI preview evidence missing; exit code '+$app.ExitCode)
+          }
+          Get-Content (Join-Path $output 'design.json')
+      - name: Save rendered previews in a temporary draft
+        if: always()
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Keep review asset names portable across GitHub upload clients.
+          $files=@(Get-ChildItem 'test-output/ui-preview/render' -Filter '*.png' -ErrorAction SilentlyContinue | Where-Object {$_.Name -match '^[a-z0-9.-]+$'} | ForEach-Object {$_.FullName})
+          if($files.Count -gt 0){
+            $tag='ui-preview-${{ github.run_id }}'
+            $existing=gh release view $tag --json isDraft --jq '.isDraft' 2>$null
+            if($LASTEXITCODE -ne 0){
+              gh release create $tag --draft --target '${{ github.sha }}' --title 'Temporary native UI preview' --notes 'Rendered UI evidence for review; not an application release.'
+              if($LASTEXITCODE -ne 0){throw 'Could not save UI preview draft'}
+            } elseif($existing -ne 'true'){throw 'Refusing to overwrite a published preview'}
+            gh release upload $tag @files --clobber
+            if($LASTEXITCODE -ne 0){throw 'Could not upload UI preview images'}
+          }

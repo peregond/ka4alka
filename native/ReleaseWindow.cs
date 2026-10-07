@@ -140,8 +140,8 @@ public partial class MainWindow
                 if(open)state.Expanded.Add(key);else state.Expanded.Remove(key);
             };
             footer.Children.Add(expand);var download=DownloadButton(entry);Grid.SetColumn(download,1);footer.Children.Add(download);body.Children.Add(footer);
-            var card=new Border{Child=body,CornerRadius=new(14),Padding=new(16),Margin=new(0,0,0,10),BorderThickness=new(1)};
-            card.SetResourceReference(Border.BackgroundProperty,"Panel");card.SetResourceReference(Border.BorderBrushProperty,"Edge");return card;
+            var card=new Border{Child=body,CornerRadius=new(12),Padding=new(16),Margin=new(0,0,0,10),BorderThickness=new(1)};
+            card.SetResourceReference(Border.BackgroundProperty,"Panel");card.SetResourceReference(Border.BorderBrushProperty,"EdgeSoft");return card;
         }
         void Show()
         {
@@ -164,7 +164,7 @@ public partial class MainWindow
                 var empty=new StackPanel{Margin=new(20)};
                 var title=Text("Таких раздач пока нет",16);title.FontWeight=FontWeights.SemiBold;empty.Children.Add(title);
                 empty.Children.Add(Text("Измени параметры или сбрось фильтры, чтобы увидеть все варианты.",12,true));
-                var surface=new Border{Child=empty,CornerRadius=new(14),BorderThickness=new(1)};surface.SetResourceReference(Border.BackgroundProperty,"Panel");surface.SetResourceReference(Border.BorderBrushProperty,"Edge");results.Children.Add(surface);return;
+                var surface=new Border{Child=empty,CornerRadius=new(12),BorderThickness=new(1)};surface.SetResourceReference(Border.BackgroundProperty,"Panel");surface.SetResourceReference(Border.BorderBrushProperty,"EdgeSoft");results.Children.Add(surface);return;
             }
             void MoreResults()
             {
@@ -189,7 +189,7 @@ public partial class MainWindow
             }
             Heading("Раздача",0,"По названию");Heading("Отдают / скачивают",1,"Больше отдающих");Heading("Качество",2,"Выше качество");
             Heading("Видео",3,"По видео");Heading("Субтитры",4,"По субтитрам");Heading("Озвучка",5,"По озвучке");Heading("Объём",6,"Меньше размер");
-            var headerFrame=new Border{Child=header,CornerRadius=new(12,12,0,0),BorderThickness=new(0,0,0,1)};headerFrame.SetResourceReference(Border.BackgroundProperty,"Sidebar");headerFrame.SetResourceReference(Border.BorderBrushProperty,"Edge");table.Children.Add(headerFrame);
+            var headerFrame=new Border{Child=header,CornerRadius=new(12,12,0,0),BorderThickness=new(0,0,0,1)};headerFrame.SetResourceReference(Border.BackgroundProperty,"PanelAlt");headerFrame.SetResourceReference(Border.BorderBrushProperty,"EdgeSoft");table.Children.Add(headerFrame);
             foreach(var entry in displayed)
             {
                 var row=RowGrid();var identity=new StackPanel{Margin=new(10,15,10,15),VerticalAlignment=VerticalAlignment.Center};
@@ -201,9 +201,9 @@ public partial class MainWindow
                 row.Children.Add(Cell(VideoLabel(entry),3,true));row.Children.Add(Cell(entry.Subs,4,true));row.Children.Add(Cell(entry.Voice,5));
                 row.Children.Add(Cell(entry.Size.HasValue?DownloadService.FormatBytes(entry.Size.Value):"—",6));
                 var download=DownloadButton(entry);download.Margin=new(0,8,12,8);Grid.SetColumn(download,7);row.Children.Add(download);
-                var rowFrame=new Border{Child=row,BorderThickness=new(0,0,0,1)};rowFrame.SetResourceReference(Border.BorderBrushProperty,"Edge");table.Children.Add(rowFrame);
+                var rowFrame=new Border{Child=row,BorderThickness=new(0,0,0,1)};rowFrame.SetResourceReference(Border.BorderBrushProperty,"EdgeSoft");table.Children.Add(rowFrame);
             }
-            var tableFrame=new Border{Child=table,BorderThickness=new(1),CornerRadius=new(13),Margin=new(0,0,0,15)};tableFrame.SetResourceReference(Border.BackgroundProperty,"Panel");tableFrame.SetResourceReference(Border.BorderBrushProperty,"Edge");results.Children.Add(tableFrame);
+            var tableFrame=new Border{Child=table,BorderThickness=new(1),CornerRadius=new(12),Margin=new(0,0,0,15)};tableFrame.SetResourceReference(Border.BackgroundProperty,"Panel");tableFrame.SetResourceReference(Border.BorderBrushProperty,"EdgeSoft");results.Children.Add(tableFrame);
             MoreResults();
         }
         foreach(var box in filters.Values)box.SelectionChanged+=(_,_)=>{if(!changingFilters){state.VisibleCount=60;Show();}};

@@ -200,7 +200,7 @@ public static class SourceTests
         Check(new CatalogIndex(indexDir).CachedReleases(indexedSeries).Single().Series.Episode==10,"release index survives restart");
         var wide=WindowSizing.Fit(1920,1040);var scaled=WindowSizing.Fit(683,350);
         Check(wide.Width==1760&&wide.Height==950&&scaled.Width<=scaled.MaxWidth&&scaled.Height<=scaled.MaxHeight&&scaled.MinWidth<=scaled.Width&&scaled.MinHeight<=scaled.Height,"window fits available desktop at normal and 200% scale");
-        Check(WindowSizing.PosterColumns(1200)==7&&WindowSizing.PosterColumns(1060)==6&&WindowSizing.PosterColumns(980)==6&&WindowSizing.PosterColumns(450)==2,"poster columns follow available width");
+        Check(WindowSizing.PosterColumns(1200)==8&&WindowSizing.PosterColumns(1060)==7&&WindowSizing.PosterColumns(980)==7&&WindowSizing.PosterColumns(450)==3,"poster columns follow available width");
         var saved=new Preferences();
         Check(!saved.FolderConfigured,"new settings require one-time download folder choice");
         saved.Save();

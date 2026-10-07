@@ -42,6 +42,13 @@ try{
    }
    Get-Content (Join-Path $scenarioEvidence $scenarioFile)
  }
+ ./tests/CacheDesignPosters.ps1
+ $designEvidence=Join-Path $root 'test-output/design-modern'
+ $designUi=Start-Process (Join-Path $root ('dist/Kachalka-'+$short+'/Kachalka.exe')) -ArgumentList @('--design-smoke-test',('"'+$designEvidence+'"')) -PassThru
+ if(-not $designUi.WaitForExit(120000)){ $designUi.Kill($true);throw 'Modern design UI smoke timed out' }
+ if(Test-Path (Join-Path $designEvidence 'error.txt')){throw (Get-Content (Join-Path $designEvidence 'error.txt') -Raw)}
+ if(-not(Test-Path (Join-Path $designEvidence 'design.json'))){throw 'Modern design UI evidence missing'}
+ Get-Content (Join-Path $designEvidence 'design.json')
  $catalogEvidence=Join-Path $root 'test-output/catalog-paging'
  $ui=Start-Process (Join-Path $root ('dist/Kachalka-'+$short+'/Kachalka.exe')) -ArgumentList @('--catalog-paging-smoke-test',('"'+$catalogEvidence+'"')) -PassThru
  if(-not $ui.WaitForExit(60000)){ $ui.Kill($true);throw 'Catalog UI smoke timed out' }

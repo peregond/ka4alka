@@ -107,8 +107,8 @@ public partial class MainWindow
             ShowDownloads(this,new RoutedEventArgs());liveKey=CurrentCatalogKey;ShowCatalogSection("Фильмы");await Settle();CheckText("Интерстеллар","return-from-downloads");
             liveKey="Сериалы||1";ShowCatalogSection("Сериалы");await Type("Severance");CheckText("Severance","latin-series-query");
             liveKey="Фильмы|Интерстеллар|1";ShowCatalogSection("Фильмы");await Settle();Check(Search.Text=="","Navigation to another catalog did not reset search.");
-            liveKey="Сериалы|Severance|1";ShowCatalogSection("Сериалы");SettingsButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));FocusCatalogSearch();await Settle();
-            Check(section=="Фильмы"&&Search.Text==""&&Search.SelectionLength==Search.Text.Length,"Search shortcut did not restore the previous catalog and query.");
+            liveKey="Сериалы|Severance|1";ShowCatalogSection("Сериалы");await Type("Severance");SettingsButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));FocusCatalogSearch();await Settle();
+            Check(section=="Сериалы"&&lastCatalogSection=="Сериалы"&&Search.Text=="Severance"&&Search.IsKeyboardFocusWithin&&Search.SelectionLength==Search.Text.Length,"Search shortcut did not restore the previous series catalog, submitted query and focus.");
             ClearSearchButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));searchDelay.Stop();
             Check(Search.Text==""&&ClearSearchButton.Visibility==Visibility.Collapsed,"Clear search action did not clear query.");
             return new{Checks=checks,SettingsIsPage=true,ThemePersisted=true,ResumePersisted=true,FolderPersisted=true,QueriesRetainedAcrossNavigation=true,SearchShortcutRestoresContext=true,SettingsFitsNarrowWindow=true,PendingSearchDoesNotChangeSettingsPage=true,SettingsReturnsToOpenedMovie=true};
@@ -116,8 +116,8 @@ public partial class MainWindow
         finally
         {
             prefs.Light=initialLight;prefs.AutoResumeDownloads=initialResume;prefs.Folder=initialFolder;prefs.FolderConfigured=initialConfigured;prefs.Save();ApplyTheme();
-            section="Фильмы";current=null;Search.Clear();searchDelay.Stop();submittedQuery="";searchCategory="";lastCatalogSection="Фильмы";
-            Width=Math.Min(1760,MaxWidth-24);Height=Math.Min(950,MaxHeight-24);liveKey="Фильмы||1";Render();await Settle();
+            section="Фильмы";current=null;Search.Clear();searchDelay.Stop();submittedQuery="";searchCategory="";lastCatalogSection="Фильмы";Status.Text="";
+            Width=Math.Min(1760,MaxWidth-24);Height=Math.Min(950,MaxHeight-24);liveKey="";Render();await Settle();
         }
     }
 }
