@@ -77,6 +77,7 @@ try{
    throw ('Desktop shortcut missing in '+$desktop+'; observed: '+$observed)
  }
  if((Get-ItemProperty 'HKCU:/Software/Microsoft/Windows/CurrentVersion/Uninstall/Kachalka').DisplayVersion -ne $version){throw 'Wrong installed version'}
+ ./tests/WindowsInstallerFinishSmoke.ps1 -Setup $setup -Output (Join-Path $root 'test-output/design-modern')
  ('PASS: EXE installation, shortcut, registered version '+$version) | Add-Content (Join-Path $evidence 'checks.txt')
 
  dotnet publish native/Kachalka.csproj -c Release -r win-x64 --self-contained true ("-p:Version="+$nextVersion) -p:DebugType=None -p:DebugSymbols=false -o ("dist/Kachalka-"+$nextVersion)

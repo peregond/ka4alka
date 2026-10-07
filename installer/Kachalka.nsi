@@ -34,7 +34,8 @@ VIAddVersionKey /LANG=1049 "LegalCopyright" "Качалка"
 !define MUI_ABORTWARNING
 !define MUI_FINISHPAGE_RUN "$INSTDIR\Kachalka.exe"
 !define MUI_FINISHPAGE_RUN_TEXT "Запустить Качалку и завершить настройку"
-!define MUI_FINISHPAGE_TEXT "Качалка установлена.$\r$\n$\r$\nПри первом запуске выбери папку: внутри неё появится Ka4alka для загрузок. Затем можно разрешить подключения в брандмауэре и включить запуск вместе с Windows.$\r$\n$\r$\nДля брандмауэра Windows попросит права администратора. Эти параметры доступны и в настройках приложения."
+!define MUI_FINISHPAGE_TEXT_LARGE
+!define MUI_FINISHPAGE_TEXT "При первом запуске выбери папку для загрузок. Затем можно настроить брандмауэр и запуск вместе с Windows.$\r$\n$\r$\nНажми «Готово», чтобы открыть Качалку."
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_PAGE_FINISH
