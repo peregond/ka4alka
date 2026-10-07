@@ -27,6 +27,37 @@ function SettingsSnapshot {
  }
  return ($snapshot | ConvertTo-Json -Depth 5 -Compress)
 }
+Add-Type @'
+using System;
+using System.Runtime.InteropServices;
+public static class ShellMenuProbe {
+ [StructLayout(LayoutKind.Sequential)] public struct Rect { public int Left,Top,Right,Bottom; }
+ [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern IntPtr FindWindow(string className,string title);
+ [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr window);
+ [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr window,out Rect rect);
+ [DllImport("user32.dll")] public static extern bool SetCursorPos(int x,int y);
+ [DllImport("user32.dll")] public static extern void mouse_event(uint flags,uint x,uint y,uint data,UIntPtr extra);
+ [DllImport("user32.dll")] public static extern void keybd_event(byte key,byte scan,uint flags,UIntPtr extra);
+ public static string Activate() {
+   var button=FindWindow("OpenShell.CStartButton",null);
+   if(button!=IntPtr.Zero && IsWindowVisible(button) && GetWindowRect(button,out var rect)) {
+     SetCursorPos((rect.Left+rect.Right)/2,(rect.Top+rect.Bottom)/2);
+     mouse_event(2,0,0,0,UIntPtr.Zero);mouse_event(4,0,0,0,UIntPtr.Zero);return "Open-Shell start button click";
+   }
+   keybd_event(0x5B,0,0,UIntPtr.Zero);keybd_event(0x5B,0,2,UIntPtr.Zero);return "Windows key";
+ }
+ public static void Escape() {keybd_event(0x1B,0,0,UIntPtr.Zero);keybd_event(0x1B,0,2,UIntPtr.Zero);}
+}
+'@
+function TestMenuActivation {
+ $method=[ShellMenuProbe]::Activate();Start-Sleep -Milliseconds 600
+ $menu=[ShellMenuProbe]::FindWindow('OpenShell.CMenuContainer',$null)
+ $visible=$menu -ne [IntPtr]::Zero -and [ShellMenuProbe]::IsWindowVisible($menu)
+ [ShellMenuProbe]::Escape();Start-Sleep -Milliseconds 300
+ Write-Output ([pscustomobject]@{Visible=$visible;Method=$method})
+}
+$baselineMenu=TestMenuActivation
+Write-Output ('Open-Shell activation before installing Kachalka: '+($baselineMenu | ConvertTo-Json -Compress))
 $beforeSettings=SettingsSnapshot
 $beforeFiles=@{}
 Get-ChildItem $shellDirectory -Filter '*.dll' | ForEach-Object {$beforeFiles[$_.FullName]=(Get-FileHash $_.FullName -Algorithm SHA256).Hash}
@@ -36,7 +67,9 @@ function AssertShell([string]$stage) {
  if((SettingsSnapshot) -ne $beforeSettings){throw ('Open-Shell settings changed at '+$stage)}
  foreach($path in $beforeFiles.Keys){if(-not(Test-Path $path) -or (Get-FileHash $path -Algorithm SHA256).Hash -ne $beforeFiles[$path]){throw ('Open-Shell executable or DLL changed at '+$stage)}}
  foreach($id in $beforeExplorer){if(-not(Get-Process -Id $id -ErrorAction SilentlyContinue)){throw ('Existing Explorer process exited at '+$stage)}}
- Write-Output ('PASS: Open-Shell stays running, settings and module hashes unchanged at '+$stage)
+ $activation=TestMenuActivation
+ if($baselineMenu.Visible -and -not $activation.Visible){throw ('Start activation changed to the system menu at '+$stage)}
+ Write-Output ('PASS: Open-Shell stays running, settings and module hashes unchanged at '+$stage+'; classic menu visible='+$activation.Visible)
 }
 ./build.ps1 -OutputDir 'dist/shell-app'
 if($LASTEXITCODE -ne 0){throw 'Compatibility application build failed'}
@@ -61,5 +94,5 @@ $uninstaller=Start-Process (Join-Path $env:LOCALAPPDATA 'Kachalka/installation/U
 if(-not $uninstaller.WaitForExit(60000)){throw 'Compatibility uninstall timed out'}
 Start-Sleep -Seconds 2
 AssertShell 'uninstall'
-@{OS=[Environment]::OSVersion.VersionString;RunnerImage=$env:ImageOS;OpenShell='4.4.198';ShellRemainsRunning=$true;ShellConfigurationUnchanged=$true;ShellFilesUnchanged=$true;ExistingExplorerProcessesPreserved=$true;NativeCloseSeconds=$closeResult.ElapsedSeconds;QueueSaved=$closeResult.QueueSaved} | ConvertTo-Json | Set-Content (Join-Path $evidence 'checks.json') -Encoding utf8NoBOM
+@{OS=[Environment]::OSVersion.VersionString;RunnerImage=$env:ImageOS;OpenShell='4.4.198';MenuActivationVerified=$baselineMenu.Visible;ActivationMethod=$baselineMenu.Method;ShellRemainsRunning=$true;ShellConfigurationUnchanged=$true;ShellFilesUnchanged=$true;ExistingExplorerProcessesPreserved=$true;NativeCloseSeconds=$closeResult.ElapsedSeconds;QueueSaved=$closeResult.QueueSaved} | ConvertTo-Json | Set-Content (Join-Path $evidence 'checks.json') -Encoding utf8NoBOM
 Get-Content (Join-Path $evidence 'checks.json')

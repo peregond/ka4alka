@@ -15,7 +15,9 @@ public partial class MainWindow
     public async Task DpiSmokeTest(string output)
     {
         Directory.CreateDirectory(output);
-        liveRequest?.Cancel();liveLoading=false;current=null;
+        liveRequest?.Cancel();liveLoading=false;current=null;favoritesOnly=true;
+        prefs.LiveFavorites=Enumerable.Range(1,8).Select(id=>new MediaItem(-50000-id,"Проверка интерфейса "+id,"Фильмы","драма",2026,"8.0","7.5","#526B69"){PageUrl="https://w6.zona.plus/movies/dpi-fixture-"+id}).ToList();
+        foreach(var item in prefs.LiveFavorites){cardMetadata[item.Id]=Task.FromResult(item);requestedDetails.Add(item.Id);}
         var cases=new List<object>();
         var fixtures=Enumerable.Range(1,8).Select(id=>new DownloadItem{Name="Fixture.S01E0"+id+".mkv",MediaTitle="Проверка масштабирования "+id,Paused=true,Progress=25,Stats="25% · на паузе"}).ToArray();
         foreach(var item in fixtures)downloads.Items.Add(item);
@@ -31,7 +33,7 @@ public partial class MainWindow
                 {
                     section=page;current=null;Render();UpdateLayout();
                     if(ActualWidth>fit.MaxWidth+1||ActualHeight>fit.MaxHeight+1)throw new Exception("Window overflows scaled work area");
-                    if(Body.ActualWidth<90||Body.ActualHeight<20)throw new Exception($"{page}: no usable content at {scale*100}%");
+                    if(Body.ActualWidth<90||Body.ActualHeight<20)throw new Exception($"{page}: no usable content at {scale*100}%: body {Body.ActualWidth} x {Body.ActualHeight}, header {PageHeader.ActualHeight}, window {ActualWidth} x {ActualHeight}");
                     foreach(var action in VisualElements<Button>(Body).Where(b=>b.IsVisible&&b.ActualWidth>0&&AutomationProperties.GetName(b) is "Продолжить" or "Удалить файлы" or "Подробнее"))
                     {
                         var box=action.TransformToAncestor(Body).TransformBounds(new Rect(new Point(),action.RenderSize));

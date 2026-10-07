@@ -5,7 +5,7 @@ using System.Windows.Media;
 namespace Kachalka;
 public partial class MainWindow
 {
-    readonly bool demoCatalog=Environment.GetCommandLineArgs().Any(x=>x is "--smoke-test" or "--layout-smoke-test" or "--dpi-smoke-test");
+    readonly bool demoCatalog=Environment.GetCommandLineArgs().Any(x=>x is "--smoke-test" or "--layout-smoke-test");
     IReadOnlyList<MediaItem> liveItems=[];
     string liveKey="",liveError="";
     bool liveLoading;
