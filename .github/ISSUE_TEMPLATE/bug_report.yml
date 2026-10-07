@@ -1,0 +1,27 @@
+name: Ошибка в Качалке
+description: Проблема с интерфейсом, загрузками или обновлением
+title: "[Ошибка] "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Что произошло?
+      description: Напиши, какие действия привели к ошибке и что ожидалось.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Версия приложения и Windows
+      description: Версия Качалки указана в настройках. Для проблемы с интерфейсом добавь масштаб Windows.
+  - type: input
+    id: source
+    attributes:
+      label: Источник раздачи и сеть
+      description: Для зависшей загрузки укажи источник, название раздачи и, если уместно, провайдера. Адреса, пароли и ключи не нужны.
+  - type: textarea
+    id: diagnostic
+    attributes:
+      label: Диагностический отчёт
+      description: Настройки → Диагностика → Скопировать логи. Просмотри отчёт и вставь нужные записи.
+      render: text

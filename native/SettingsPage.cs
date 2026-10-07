@@ -21,8 +21,8 @@ public partial class MainWindow
     {
         var back=ActionButton("Вернуться","IconBack",()=>{section=settingsReturnSection;current=settingsReturnItem;Render();});
         back.HorizontalAlignment=HorizontalAlignment.Left;back.Margin=new(0,0,0,12);PageHeader.Children.Add(back);
-        var title=Text("Настройки",30);title.FontWeight=FontWeights.SemiBold;PageHeader.Children.Add(title);
-        var subtitle=Text("Всё для комфортного просмотра и загрузок. Изменения сохраняются сразу.",13,true);subtitle.Margin=new(0,0,0,22);PageHeader.Children.Add(subtitle);
+        var title=Text("Настройки",compactHeight?25:30);title.FontWeight=FontWeights.SemiBold;PageHeader.Children.Add(title);
+        var subtitle=Text("Всё для комфортного просмотра и загрузок. Изменения сохраняются сразу.",13,true);subtitle.Margin=new(0,0,0,22);subtitle.Visibility=compactHeight?Visibility.Collapsed:Visibility.Visible;PageHeader.Children.Add(subtitle);
         var content=new StackPanel{MaxWidth=820,HorizontalAlignment=HorizontalAlignment.Left,Margin=new(0,0,10,12)};
         Body.Children.Add(new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=content,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});
         StackPanel Card(string heading,string description)
@@ -77,6 +77,18 @@ public partial class MainWindow
         }
         resume.Click+=(_,_)=>SaveResume();startup.Children.Add(resume);startup.Children.Add(Text("Загрузки, которые ты поставил на паузу вручную, останутся на паузе.",12,true));
         RenderUpdateSettings(Card("Обновления","Новые версии из официального репозитория GitHub."));
+        var diagnostics=Card("Диагностика","Скопируй отчёт, чтобы проверить проблему или приложить его к сообщению об ошибке. Личные пути и ключи доступа скрываются. Отправка происходит только вручную.");
+        var diagnosticActions=new WrapPanel();diagnostics.Children.Add(diagnosticActions);
+        diagnosticActions.Children.Add(ActionButton("Скопировать логи","IconFile",()=>
+        {
+            try{Clipboard.SetText(DiagnosticReport.Create(prefs,downloads));Status.Text="Диагностический отчёт скопирован.";}
+            catch(Exception error){Status.Text="Не удалось скопировать логи: "+error.Message;}
+        }));
+        diagnosticActions.Children.Add(ActionButton("Сообщить об ошибке","IconInfo",()=>
+        {
+            try{System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(DiagnosticReport.IssueUrl){UseShellExecute=true});}
+            catch(Exception error){Status.Text="Не удалось открыть форму: "+error.Message;}
+        }));
         var about=Card("Качалка","Нативное приложение для Windows. Версия "+(typeof(MainWindow).Assembly.GetName().Version?.ToString(3)??""));
         about.Children.Add(Text("Постеры загружаются по мере просмотра. Торрент-движок работает, пока есть активные задачи, и освобождает ресурсы после их остановки.",12,true));
     }

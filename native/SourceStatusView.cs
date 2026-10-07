@@ -46,7 +46,7 @@ public partial class MainWindow
     {
         if(!releaseViews.TryGetValue(item.Id,out var view))return;
         var content=new StackPanel();
-        var summary=view.Checking?"Проверяем источники. Найденные варианты уже можно скачивать.":view.Saved?"Есть сохранённые варианты. Число сидов могло измениться.":view.ReceivedUtc.HasValue?"Варианты получены "+DateLabel(view.ReceivedUtc.Value)+".":"Свежих вариантов пока нет.";
+        var summary=view.Checking?"Проверяем источники. Найденные варианты уже можно скачивать.":view.Saved?"Есть сохранённые варианты. Число отдающих могло измениться.":view.ReceivedUtc.HasValue?"Варианты получены "+DateLabel(view.ReceivedUtc.Value)+".":"Свежих вариантов пока нет.";
         var text=Text(summary,12,true);text.Name="SourceSummary";text.Margin=new(0,0,0,8);content.Children.Add(text);
         if(view.Saved&&view.SavedUtc.HasValue){var date=Text("Сохранённая подборка: "+DateLabel(view.SavedUtc.Value),11,true);date.Margin=new(0,0,0,8);content.Children.Add(date);}
         var actions=new WrapPanel();content.Children.Add(actions);

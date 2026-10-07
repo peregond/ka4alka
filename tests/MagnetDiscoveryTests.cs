@@ -51,7 +51,8 @@ static class MagnetDiscoveryTests
             Check(http.GoodAnnounces>0&&http.FailedAnnounces>0,"a failed HTTP tracker does not prevent another independent tier from finding a peer");
             Check(manager.TrackerManager.Tiers.SelectMany(t=>t.Trackers).Count()==3,"fallback tracker deduplication retains the original tracker");
             Check(manager.InfoHashes.V1!.ToHex()==hash,"discovery keeps the exact selected infohash");
-            await service.Close();
+            var closeWatch=System.Diagnostics.Stopwatch.StartNew();await service.Close();
+            Check(closeWatch.Elapsed<TimeSpan.FromSeconds(10),"closing with an unresponsive UDP tracker finishes promptly and persists the queue");
             var restored=new DownloadService(Settings("discovery-restore-cache",FreePort()),publicTrackers:[http.Url]);
             try
             {
@@ -102,7 +103,8 @@ static class MagnetDiscoveryTests
                     var line=await reader.ReadLineAsync(stop.Token)??"";
                     while(!string.IsNullOrEmpty(await reader.ReadLineAsync(stop.Token))){}
                     byte[] body;string status;
-                    if(line.StartsWith("GET /fail?",StringComparison.Ordinal)){Interlocked.Increment(ref failed);status="503 Service Unavailable";body=[];}
+                    if(line.StartsWith("GET /scrape?",StringComparison.Ordinal)){status="200 OK";body=Encoding.ASCII.GetBytes("d5:filesdee");}
+                    else if(line.StartsWith("GET /fail?",StringComparison.Ordinal)){Interlocked.Increment(ref failed);status="503 Service Unavailable";body=[];}
                     else
                     {
                         if(!line.StartsWith("GET /announce?",StringComparison.Ordinal)||!line.Contains("info_hash="))throw new Exception("Malformed tracker announce");

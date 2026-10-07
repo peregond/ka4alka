@@ -17,6 +17,11 @@ public static class WindowSizing
         var height=Math.Max(1,Math.Min(950,maxHeight-24));
         return new(width,height,Math.Min(620,width),Math.Min(420,height),maxWidth,maxHeight);
     }
+    public static WindowDimensions FitPixels(double width,double height,double scaleX,double scaleY)
+    {
+        if(!double.IsFinite(scaleX)||!double.IsFinite(scaleY)||scaleX<=0||scaleY<=0)throw new ArgumentOutOfRangeException(nameof(scaleX));
+        return Fit(width/scaleX,height/scaleY);
+    }
     public static int PosterColumns(double contentWidth)=>contentWidth>=1190?7:contentWidth>=900?6:Math.Clamp((int)Math.Floor(contentWidth/155),1,5);
 }
 
@@ -70,12 +75,17 @@ public partial class MainWindow
         var changed=first||monitor!=activeMonitor||Math.Abs(scaleX-activeScaleX)>0.01||Math.Abs(scaleY-activeScaleY)>0.01;
         if(!changed&&Width<=MaxWidth&&Height<=MaxHeight)return;
         activeMonitor=monitor;activeScaleX=scaleX;activeScaleY=scaleY;
-        var fit=WindowSizing.Fit(info.Work.Width/scaleX,info.Work.Height/scaleY);
+        var fit=WindowSizing.FitPixels(info.Work.Width,info.Work.Height,scaleX,scaleY);
         MaxWidth=fit.MaxWidth;MaxHeight=fit.MaxHeight;
         MinWidth=fit.MinWidth;MinHeight=fit.MinHeight;
         if(WindowState==WindowState.Normal){Width=first?fit.Width:Math.Min(Width,fit.Width);Height=first?fit.Height:Math.Min(Height,fit.Height);}
         ApplyCompactLayout();
-        Dispatcher.BeginInvoke(DispatcherPriority.Loaded,new Action(()=>PlaceWithinWorkArea(handle,info.Work,first)));
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded,new Action(()=>
+        {
+            var currentInfo=new MonitorInfo{Size=(uint)Marshal.SizeOf<MonitorInfo>()};
+            var currentMonitor=MonitorFromWindow(handle,MonitorDefaultNearest);
+            if(GetMonitorInfo(currentMonitor,ref currentInfo))PlaceWithinWorkArea(handle,currentInfo.Work,first);
+        }));
     }
     static void PlaceWithinWorkArea(IntPtr handle,NativeRect work,bool center)
     {

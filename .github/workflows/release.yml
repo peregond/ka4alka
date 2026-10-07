@@ -93,6 +93,9 @@ jobs:
           name: production-windows-update-evidence
           path: |
             test-output/windows-update/checks.txt
+            test-output/dpi-reliability/*
+            test-output/close-reliability/*.json
+            test-output/close-reliability/error.txt
             test-output/catalog-paging/*
             test-output/search-downloads/*
             test-output/download-end-to-end/*.json

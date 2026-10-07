@@ -38,7 +38,7 @@ public record TrackerHealth(int Total,int Responded,int Failed)
     public string Summary=>Total==0?"":$"Трекеры: ответили {Responded} из {Total}. ";
     public string WaitingHint=>Total>0&&Failed==Total
         ?"Трекеры пока недоступны. Проверь подключение к сети или попробуй другую раздачу."
-        :Summary+"Сейчас никто не подключён к этой раздаче. Число сидов в поиске может быть устаревшим. Если ожидание затянется, попробуй другой вариант.";
+        :Summary+"Сейчас никто не подключён к этой раздаче. Число отдающих в поиске может быть устаревшим. Если ожидание затянется, попробуй другой вариант.";
 }
 
 public record DownloadSnapshot(TorrentState State,bool Paused,double Progress,long? TotalBytes,long DownloadRate,long UploadRate,int Connections,int Seeds,DateTime StartedUtc,DateTime? LastPayloadUtc,string? Error=null,TrackerHealth? Trackers=null);
@@ -55,7 +55,7 @@ public static class DownloadPresentation
         var up=!s.Paused&&(s.State is TorrentState.Downloading or TorrentState.Seeding)?Math.Max(0,s.UploadRate):0;
         item.Progress=progress;item.DownloadRate=down;item.UploadRate=up;item.TotalBytes=total;item.Remaining="";item.Hint="";
         item.Indeterminate=!s.Paused&&(s.State is TorrentState.Metadata or TorrentState.Hashing);
-        item.PeersText=s.Paused?"":$"Подключено: {Math.Max(0,s.Connections)} · сидов: {Math.Max(0,s.Seeds)}";
+        item.PeersText=s.Paused?"":$"Подключено: {Math.Max(0,s.Connections)} · отдают: {Math.Max(0,s.Seeds)}";
         var volume=total.HasValue?$"{DownloadService.FormatBytes(transferred)} из {DownloadService.FormatBytes(total.Value)}":"Размер станет известен после получения метаданных";
         if(s.Paused){item.Status="На паузе";item.Stats=$"{progress:F1}% · {volume}";return;}
         switch(s.State)

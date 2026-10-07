@@ -26,6 +26,12 @@ public partial class MainWindow
             check(catalogDisplay.Count==3&&Preferences.Load().HidePoorQuality,"top quality filter hides poor-only titles and persists the choice");
             FindVisual<ComboBox>(PageHeader,x=>AutomationProperties.GetName(x)=="Минимальное качество")!.SelectedItem="Full HD";UpdateLayout();
             check(catalogDisplay.Count==2&&catalogDisplay.Any(x=>x.Id==items[3].Id)&&Preferences.Load().MinimumReleaseHeight==1080,"Full HD minimum hides 720p titles while retaining unknown-quality titles");
+            prefs.HidePoorQuality=false;await catalogIndex.CacheReleasesAsync(items[3],[],[new("Fixture",SourceState.Empty,CheckedUtc:DateTime.UtcNow)]);
+            favoritesOnly=false;liveItems=items;liveKey=CurrentCatalogKey;Render();UpdateLayout();
+            check(catalogDisplay.Count==3&&!catalogDisplay.Any(x=>x.Id==items[3].Id),"feed hides a successfully checked title with no download options");
+            favoritesOnly=true;Render();UpdateLayout();
+            check(catalogDisplay.Count==4,"a hidden title remains accessible in Saved for future rechecking");
+            prefs.HidePoorQuality=true;
             var selected=items[1];liveReleases[selected.Id]=[Row("a","HDCAM 1080p"),Row("b","720p"),Row("c","1080p"),Row("d","WEBRip")];
             current=selected;Render();UpdateLayout();
             check(VisualElements<Button>(Body).Select(x=>x.Tag).OfType<SourceEntry>().Count()==2,"the global filter carries into film detail and retains Full HD and unknown releases");

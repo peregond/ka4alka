@@ -31,7 +31,7 @@ public sealed class PirateBaySource(SourceClient client)
             long? size=long.TryParse(Value("size"),out var amount)&&amount>0?amount:null;
             int? seeds=int.TryParse(Value("seeders"),out var count)&&count>=0?count:null;
             var entry=new SourceEntry("The Pirate Bay:"+id,title,"The Pirate Bay","https://thepiratebay.org/description.php?id="+id,
-                "magnet:?xt=urn:btih:"+hash.ToUpperInvariant()+"&dn="+Uri.EscapeDataString(title)+"&tr="+Uri.EscapeDataString("udp://tracker.opentrackr.org:1337/announce"),null,size,seeds);
+                "magnet:?xt=urn:btih:"+hash.ToUpperInvariant()+"&dn="+Uri.EscapeDataString(title)+"&tr="+Uri.EscapeDataString("udp://tracker.opentrackr.org:1337/announce"),null,size,seeds){Leechers=int.TryParse(Value("leechers"),out var peers)&&peers>=0?peers:null};
             if(!LiveCatalog.Matches(item,entry))continue;
             if(item.Section=="Фильмы"&&item.Year>0&&!Regex.IsMatch(title,@"(?<!\d)"+item.Year+@"(?!\d)"))continue;
             result.Add(entry);

@@ -139,7 +139,7 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null)
             id=Uri.UnescapeDataString(archive.AbsolutePath["/details/".Length..].TrimEnd('/'));
             if(id.Length==0||id.Contains('/'))return null;
         }
-        return new SourceEntry(id,title,source,page,torrent,null,Long(row,"size"),Count(row,"seeds")){Via=String(row,"via")};
+        return new SourceEntry(id,title,source,page,torrent,null,Long(row,"size"),Count(row,"seeds")){Via=String(row,"via"),Leechers=Count(row,"leechers")};
     }
 
     public async Task<IReadOnlyList<SourceEntry>> Releases(MediaItem item,CancellationToken ct)
