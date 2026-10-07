@@ -2,8 +2,8 @@ name: Investigate public film metadata and Russian sources
 on:
   workflow_dispatch:
   push:
-    branches: [codex/quality-sources-0.28]
-    paths: [scripts/probe-additional-sources.py, .github/workflows/source-investigation.yml]
+    branches: [codex/dark-default-0.28.1]
+    paths: [scripts/probe-additional-sources.py, scripts/probe-magnet-discovery.py, .github/workflows/source-investigation.yml]
 permissions:
   contents: read
 jobs:
@@ -14,3 +14,5 @@ jobs:
       - uses: actions/checkout@v4
       - name: Read public pages and report source markup
         run: python -X utf8 scripts/probe-additional-sources.py
+      - name: Probe magnet discovery and HTTPS tracker responses
+        run: python -X utf8 scripts/probe-magnet-discovery.py
