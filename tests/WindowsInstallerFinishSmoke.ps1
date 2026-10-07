@@ -6,13 +6,16 @@ using System;
 using System.Runtime.InteropServices;
 public static class InstallerScreen {
  [StructLayout(LayoutKind.Sequential)] public struct Rect {public int Left,Top,Right,Bottom;}
+ [DllImport("user32.dll")] public static extern IntPtr GetDlgItem(IntPtr dialog,int id);
+ [DllImport("user32.dll")] public static extern bool IsWindowEnabled(IntPtr window);
+ [DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr window,uint message,IntPtr param,IntPtr data);
  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr handle,out Rect rect);
  [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr handle,IntPtr context,uint flags);
 }
 '@
 $process=Start-Process -FilePath $Setup -PassThru
 try {
- $deadline=(Get-Date).AddSeconds(45)
+ $deadline=(Get-Date).AddSeconds(90)
  $root=$null
  do {
   $process.Refresh()
@@ -21,19 +24,25 @@ try {
   if($null -eq $root){Start-Sleep -Milliseconds 100}
  } while($null -eq $root -and (Get-Date) -lt $deadline)
  if($null -eq $root){throw 'Installer window missing'}
- $buttons=[System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ControlTypeProperty,[System.Windows.Automation.ControlType]::Button)
- function Find-Button([string]$pattern){@($root.FindAll([System.Windows.Automation.TreeScope]::Descendants,$buttons)) | Where-Object {$_.Current.IsEnabled -and $_.Current.Name -match $pattern} | Select-Object -First 1}
- $finish=$null
+ $finish=$null;$guide=$null
  while((Get-Date)-lt $deadline){
-  $finish=Find-Button '^Готово$'
-  if($null -ne $finish){break}
-  $next=Find-Button '^(Далее|Установить)'
-  if($null -ne $next){([System.Windows.Automation.InvokePattern]$next.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern)).Invoke()}
+  $process.Refresh()
+  if($process.HasExited){throw 'Installer exited before the final page'}
+  $texts=$root.FindAll([System.Windows.Automation.TreeScope]::Descendants,[System.Windows.Automation.Condition]::TrueCondition)
+  $guide=@($texts) | Where-Object {$_.Current.Name.StartsWith('При первом запуске выбери папку')} | Select-Object -First 1
+  # NSIS uses IDOK (1) for Next, Install, and Finish on the outer dialog.
+  # Native activation also works when accessibility includes a mnemonic in Name.
+  $next=[InstallerScreen]::GetDlgItem($process.MainWindowHandle,1)
+  if($null -ne $guide -and $next -ne [IntPtr]::Zero){$finish=[System.Windows.Automation.AutomationElement]::FromHandle($next);break}
+  if($next -ne [IntPtr]::Zero -and [InstallerScreen]::IsWindowEnabled($next)){
+   [InstallerScreen]::SendMessage($next,0x00F5,[IntPtr]::Zero,[IntPtr]::Zero) | Out-Null
+  }
   Start-Sleep -Milliseconds 250
  }
- if($null -eq $finish){throw 'Installer never reached Finish'}
- $texts=$root.FindAll([System.Windows.Automation.TreeScope]::Descendants,[System.Windows.Automation.Condition]::TrueCondition)
- $guide=@($texts) | Where-Object {$_.Current.Name.StartsWith('При первом запуске выбери папку')} | Select-Object -First 1
+ if($null -eq $finish){
+  $observed=@($root.FindAll([System.Windows.Automation.TreeScope]::Descendants,[System.Windows.Automation.Condition]::TrueCondition)) | ForEach-Object {$_.Current.Name}
+  throw ('Installer never reached Finish; observed controls: '+($observed -join ' | '))
+ }
  if($null -eq $guide){throw 'Installer finish guide is missing'}
  $bounds=$guide.Current.BoundingRectangle
  $scale=$bounds.Width/292.5
