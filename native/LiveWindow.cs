@@ -45,7 +45,7 @@ public partial class MainWindow
                 MediaItem indexed;
                 try{indexed=await onlineIndex.Detail(item,CancellationToken.None);}
                 catch{return await new LiveCatalog(sourceClient).Detail(item,CancellationToken.None);}
-                if(!string.IsNullOrWhiteSpace(indexed.Description))return indexed;
+                if(!string.IsNullOrWhiteSpace(indexed.Description)&&indexed.People.Length>0)return indexed;
                 try
                 {
                     var direct=await new LiveCatalog(sourceClient).Detail(indexed,CancellationToken.None);
@@ -54,6 +54,8 @@ public partial class MainWindow
                         Description=string.IsNullOrWhiteSpace(direct.Description)?"Описание временно недоступно.":direct.Description,
                         Kinopoisk=direct.Kinopoisk=="—"?indexed.Kinopoisk:direct.Kinopoisk,
                         Imdb=direct.Imdb=="—"?indexed.Imdb:direct.Imdb,
+                        People=direct.People.Length>0?direct.People:indexed.People,
+                        Collections=direct.Collections.Length>0?direct.Collections:indexed.Collections,
                         OriginalTitle=direct.OriginalTitle??indexed.OriginalTitle
                     };
                 }
@@ -223,6 +225,7 @@ public partial class MainWindow
         descriptionToggle=Button(descriptionExpanded?"Свернуть описание":"Читать дальше",()=>{descriptionExpanded=!descriptionExpanded;Render();});descriptionToggle.Name="DescriptionToggle";descriptionToggle.Style=(Style)FindResource("QuietButton");descriptionToggle.HorizontalAlignment=HorizontalAlignment.Left;descriptionToggle.Padding=new(0,5,0,5);descriptionToggle.Margin=new(0);descriptionToggle.MinHeight=26;descriptionToggle.Visibility=Visibility.Collapsed;detailDescription.Children.Add(descriptionToggle);
         detailSynopsis.SizeChanged+=(sender,_)=>{if(ReferenceEquals(sender,detailSynopsis))UpdateDescriptionToggle();};
         var heroFrame=new Border{Child=detailHero,Background=(Brush)FindResource("Panel"),BorderBrush=(Brush)FindResource("Edge"),BorderThickness=new(1),CornerRadius=new(22),Padding=new(20),Margin=new(0,0,0,24)};panel.Children.Add(heroFrame);UpdateDetailLayout();
+        RenderCinemaConnections(panel,item);
         var releasesTitle=Text("Варианты загрузки",23);releasesTitle.FontWeight=FontWeights.SemiBold;releasesTitle.Margin=new(0,0,0,13);panel.Children.Add(releasesTitle);
         RenderSourceStatus(panel,item);
         if(!liveReleases.TryGetValue(item.Id,out var releases)){panel.Children.Add(Text("Ищем доступные раздачи…",13,true));return;}

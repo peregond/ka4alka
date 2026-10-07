@@ -42,6 +42,7 @@ if(args.Contains("--probe-public"))
  finally{await probe.Close();}
  return;
 }
+if(args.Contains("--verify-cinema-source")){await CinemaSourceTests.Run();return;}
 DownloadTests.Run();
 await CatalogBatchTests.Run();
 if(args.Contains("--catalog-only"))return;

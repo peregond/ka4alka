@@ -1,6 +1,6 @@
 # Публикация сборок «Качалки»
 
-Готовые сборки распространяются через отдельный публичный репозиторий `peregond/kachalka-releases`. Исходники приложения и локальные настройки туда не отправляются. Источник документации релизов — каталог `distribution/` в этом рабочем пространстве.
+Готовые сборки распространяются через Releases публичного репозитория `peregond/ka4alka`. В архив входят только файлы приложения; локальные настройки туда не отправляются. Источник документации релизов — каталог `distribution/` в этом рабочем пространстве.
 
 ## Подготовка выпуска
 
@@ -9,7 +9,7 @@
 3. Сформировать пакет публикации:
 
 ```powershell
-./package-release.ps1 -Version 0.18.0 -ArchivePath dist/Kachalka-0.18.zip
+./package-release.ps1 -Version 0.19.0 -ArchivePath dist/Kachalka-0.19.zip
 ```
 
 Скрипт проверяет структуру архива и версию DLL без её запуска, исключает случайное включение тестового EXE, копирует ZIP под постоянным именем и создаёт `latest.json` и `SHA256SUMS.txt`.
@@ -17,7 +17,7 @@
 ## Порядок размещения
 
 1. Подготовить описание выпуска, обновить документацию в `distribution/`.
-2. Отправить только эту документацию в репозиторий релизов.
+2. Отправить проверенные исходники и документацию в репозиторий.
 3. Создать черновик GitHub Release с тегом нужной версии и конкретным коммитом документации.
 4. Загрузить три файла: `Kachalka-win-x64.zip`, `latest.json`, `SHA256SUMS.txt`.
 5. Проверить размеры и SHA-256 загруженных файлов. Сохранённый черновик не является публичной версией.
@@ -26,11 +26,16 @@
 Пример для уже подготовленного и отправленного коммита:
 
 ```powershell
-gh release create v0.18.0 --repo peregond/kachalka-releases --target <COMMIT_SHA> --draft --title "Качалка 0.18" --notes-file distribution/RELEASE-NOTES-0.18.md
-gh release upload v0.18.0 --repo peregond/kachalka-releases dist/release-0.18.0/Kachalka-win-x64.zip dist/release-0.18.0/latest.json dist/release-0.18.0/SHA256SUMS.txt
-gh release edit v0.18.0 --repo peregond/kachalka-releases --draft=false --latest
+gh release create v0.19.0 --repo peregond/ka4alka --target <COMMIT_SHA> --draft --title "Качалка 0.19" --notes-file distribution/RELEASE-NOTES-0.19.md
+gh release upload v0.19.0 --repo peregond/ka4alka dist/release-0.19.0/Kachalka-win-x64.zip dist/release-0.19.0/latest.json dist/release-0.19.0/SHA256SUMS.txt
+gh release edit v0.19.0 --repo peregond/ka4alka --draft=false --latest
 ```
 
 Не заменять уже опубликованный архив под прежним номером версии. Следующий выпуск получает новый тег, а постоянные ссылки `releases/latest/download/...` переходят на него.
 
-Формат будущего обновления и оставшиеся задачи описаны в `distribution/UPDATE_PROTOCOL.md`. Автоматического обновления клиента 0.18 пока нет.
+Формат будущего обновления и оставшиеся задачи описаны в `distribution/UPDATE_PROTOCOL.md`. Автоматического обновления клиента 0.19 пока нет.
+
+Выпуск 0.19 находится в подготовке. Перед публикацией требуется Windows-сборка,
+запуск тестов и проверка карточек участников на живом источнике. Опубликованный
+`distribution/latest.json` остаётся на 0.18.0 до сборки и проверки нового архива;
+размер и SHA-256 нового выпуска формирует `package-release.ps1`.

@@ -2,11 +2,11 @@
 
 Постоянный адрес метаданных:
 
-`https://github.com/peregond/kachalka-releases/releases/latest/download/latest.json`
+`https://github.com/peregond/ka4alka/releases/latest/download/latest.json`
 
 Архив для ручной установки:
 
-`https://github.com/peregond/kachalka-releases/releases/latest/download/Kachalka-win-x64.zip`
+`https://github.com/peregond/ka4alka/releases/latest/download/Kachalka-win-x64.zip`
 
 Архив каждого выпуска имеет собственный адрес с тегом версии. `latest.json` ссылается на этот адрес, поэтому скачивание не перепутает версии при появлении нового выпуска.
 

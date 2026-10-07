@@ -63,6 +63,13 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null)
         return Slug(slug)?section+":"+slug:null;
     }
 
+    static T[] MetadataArray<T>(JsonElement row,string name)
+    {
+        if(!row.TryGetProperty(name,out var value)||value.ValueKind!=JsonValueKind.Array)return [];
+        try{return JsonSerializer.Deserialize<T[]>(value.GetRawText(),new JsonSerializerOptions{PropertyNameCaseInsensitive=true})?.Where(x=>x!=null).Take(100).ToArray()??[];}
+        catch(JsonException){return [];}
+    }
+
     static MediaItem? Media(JsonElement row,string section)
     {
         if(String(row,"section")!=SectionKey(section))return null;
@@ -75,7 +82,10 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null)
         return new MediaItem(id,title,section,"",Integer(row,"year"),Score(String(row,"kinopoisk")),Score(String(row,"imdb")),"#526B69")
         {
             OnlineId=onlineId,PageUrl=url,ImageUrl=Https(String(row,"poster")),
-            OriginalTitle=String(row,"originalTitle"),Description=String(row,"description")
+            OriginalTitle=String(row,"originalTitle"),Description=String(row,"description"),
+            People=MetadataArray<CinemaPerson>(row,"people").Where(x=>!string.IsNullOrWhiteSpace(x.Name)&&!string.IsNullOrWhiteSpace(x.Role)&&CinemaMetadata.CatalogUrl(x.PageUrl,"/persons/","/person/","/people/")!=null).ToArray(),
+            Awards=MetadataArray<CinemaAward>(row,"awards").Where(x=>!string.IsNullOrWhiteSpace(x.Name)&&!string.IsNullOrWhiteSpace(x.Category)&&x.Year>0).ToArray(),
+            Collections=MetadataArray<CinemaCollection>(row,"collections").Where(x=>!string.IsNullOrWhiteSpace(x.Name)&&CinemaMetadata.CatalogUrl(x.PageUrl,"/collections/","/franchise/")!=null).ToArray()
         };
     }
 
@@ -100,6 +110,9 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null)
             OnlineId=fresh.OnlineId,Title=fresh.Title,Year=fresh.Year>0?fresh.Year:item.Year,
             ImageUrl=fresh.ImageUrl??item.ImageUrl,OriginalTitle=fresh.OriginalTitle??item.OriginalTitle,
             Description=fresh.Description??item.Description,
+            People=fresh.People.Length>0?fresh.People:item.People,
+            Awards=fresh.Awards.Length>0?fresh.Awards:item.Awards,
+            Collections=fresh.Collections.Length>0?fresh.Collections:item.Collections,
             Kinopoisk=fresh.Kinopoisk=="—"?item.Kinopoisk:fresh.Kinopoisk,
             Imdb=fresh.Imdb=="—"?item.Imdb:fresh.Imdb
         };

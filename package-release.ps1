@@ -1,7 +1,7 @@
 param(
- [string]$Version='0.18.0',
- [string]$ArchivePath='dist/Kachalka-0.18.zip',
- [string]$Repository='peregond/kachalka-releases'
+ [string]$Version='0.19.0',
+ [string]$ArchivePath='dist/Kachalka-0.19.zip',
+ [string]$Repository='peregond/ka4alka'
 )
 $ErrorActionPreference='Stop'
 if($Version -notmatch '^\d+\.\d+\.\d+$'){throw 'Version must have three numeric components'}

@@ -6,7 +6,7 @@ using HtmlAgilityPack;
 namespace Kachalka;
 public sealed class LiveCatalog(SourceClient client)
 {
-    record DetailSnapshot(string Kinopoisk,string Imdb,string Description,string? OriginalTitle=null);
+    record DetailSnapshot(string Kinopoisk,string Imdb,string Description,string? OriginalTitle=null,CinemaPerson[]? People=null,CinemaCollection[]? Collections=null);
     public const string Base="https://w6.zona.plus";
     static HtmlDocument Html(byte[] b){var h=new HtmlDocument();h.LoadHtml(Encoding.UTF8.GetString(b));return h;}
     static string Text(HtmlNode? n)=>HtmlEntity.DeEntitize(n?.InnerText??"").Trim();
@@ -35,18 +35,34 @@ public sealed class LiveCatalog(SourceClient client)
         var cache=System.IO.Path.Combine(Preferences.DataDir,"details",key+".json");
         try
         {
-            var h=Html(await client.Read(SourceClient.WebUri(item.PageUrl!),4*1024*1024,ct));
+            var bytes=await client.Read(SourceClient.WebUri(item.PageUrl!),4*1024*1024,ct);
+            var h=Html(bytes);
             string Score(string name){var v=Text(h.DocumentNode.SelectSingleNode("//*["+Class(name)+"]"));return Regex.IsMatch(v,@"^\d{1,2}([.,]\d)?$")?v:"—";}
             var original=HtmlEntity.DeEntitize(h.DocumentNode.SelectSingleNode("//meta[@itemprop='alternativeHeadline']")?.GetAttributeValue("content","")??"").Trim();
-            var result=item with{Kinopoisk=Score("entity-rating-kp"),Imdb=Score("entity-rating-imdb"),Description=Text(h.DocumentNode.SelectSingleNode("//*[@itemprop='description' and not(self::meta)]")),OriginalTitle=original.Length==0?null:original};
-            try{System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(cache)!);await System.IO.File.WriteAllTextAsync(cache,JsonSerializer.Serialize(new DetailSnapshot(result.Kinopoisk,result.Imdb,result.Description??"",result.OriginalTitle)),ct);}catch(System.IO.IOException){}
+            var result=item with{Kinopoisk=Score("entity-rating-kp"),Imdb=Score("entity-rating-imdb"),Description=Text(h.DocumentNode.SelectSingleNode("//*[@itemprop='description' and not(self::meta)]")),OriginalTitle=original.Length==0?null:original,People=CinemaMetadata.People(bytes),Collections=CinemaMetadata.Collections(bytes)};
+            try{System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(cache)!);await System.IO.File.WriteAllTextAsync(cache,JsonSerializer.Serialize(new DetailSnapshot(result.Kinopoisk,result.Imdb,result.Description??"",result.OriginalTitle,result.People,result.Collections)),ct);}catch(System.IO.IOException){}
             return result;
         }
         catch(Exception) when(!ct.IsCancellationRequested&&System.IO.File.Exists(cache))
         {
             var saved=JsonSerializer.Deserialize<DetailSnapshot>(await System.IO.File.ReadAllTextAsync(cache,ct))!;
-            return item with{Kinopoisk=saved.Kinopoisk,Imdb=saved.Imdb,Description=saved.Description,OriginalTitle=saved.OriginalTitle};
+            return item with{Kinopoisk=saved.Kinopoisk,Imdb=saved.Imdb,Description=saved.Description,OriginalTitle=saved.OriginalTitle,People=saved.People??item.People,Collections=saved.Collections??item.Collections};
         }
+    }
+    public async Task<PersonProfile> Person(CinemaPerson person,CancellationToken ct)
+    {
+        var url=CinemaMetadata.CatalogUrl(person.PageUrl,"/persons/","/person/","/people/")??throw new ArgumentException("Неверная карточка человека.");
+        var key=Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(url)));
+        var cache=System.IO.Path.Combine(Preferences.DataDir,"people",key+".html");
+        try
+        {
+            var bytes=await client.Read(new Uri(url),4*1024*1024,ct);
+            var result=CinemaMetadata.Person(bytes,person);
+            if(result.Description.Length==0&&result.Filmography.Length==0)throw new System.IO.InvalidDataException("Источник не вернул сведения о человеке.");
+            try{System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(cache)!);await System.IO.File.WriteAllBytesAsync(cache,bytes,ct);}catch(System.IO.IOException){}
+            return result;
+        }
+        catch(Exception) when(!ct.IsCancellationRequested&&System.IO.File.Exists(cache)){return CinemaMetadata.Person(await System.IO.File.ReadAllBytesAsync(cache,ct),person);}
     }
     public async Task<IReadOnlyList<SourceEntry>> Releases(string title,CancellationToken ct)
     {

@@ -2,16 +2,16 @@
 
 Нативное приложение для Windows: фильмы и сериалы с постерами, выбор раздачи и загрузка через torrent или magnet. Без Electron и встроенного браузерного движка.
 
-**[Скачать последнюю версию для Windows x64](https://github.com/peregond/kachalka-releases/releases/latest/download/Kachalka-win-x64.zip)**
+**[Скачать последнюю версию для Windows x64](https://github.com/peregond/ka4alka/releases/latest/download/Kachalka-win-x64.zip)**
 
-[Все выпуски и изменения](https://github.com/peregond/kachalka-releases/releases) · [Каталог «Ка4алка Онл@йн»](https://kachalka-index-2026.peregon.chatgpt.site/)
+[Все выпуски и изменения](https://github.com/peregond/ka4alka/releases) · [Каталог «Ка4алка Онл@йн»](https://kachalka-index-2026.peregon.chatgpt.site/)
 
 ![Каталог «Качалки»](assets/catalog.png)
 
 ## Установка
 
 1. Скачайте ZIP и распакуйте его целиком.
-2. Откройте папку `Kachalka-0.18` и запустите `Kachalka.exe`.
+2. Откройте папку `Kachalka-0.19` и запустите `Kachalka.exe`.
 3. При первом запуске выберите папку загрузок. Позже её можно поменять в настройках.
 
 Нужны Windows 10/11 x64 и интернет для каталога и поиска участников. .NET входит в архив; устанавливать его отдельно не нужно. Подпись издателя пока отсутствует. Это ранняя версия приложения.
@@ -27,9 +27,9 @@
 
 ## Обновление
 
-В 0.18 обновление выполняется вручную: закройте приложение, скачайте новый архив и распакуйте его в отдельную папку. Настройки и очередь хранятся в `%LOCALAPPDATA%/Kachalka` и доступны новой версии.
+В 0.19 обновление выполняется вручную: закройте приложение, скачайте новый архив и распакуйте его в отдельную папку. Настройки и очередь хранятся в `%LOCALAPPDATA%/Kachalka` и доступны новой версии.
 
-Для будущего механизма обновлений опубликован [latest.json](https://github.com/peregond/kachalka-releases/releases/latest/download/latest.json). Автоматическая установка обновлений в 0.18 ещё не включена.
+Для будущего механизма обновлений опубликован [latest.json](https://github.com/peregond/ka4alka/releases/latest/download/latest.json). Автоматическая установка обновлений в 0.19 ещё не включена.
 
 ## Проверка архива
 

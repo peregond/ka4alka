@@ -32,6 +32,33 @@ public static class SourceTests
     public static async Task Run(bool live,bool allSections=false)
     {
         static void Check(bool value,string name){if(!value)throw new Exception(name);Console.WriteLine("PASS: "+name);}
+        var cinemaFixture=Encoding.UTF8.GetBytes("""
+            <div itemprop='actor'><a href='/persons/test-actor'><span itemprop='name'>Тест &amp; актёр</span></a></div>
+            <div itemprop='actor'><a href='/persons/test-actor'>Тест &amp; актёр</a></div>
+            <div itemprop='director'><a href='/persons/test-actor'>Тест &amp; актёр</a></div>
+            <div><span class='entity-desc-label'>Оператор</span><a href='/persons/test-camera'>Оператор</a></div>
+            <div itemprop='actor'><a href='https://other.test/persons/fake'>Чужой</a></div>
+            <div itemprop='isPartOf'><a href='/franchise/test-series'>Серия фильмов</a></div>
+            <a href='/collections/unrelated'>Навигация</a>
+            <div itemprop='description'>Биография участника</div>
+            <li class='results-item-wrap'><a itemprop='url' href='/movies/first'><span itemprop='name'>Первый фильм</span></a><span class='results-item-year'>2020</span><span class='results-item-rating'>8,5</span></li>
+            <li class='results-item-wrap'><a itemprop='url' href='/movies/second'><span itemprop='name'>Второй фильм</span></a><span class='results-item-year'>2022</span><span class='results-item-rating'>9.1</span></li>
+            <li class='results-item-wrap'><a itemprop='url' href='/movies/unknown'><span itemprop='name'>Без рейтинга</span></a></li>
+            """);
+        var people=CinemaMetadata.People(cinemaFixture);
+        Check(people.Length==3&&people.Count(x=>x.Name=="Тест & актёр")==2&&people.Any(x=>x.Role=="Операторы"),"credits preserve multiple roles, decode names, reject foreign links and deduplicate");
+        Check(CinemaMetadata.CatalogUrl("//other.test/persons/test","/persons/")==null&&CinemaMetadata.CatalogUrl("/persons/test?q=1","/persons/")==null,"person links stay on trusted catalog routes");
+        Check(CinemaMetadata.Collections(cinemaFixture).Single().Kind=="Франшиза","collections use explicit membership rather than unrelated navigation");
+        var personProfile=CinemaMetadata.Person(cinemaFixture,people[0]);
+        Check(personProfile.Description=="Биография участника"&&personProfile.Filmography.Length==3&&CinemaMetadata.Top(personProfile.Filmography).Select(x=>x.Title).SequenceEqual(new[]{"Второй фильм","Первый фильм"}),"person filmography keeps card ratings and excludes unknown scores from top");
+        using(var fixture=new SourceClient(new FixtureHandler(cinemaFixture)))
+        {
+            var catalog=new LiveCatalog(fixture);await catalog.Person(people[0],CancellationToken.None);
+            var cinemaMovie=personProfile.Filmography[0];await catalog.Detail(cinemaMovie,CancellationToken.None);
+            using var offline=new SourceClient(new OfflineHandler());var cachedCatalog=new LiveCatalog(offline);
+            var cachedPerson=await cachedCatalog.Person(people[0],CancellationToken.None);var cachedDetail=await cachedCatalog.Detail(cinemaMovie,CancellationToken.None);
+            Check(cachedPerson.Filmography.Length==3&&cachedDetail.People.Length==3&&cachedDetail.Collections.Length==1,"person filmography and film connections survive offline restart");
+        }
         var coverPath=Path.GetFullPath(Path.Combine("test-output","cover-recovery-"+Guid.NewGuid().ToString("N")+".img"));
         Directory.CreateDirectory(Path.GetDirectoryName(coverPath)!);
         static string DecodeCover(byte[] bytes)=>Encoding.ASCII.GetString(bytes)=="valid-image"?"decoded":throw new InvalidDataException("Invalid image");

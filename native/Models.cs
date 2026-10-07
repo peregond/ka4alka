@@ -12,6 +12,9 @@ public record MediaItem(int Id, string Title, string Section, string Genre, int 
     public string? ImageUrl {get;init;}
     public string? Description {get;init;}
     public string? OriginalTitle {get;init;}
+    public CinemaPerson[] People {get;init;}=[];
+    public CinemaAward[] Awards {get;init;}=[];
+    public CinemaCollection[] Collections {get;init;}=[];
     [JsonIgnore] public bool IsLive => PageUrl!=null;
     [JsonIgnore] public bool Cinema => Section is "Фильмы" or "Сериалы";
     string? liveScores,liveKp,liveImdb;

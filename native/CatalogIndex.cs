@@ -111,6 +111,9 @@ public sealed class CatalogIndex
                     {
                         OriginalTitle=item.OriginalTitle??old.OriginalTitle,
                         Description=item.Description??old.Description,
+                        People=item.People.Length>0?item.People:old.People,
+                        Awards=item.Awards.Length>0?item.Awards:old.Awards,
+                        Collections=item.Collections.Length>0?item.Collections:old.Collections,
                         Kinopoisk=item.Kinopoisk=="—"?old.Kinopoisk:item.Kinopoisk,
                         Imdb=item.Imdb=="—"?old.Imdb:item.Imdb,
                         OnlineId=item.OnlineId??old.OnlineId,

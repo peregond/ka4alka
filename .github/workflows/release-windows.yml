@@ -1,0 +1,89 @@
+name: Build and publish Windows release
+on:
+  push:
+    branches: [main, release/0.19.0]
+    paths:
+      - native/**
+      - tests/**
+      - distribution/**
+      - build.ps1
+      - package-release.ps1
+      - .github/workflows/release-windows.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: windows-release-0.19.0
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Verify release version
+        shell: pwsh
+        run: |
+          [xml]$project=Get-Content native/Kachalka.csproj
+          if($project.Project.PropertyGroup.Version -ne '0.19.0'){throw 'Unexpected application version'}
+      - name: Run integration tests and build portable application
+        shell: pwsh
+        run: ./build.ps1 -Test -OutputDir dist/Kachalka-0.19
+      - name: Verify live cinema metadata
+        shell: pwsh
+        run: |
+          dotnet run --project tests/Kachalka.Tests.csproj -c Release --no-build -- --verify-cinema-source
+          if($LASTEXITCODE -ne 0){throw 'Cinema metadata source verification failed'}
+      - name: Verify application starts and renders
+        shell: pwsh
+        run: |
+          $env:KACHALKA_DATA=Join-Path $env:RUNNER_TEMP 'kachalka-ui-state'
+          $output=Join-Path $pwd 'test-output/ui-smoke'
+          $process=Start-Process dist/Kachalka-0.19/Kachalka.exe -ArgumentList @('--smoke-test',$output) -PassThru
+          if(-not $process.WaitForExit(90000)){$process.Kill();throw 'UI smoke timed out'}
+          if($process.ExitCode -ne 0 -or (Test-Path "$output/error.txt") -or -not (Test-Path "$output/smoke.json")){throw 'UI smoke failed'}
+      - name: Package verified release
+        shell: pwsh
+        run: |
+          Compress-Archive -Path dist/Kachalka-0.19 -DestinationPath dist/Kachalka-0.19.zip
+          ./package-release.ps1 -Version 0.19.0 -ArchivePath dist/Kachalka-0.19.zip -Repository $env:GITHUB_REPOSITORY
+      - name: Preserve checks and build artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-release-0.19.0
+          path: |
+            dist/release-0.19.0/
+            test-output/
+          retention-days: 14
+      - name: Publish and verify release
+        if: github.ref == 'refs/heads/main'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag='v0.19.0'
+          $existing=gh release view $tag --json isDraft | ConvertFrom-Json
+          if($LASTEXITCODE -eq 0){
+            if(-not $existing.isDraft){throw 'This version is already published; do not overwrite it'}
+          }else{
+            gh release create $tag --target $env:GITHUB_SHA --draft --title 'Качалка 0.19' --notes-file distribution/RELEASE-NOTES-0.19.md
+            if($LASTEXITCODE -ne 0){throw 'Cannot create draft release'}
+          }
+          gh release upload $tag dist/release-0.19.0/Kachalka-win-x64.zip dist/release-0.19.0/latest.json dist/release-0.19.0/SHA256SUMS.txt --clobber
+          if($LASTEXITCODE -ne 0){throw 'Cannot upload release assets'}
+          gh release download $tag --dir dist/verified-release
+          if($LASTEXITCODE -ne 0){throw 'Cannot read back release assets'}
+          $manifest=Get-Content dist/verified-release/latest.json -Raw | ConvertFrom-Json
+          $package=Get-Item dist/verified-release/Kachalka-win-x64.zip
+          $hash=(Get-FileHash $package.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          if($package.Length -ne $manifest.package.size -or $hash -ne $manifest.package.sha256){throw 'Uploaded package does not match manifest'}
+          if((Get-Content dist/verified-release/SHA256SUMS.txt -Raw).Trim() -ne "$hash  Kachalka-win-x64.zip"){throw 'Uploaded checksum file does not match package'}
+          gh release edit $tag --draft=false --latest
+          if($LASTEXITCODE -ne 0){throw 'Cannot publish release'}
+          Invoke-WebRequest "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$tag/latest.json" -OutFile dist/public-latest.json
+          if((Get-FileHash dist/public-latest.json).Hash -ne (Get-FileHash dist/verified-release/latest.json).Hash){throw 'Anonymous manifest download differs'}
+          "Published https://github.com/$env:GITHUB_REPOSITORY/releases/tag/$tag; SHA256 $hash" >> $env:GITHUB_STEP_SUMMARY
