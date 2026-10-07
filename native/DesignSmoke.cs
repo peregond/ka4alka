@@ -197,26 +197,45 @@ public partial class MainWindow
             if(downloads.Items.Count!=0||downloads.EngineCreated)throw new Exception("Design smoke unexpectedly created a download.");
             Shot("downloads-empty");
             var fixtureNow=DateTime.UtcNow;
-            var activeDownload=new DownloadItem{Name="Big Buck Bunny · 1080p",Folder=@"C:\Downloads\Качалка",Paused=false};
+            var downloadCards=liveItems.Where(x=>x.ImageUrl!=null&&coverCache.ContainsKey(x.ImageUrl)).Concat(liveItems).DistinctBy(x=>x.Id).Take(3).ToArray();
+            DownloadItem VisualDownload(string name,int index)
+            {
+                var card=downloadCards.ElementAtOrDefault(index);
+                return new(){Name=name,Folder=@"C:\Downloads\Качалка",Paused=false,AddedUtc=fixtureNow.AddSeconds(-index),MediaTitle=card?.Title,MediaSection=card?.Section,MediaYear=card?.Year??0,ImageUrl=card?.ImageUrl,MediaPageUrl=card?.PageUrl};
+            }
+            var activeDownload=VisualDownload("Big Buck Bunny · 1080p",0);
             DownloadPresentation.Apply(activeDownload,new(MonoTorrent.Client.TorrentState.Downloading,false,42,2L*1024*1024*1024,1800*1024,128*1024,12,5,fixtureNow.AddMinutes(-3),fixtureNow),fixtureNow);
-            var waitingDownload=new DownloadItem{Name="Sintel · 2160p",Folder=activeDownload.Folder,Paused=false};
+            var waitingDownload=VisualDownload("Sintel · 2160p",1);
             DownloadPresentation.Apply(waitingDownload,new(MonoTorrent.Client.TorrentState.Downloading,false,8,4L*1024*1024*1024,0,0,3,0,fixtureNow.AddMinutes(-2),null),fixtureNow);
-            var completedDownload=new DownloadItem{Name="Tears of Steel · 1080p",Folder=activeDownload.Folder,Paused=false};
+            var completedDownload=VisualDownload("Tears of Steel · 1080p",2);
             DownloadPresentation.Apply(completedDownload,new(MonoTorrent.Client.TorrentState.Seeding,false,100,1024L*1024*1024,0,256*1024,2,0,fixtureNow.AddMinutes(-20),fixtureNow),fixtureNow);
             downloads.Items.Add(activeDownload);downloads.Items.Add(waitingDownload);downloads.Items.Add(completedDownload);
             prefs.Light=true;ApplyTheme();Render();await Settle();Shot("downloads-light");
             prefs.Light=false;ApplyTheme();Render();await Settle();
             var expectedInk=((SolidColorBrush)FindResource("Text")).Color;
-            foreach(var block in VisualElements<TextBlock>(Body).Where(x=>x.Text==activeDownload.Name||x.Text==activeDownload.Status))
+            foreach(var block in VisualElements<TextBlock>(Body).Where(x=>x.Text==activeDownload.DisplayName||x.Text==activeDownload.Status))
                 if(block.Foreground is not SolidColorBrush ink||ink.Color!=expectedInk)throw new Exception("Download text does not follow dark theme.");
+            var releaseInk=((SolidColorBrush)FindResource("Muted")).Color;
+            foreach(var block in VisualElements<TextBlock>(Body).Where(x=>x.Text==activeDownload.Name&&AutomationProperties.GetName(x)=="Название раздачи"))
+                if(block.Foreground is not SolidColorBrush ink||ink.Color!=releaseInk)throw new Exception("Secondary release name does not follow dark theme.");
             Shot("downloads-dark");
-            await Size(510,820);Render();await Settle();Shot("downloads-510");
-            var downloadStats=VisualElements<TextBlock>(Body).Where(x=>x.Text==activeDownload.Stats||x.Text==waitingDownload.Stats).ToArray();
-            if(downloadStats.Length==0)throw new Exception("Download telemetry is not visible.");
-            foreach(var block in downloadStats)
+            foreach(var width in new[]{510d,360d})
             {
-                var origin=block.TransformToAncestor(Body).Transform(new Point());
-                if(origin.X<-.5||origin.X+block.ActualWidth>Body.ActualWidth+1)throw new Exception("Download telemetry overflows narrow window.");
+                await Size(width,820);Render();await Settle();Shot("downloads-"+width);
+                var downloadStats=VisualElements<TextBlock>(Body).Where(x=>x.Text==activeDownload.Stats||x.Text==waitingDownload.Stats).ToArray();
+                if(downloadStats.Length==0)throw new Exception("Download telemetry is not visible.");
+                foreach(var block in downloadStats)
+                {
+                    var origin=block.TransformToAncestor(Body).Transform(new Point());
+                    if(origin.X<-.5||origin.X+block.ActualWidth>Body.ActualWidth+1)throw new Exception($"Download telemetry overflows {width} px window.");
+                }
+                var actions=VisualElements<Button>(Body).Where(x=>x.IsVisible&&x.Tag is DownloadItem&&AutomationProperties.GetName(x) is "Пауза" or "Подробнее" or "Открыть папку" or "Удалить из загрузок" or "Удалить файлы").ToArray();
+                if(actions.Length<5)throw new Exception("Download row actions are missing.");
+                foreach(var action in actions)
+                {
+                    var bounds=action.TransformToAncestor(Body).TransformBounds(new Rect(new Point(),action.RenderSize));
+                    if(bounds.Width<=0||bounds.Left<-.5||bounds.Right>Body.ActualWidth+1)throw new Exception($"Download action overflows {width} px window: "+AutomationProperties.GetName(action));
+                }
             }
             if(downloads.EngineCreated)throw new Exception("Download visual fixtures unexpectedly started an engine.");
             downloads.Items.Clear();
@@ -229,7 +248,7 @@ public partial class MainWindow
                 SearchAndSettings=searchSettings,
                 WheelScrolling=wheelScrolling,
                 SourceFailureVisible=true,SourceProgressPreservesOpenFilter=true,SourceProgressPreservesScroll=true,SourceRetryState=true,
-                WidthChecks=checks,Screens=new[]{"sources-light","sources-dark","sources-510","search-light","search-dark","search-small","search-minimum","settings-light","settings-dark","settings-small","settings-minimum","catalog-light","catalog-dark","detail-wide-light","detail-wide-dark","detail-720","release-720","detail-510","release-510","short-description-expanded","series-season-filter","downloads-empty","downloads-light","downloads-dark","downloads-510"}
+                WidthChecks=checks,Screens=new[]{"sources-light","sources-dark","sources-510","search-light","search-dark","search-small","search-minimum","settings-light","settings-dark","settings-small","settings-minimum","catalog-light","catalog-dark","detail-wide-light","detail-wide-dark","detail-720","release-720","detail-510","release-510","short-description-expanded","series-season-filter","downloads-empty","downloads-light","downloads-dark","downloads-510","downloads-360"}
             },new JsonSerializerOptions{WriteIndented=true}));
         }
         catch(Exception error)

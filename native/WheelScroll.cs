@@ -69,9 +69,10 @@ public static class WheelScroll
     {
         readonly ScrollViewer viewer;
         readonly DispatcherTimer timer;
+        DispatcherOperation? immediate;
         double start,target;
         long began;
-        public bool Running=>timer.IsEnabled;
+        public bool Running=>timer.IsEnabled||immediate?.Status==DispatcherOperationStatus.Pending;
         public Motion(ScrollViewer viewer)
         {
             this.viewer=viewer;
@@ -80,9 +81,25 @@ public static class WheelScroll
         }
         public void Move(double distance)
         {
+            if(!SystemParameters.ClientAreaAnimation)
+            {
+                timer.Stop();
+                // ScrollViewer applies scroll commands during layout. Accumulate
+                // input arriving before that layout instead of reading a stale offset.
+                var pending=immediate?.Status==DispatcherOperationStatus.Pending;
+                target=Math.Clamp((pending?target:viewer.VerticalOffset)+distance,0,viewer.ScrollableHeight);
+                if(Math.Abs(target-viewer.VerticalOffset)<.1){Stop();return;}
+                if(pending)return;
+                immediate=viewer.Dispatcher.BeginInvoke(DispatcherPriority.Render,new Action(()=>
+                {
+                    immediate=null;
+                    if(viewer.IsLoaded&&viewer.IsVisible)viewer.ScrollToVerticalOffset(Math.Clamp(target,0,viewer.ScrollableHeight));
+                }));
+                return;
+            }
             var next=Destination(viewer.VerticalOffset,target,distance,viewer.ScrollableHeight,Running);
+            immediate?.Abort();immediate=null;
             start=viewer.VerticalOffset;target=next;began=Stopwatch.GetTimestamp();
-            if(!SystemParameters.ClientAreaAnimation){Stop();viewer.ScrollToVerticalOffset(target);return;}
             if(Math.Abs(target-start)<.1){Stop();return;}
             timer.Start();
         }
@@ -95,6 +112,6 @@ public static class WheelScroll
             viewer.ScrollToVerticalOffset(start+(target-start)*eased);
             if(progress>=1)Stop();
         }
-        public void Stop()=>timer.Stop();
+        public void Stop(){timer.Stop();immediate?.Abort();immediate=null;}
     }
 }
