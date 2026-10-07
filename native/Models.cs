@@ -13,6 +13,9 @@ public record MediaItem(int Id, string Title, string Section, string Genre, int 
     public string? ImageUrl {get;init;}
     public string? Description {get;init;}
     public string? OriginalTitle {get;init;}
+    public CinemaPerson[] People {get;init;}=[];
+    public CinemaAward[] Awards {get;init;}=[];
+    public CinemaCollection[] Collections {get;init;}=[];
     public string? ImdbId {get;init;}
     public string[] GenreKeys {get;init;}=[];
     public string[] CountryKeys {get;init;}=[];

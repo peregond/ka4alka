@@ -5,9 +5,9 @@ on:
       version:
         description: Version matching native/Kachalka.csproj
         required: true
-        default: '0.29.2'
+        default: '0.30.0'
   push:
-    branches: [codex/ui-actions-0.29.2]
+    branches: [release/0.30.0]
     paths: [.github/workflows/release.yml, 'native/**', 'update-core/**', 'updater/**', 'update-tests/**', 'tests/**', 'installer/**', build-release.ps1, package-release.ps1]
 permissions:
   contents: write
@@ -19,13 +19,15 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 25
     env:
-      RELEASE_VERSION: ${{ inputs.version || '0.29.2' }}
+      RELEASE_VERSION: ${{ inputs.version || '0.30.0' }}
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+      - name: Verify live cinema navigation
+        run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --verify-cinema-source
       - name: Verify metadata and actual release for affected new films
         run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --probe-affected-films
       - name: Verify public replacement site
@@ -122,3 +124,27 @@ jobs:
             test-output/published-upgrade/checks.txt
             test-output/published-upgrade/data/updates/*/result.txt
             test-output/windows-update/data/updates/*/result.txt
+      - name: Publish authorized release and verify anonymous download
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version=$env:RELEASE_VERSION
+          $tag='v'+$version
+          $latest=gh release view --json tagName | ConvertFrom-Json
+          if($LASTEXITCODE -eq 0 -and $latest.tagName -match '^v(\d+\.\d+\.\d+)$' -and [Version]$Matches[1] -ge [Version]$version){throw 'A release at or above this version is already latest; do not downgrade'}
+          $release=gh release view $tag --json assets,isDraft | ConvertFrom-Json
+          if($LASTEXITCODE -ne 0 -or -not $release.isDraft){throw 'Expected verified draft release'}
+          foreach($asset in $release.assets | Where-Object {$_.name.StartsWith('preview-')}){
+            gh release delete-asset $tag $asset.name --yes
+            if($LASTEXITCODE -ne 0){throw 'Cannot remove temporary review image'}
+          }
+          gh release edit $tag --draft=false --latest
+          if($LASTEXITCODE -ne 0){throw 'Cannot publish release'}
+          $public=Join-Path $env:RUNNER_TEMP 'anonymous-release'
+          New-Item -ItemType Directory -Force $public | Out-Null
+          foreach($name in @('latest.json','latest.sig','Kachalka-win-x64.zip','SHA256SUMS.txt')){
+            Invoke-WebRequest "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$tag/$name" -OutFile (Join-Path $public $name) -TimeoutSec 180
+            if((Get-FileHash (Join-Path $public $name)).Hash -ne (Get-FileHash (Join-Path ('dist/release-'+$version) $name)).Hash){throw ('Anonymous download differs: '+$name)}
+          }
+          "Published https://github.com/$env:GITHUB_REPOSITORY/releases/tag/$tag with verified anonymous downloads." >> $env:GITHUB_STEP_SUMMARY

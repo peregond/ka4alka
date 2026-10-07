@@ -45,6 +45,7 @@ if(args.Contains("--probe-public"))
  finally{await probe.Close();}
  return;
 }
+if(args.Contains("--verify-cinema-source")){await CinemaSourceTests.Run();return;}
 DownloadTests.Run();
 DownloadFolderTests.Run();
 ReleaseQualityTests.Run();

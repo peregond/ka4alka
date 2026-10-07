@@ -50,7 +50,7 @@ public partial class MainWindow
                         var direct=await new LiveCatalog(sourceClient).Detail(item,CancellationToken.None);
                         return direct with{Kinopoisk=direct.Kinopoisk=="—"?item.Kinopoisk:direct.Kinopoisk,Imdb=direct.Imdb=="—"?item.Imdb:direct.Imdb,OriginalTitle=direct.OriginalTitle??item.OriginalTitle};
                     }
-                    if(!string.IsNullOrWhiteSpace(indexed.Description)&&indexed.GenreKeys.Length>0&&indexed.CountryKeys.Length>0&&(!priority||!string.IsNullOrWhiteSpace(indexed.OriginalTitle)))return indexed;
+                    if(!string.IsNullOrWhiteSpace(indexed.Description)&&indexed.GenreKeys.Length>0&&indexed.CountryKeys.Length>0&&(!priority||indexed.People.Length>0)&&(!priority||!string.IsNullOrWhiteSpace(indexed.OriginalTitle)))return indexed;
                     try
                     {
                         var direct=await new LiveCatalog(sourceClient).Detail(indexed,CancellationToken.None);
@@ -60,6 +60,7 @@ public partial class MainWindow
                             Kinopoisk=direct.Kinopoisk=="—"?indexed.Kinopoisk:direct.Kinopoisk,
                             Imdb=direct.Imdb=="—"?indexed.Imdb:direct.Imdb,
                             OriginalTitle=direct.OriginalTitle??indexed.OriginalTitle,
+                            People=direct.People.Length>0?direct.People:indexed.People,Collections=direct.Collections.Length>0?direct.Collections:indexed.Collections,
                             Genre=direct.Genre,Country=direct.Country,GenreKeys=direct.GenreKeys,CountryKeys=direct.CountryKeys
                         };
                     }
@@ -288,6 +289,7 @@ public partial class MainWindow
         descriptionToggle=Button(descriptionExpanded?"Свернуть описание":"Читать дальше",()=>{descriptionExpanded=!descriptionExpanded;Render();});descriptionToggle.Name="DescriptionToggle";descriptionToggle.Style=(Style)FindResource("QuietButton");descriptionToggle.HorizontalAlignment=HorizontalAlignment.Left;descriptionToggle.Padding=new(0,5,0,5);descriptionToggle.Margin=new(0);descriptionToggle.MinHeight=26;descriptionToggle.Visibility=Visibility.Collapsed;detailDescription.Children.Add(descriptionToggle);
         detailSynopsis.SizeChanged+=(sender,_)=>{if(ReferenceEquals(sender,detailSynopsis))UpdateDescriptionToggle();};
         var heroFrame=new Border{Child=detailHero,Background=(Brush)FindResource("Panel"),BorderBrush=(Brush)FindResource("Edge"),BorderThickness=new(1),CornerRadius=new(22),Padding=new(20),Margin=new(0,0,0,24)};panel.Children.Add(heroFrame);UpdateDetailLayout();
+        RenderCinemaConnections(panel,item);
         var releasesTitle=Text("Раздачи",23);releasesTitle.FontWeight=FontWeights.SemiBold;releasesTitle.Margin=new(0,0,0,13);panel.Children.Add(releasesTitle);
         RenderReleaseLoading(panel,item);
         RenderSourceStatus(panel,item);
