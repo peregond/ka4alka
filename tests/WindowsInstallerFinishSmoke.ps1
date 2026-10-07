@@ -4,8 +4,22 @@ Add-Type -AssemblyName UIAutomationClient,UIAutomationTypes,System.Drawing
 Add-Type @'
 using System;
 using System.Runtime.InteropServices;
+using System.Text;
 public static class InstallerScreen {
  [StructLayout(LayoutKind.Sequential)] public struct Rect {public int Left,Top,Right,Bottom;}
+ delegate bool EnumProc(IntPtr window,IntPtr state);
+ [DllImport("user32.dll")] static extern bool EnumChildWindows(IntPtr parent,EnumProc callback,IntPtr state);
+ [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern int GetClassName(IntPtr window,StringBuilder text,int maximum);
+ [DllImport("user32.dll")] static extern int GetWindowLong(IntPtr window,int index);
+ public static IntPtr FindCheckbox(IntPtr parent) {
+  IntPtr found=IntPtr.Zero;
+  EnumChildWindows(parent,(window,state)=>{
+   var name=new StringBuilder(32);GetClassName(window,name,name.Capacity);
+   int style=GetWindowLong(window,-16)&15;
+   if(name.ToString()=="Button"&&(style==2||style==3)){found=window;return false;}
+   return true;
+  },IntPtr.Zero);return found;
+ }
  [DllImport("user32.dll")] public static extern IntPtr GetDlgItem(IntPtr dialog,int id);
  [DllImport("user32.dll")] public static extern bool IsWindowEnabled(IntPtr window);
  [DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr window,uint message,IntPtr param,IntPtr data);
@@ -51,11 +65,11 @@ try {
  $font=[System.Drawing.Font]::new('Tahoma',8.25*$scale,[System.Drawing.FontStyle]::Regular,[System.Drawing.GraphicsUnit]::Point)
  $measure=[System.Drawing.Bitmap]::new(2,2);$graphics=[System.Drawing.Graphics]::FromImage($measure)
  try{$size=$graphics.MeasureString($guide.Current.Name,$font,[int]$bounds.Width);if($size.Height-gt $bounds.Height+2){throw ('Installer guide is clipped: text '+$size.Height+' vs control '+$bounds.Height)}}finally{$graphics.Dispose();$font.Dispose();$measure.Dispose()}
- $checks=[System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ControlTypeProperty,[System.Windows.Automation.ControlType]::CheckBox)
- $run=@($root.FindAll([System.Windows.Automation.TreeScope]::Descendants,$checks)) | Where-Object {$_.Current.Name.StartsWith('Запустить Качалку')} | Select-Object -First 1
- if($null -eq $run){throw 'Installer launch checkbox missing'}
- $toggle=[System.Windows.Automation.TogglePattern]$run.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern)
- if($toggle.Current.ToggleState -eq [System.Windows.Automation.ToggleState]::On){$toggle.Toggle()}
+ $run=[InstallerScreen]::FindCheckbox($process.MainWindowHandle)
+ if($run -eq [IntPtr]::Zero){throw 'Installer launch checkbox missing'}
+ # Uncheck the optional NSIS run action without depending on accessibility labels.
+ [InstallerScreen]::SendMessage($run,0x00F1,[IntPtr]::Zero,[IntPtr]::Zero) | Out-Null
+ if([InstallerScreen]::SendMessage($run,0x00F0,[IntPtr]::Zero,[IntPtr]::Zero) -ne [IntPtr]::Zero){throw 'Installer run checkbox cannot be disabled'}
  $rect=[InstallerScreen+Rect]::new();if(-not[InstallerScreen]::GetWindowRect($process.MainWindowHandle,[ref]$rect)){throw 'Cannot read installer size'}
  New-Item -ItemType Directory -Force $Output | Out-Null
  $bitmap=[System.Drawing.Bitmap]::new($rect.Right-$rect.Left,$rect.Bottom-$rect.Top);$draw=[System.Drawing.Graphics]::FromImage($bitmap);$context=$draw.GetHdc()
