@@ -43,18 +43,18 @@ public partial class MainWindow
             var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(bitmap));using var stream=File.Create(Path.Combine(output,name+".png"));encoder.Save(stream);
         }
         if(FindVisual<Image>(Body,x=>x.Source!=null)==null)throw new Exception("Cached person photograph missing.");
-        designFixedViewport=true;MaxWidth=2000;MaxHeight=1200;Width=1440;Height=900;await Task.Delay(150);Shot("person-wide");Width=760;Height=720;await Task.Delay(150);Shot("person-narrow");
+        designFixedViewport=true;MaxWidth=2000;MaxHeight=1200;MinWidth=1440;Width=1440;Height=900;await Task.Delay(150);Shot("person-wide");MinWidth=760;Width=760;Height=720;await Task.Delay(150);Shot("person-narrow");
         var film=FindVisual<Button>(Body,x=>AutomationProperties.GetName(x)=="Открыть "+next.Title)??throw new Exception("Filmography action missing.");
         film.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
         if(current?.Id!=next.Id||activePerson!=null)throw new Exception("Film → person → film navigation failed.");
         CinemaBack();if(activePerson!=person)throw new Exception("Movie back did not restore person page.");
         var back=FindVisual<Button>(PageHeader,x=>AutomationProperties.GetName(x).Contains("Назад к фильму")||FindVisual<TextBlock>(x,t=>t.Text.StartsWith("Назад к фильму"))!=null)??throw new Exception("Person back action missing.");
         back.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));if(activePerson!=null||current?.Id!=original.Id)throw new Exception("Person back did not restore original movie.");
-        Width=1600;await Task.Delay(150);UpdateLayout();Shot("film-wide");
+        MinWidth=1600;Width=1600;await Task.Delay(150);UpdateLayout();Shot("film-wide");
         var cards=FindVisual<Grid>(Body,x=>x.Name=="CinemaCards")??throw new Exception("Film cards missing.");
         var participants=FindVisual<Border>(Body,x=>x.Name=="CinemaParticipants")??throw new Exception("Participants card missing.");
         if(Grid.GetColumn(participants)!=1)throw new Exception($"Wide layout did not place participants next to the movie: window={ActualWidth}, cards={cards.ActualWidth}.");
-        Width=760;await Task.Delay(150);UpdateLayout();Shot("film-narrow");
+        MinWidth=760;Width=760;await Task.Delay(150);UpdateLayout();Shot("film-narrow");
         if(Grid.GetRow(participants)!=1||Grid.GetColumn(participants)!=0)throw new Exception("Narrow layout did not stack participants.");
         await File.WriteAllTextAsync(Path.Combine(output,"checks.json"),JsonSerializer.Serialize(new{PersonCard=true,Biography=true,Filmography=true,WideAndNarrow=true,Navigation=true}));Close();
     }
