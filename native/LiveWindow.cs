@@ -184,7 +184,7 @@ public partial class MainWindow
                 var option=new MenuItem{Header=item.Label,Tag=item.Key,IsCheckable=true,IsChecked=item.Key==selected};
                 option.Click+=(_,_)=>{menu.IsOpen=false;if(item.Key!=selected)ChangeCatalogFilter(()=>changed(item.Key));};menu.Items.Add(option);
             }
-            button.ContextMenu=menu;button.Click+=(_,_)=>menu.IsOpen=true;target.Children.Add(button);
+            AttachMenuToggle(button,menu);target.Children.Add(button);
         }
         if(!favoritesOnly&&!SearchActive)Choice("Подборка",[new("all","Весь каталог"),new("popular","Популярное · Zona"),new("rated","Высокий рейтинг · Zona")],catalogCollection,v=>catalogCollection=v);
         Choice("Жанр",new[]{new CatalogChoice("","Любой жанр")}.Concat(catalogGenres),catalogGenre,v=>catalogGenre=v);
@@ -277,7 +277,7 @@ public partial class MainWindow
         var info=new StackPanel{VerticalAlignment=VerticalAlignment.Top};Grid.SetColumn(info,1);detailHero.Children.Add(info);
         var meta=Text(string.Join("  ·  ",new[]{item.Section,item.Year>0?item.Year.ToString():null,item.Genre,item.Country}.Where(x=>!string.IsNullOrWhiteSpace(x))),12,true);meta.Margin=new(0,0,0,9);info.Children.Add(meta);
         detailTitle=Text(item.Title,30);detailTitle.Name="DetailTitle";detailTitle.FontWeight=FontWeights.SemiBold;detailTitle.Margin=new(0,0,0,14);info.Children.Add(detailTitle);
-        if(item.OnlyPoorQuality)info.Children.Add(PoorQualityBadge());
+        if(item.OnlyPoorQuality)info.Children.Add(PoorQualityBadge(item.PosterQuality));
         if(!string.IsNullOrWhiteSpace(item.OriginalTitle)&&!item.OriginalTitle.Equals(item.Title,StringComparison.OrdinalIgnoreCase)){var original=Text(item.OriginalTitle,13,true);original.Margin=new(0,0,0,12);info.Children.Add(original);}
         var scores=new WrapPanel{Margin=new(0,0,0,10)};
         Border Rating(string name,string value){var label=new TextBlock{Text=name+"  ",Foreground=(Brush)FindResource("Muted"),FontSize=11,VerticalAlignment=VerticalAlignment.Center};var rating=new TextBlock{Text=value,FontSize=14,FontWeight=FontWeights.SemiBold,Foreground=(Brush)FindResource("Text")};var row=new StackPanel{Orientation=Orientation.Horizontal};row.Children.Add(label);row.Children.Add(rating);return new Border{Child=row,Padding=new(10,6,10,6),Background=(Brush)FindResource("Panel"),BorderBrush=(Brush)FindResource("EdgeSoft"),BorderThickness=new(1),CornerRadius=new(8),Margin=new(0,0,8,7)};}

@@ -33,7 +33,8 @@ VIAddVersionKey /LANG=1049 "FileDescription" "Установка Качалки"
 VIAddVersionKey /LANG=1049 "LegalCopyright" "Качалка"
 !define MUI_ABORTWARNING
 !define MUI_FINISHPAGE_RUN "$INSTDIR\Kachalka.exe"
-!define MUI_FINISHPAGE_RUN_TEXT "Запустить Качалку"
+!define MUI_FINISHPAGE_RUN_TEXT "Запустить Качалку и завершить настройку"
+!define MUI_FINISHPAGE_TEXT "Качалка установлена.$\r$\n$\r$\nПри первом запуске выбери папку: внутри неё появится Ka4alka для загрузок. Затем можно разрешить подключения в брандмауэре и включить запуск вместе с Windows.$\r$\n$\r$\nДля брандмауэра Windows попросит права администратора. Эти параметры доступны и в настройках приложения."
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_PAGE_FINISH
@@ -96,6 +97,7 @@ Section "Uninstall"
   RMDir "$SMPROGRAMS\Качалка"
   Delete "$DESKTOP\Качалка.lnk"
   DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Kachalka"
+  DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "Ka4alka"
   Delete "$LOCALAPPDATA\Kachalka\installation\Uninstall.exe"
   RMDir "$LOCALAPPDATA\Kachalka\installation"
   ; Settings, queue, and downloaded files are deliberately retained.

@@ -15,15 +15,19 @@ public partial class MainWindow
     bool checkingUpdate, updateRestartRequested;
     string updateStatus = "Проверка обновлений ещё не выполнялась.";
     TextBlock? updateStatusLabel;
-    Button? updateCheckButton, updateInstallButton;
+    Button? updateActionButton;
     static Version CurrentVersion => typeof(MainWindow).Assembly.GetName().Version ?? new(0, 19, 0);
     void UpdateStatus(string text)
     {
         updateStatus = text;RefreshSidebarUpdate();
         if (updateStatusLabel is not null) updateStatusLabel.Text = text;
-        if (updateCheckButton is not null) updateCheckButton.IsEnabled = !checkingUpdate;
-        if (updateInstallButton is not null) updateInstallButton.Visibility = updateOffer is not null ? Visibility.Visible : Visibility.Collapsed;
-        if (updateInstallButton is not null) updateInstallButton.IsEnabled = !checkingUpdate;
+        if (updateActionButton is not null)
+        {
+            updateActionButton.Content=checkingUpdate?preparedUpdateJob is not null?"Устанавливаем…":updateOffer is null?"Проверяем…":"Скачиваем…":preparedUpdateJob is not null?"Обновить":updateOffer is not null?"Скачать":"Проверить обновления";
+            updateActionButton.IsEnabled=!checkingUpdate;
+            updateActionButton.ToolTip=preparedUpdateJob is not null?"Установить обновление и перезапустить приложение":updateOffer is not null?"Скачать обновлённые компоненты":"Проверить новую версию на GitHub";
+            System.Windows.Automation.AutomationProperties.SetName(updateActionButton,updateActionButton.Content.ToString());
+        }
     }
     internal async Task CheckUpdatesAsync(bool manual = false)
     {
@@ -34,7 +38,7 @@ public partial class MainWindow
             updateOffer = await updateClient.CheckAsync(CurrentVersion, updateCancellation.Token);
             if (closed) return;
             UpdateStatus(updateOffer is null ? "Установлена последняя версия." : "Доступна версия " + updateOffer.Manifest.Version + ".");
-            if (updateOffer is not null && prefs.AutoUpdate) await PrepareUpdateAsync();
+            if (updateOffer is not null && prefs.AutoUpdate && !manual) await PrepareUpdateAsync();
         }
         catch (OperationCanceledException) { if (!closed) UpdateStatus("Проверка обновления отменена или истекло время ожидания."); }
         catch (Exception error) { if (!closed) UpdateStatus("Не удалось проверить обновление: " + error.Message); }
@@ -82,18 +86,29 @@ public partial class MainWindow
             await File.WriteAllTextAsync(path, JsonSerializer.Serialize(job), updateCancellation.Token);
             preparedUpdateJob = path;
             ready = true;
-            UpdateStatus("Версия " + updateOffer.Manifest.Version + " готова. Установится при выходе из приложения.");
-            Status.Text = "Обновление скачано. Для установки открой Настройки → Обновления.";
+            UpdateStatus("Версия " + updateOffer.Manifest.Version + " готова. "+(prefs.AutoUpdate?"Установится при выходе из приложения.":"Нажми «Обновить», чтобы установить."));
+            Status.Text = "Обновление готово. Нажми «Обновить», чтобы установить его и перезапустить приложение.";
         }
         finally { if (!ready) { preparedUpdateJob = null; Directory.Delete(work, true); } }
     }
     async Task RestartForUpdateAsync()
     {
         if (checkingUpdate) return;
-        checkingUpdate = true;
+        checkingUpdate = true;UpdateStatus(updateStatus);
         try { await PrepareUpdateAsync(); if (preparedUpdateJob is not null) { updateRestartRequested = true; Close(); } }
         catch (Exception error) { UpdateStatus("Не удалось подготовить обновление: " + error.Message); }
         finally { checkingUpdate = false; if (!closed) UpdateStatus(updateStatus); }
+    }
+    async Task UpdateActionAsync()
+    {
+        if(checkingUpdate||closed)return;
+        if(preparedUpdateJob is not null){await RestartForUpdateAsync();return;}
+        if(updateOffer is null){await CheckUpdatesAsync(true);return;}
+        checkingUpdate=true;UpdateStatus("Скачиваем обновление…");
+        try{await PrepareUpdateAsync();}
+        catch(OperationCanceledException){if(!closed)UpdateStatus("Загрузка обновления отменена. Можно попробовать ещё раз.");}
+        catch(Exception error){if(!closed)UpdateStatus("Не удалось скачать обновление: "+error.Message);}
+        finally{checkingUpdate=false;if(!closed)UpdateStatus(updateStatus);}
     }
     void LaunchPreparedUpdate()
     {
@@ -121,9 +136,16 @@ public partial class MainWindow
         panel.Children.Add(Text("Обновление применяется после сохранения очереди. Неизменившиеся компоненты повторно не скачиваются. Настройки и загруженные файлы остаются на месте.", 12, true));
         updateStatusLabel = Text(updateStatus); panel.Children.Add(updateStatusLabel);
         var actions = new WrapPanel(); panel.Children.Add(actions);
-        updateCheckButton = AsyncButton("Проверить обновления", () => CheckUpdatesAsync(true)); actions.Children.Add(updateCheckButton);
-        updateInstallButton = AsyncButton("Обновить и перезапустить", RestartForUpdateAsync); actions.Children.Add(updateInstallButton);
-        actions.Children.Add(Button("Что нового", () => Process.Start(new ProcessStartInfo(updateOffer?.Manifest.ReleaseNotesUrl ?? "https://github.com/" + UpdateManifest.Repository + "/releases") { UseShellExecute = true })));
+        updateActionButton=new Button {Name="SettingsUpdateAction",Style=(Style)FindResource("PrimaryButton")};
+        updateActionButton.Click+=async(_,_)=>await UpdateActionAsync();actions.Children.Add(updateActionButton);
+        var notes=new TextBlock {Margin=new(10,0,0,0),VerticalAlignment=VerticalAlignment.Center};
+        var link=new System.Windows.Documents.Hyperlink(new System.Windows.Documents.Run("Что нового"));link.SetResourceReference(System.Windows.Documents.TextElement.ForegroundProperty,"Accent");
+        link.Click+=(_,_)=>
+        {
+            try{Process.Start(new ProcessStartInfo(updateOffer?.Manifest.ReleaseNotesUrl??"https://github.com/"+UpdateManifest.Repository+"/releases"){UseShellExecute=true});}
+            catch(Exception error){UpdateStatus("Не удалось открыть описание обновления: "+error.Message);}
+        };
+        notes.Inlines.Add(link);actions.Children.Add(notes);
         UpdateStatus(updateStatus);
     }
 }

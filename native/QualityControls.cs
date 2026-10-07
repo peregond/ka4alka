@@ -46,7 +46,7 @@ public partial class MainWindow
             var option=new MenuItem{Header=choice.Label,Tag=choice.Height,IsCheckable=true,IsChecked=QualityMinimum==choice.Height};
             option.Click+=(_,_)=>{menu.IsOpen=false;Save(prefs.HidePoorQuality,choice.Height);};menu.Items.Add(option);
         }
-        minimum.ContextMenu=menu;minimum.Click+=(_,_)=>menu.IsOpen=true;controls.Children.Add(minimum);return controls;
+        AttachMenuToggle(minimum,menu);controls.Children.Add(minimum);return controls;
     }
 
     FrameworkElement QualityControls(Action changed)
@@ -67,5 +67,5 @@ public partial class MainWindow
         hide.Checked+=(_,_)=>Save();hide.Unchecked+=(_,_)=>Save();minimum.SelectionChanged+=(_,_)=>Save();
         return controls;
     }
-    static TextBlock PoorQualityBadge()=>new(){Text="💩",FontFamily=new FontFamily("Segoe UI Emoji"),FontSize=18,ToolTip="Плохое качество",Margin=new(0,0,7,0),VerticalAlignment=VerticalAlignment.Center};
+    static TextBlock PoorQualityBadge(string label)=>new(){Text=label,FontSize=11,FontWeight=FontWeights.Medium,ToolTip=label=="Экранка"?"Экранная запись: плохое качество изображения":"Видео ниже выбранного минимального качества",Margin=new(0,0,7,0),VerticalAlignment=VerticalAlignment.Center};
 }

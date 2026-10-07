@@ -1,7 +1,7 @@
 name: Native UI preview
 on:
   push:
-    branches: [codex/ui-polish-0.29.1]
+    branches: [codex/ui-actions-0.29.2]
     paths: ['native/**', 'tests/**', '.github/workflows/ui-preview.yml']
   workflow_dispatch:
 permissions:
