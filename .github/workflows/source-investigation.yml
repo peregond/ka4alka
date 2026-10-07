@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [codex/dark-default-0.28.1]
-    paths: [scripts/probe-additional-sources.py, scripts/probe-magnet-discovery.py, .github/workflows/source-investigation.yml]
+    paths: [scripts/probe-additional-sources.py, scripts/probe-magnet-discovery.py, native/MagnetDiscovery.cs, tests/MagnetDiscoveryProbe.cs, .github/workflows/source-investigation.yml]
 permissions:
   contents: read
 jobs:
@@ -16,3 +16,13 @@ jobs:
         run: python -X utf8 scripts/probe-additional-sources.py
       - name: Probe magnet discovery and HTTPS tracker responses
         run: python -X utf8 scripts/probe-magnet-discovery.py
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Probe real metadata discovery for the reported public release
+        run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --probe-magnet-discovery
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: magnet-discovery-evidence
+          path: test-output/transfer-*/*.json

@@ -15,11 +15,13 @@ public sealed class DownloadService
     public ObservableCollection<DownloadItem> Items {get;}=[];
     public bool EngineCreated => engine!=null;
     readonly EngineSettings? customSettings;
+    readonly IReadOnlyList<string> publicTrackers;
     public int DownloadLimitKbps {get;private set;}
     public int UploadLimitKbps {get;private set;}
-    public DownloadService(EngineSettings? settings=null,int? downloadLimitKbps=null,int? uploadLimitKbps=null)
+    public DownloadService(EngineSettings? settings=null,int? downloadLimitKbps=null,int? uploadLimitKbps=null,IReadOnlyList<string>? publicTrackers=null)
     {
         customSettings=settings;
+        this.publicTrackers=publicTrackers??MagnetDiscovery.PublicTrackers;
         DownloadLimitKbps=Math.Clamp(downloadLimitKbps??settings?.MaximumDownloadRate/1024??0,0,int.MaxValue/1024);
         UploadLimitKbps=Math.Clamp(uploadLimitKbps??settings?.MaximumUploadRate/1024??0,0,int.MaxValue/1024);
         if(!File.Exists(queuePath))return;
@@ -96,6 +98,12 @@ public sealed class DownloadService
         var manager=item.Source.StartsWith("magnet:",StringComparison.OrdinalIgnoreCase)
           ? await Engine.AddAsync(MagnetLink.Parse(item.Source),item.Folder,settings)
           : await Engine.AddAsync(item.Source,item.Folder,settings);
+        try
+        {
+            if(item.Source.StartsWith("magnet:",StringComparison.OrdinalIgnoreCase)&&string.Equals(item.ReleaseSource,"The Pirate Bay",StringComparison.OrdinalIgnoreCase))
+                await MagnetDiscovery.ConfigureAsync(manager,publicTrackers);
+        }
+        catch{await Engine.RemoveAsync(manager);throw;}
         managers[item.Id]=manager;meters[item.Id]=(new(),new());return manager;
     }
     public async Task Add(string source,string folder,MediaItem? media=null,string? imageUrl=null,SourceEntry? release=null)
@@ -184,7 +192,7 @@ public sealed class DownloadService
             item.Name=m.Torrent?.Name??item.Name;SnapshotFiles(item,m);
             var meter=meters[item.Id];var rate=meter.Down.Sample(now,item.LastStartedUtc,m.Monitor.DataBytesReceived);
             var upload=meter.Up.Sample(now,item.LastStartedUtc,m.Monitor.DataBytesSent);
-            DownloadPresentation.Apply(item,new(m.State,item.Paused,m.Progress,m.Torrent?.Size,rate,upload,m.OpenConnections,m.Peers.Seeds,item.LastStartedUtc,meter.Down.LastPayloadUtc,m.Error?.Exception?.Message),now);
+            DownloadPresentation.Apply(item,new(m.State,item.Paused,m.Progress,m.Torrent?.Size,rate,upload,m.OpenConnections,m.Peers.Seeds,item.LastStartedUtc,meter.Down.LastPayloadUtc,m.Error?.Exception?.Message,TrackerHealth.From(m)),now);
             item.Refresh();
         }
     }

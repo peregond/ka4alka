@@ -1,4 +1,5 @@
 using MonoTorrent.Client;
+using MonoTorrent.Trackers;
 
 namespace Kachalka;
 
@@ -27,7 +28,20 @@ public sealed class PayloadMeter
     }
 }
 
-public record DownloadSnapshot(TorrentState State,bool Paused,double Progress,long? TotalBytes,long DownloadRate,long UploadRate,int Connections,int Seeds,DateTime StartedUtc,DateTime? LastPayloadUtc,string? Error=null);
+public record TrackerHealth(int Total,int Responded,int Failed)
+{
+    public static TrackerHealth From(TorrentManager manager)
+    {
+        var trackers=manager.TrackerManager.Tiers.SelectMany(t=>t.Trackers).ToArray();
+        return new(trackers.Length,trackers.Count(t=>t.Status==TrackerState.Ok),trackers.Count(t=>t.Status is TrackerState.Offline or TrackerState.InvalidResponse));
+    }
+    public string Summary=>Total==0?"":$"Трекеры: ответили {Responded} из {Total}. ";
+    public string WaitingHint=>Total>0&&Failed==Total
+        ?"Трекеры пока недоступны. Проверь подключение к сети или попробуй другую раздачу."
+        :Summary+"Сейчас никто не подключён к этой раздаче. Число сидов в поиске может быть устаревшим. Если ожидание затянется, попробуй другой вариант.";
+}
+
+public record DownloadSnapshot(TorrentState State,bool Paused,double Progress,long? TotalBytes,long DownloadRate,long UploadRate,int Connections,int Seeds,DateTime StartedUtc,DateTime? LastPayloadUtc,string? Error=null,TrackerHealth? Trackers=null);
 
 public static class DownloadPresentation
 {
@@ -49,7 +63,7 @@ public static class DownloadPresentation
             case TorrentState.Metadata:
                 item.Status=idle&&s.Connections==0?"Ожидание участников для получения файлов":"Получение метаданных…";
                 item.Stats="Получаем список файлов и размер раздачи";
-                item.Hint=idle&&s.Connections==0?MissingPeers:"Загрузка файлов начнётся после получения метаданных magnet-ссылки.";
+                item.Hint=idle&&s.Connections==0?(s.Trackers?.WaitingHint??MissingPeers):"Загрузка файлов начнётся после получения метаданных magnet-ссылки.";
                 break;
             case TorrentState.Hashing:
                 item.Status="Проверка файлов";item.Stats="Проверяем уже сохранённые данные";
@@ -58,7 +72,7 @@ public static class DownloadPresentation
             case TorrentState.Downloading:
                 item.Status=down>0?"Скачивание":idle?(s.Connections==0?"Ожидание участников":"Ожидание данных"):"Подключение к участникам…";
                 item.Stats=$"{progress:F1}% · {volume} · ↓ {DownloadService.FormatBytes(down)}/с · ↑ {DownloadService.FormatBytes(up)}/с";
-                if(idle&&down==0)item.Hint=s.Connections==0?MissingPeers:"Участники подключены, но пока не передают файлы. Если ожидание затянется, попробуй другую раздачу с сидами.";
+                if(idle&&down==0)item.Hint=s.Connections==0?(s.Trackers?.WaitingHint??MissingPeers):"Участники подключены, но пока не передают файлы. Если ожидание затянется, попробуй другую раздачу с сидами.";
                 if(down>0&&total.HasValue&&progress<100)item.Remaining=Eta((total.Value-transferred)/(double)down);
                 break;
             case TorrentState.Seeding:
