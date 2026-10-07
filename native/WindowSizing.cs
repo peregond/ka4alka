@@ -97,7 +97,9 @@ public partial class MainWindow
         SidebarColumn.Width=new GridLength(narrow?80:196);
         SidePanel.Margin=narrow?new Thickness(0,0,12,0):new Thickness(0,0,24,0);
         SidePanel.Padding=new Thickness(narrow?8:12);
-        Brand.Margin=narrow?new Thickness(8,8,0,24):new Thickness(8,10,0,35);
+        Brand.Margin=narrow?new Thickness(0,8,0,24):new Thickness(8,10,0,35);
+        Brand.HorizontalAlignment=narrow?HorizontalAlignment.Center:HorizontalAlignment.Stretch;
+        BrandLogo.Width=narrow?32:40;BrandLogo.Height=narrow?32:40;BrandLogo.Margin=new Thickness(0,0,narrow?0:10,0);
         BrandText.Visibility=narrow?Visibility.Collapsed:Visibility.Visible;
         LibraryLabel.Visibility=narrow?Visibility.Collapsed:Visibility.Visible;
         foreach(var nav in Navigation.Children.OfType<Button>()){var name=nav.Tag?.ToString()??"";nav.Content=IconLabel(narrow?"":name,name=="Фильмы"?"IconMovies":"IconSeries");nav.HorizontalContentAlignment=narrow?HorizontalAlignment.Center:HorizontalAlignment.Left;nav.Padding=new Thickness(narrow?10:12,10,narrow?10:12,10);}

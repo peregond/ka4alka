@@ -15,7 +15,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Check collector
-        run: python scripts/test-refresh-library.py
+        run: |
+          python scripts/test-refresh-library.py
+          python scripts/test-library-metadata.py
       - name: Collect current films and series
         run: python scripts/refresh-library.py --output catalog-output/catalog.json
       - name: Publish complete library independently of application updates

@@ -5,7 +5,10 @@
     "title": "Объект преступления",
     "year": 2026,
     "poster": "https://img3.zonapic.com/images/film_240/11930/11930434.jpg",
-    "pageUrl": "https://w6.zona.plus/movies/obekt-prestupleniya"
+    "pageUrl": "https://w6.zona.plus/movies/obekt-prestupleniya",
+    "originalTitle": "L'objet du délit",
+    "imdbId": "tt37535559",
+    "imdb": "6.2"
   },
   {
     "id": "movies:mangust-2026",
@@ -13,7 +16,10 @@
     "title": "Мангуст",
     "year": 2026,
     "poster": "https://img2.zonapic.com/images/film_240/9147/9147477.jpg",
-    "pageUrl": "https://w6.zona.plus/movies/mangust-2026"
+    "pageUrl": "https://w6.zona.plus/movies/mangust-2026",
+    "originalTitle": "The Mongoose",
+    "kinopoisk": "5.4",
+    "imdbId": "tt13611778"
   },
   {
     "id": "movies:do-poslednego-gramma",
@@ -21,7 +27,10 @@
     "title": "До последнего грамма",
     "year": 2026,
     "poster": "https://img3.zonapic.com/images/film_240/1330/1330494.jpg",
-    "pageUrl": "https://w6.zona.plus/movies/do-poslednego-gramma"
+    "pageUrl": "https://w6.zona.plus/movies/do-poslednego-gramma",
+    "originalTitle": "The Weight",
+    "imdbId": "tt10794054",
+    "imdb": "6.9"
   },
   {
     "id": "movies:komnata-vnizu",
@@ -29,7 +38,10 @@
     "title": "Комната внизу",
     "year": 2026,
     "poster": "https://img4.zonapic.com/images/film_240/1391/1391407.jpg",
-    "pageUrl": "https://w6.zona.plus/movies/komnata-vnizu"
+    "pageUrl": "https://w6.zona.plus/movies/komnata-vnizu",
+    "originalTitle": "The Room Below",
+    "imdbId": "tt7265638",
+    "imdb": "4.0"
   },
   {
     "id": "movies:arahnid-2026",
@@ -37,7 +49,11 @@
     "title": "Арахнид",
     "year": 2026,
     "poster": "https://img1.zonapic.com/images/film_240/6146/6146248.jpg",
-    "pageUrl": "https://w6.zona.plus/movies/arahnid-2026"
+    "pageUrl": "https://w6.zona.plus/movies/arahnid-2026",
+    "originalTitle": "Crawlers",
+    "kinopoisk": "4.9",
+    "imdb": "4.8",
+    "imdbId": "tt32329539"
   },
   {
     "id": "movies:unabomber",
@@ -45,23 +61,11 @@
     "title": "Унабомбер",
     "year": 2026,
     "poster": "https://img4.zonapic.com/images/film_240/1045/1045479.jpg",
-    "pageUrl": "https://w6.zona.plus/movies/unabomber"
-  },
-  {
-    "id": "movies:tvoya-mat-tvoya-mat-tvoya-mat",
-    "section": "movies",
-    "title": "Твоя мать, твоя мать, твоя мать",
-    "year": 2026,
-    "poster": "https://img4.zonapic.com/images/film_240/13002/13002779.jpg",
-    "pageUrl": "https://w6.zona.plus/movies/tvoya-mat-tvoya-mat-tvoya-mat"
-  },
-  {
-    "id": "movies:voditel-kaskader",
-    "section": "movies",
-    "title": "Водитель-каскадёр",
-    "year": 2026,
-    "poster": "https://img3.zonapic.com/images/film_240/13038/13038266.jpg",
-    "pageUrl": "https://w6.zona.plus/movies/voditel-kaskader"
+    "pageUrl": "https://w6.zona.plus/movies/unabomber",
+    "originalTitle": "Unabomber",
+    "kinopoisk": "6.1",
+    "imdb": "6.2",
+    "imdbId": "tt6933238"
   },
   {
     "id": "movies:ne-stesnyaisya",
@@ -69,7 +73,32 @@
     "title": "Не стесняйся!",
     "year": 2026,
     "poster": "https://img4.zonapic.com/images/film_240/14211/14211607.jpg",
-    "pageUrl": "https://w6.zona.plus/movies/ne-stesnyaisya"
+    "pageUrl": "https://w6.zona.plus/movies/ne-stesnyaisya",
+    "originalTitle": "Don't Be Shy!",
+    "imdbId": "tt39528902",
+    "imdb": "8.3"
+  },
+  {
+    "id": "movies:tvoya-mat-tvoya-mat-tvoya-mat",
+    "section": "movies",
+    "title": "Твоя мать, твоя мать, твоя мать",
+    "year": 2026,
+    "poster": "https://img4.zonapic.com/images/film_240/13002/13002779.jpg",
+    "pageUrl": "https://w6.zona.plus/movies/tvoya-mat-tvoya-mat-tvoya-mat",
+    "originalTitle": "Your Mother Your Mother Your Mother",
+    "imdbId": "tt35856037",
+    "imdb": "7.5"
+  },
+  {
+    "id": "movies:voditel-kaskader",
+    "section": "movies",
+    "title": "Водитель-каскадёр",
+    "year": 2026,
+    "poster": "https://img3.zonapic.com/images/film_240/13038/13038266.jpg",
+    "pageUrl": "https://w6.zona.plus/movies/voditel-kaskader",
+    "originalTitle": "The Stunt Driver",
+    "imdbId": "tt34611096",
+    "imdb": "6.5"
   },
   {
     "id": "movies:gipoteza-lyubvi",
@@ -77,7 +106,11 @@
     "title": "Гипотеза любви",
     "year": 2026,
     "poster": "https://img1.zonapic.com/images/film_240/8496/8496236.jpg",
-    "pageUrl": "https://w6.zona.plus/movies/gipoteza-lyubvi"
+    "pageUrl": "https://w6.zona.plus/movies/gipoteza-lyubvi",
+    "originalTitle": "The Love Hypothesis",
+    "kinopoisk": "7.3",
+    "imdb": "6.9",
+    "imdbId": "tt22526100"
   },
   {
     "id": "movies:digger-2026",
@@ -85,7 +118,11 @@
     "title": "Диггер",
     "year": 2026,
     "poster": "https://img3.zonapic.com/images/film_240/5463/5463546.jpg",
-    "pageUrl": "https://w6.zona.plus/movies/digger-2026"
+    "pageUrl": "https://w6.zona.plus/movies/digger-2026",
+    "originalTitle": "Digger",
+    "kinopoisk": "7.2",
+    "imdb": "7.3",
+    "imdbId": "tt31450459"
   },
   {
     "id": "movies:odin-poslednii-vystrel",
@@ -93,7 +130,11 @@
     "title": "Один последний выстрел",
     "year": 2026,
     "poster": "https://img1.zonapic.com/images/film_240/9932/9932880.jpg",
-    "pageUrl": "https://w6.zona.plus/movies/odin-poslednii-vystrel"
+    "pageUrl": "https://w6.zona.plus/movies/odin-poslednii-vystrel",
+    "originalTitle": "One Last Shot",
+    "kinopoisk": "5.4",
+    "imdb": "5.1",
+    "imdbId": "tt37971717"
   },
   {
     "id": "movies:serdtse-zverya-2026",
@@ -101,7 +142,11 @@
     "title": "Сердце зверя",
     "year": 2026,
     "poster": "https://img1.zonapic.com/images/film_240/7077/7077372.jpg",
-    "pageUrl": "https://w6.zona.plus/movies/serdtse-zverya-2026"
+    "pageUrl": "https://w6.zona.plus/movies/serdtse-zverya-2026",
+    "originalTitle": "Heart of the Beast",
+    "kinopoisk": "7.3",
+    "imdb": "7.3",
+    "imdbId": "tt7526136"
   },
   {
     "id": "movies:daniil-i-ognennaya-pech",
@@ -109,7 +154,10 @@
     "title": "Даниил и огненная печь",
     "year": 2026,
     "poster": "https://img4.zonapic.com/images/film_240/14223/14223639.jpg",
-    "pageUrl": "https://w6.zona.plus/movies/daniil-i-ognennaya-pech"
+    "pageUrl": "https://w6.zona.plus/movies/daniil-i-ognennaya-pech",
+    "originalTitle": "Daniel and the Fiery Furnace",
+    "imdb": "5.5",
+    "imdbId": "tt37542993"
   },
   {
     "id": "movies:malenkie-begletsy-2026",
@@ -117,7 +165,10 @@
     "title": "Маленькие беглецы",
     "year": 2026,
     "poster": "https://img2.zonapic.com/images/film_240/6579/6579797.jpg",
-    "pageUrl": "https://w6.zona.plus/movies/malenkie-begletsy-2026"
+    "pageUrl": "https://w6.zona.plus/movies/malenkie-begletsy-2026",
+    "originalTitle": "Tiny Fugitives",
+    "imdbId": "tt32827454",
+    "imdb": "5.9"
   },
   {
     "id": "movies:begi-pryachsya-bei-nevernye",
@@ -125,7 +176,10 @@
     "title": "Беги, прячься, бей: Неверные",
     "year": 2026,
     "poster": "https://img2.zonapic.com/images/film_240/11398/11398401.jpg",
-    "pageUrl": "https://w6.zona.plus/movies/begi-pryachsya-bei-nevernye"
+    "pageUrl": "https://w6.zona.plus/movies/begi-pryachsya-bei-nevernye",
+    "originalTitle": "Run Hide Fight: Infidels",
+    "imdb": "4.2",
+    "imdbId": "tt40231163"
   },
   {
     "id": "movies:obitel-zla-2026",
@@ -133,7 +187,11 @@
     "title": "Обитель зла",
     "year": 2026,
     "poster": "https://img2.zonapic.com/images/film_240/7378/7378605.jpg",
-    "pageUrl": "https://w6.zona.plus/movies/obitel-zla-2026"
+    "pageUrl": "https://w6.zona.plus/movies/obitel-zla-2026",
+    "originalTitle": "Resident Evil",
+    "kinopoisk": "7.3",
+    "imdb": "7.6",
+    "imdbId": "tt35538033"
   },
   {
     "id": "movies:kulak-lva",
@@ -141,7 +199,10 @@
     "title": "Кулак льва",
     "year": 2026,
     "poster": "https://img4.zonapic.com/images/film_240/14153/14153015.jpg",
-    "pageUrl": "https://w6.zona.plus/movies/kulak-lva"
+    "pageUrl": "https://w6.zona.plus/movies/kulak-lva",
+    "originalTitle": "Lion Fist",
+    "imdb": "4.4",
+    "imdbId": "tt38953026"
   },
   {
     "id": "movies:potselui-smerti-2026",
@@ -149,7 +210,11 @@
     "title": "Поцелуй смерти",
     "year": 2026,
     "poster": "https://img1.zonapic.com/images/film_240/6767/6767168.jpg",
-    "pageUrl": "https://w6.zona.plus/movies/potselui-smerti-2026"
+    "pageUrl": "https://w6.zona.plus/movies/potselui-smerti-2026",
+    "originalTitle": "The Last Kiss",
+    "kinopoisk": "5.5",
+    "imdbId": "tt33253206",
+    "imdb": "5.2"
   },
   {
     "id": "movies:ne-shevelis",
@@ -157,15 +222,10 @@
     "title": "Не шевелись",
     "year": 2026,
     "poster": "https://img1.zonapic.com/images/film_240/12935/12935336.jpg",
-    "pageUrl": "https://w6.zona.plus/movies/ne-shevelis"
-  },
-  {
-    "id": "movies:gracias-equipo",
-    "section": "movies",
-    "title": "Вперед, команда!",
-    "year": 2026,
-    "poster": "https://img3.zonapic.com/images/film_240/14115/14115758.jpg",
-    "pageUrl": "https://w6.zona.plus/movies/gracias-equipo"
+    "pageUrl": "https://w6.zona.plus/movies/ne-shevelis",
+    "originalTitle": "Don't Move",
+    "imdbId": "tt29630464",
+    "imdb": "4.9"
   },
   {
     "id": "movies:drive-through-fire",
@@ -173,7 +233,10 @@
     "title": "Сквозь огонь",
     "year": 2026,
     "poster": "https://img4.zonapic.com/images/film_240/14243/14243047.jpg",
-    "pageUrl": "https://w6.zona.plus/movies/drive-through-fire"
+    "pageUrl": "https://w6.zona.plus/movies/drive-through-fire",
+    "originalTitle": "Drive Through Fire",
+    "imdb": "4.2",
+    "imdbId": "tt33512134"
   },
   {
     "id": "movies:operatsiya-vozmezdie-2026",
@@ -181,7 +244,21 @@
     "title": "Операция «Возмездие»",
     "year": 2026,
     "poster": "https://img3.zonapic.com/images/film_240/5146/5146946.jpg",
-    "pageUrl": "https://w6.zona.plus/movies/operatsiya-vozmezdie-2026"
+    "pageUrl": "https://w6.zona.plus/movies/operatsiya-vozmezdie-2026",
+    "originalTitle": "The Fix",
+    "kinopoisk": "5.6",
+    "imdb": "4.7",
+    "imdbId": "tt9601292"
+  },
+  {
+    "id": "movies:gracias-equipo",
+    "section": "movies",
+    "title": "Вперед, команда!",
+    "year": 2026,
+    "poster": "https://img3.zonapic.com/images/film_240/14115/14115758.jpg",
+    "pageUrl": "https://w6.zona.plus/movies/gracias-equipo",
+    "originalTitle": "Gracias, equipo",
+    "imdb": "5.3"
   },
   {
     "id": "movies:kurer-2026",
@@ -189,7 +266,11 @@
     "title": "Курьер",
     "year": 2026,
     "poster": "https://img4.zonapic.com/images/film_240/7178/7178187.jpg",
-    "pageUrl": "https://w6.zona.plus/movies/kurer-2026"
+    "pageUrl": "https://w6.zona.plus/movies/kurer-2026",
+    "originalTitle": "Runner",
+    "kinopoisk": "6.5",
+    "imdb": "6.3",
+    "imdbId": "tt31349844"
   },
   {
     "id": "movies:bratya-po-oruzhiyu-nasledie",
@@ -197,7 +278,10 @@
     "title": "Братья по оружию: Наследие",
     "year": 2026,
     "poster": "https://img3.zonapic.com/images/film_240/14017/14017518.jpg",
-    "pageUrl": "https://w6.zona.plus/movies/bratya-po-oruzhiyu-nasledie"
+    "pageUrl": "https://w6.zona.plus/movies/bratya-po-oruzhiyu-nasledie",
+    "originalTitle": "Band of Brothers: Legacy",
+    "imdb": "8.3",
+    "imdbId": "tt33510831"
   },
   {
     "id": "movies:zachem-my-opyat-zhenimsya",
@@ -205,7 +289,10 @@
     "title": "Зачем мы опять женимся",
     "year": 2026,
     "poster": "https://img1.zonapic.com/images/film_240/14034/14034684.jpg",
-    "pageUrl": "https://w6.zona.plus/movies/zachem-my-opyat-zhenimsya"
+    "pageUrl": "https://w6.zona.plus/movies/zachem-my-opyat-zhenimsya",
+    "originalTitle": "Why Did I Get Married Again?",
+    "imdb": "5.3",
+    "imdbId": "tt38061210"
   },
   {
     "id": "movies:slonovaya-kost-2026",
@@ -213,7 +300,21 @@
     "title": "Слоновая кость",
     "year": 2026,
     "poster": "https://img4.zonapic.com/images/film_240/14058/14058379.jpg",
-    "pageUrl": "https://w6.zona.plus/movies/slonovaya-kost-2026"
+    "pageUrl": "https://w6.zona.plus/movies/slonovaya-kost-2026",
+    "originalTitle": "Enfrentados: Marfil",
+    "kinopoisk": "6.4",
+    "imdb": "5.4"
+  },
+  {
+    "id": "movies:eho-kamera-2026",
+    "section": "movies",
+    "title": "Эхо-камера",
+    "year": 2026,
+    "poster": "https://img3.zonapic.com/images/film_240/12836/12836262.jpg",
+    "pageUrl": "https://w6.zona.plus/movies/eho-kamera-2026",
+    "originalTitle": "The Echo Chamber",
+    "imdb": "5.5",
+    "imdbId": "tt9395802"
   },
   {
     "id": "movies:haunted-harmony-mysteries-prelude-to-a-wedding",
@@ -221,7 +322,8 @@
     "title": "Таинства призрачной гармонии: прелюдия к свадьбе",
     "year": 2026,
     "poster": "https://img1.zonapic.com/images/film_240/13926/13926912.jpg",
-    "pageUrl": "https://w6.zona.plus/movies/haunted-harmony-mysteries-prelude-to-a-wedding"
+    "pageUrl": "https://w6.zona.plus/movies/haunted-harmony-mysteries-prelude-to-a-wedding",
+    "originalTitle": "Haunted Harmony Mysteries: Prelude to a Wedding"
   },
   {
     "id": "movies:praim-taim-2026",
@@ -229,7 +331,11 @@
     "title": "Прайм-тайм",
     "year": 2026,
     "poster": "https://img1.zonapic.com/images/film_240/7400/7400696.jpg",
-    "pageUrl": "https://w6.zona.plus/movies/praim-taim-2026"
+    "pageUrl": "https://w6.zona.plus/movies/praim-taim-2026",
+    "originalTitle": "Primetime",
+    "kinopoisk": "6.2",
+    "imdb": "7.2",
+    "imdbId": "tt34206385"
   },
   {
     "id": "movies:tochka-kipeniya-2026",
@@ -237,7 +343,10 @@
     "title": "Точка кипения",
     "year": 2026,
     "poster": "https://img2.zonapic.com/images/film_240/12930/12930513.jpg",
-    "pageUrl": "https://w6.zona.plus/movies/tochka-kipeniya-2026"
+    "pageUrl": "https://w6.zona.plus/movies/tochka-kipeniya-2026",
+    "originalTitle": "Come with Me",
+    "imdbId": "tt32500181",
+    "imdb": "4.8"
   },
   {
     "id": "movies:dark-hollow",
@@ -245,7 +354,10 @@
     "title": "Тёмная лощина",
     "year": 2026,
     "poster": "https://img3.zonapic.com/images/film_240/13994/13994742.jpg",
-    "pageUrl": "https://w6.zona.plus/movies/dark-hollow"
+    "pageUrl": "https://w6.zona.plus/movies/dark-hollow",
+    "originalTitle": "Dark Hollow",
+    "imdb": "3.6",
+    "imdbId": "tt37593831"
   },
   {
     "id": "movies:meidei",
@@ -253,7 +365,11 @@
     "title": "Мэйдэй",
     "year": 2026,
     "poster": "https://img3.zonapic.com/images/film_240/6446/6446910.jpg",
-    "pageUrl": "https://w6.zona.plus/movies/meidei"
+    "pageUrl": "https://w6.zona.plus/movies/meidei",
+    "originalTitle": "Mayday",
+    "kinopoisk": "6.4",
+    "imdbId": "tt28014327",
+    "imdb": "6.8"
   },
   {
     "id": "movies:lyuboi-tsenoi-2026",
@@ -261,15 +377,10 @@
     "title": "Любой ценой",
     "year": 2026,
     "poster": "https://img3.zonapic.com/images/film_240/6955/6955070.jpg",
-    "pageUrl": "https://w6.zona.plus/movies/lyuboi-tsenoi-2026"
-  },
-  {
-    "id": "movies:confinement-2026",
-    "section": "movies",
-    "title": "Заточение",
-    "year": 2026,
-    "poster": "https://img2.zonapic.com/images/film_240/13584/13584653.jpg",
-    "pageUrl": "https://w6.zona.plus/movies/confinement-2026"
+    "pageUrl": "https://w6.zona.plus/movies/lyuboi-tsenoi-2026",
+    "originalTitle": "By Any Means",
+    "imdbId": "tt34379051",
+    "imdb": "6.8"
   },
   {
     "id": "movies:the-otherkind",
@@ -277,7 +388,21 @@
     "title": "Иной вид",
     "year": 2026,
     "poster": "https://img3.zonapic.com/images/film_240/4987/4987338.jpg",
-    "pageUrl": "https://w6.zona.plus/movies/the-otherkind"
+    "pageUrl": "https://w6.zona.plus/movies/the-otherkind",
+    "originalTitle": "The Otherkind",
+    "imdb": "7.5",
+    "imdbId": "tt7174714"
+  },
+  {
+    "id": "movies:confinement-2026",
+    "section": "movies",
+    "title": "Заточение",
+    "year": 2026,
+    "poster": "https://img2.zonapic.com/images/film_240/13584/13584653.jpg",
+    "pageUrl": "https://w6.zona.plus/movies/confinement-2026",
+    "originalTitle": "Confinement",
+    "imdbId": "tt38907741",
+    "imdb": "4.4"
   },
   {
     "id": "movies:robotsyp-spetsvypusk-adult-swim",
@@ -285,7 +410,8 @@
     "title": "Робоцып. Спецвыпуск Adult Swim",
     "year": 2026,
     "poster": "https://img3.zonapic.com/images/film_240/13848/13848450.jpg",
-    "pageUrl": "https://w6.zona.plus/movies/robotsyp-spetsvypusk-adult-swim"
+    "pageUrl": "https://w6.zona.plus/movies/robotsyp-spetsvypusk-adult-swim",
+    "originalTitle": "Robot Chicken Adult Swim Special"
   },
   {
     "id": "movies:dix-pour-cent",
@@ -293,7 +419,9 @@
     "title": "Позвоните моему агенту! Фильм",
     "year": 2026,
     "poster": "https://img1.zonapic.com/images/film_240/14058/14058380.jpg",
-    "pageUrl": "https://w6.zona.plus/movies/dix-pour-cent"
+    "pageUrl": "https://w6.zona.plus/movies/dix-pour-cent",
+    "originalTitle": "Dix Pour Cent",
+    "imdb": "6.1"
   },
   {
     "id": "movies:barreda",
@@ -301,7 +429,11 @@
     "title": "Барреда",
     "year": 2026,
     "poster": "https://img1.zonapic.com/images/film_240/13421/13421068.jpg",
-    "pageUrl": "https://w6.zona.plus/movies/barreda"
+    "pageUrl": "https://w6.zona.plus/movies/barreda",
+    "originalTitle": "Barreda",
+    "kinopoisk": "5.9",
+    "imdbId": "tt43706402",
+    "imdb": "6.4"
   },
   {
     "id": "movies:gaskins-the-hitchhiker-killer",
@@ -309,15 +441,10 @@
     "title": "Гаскинс: Убийца автостопщиков",
     "year": 2026,
     "poster": "https://img2.zonapic.com/images/film_240/13653/13653289.jpg",
-    "pageUrl": "https://w6.zona.plus/movies/gaskins-the-hitchhiker-killer"
-  },
-  {
-    "id": "movies:den-hemmelige-kvinde",
-    "section": "movies",
-    "title": "Загадочная женщина",
-    "year": 2026,
-    "poster": "https://img4.zonapic.com/images/film_240/13895/13895515.jpg",
-    "pageUrl": "https://w6.zona.plus/movies/den-hemmelige-kvinde"
+    "pageUrl": "https://w6.zona.plus/movies/gaskins-the-hitchhiker-killer",
+    "originalTitle": "Gaskins: The Hitchhiker Killer",
+    "imdb": "3.4",
+    "imdbId": "tt33256086"
   },
   {
     "id": "series:zhizn-bez-oshibok",
@@ -333,7 +460,9 @@
     "title": "Истина и измена",
     "year": 2025,
     "poster": "https://img2.zonapic.com/images/film_240/10680/10680557.jpg",
-    "pageUrl": "https://w6.zona.plus/tvseries/truth-and-treason"
+    "pageUrl": "https://w6.zona.plus/tvseries/truth-and-treason",
+    "originalTitle": "Truth & Treason",
+    "imdb": "7.6"
   },
   {
     "id": "series:tatsuki-fudzimoto-s-17-do-26",
@@ -341,7 +470,11 @@
     "title": "Тацуки Фудзимото: С 17 до 26",
     "year": 2025,
     "poster": "https://img2.zonapic.com/images/film_240/9222/9222873.jpg",
-    "pageUrl": "https://w6.zona.plus/tvseries/tatsuki-fudzimoto-s-17-do-26"
+    "pageUrl": "https://w6.zona.plus/tvseries/tatsuki-fudzimoto-s-17-do-26",
+    "originalTitle": "Tatsuki Fujimoto 17-26",
+    "kinopoisk": "7.6",
+    "imdb": "7.9",
+    "imdbId": "tt38491451"
   },
   {
     "id": "series:zheleznoe-serdtse-2025",
@@ -349,7 +482,11 @@
     "title": "Железное Сердце",
     "year": 2025,
     "poster": "https://img4.zonapic.com/images/film_240/4295/4295935.jpg",
-    "pageUrl": "https://w6.zona.plus/tvseries/zheleznoe-serdtse-2025"
+    "pageUrl": "https://w6.zona.plus/tvseries/zheleznoe-serdtse-2025",
+    "originalTitle": "Ironheart",
+    "kinopoisk": "4.0",
+    "imdb": "4.5",
+    "imdbId": "tt13623126"
   },
   {
     "id": "series:eternavt",
@@ -357,7 +494,10 @@
     "title": "Этернавт",
     "year": 2025,
     "poster": "https://img3.zonapic.com/images/film_240/6324/6324930.jpg",
-    "pageUrl": "https://w6.zona.plus/tvseries/eternavt"
+    "pageUrl": "https://w6.zona.plus/tvseries/eternavt",
+    "originalTitle": "El Eternauta",
+    "kinopoisk": "6.5",
+    "imdb": "7.3"
   },
   {
     "id": "series:gangsterlend",
@@ -365,7 +505,11 @@
     "title": "Гангстерленд",
     "year": 2025,
     "poster": "https://img1.zonapic.com/images/film_240/5512/5512084.jpg",
-    "pageUrl": "https://w6.zona.plus/tvseries/gangsterlend"
+    "pageUrl": "https://w6.zona.plus/tvseries/gangsterlend",
+    "originalTitle": "MobLand",
+    "kinopoisk": "8.2",
+    "imdb": "8.3",
+    "imdbId": "tt31510819"
   },
   {
     "id": "series:horoshaya-amerikanskaya-semya",
@@ -373,7 +517,11 @@
     "title": "Хорошая американская семья",
     "year": 2025,
     "poster": "https://img3.zonapic.com/images/film_240/5069/5069342.jpg",
-    "pageUrl": "https://w6.zona.plus/tvseries/horoshaya-amerikanskaya-semya"
+    "pageUrl": "https://w6.zona.plus/tvseries/horoshaya-amerikanskaya-semya",
+    "originalTitle": "Good American Family",
+    "kinopoisk": "7.3",
+    "imdb": "6.8",
+    "imdbId": "tt21441010"
   },
   {
     "id": "series:devyat-tel-v-meksikanskom-morge",
@@ -381,7 +529,11 @@
     "title": "Девять тел в мексиканском морге",
     "year": 2025,
     "poster": "https://img4.zonapic.com/images/film_240/7293/7293987.jpg",
-    "pageUrl": "https://w6.zona.plus/tvseries/devyat-tel-v-meksikanskom-morge"
+    "pageUrl": "https://w6.zona.plus/tvseries/devyat-tel-v-meksikanskom-morge",
+    "originalTitle": "Nine Bodies in a Mexican Morgue",
+    "kinopoisk": "6.8",
+    "imdb": "6.3",
+    "imdbId": "tt12908464"
   },
   {
     "id": "series:nulevoi-den-2025",
@@ -389,7 +541,11 @@
     "title": "Нулевой день",
     "year": 2025,
     "poster": "https://img4.zonapic.com/images/film_240/5379/5379179.jpg",
-    "pageUrl": "https://w6.zona.plus/tvseries/nulevoi-den-2025"
+    "pageUrl": "https://w6.zona.plus/tvseries/nulevoi-den-2025",
+    "originalTitle": "Zero Day",
+    "kinopoisk": "6.8",
+    "imdb": "7.0",
+    "imdbId": "tt23872886"
   },
   {
     "id": "series:pervozdannaya-amerika",
@@ -397,7 +553,11 @@
     "title": "Первозданная Америка",
     "year": 2025,
     "poster": "https://img1.zonapic.com/images/film_240/5461/5461804.jpg",
-    "pageUrl": "https://w6.zona.plus/tvseries/pervozdannaya-amerika"
+    "pageUrl": "https://w6.zona.plus/tvseries/pervozdannaya-amerika",
+    "originalTitle": "American Primeval",
+    "kinopoisk": "7.7",
+    "imdb": "8.0",
+    "imdbId": "tt24069848"
   },
   {
     "id": "series:munai",
@@ -405,7 +565,9 @@
     "title": "Мунай",
     "year": 2025,
     "poster": "https://img2.zonapic.com/images/film_240/10967/10967025.jpg",
-    "pageUrl": "https://w6.zona.plus/tvseries/munai"
+    "pageUrl": "https://w6.zona.plus/tvseries/munai",
+    "originalTitle": "Мұнай",
+    "kinopoisk": "7.5"
   },
   {
     "id": "series:kak-priruchit-lisu",
@@ -413,7 +575,8 @@
     "title": "Как приручить лису",
     "year": 2025,
     "poster": "https://img4.zonapic.com/images/film_240/5454/5454707.jpg",
-    "pageUrl": "https://w6.zona.plus/tvseries/kak-priruchit-lisu"
+    "pageUrl": "https://w6.zona.plus/tvseries/kak-priruchit-lisu",
+    "kinopoisk": "7.2"
   },
   {
     "id": "series:mne-nuzhna-tvoya-zhizn",
@@ -429,15 +592,11 @@
     "title": "Декстер: Первородный грех",
     "year": 2024,
     "poster": "https://img4.zonapic.com/images/film_240/5626/5626999.jpg",
-    "pageUrl": "https://w6.zona.plus/tvseries/dekster-pervorodnyi-greh"
-  },
-  {
-    "id": "series:sto-let-odinochestva",
-    "section": "series",
-    "title": "Сто лет одиночества",
-    "year": 2024,
-    "poster": "https://img3.zonapic.com/images/film_240/5137/5137054.jpg",
-    "pageUrl": "https://w6.zona.plus/tvseries/sto-let-odinochestva"
+    "pageUrl": "https://w6.zona.plus/tvseries/dekster-pervorodnyi-greh",
+    "originalTitle": "Dexter: Original Sin",
+    "kinopoisk": "7.9",
+    "imdb": "8.1",
+    "imdbId": "tt32252772"
   },
   {
     "id": "series:sekretnyi-uroven",
@@ -445,7 +604,11 @@
     "title": "Секретный уровень",
     "year": 2024,
     "poster": "https://img3.zonapic.com/images/film_240/6141/6141858.jpg",
-    "pageUrl": "https://w6.zona.plus/tvseries/sekretnyi-uroven"
+    "pageUrl": "https://w6.zona.plus/tvseries/sekretnyi-uroven",
+    "originalTitle": "Secret Level",
+    "kinopoisk": "6.8",
+    "imdb": "7.3",
+    "imdbId": "tt33204697"
   },
   {
     "id": "series:zvezdnye-voiny-opornaya-komanda",
@@ -453,7 +616,11 @@
     "title": "Звездные войны: Опорная команда",
     "year": 2024,
     "poster": "https://img1.zonapic.com/images/film_240/4982/4982940.jpg",
-    "pageUrl": "https://w6.zona.plus/tvseries/zvezdnye-voiny-opornaya-komanda"
+    "pageUrl": "https://w6.zona.plus/tvseries/zvezdnye-voiny-opornaya-komanda",
+    "originalTitle": "Skeleton Crew",
+    "kinopoisk": "6.7",
+    "imdb": "7.0",
+    "imdbId": "tt20600980"
   },
   {
     "id": "series:zemlya-bez-lyudei",
@@ -461,7 +628,11 @@
     "title": "Земля без людей",
     "year": 2024,
     "poster": "https://img2.zonapic.com/images/film_240/6458/6458997.jpg",
-    "pageUrl": "https://w6.zona.plus/tvseries/zemlya-bez-lyudei"
+    "pageUrl": "https://w6.zona.plus/tvseries/zemlya-bez-lyudei",
+    "originalTitle": "Earth Abides",
+    "kinopoisk": "6.5",
+    "imdb": "6.3",
+    "imdbId": "tt26443935"
   },
   {
     "id": "series:lendmen",
@@ -469,7 +640,11 @@
     "title": "Лэндмен",
     "year": 2024,
     "poster": "https://img4.zonapic.com/images/film_240/4909/4909559.jpg",
-    "pageUrl": "https://w6.zona.plus/tvseries/lendmen"
+    "pageUrl": "https://w6.zona.plus/tvseries/lendmen",
+    "originalTitle": "Landman",
+    "kinopoisk": "8.3",
+    "imdb": "8.2",
+    "imdbId": "tt14186672"
   },
   {
     "id": "series:den-shakala-2024",
@@ -477,7 +652,11 @@
     "title": "День Шакала",
     "year": 2024,
     "poster": "https://img4.zonapic.com/images/film_240/5461/5461927.jpg",
-    "pageUrl": "https://w6.zona.plus/tvseries/den-shakala-2024"
+    "pageUrl": "https://w6.zona.plus/tvseries/den-shakala-2024",
+    "originalTitle": "The Day of the Jackal",
+    "kinopoisk": "7.9",
+    "imdb": "8.1",
+    "imdbId": "tt24053860"
   },
   {
     "id": "series:dyuna-prorochestvo",
@@ -485,7 +664,11 @@
     "title": "Дюна: Пророчество",
     "year": 2024,
     "poster": "https://img1.zonapic.com/images/film_240/1274/1274452.jpg",
-    "pageUrl": "https://w6.zona.plus/tvseries/dyuna-prorochestvo"
+    "pageUrl": "https://w6.zona.plus/tvseries/dyuna-prorochestvo",
+    "originalTitle": "Dune: Prophecy",
+    "kinopoisk": "7.2",
+    "imdb": "7.3",
+    "imdbId": "tt10466872"
   },
   {
     "id": "series:graf-monte-kristo-2024-2",
@@ -608,20 +791,20 @@
     "pageUrl": "https://w6.zona.plus/tvseries/lyudi-iks-97"
   },
   {
-    "id": "series:yabloki-nikogda-ne-padayut",
-    "section": "series",
-    "title": "Яблоки никогда не падают",
-    "year": 2024,
-    "poster": "https://img4.zonapic.com/images/film_240/4859/4859755.jpg",
-    "pageUrl": "https://w6.zona.plus/tvseries/yabloki-nikogda-ne-padayut"
-  },
-  {
     "id": "series:admiral-kuznetsov",
     "section": "series",
     "title": "Адмирал Кузнецов",
     "year": 2024,
     "poster": "https://img4.zonapic.com/images/film_240/5367/5367251.jpg",
     "pageUrl": "https://w6.zona.plus/tvseries/admiral-kuznetsov"
+  },
+  {
+    "id": "series:yabloki-nikogda-ne-padayut",
+    "section": "series",
+    "title": "Яблоки никогда не падают",
+    "year": 2024,
+    "poster": "https://img4.zonapic.com/images/film_240/4859/4859755.jpg",
+    "pageUrl": "https://w6.zona.plus/tvseries/yabloki-nikogda-ne-padayut"
   },
   {
     "id": "series:zadacha-treh-tel-2024",
@@ -638,5 +821,13 @@
     "year": 2024,
     "poster": "https://img4.zonapic.com/images/film_240/1435/1435343.jpg",
     "pageUrl": "https://w6.zona.plus/tvseries/dzhentlmeny-2024"
+  },
+  {
+    "id": "series:signal-2024",
+    "section": "series",
+    "title": "Сигнал",
+    "year": 2024,
+    "poster": "https://img4.zonapic.com/images/film_240/5450/5450615.jpg",
+    "pageUrl": "https://w6.zona.plus/tvseries/signal-2024"
   }
 ]

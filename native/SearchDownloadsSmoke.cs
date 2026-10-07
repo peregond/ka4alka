@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -194,6 +195,21 @@ public partial class MainWindow
                 check(VisualElements<System.Windows.Shapes.Path>(fileFrame).Any(icon=>icon.Data is{Bounds.IsEmpty:false}),"file details resolve the file icon geometry inside the owned dialog");Shot(dialog,"downloads-details-dark");
                 prefs.Light=true;ApplyTheme();dialog.UpdateLayout();Shot(dialog,"downloads-details-light");dialog.Width=360;dialog.Height=300;dialog.UpdateLayout();Shot(dialog,"downloads-details-minimum");check(files.ActualHeight>30,"file details remain usable in a minimum-size window");
             });
+            var font=new Typeface(FontFamily,FontStyles.Normal,FontWeights.Normal,FontStretches.Normal);
+            check(FontFamily.Source.Contains("Fonts/#Inter")&&font.TryGetGlyphTypeface(out var glyph)&&glyph.FamilyNames.Values.Any(name=>name=="Inter")&&glyph.CharacterToGlyphMap.ContainsKey('М'),"the packaged Inter font is used by the window and contains Cyrillic glyphs");
+            check(Icon is BitmapSource&&BrandLogo.Source is BitmapSource,"application icon and transparent kettlebell logo load from packaged resources");
+            Width=1280;Height=800;section="Загрузки";current=null;Render();await SettleDownloads();
+            fixtures[^1].MediaPageUrl="https://w6.zona.plus/tvseries/download-fixture";fixtures[^1].Refresh();await SettleDownloads();
+            var linked=DownloadMetadata.Card(fixtures[^1])!;requestedDetails.Add(linked.Id);
+            foreach(var label in new[]{"Открыть карточку по постеру","Открыть карточку по названию"})
+            {
+                var link=FindVisual<Button>(FirstRow(),b=>AutomationProperties.GetName(b)==label)!;
+                check(link.IsEnabled&&link.Cursor==Cursors.Hand,"download card link is visibly interactive: "+label);
+                link.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await SettleDownloads();
+                check(current?.Id==linked.Id&&detailTitle?.Text==fixtures[^1].MediaTitle&&section=="Загрузки","download poster/title opens its associated internal card while retaining the queue as the return destination");
+                FindVisual<Button>(PageHeader,b=>AutomationProperties.GetName(b)=="Загрузки")!.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await SettleDownloads();
+                check(current==null&&Queue().Items.Count==fixtures.Length&&fixtures.All(x=>x.Paused),"returning from the internal card preserves the queue and its paused transfers");
+            }
             check(!downloads.EngineCreated,"download design and menu fixtures do not start a torrent engine");
         }
         finally{downloads.Items.Clear();prefs.Light=originalLight;prefs.DownloadSort=originalSort;downloadSort=originalSort;ApplyTheme();MinWidth=originalMinWidth;Width=1280;Height=800;}

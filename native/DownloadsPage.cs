@@ -8,8 +8,17 @@ using System.Windows.Shapes;
 namespace Kachalka;
 public partial class MainWindow
 {
+    void OpenDownloadCard(object sender,RoutedEventArgs e)
+    {
+        if((sender as FrameworkElement)?.Tag is not DownloadItem item)return;
+        var card=DownloadMetadata.Card(item);if(card==null)return;
+        downloadReturnItem=item;
+        current=DownloadMetadata.EnrichMedia(card,new[]{sharedCatalog.Find(card)}.OfType<MediaItem>().Concat(prefs.LiveFavorites).Concat(catalogIndex.Recent(card.Section,200)).Concat(BundledCatalog.Search(card.Section,card.Title)));
+        Render();
+    }
     ListCollectionView? downloadView;
     ListBox? downloadList;
+    DownloadItem? downloadReturnItem;
     TextBlock? downloadSummary;
     TextBlock? downloadHeading;
     Button? downloadControls,downloadOrder;
@@ -58,7 +67,12 @@ public partial class MainWindow
         if(downloads.Items.Count>0)
         {
             downloadView=new ListCollectionView(downloads.Items){CustomSort=DownloadOrdering.Comparer(DownloadSortChoices.First(x=>x.Key==downloadSort).Sort)};
-            downloadList=new ListBox{ItemsSource=downloadView,ItemTemplate=(DataTemplate)FindResource("DownloadRow")};AutomationProperties.SetName(downloadList,"Очередь загрузок");Body.Children.Add(downloadList);return;
+            downloadList=new ListBox{ItemsSource=downloadView,ItemTemplate=(DataTemplate)FindResource("DownloadRow")};AutomationProperties.SetName(downloadList,"Очередь загрузок");
+            if(downloadReturnItem is {} returned&&downloads.Items.Contains(returned))
+            {
+                var list=downloadList;list.Loaded+=(_,_)=>list.ScrollIntoView(returned);
+            }
+            downloadReturnItem=null;Body.Children.Add(downloadList);return;
         }
         var empty=new StackPanel{HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center,MaxWidth=360};
         var illustration=IconLabel("","IconDownload",32);foreach(var path in VisualElements<Path>(illustration)){BindingOperations.ClearBinding(path,Shape.StrokeProperty);path.SetResourceReference(Shape.StrokeProperty,"Muted");}illustration.HorizontalAlignment=HorizontalAlignment.Center;illustration.Margin=new(0,0,0,18);empty.Children.Add(illustration);

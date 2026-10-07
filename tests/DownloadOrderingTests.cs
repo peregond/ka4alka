@@ -67,6 +67,14 @@ static class DownloadOrderingTests
         Check(enriched.Title==media.Title&&enriched.ImageUrl==media.ImageUrl,"selected card identity enriches an English title and missing poster from its Russian catalog entry");
         var byPage=new DownloadItem{Name="Unrelated.Tracker.Release.1080p",MediaPageUrl=media.PageUrl};
         Check(DownloadMetadata.Associate(byPage,[media,remake])&&byPage.MediaTitle==media.Title&&byPage.ImageUrl==media.ImageUrl,"persisted card identity restores metadata even when torrent naming is unrelated");
+        var actual=BundledCatalog.Page("Фильмы",1).Items[0];
+        var linked=new DownloadItem{MediaTitle=actual.Title,MediaSection=actual.Section,MediaPageUrl=actual.PageUrl,MediaYear=actual.Year,ImageUrl=actual.ImageUrl};
+        var card=DownloadMetadata.Card(linked);
+        Check(card!=null&&card.Id==actual.Id&&card.OnlineId==actual.OnlineId&&card.PageUrl==actual.PageUrl,"download navigation restores the exact catalog identity rather than guessing from its torrent name");
+        var rated=DownloadMetadata.EnrichMedia(card!,[actual with{Imdb="0",OriginalTitle="Existing identity"},actual with{Imdb="6.9"}]);
+        Check(rated.Imdb=="6.9","older partial metadata or a zero score does not hide a confirmed catalog rating");
+        linked.MediaPageUrl="https://unrelated.test/movies/other";
+        Check(DownloadMetadata.Card(linked)==null&&!linked.HasMediaCard,"downloads without a trusted associated catalog page do not open an unrelated card");
         var hash=new string('e',40);var cachedRelease=new SourceEntry("cache-release","Northern Lights (2025) 1080p","Fixture","https://example.test/source/release","magnet:?xt=urn:btih:"+hash,null);
         var byHash=new DownloadItem{Name="Unrelated.Tracker.Release.1080p",InfoHash=hash};
         Check(DownloadMetadata.Associate(byHash,[media,remake],candidate=>candidate.Id==media.Id?[cachedRelease]:[])&&byHash.MediaTitle==media.Title,"cached release hash restores the correct card for an unrecognizable legacy torrent name");

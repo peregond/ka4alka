@@ -1,7 +1,7 @@
 name: Windows release validation
 on:
   push:
-    branches: [codex/new-site-0.26.1]
+    branches: [codex/cards-sources-0.27]
   pull_request:
   workflow_dispatch:
 permissions:

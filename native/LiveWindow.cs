@@ -34,6 +34,7 @@ public partial class MainWindow
     readonly OnlineIndexClient onlineIndex;
     Task<MediaItem> Metadata(MediaItem item,bool priority=false)
     {
+        item=DownloadMetadata.EnrichMedia(item,new[]{sharedCatalog.Find(item)}.OfType<MediaItem>().Concat(BundledCatalog.Search(item.Section,item.Title)));
         if(cardMetadata.TryGetValue(item.Id,out var task)&&(!priority||task.IsCompletedSuccessfully&&!string.IsNullOrWhiteSpace(task.Result.OriginalTitle)||priorityMetadata.Contains(item.Id)))return task;
         async Task<MediaItem> Load()
         {
@@ -44,7 +45,11 @@ public partial class MainWindow
                 {
                     MediaItem indexed;
                     try{indexed=await onlineIndex.Detail(item,CancellationToken.None);}
-                    catch{return await new LiveCatalog(sourceClient).Detail(item,CancellationToken.None);}
+                    catch
+                    {
+                        var direct=await new LiveCatalog(sourceClient).Detail(item,CancellationToken.None);
+                        return direct with{Kinopoisk=direct.Kinopoisk=="—"?item.Kinopoisk:direct.Kinopoisk,Imdb=direct.Imdb=="—"?item.Imdb:direct.Imdb,OriginalTitle=direct.OriginalTitle??item.OriginalTitle};
+                    }
                     if(!string.IsNullOrWhiteSpace(indexed.Description)&&indexed.GenreKeys.Length>0&&indexed.CountryKeys.Length>0&&(!priority||!string.IsNullOrWhiteSpace(indexed.OriginalTitle)))return indexed;
                     try
                     {
@@ -58,7 +63,7 @@ public partial class MainWindow
                             Genre=direct.Genre,Country=direct.Country,GenreKeys=direct.GenreKeys,CountryKeys=direct.CountryKeys
                         };
                     }
-                    catch{return indexed with{Description="Описание временно недоступно."};}
+                    catch{return indexed with{Description=string.IsNullOrWhiteSpace(indexed.Description)?"Описание временно недоступно.":indexed.Description};}
                 });
             }
             finally{if(priority)priorityMetadata.Remove(item.Id);}
@@ -81,7 +86,7 @@ public partial class MainWindow
     bool ExpireCatalogPages()
     {
         var boundary=SharedCatalog.BoundaryUtc(DateTime.UtcNow);if(boundary==catalogMemoryBoundary)return false;
-        catalogMemoryBoundary=boundary;catalogPages.Clear();catalogLastPage=null;if(!SearchActive)liveKey="";return true;
+        catalogMemoryBoundary=boundary;catalogPages.Clear();cardMetadata.Clear();catalogLastPage=null;if(!SearchActive)liveKey="";return true;
     }
     string CurrentCatalogKey=>SearchActive?"Поиск|"+submittedQuery:section+"|"+livePage+"|"+CatalogSelection.Filter+"|"+CatalogSelection.Collection;
     CatalogSelection CatalogSelection=>new(catalogGenre,catalogCountry,catalogYear,catalogRating,catalogOrder switch{"По рейтингу"=>"rating","По популярности"=>"popular",_=>"date"},catalogCollection);

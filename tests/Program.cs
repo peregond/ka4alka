@@ -17,6 +17,7 @@ File.WriteAllText(diagnosticPath,new string('x',1024*1024+1));ErrorLog.Write(new
 if(!File.Exists(diagnosticPath+".previous")||!File.ReadAllText(diagnosticPath).Contains("after-rotation"))throw new Exception("Diagnostic log rotation failed.");
 Console.WriteLine("PASS: exception diagnostics retain details and rotate oversized log");
 if(args.Contains("--probe-releases")){await ReleaseProbe.Run();return;}
+if(args.Contains("--probe-affected-films")){await ReleaseProbe.AffectedFilms();return;}
 if(args.Contains("--probe-public"))
 {
  using var sourceClient=new SourceClient();

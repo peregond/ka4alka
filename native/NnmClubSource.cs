@@ -11,7 +11,7 @@ public sealed class NnmClubSource(SourceClient client)
     static readonly Uri Base=new("https://nnmclub.to/forum/");
     static readonly Regex TopicPath=new(@"^viewtopic\.php\?t=\d{1,12}$",RegexOptions.CultureInvariant|RegexOptions.Compiled);
     static readonly Regex DownloadPath=new(@"^download\.php\?id=(\d{1,12})$",RegexOptions.CultureInvariant|RegexOptions.Compiled);
-    static readonly Regex VideoCategory=new(@"(?:сериал|кино|фильм|мультфильм|аниме|video|видео)",RegexOptions.IgnoreCase|RegexOptions.CultureInvariant|RegexOptions.Compiled);
+    static readonly Regex VideoCategory=new(@"(?:сериал|кино|фильм|мультфильм|аниме|video|видео|экранк)",RegexOptions.IgnoreCase|RegexOptions.CultureInvariant|RegexOptions.Compiled);
     static readonly Regex SeriesCategory=new(@"(?:сериал|аниме)",RegexOptions.IgnoreCase|RegexOptions.CultureInvariant|RegexOptions.Compiled);
 
     public static Uri QueryUri(string title)=>new(Base,"tracker.php?nm="+Uri.EscapeDataString(title.Trim()));

@@ -1,0 +1,16 @@
+name: Investigate public film metadata and Russian sources
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/cards-sources-0.27]
+    paths: [scripts/probe-film-sources.py, .github/workflows/source-investigation.yml]
+permissions:
+  contents: read
+jobs:
+  sources:
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read public pages and report source markup
+        run: python -X utf8 scripts/probe-film-sources.py

@@ -47,7 +47,7 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null)
     static int Integer(JsonElement row,string key)=>row.TryGetProperty(key,out var value)&&value.ValueKind==JsonValueKind.Number&&value.TryGetInt32(out var number)?number:0;
     static long? Long(JsonElement row,string key)=>row.TryGetProperty(key,out var value)&&value.ValueKind==JsonValueKind.Number&&value.TryGetInt64(out var number)&&number>0?number:null;
     static int? Count(JsonElement row,string key)=>row.TryGetProperty(key,out var value)&&value.ValueKind==JsonValueKind.Number&&value.TryGetInt32(out var number)&&number>=0?number:null;
-    static string Score(string? value)=>value!=null&&Regex.IsMatch(value,@"^\d{1,2}([.,]\d)?$")?value:"—";
+    static string Score(string? value)=>value!=null&&Regex.IsMatch(value,@"^\d{1,2}([.,]\d)?$")&&double.TryParse(value.Replace(',','.'),System.Globalization.NumberStyles.Float,System.Globalization.CultureInfo.InvariantCulture,out var score)&&score is >0 and <=10?value:"—";
     static string? Https(string? value)=>Uri.TryCreate(value,UriKind.Absolute,out var uri)&&uri.Scheme=="https"&&string.IsNullOrEmpty(uri.UserInfo)?uri.AbsoluteUri:null;
     static string? SectionKey(string section)=>section switch{"Фильмы"=>"movies","Сериалы"=>"series",_=>null};
     static string? PathPart(string section)=>section switch{"Фильмы"=>"/movies/","Сериалы"=>"/tvseries/",_=>null};

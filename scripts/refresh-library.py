@@ -72,8 +72,10 @@ def main():
     rows = collect()
     now = datetime.datetime.now(datetime.timezone.utc)
     rows.sort(key=lambda row: min(row['year'], now.year), reverse=True)
+    from library_metadata import enrich
+    rows = enrich(rows)
     feed = dict(schemaVersion=1, generatedAtUtc=now.isoformat().replace('+00:00', 'Z'),
-                source='https://w6.zona.plus', items=rows)
+                source='https://w6.zona.plus', metadataVersion=1, items=rows)
     target = Path(args.output)
     target.parent.mkdir(parents=True, exist_ok=True)
     temp = target.with_suffix('.tmp')
