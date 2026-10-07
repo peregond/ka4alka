@@ -27,7 +27,7 @@ def probe(label, url, encoding='utf-8'):
                   'names': [html.unescape(re.sub('<[^>]+>', '', value)).strip()[:240] for value in titles[:10]],
                   'snippets': snippets[:4], 'rows': matching_rows[:2], 'ratings': ratings[:10] if 'detail' in label else [],
                   'json': text[:5000] if 'suggestion' in label else None,
-                  'forms': [{'action':re.findall(r'action=["\']([^"\']+)', form[:400],re.I), 'fields':re.findall(r'\bname=["\']([^"\']+)', form,re.I)} for form in re.findall(r'<form\b[\s\S]*?</form>',text,re.I)[:3]] if label=='BitRu home' else []}
+                  'forms': [{'method':re.findall(r'method=["\']([^"\']+)',form[:400],re.I),'action':re.findall(r'action=["\']([^"\']+)', form[:400],re.I), 'fields':re.findall(r'\bname=["\']([^"\']+)', form,re.I)} for form in re.findall(r'<form\b[\s\S]*?</form>',text,re.I)[:3]] if label=='BitRu home' else []}
     except Exception as error:
         result = {'source': label, 'error': str(error)}
     return result
@@ -55,6 +55,10 @@ if __name__ == '__main__':
         jobs.append((title+' kinopoisk suggestion', 'https://www.kinopoisk.ru/api/suggest/v2/?query='+urllib.parse.quote(title)))
     jobs.extend([
         ('BitRu home', 'https://bitru.org/'),
+        ('BitRu English search','https://bitru.org/browse.php?s=Interstellar'),
+        ('BitRu encoded search','https://bitru.org/browse.php?s='+urllib.parse.quote_from_bytes('До последнего грамма'.encode('cp1251'))),
+        ('Kinozal mirror search','https://kinozal.guru/browse.php?s='+urllib.parse.quote_from_bytes('До последнего грамма'.encode('cp1251')),'cp1251'),
+        ('Kinozal public http','http://kinozal.tv/browse.php?s='+urllib.parse.quote_from_bytes('До последнего грамма'.encode('cp1251')),'cp1251'),
         ('BitRu The Weight search', 'https://bitru.org/browse.php?s='+urllib.parse.quote('До последнего грамма')),
         ('BitRu Object search', 'https://bitru.org/browse.php?s='+urllib.parse.quote('Объект преступления')),
         ('Rustorka The Weight', 'https://rustorka.com/forum/tracker.php?nm='+urllib.parse.quote('До последнего грамма'), 'cp1251'),
