@@ -35,7 +35,7 @@ public partial class MainWindow
             }
         }
         designCatalogFallback=cached.Count==0;
-        if(designCatalogFallback)cached=Catalog.Items.Where(x=>x.Section=="Фильмы").Select(x=>x with{PageUrl="https://example.invalid/design/catalog/"+x.Id}).ToArray();
+        if(designCatalogFallback)cached=BundledCatalog.Page("Фильмы",1).Items.Select(x=>x with{PageUrl="https://example.invalid/design/catalog/"+x.Id}).ToArray();
         var cards=new List<MediaItem>();
         foreach(var original in cached)
         {
@@ -58,7 +58,12 @@ public partial class MainWindow
             }
             cardMetadata[item.Id]=Task.FromResult(item);requestedDetails.Add(item.Id);cards.Add(item);
         }
-        section="Фильмы";current=null;favoritesOnly=false;catalogYear=null;livePage=1;Search.Text="";searchDelay.Stop();
+        catalogPages["Фильмы||1"]=new(cards.ToArray(),false,CatalogChoices.Genres,CatalogChoices.Countries);
+        var shows=BundledCatalog.Page("Сериалы",1).Items.Select(x=>x with{PageUrl="https://example.invalid/design/catalog/"+x.Id,ImageUrl=null}).ToArray();
+        foreach(var show in shows){cardMetadata[show.Id]=Task.FromResult(show);requestedDetails.Add(show.Id);}
+        catalogPages["Сериалы||1"]=new(shows,false,CatalogChoices.Genres,CatalogChoices.Countries);
+        searchProvider=(kind,_,_)=>Task.FromResult<IReadOnlyList<MediaItem>>(kind=="Фильмы"?cards:shows);
+        section="Фильмы";current=null;favoritesOnly=false;ResetCatalogFilters();livePage=1;Search.Text="";searchDelay.Stop();submittedQuery="";searchCategory="";
         liveItems=cards;liveKey="design-smoke-prepared";liveLoading=false;liveError="";
     }
 
@@ -67,7 +72,8 @@ public partial class MainWindow
         Directory.CreateDirectory(output);
         var originalLight=prefs.Light;
         var checks=new List<object>();
-        MinWidth=360;MinHeight=300;
+        // Render a full desktop viewport even when the hosted runner's monitor is smaller.
+        MaxWidth=1800;MaxHeight=1000;MinWidth=360;MinHeight=300;
         async Task Settle()
         {
             UpdateLayout();await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);await Task.Delay(90);UpdateLayout();
@@ -86,10 +92,10 @@ public partial class MainWindow
         void CheckFilter(string stage)
         {
             var filter=QualityFilter();
-            if(filter.SelectedItem?.ToString()!="1080p")throw new Exception(stage+": selected 1080p filter was lost.");
+            if(filter.SelectedItem?.ToString()!="Full HD")throw new Exception(stage+": selected Full HD filter was lost.");
             if(!filter.IsVisible||filter.ActualWidth<=0)throw new Exception(stage+": quality filter is not visible.");
             var buttons=VisualElements<Button>(Body).Where(x=>x.Tag is SourceEntry).ToArray();
-            if(buttons.Length!=1||buttons[0].Tag is not SourceEntry entry||entry.Quality!="1080p")throw new Exception(stage+": quality filter did not leave exactly the 1080p release.");
+            if(buttons.Length!=1||buttons[0].Tag is not SourceEntry entry||entry.Quality!="Full HD")throw new Exception(stage+": quality filter did not leave exactly the Full HD release.");
             if(!buttons[0].IsVisible||buttons[0].ActualWidth<=0)throw new Exception(stage+": download action is not visible.");
         }
         void CheckHero(string stage)
@@ -102,7 +108,7 @@ public partial class MainWindow
                 if(element.ActualWidth<=0||element.ActualWidth>Body.ActualWidth+1||origin.X<-.5||origin.X+element.ActualWidth>Body.ActualWidth+1)
                     throw new Exception($"{stage}: {name} overflows body ({origin.X:F1}+{element.ActualWidth:F1}>{Body.ActualWidth:F1}).");
             }
-            checks.Add(new{Stage=stage,WindowWidth=Math.Round(ActualWidth),BodyWidth=Math.Round(Body.ActualWidth),TitleWidth=Math.Round(title.ActualWidth),SynopsisWidth=Math.Round(synopsis.ActualWidth),Filter="1080p",DownloadActionVisible=true});
+            checks.Add(new{Stage=stage,WindowWidth=Math.Round(ActualWidth),BodyWidth=Math.Round(Body.ActualWidth),TitleWidth=Math.Round(title.ActualWidth),SynopsisWidth=Math.Round(synopsis.ActualWidth),Filter="Full HD",DownloadActionVisible=true});
         }
         async Task RevealDownload(string name)
         {
@@ -138,7 +144,7 @@ public partial class MainWindow
             releaseViews[movie.Id]=sourceView;
             current=movie;Render();await Settle();Shot("detail-wide-dark");
             prefs.Light=true;ApplyTheme();Render();await Settle();Shot("detail-wide-light");
-            QualityFilter().SelectedItem="1080p";await Settle();CheckFilter("selected");
+            QualityFilter().SelectedItem="Full HD";await Settle();CheckFilter("selected");
             Render();await Settle();CheckFilter("rendered");
             var sourceToggle=FindVisual<Button>(Body,b=>AutomationProperties.GetName(b)=="Показать состояние источников")??throw new Exception("Source status toggle missing.");
             sourceToggle.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Settle();
@@ -226,7 +232,7 @@ public partial class MainWindow
                 WidthChecks=checks,Screens=new[]{"sources-light","sources-dark","sources-510","search-light","search-dark","search-small","search-minimum","settings-light","settings-dark","settings-small","settings-minimum","catalog-light","catalog-dark","detail-wide-light","detail-wide-dark","detail-720","release-720","detail-510","release-510","short-description-expanded","series-season-filter","downloads-empty","downloads-light","downloads-dark","downloads-510"}
             },new JsonSerializerOptions{WriteIndented=true}));
         }
-        finally{prefs.Light=originalLight;Close();}
+        finally{prefs.Light=originalLight;searchProvider=null;Close();}
     }
 
 }

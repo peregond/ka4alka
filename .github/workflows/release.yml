@@ -5,9 +5,9 @@ on:
       version:
         description: Version matching native/Kachalka.csproj
         required: true
-        default: '0.28.2'
+        default: '0.29.0'
   push:
-    branches: [codex/catalog-controls-0.28.2]
+    branches: [codex/modern-ui-0.29]
     paths: [.github/workflows/release.yml, 'native/**', 'update-core/**', 'updater/**', 'update-tests/**', 'tests/**', 'installer/**', build-release.ps1, package-release.ps1]
 permissions:
   contents: write
@@ -19,7 +19,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 25
     env:
-      RELEASE_VERSION: ${{ inputs.version || '0.28.2' }}
+      RELEASE_VERSION: ${{ inputs.version || '0.29.0' }}
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
     steps:
       - uses: actions/checkout@v4
@@ -53,7 +53,7 @@ jobs:
             [System.IO.File]::WriteAllText($key,$env:RELEASE_SIGNING_KEY)
             ./build-release.ps1 -Version $env:RELEASE_VERSION -SigningKeyPath $key -MakeNsis 'C:/Program Files (x86)/NSIS/makensis.exe'
           } finally { Remove-Item $key -ErrorAction SilentlyContinue }
-      - name: Verify upgrade from previously published 0.28.1
+      - name: Verify upgrade from previously published 0.28.2
         shell: pwsh
         run: ./tests/WindowsPublishedUpgrade.ps1 -ReleaseDirectory ('dist/release-'+$env:RELEASE_VERSION)
       - name: Upload verified files to draft GitHub Release
@@ -86,6 +86,23 @@ jobs:
           dotnet run --project update-tests/Kachalka.UpdateTests.csproj -c Release -- --verify-release $download
           if($LASTEXITCODE -ne 0){throw 'Uploaded package signature or contents invalid'}
           'Windows validation passed; uploaded assets read back with matching SHA256 and valid publisher signature.' >> $env:GITHUB_STEP_SUMMARY
+      - name: Attach temporary rendered UI previews to the draft release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $names=@('catalog-dark','catalog-light','detail-wide-dark','detail-wide-light','settings-dark','settings-light','downloads-dark','downloads-light')
+          $previews=@()
+          foreach($name in $names){
+            $source=Join-Path 'test-output/design-modern' ($name+'.png')
+            if(-not(Test-Path $source)){throw ('Missing rendered preview: '+$name)}
+            $target=Join-Path $env:RUNNER_TEMP ('preview-'+$name+'.png')
+            Copy-Item $source $target
+            $previews+=$target
+          }
+          # Review-only assets; removed before the public release is published.
+          gh release upload ('v'+$env:RELEASE_VERSION) @previews --clobber
+          if($LASTEXITCODE -ne 0){throw 'Cannot attach rendered review previews'}
       - name: Upload smoke-test evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -97,6 +114,7 @@ jobs:
             test-output/close-reliability/*.json
             test-output/close-reliability/error.txt
             test-output/catalog-paging/*
+            test-output/design-modern/*
             test-output/search-downloads/*
             test-output/download-end-to-end/*.json
             test-output/download-end-to-end/error.txt

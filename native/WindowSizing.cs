@@ -22,7 +22,7 @@ public static class WindowSizing
         if(!double.IsFinite(scaleX)||!double.IsFinite(scaleY)||scaleX<=0||scaleY<=0)throw new ArgumentOutOfRangeException(nameof(scaleX));
         return Fit(width/scaleX,height/scaleY);
     }
-    public static int PosterColumns(double contentWidth)=>contentWidth>=1190?7:contentWidth>=900?6:Math.Clamp((int)Math.Floor(contentWidth/155),1,5);
+    public static int PosterColumns(double contentWidth)=>Math.Clamp((int)Math.Floor(contentWidth/140),1,9);
 }
 
 public partial class MainWindow
@@ -105,14 +105,14 @@ public partial class MainWindow
         FitDownloadsToolbar();
         if(layoutInitialized&&narrow==compactWidth&&tiny==tinyWidth&&shortView==compactHeight&&veryShort==veryCompactHeight&&narrowSearch==compactSearch){UpdateFilterRail();return;}
         layoutInitialized=true;compactWidth=narrow;tinyWidth=tiny;compactHeight=shortView;veryCompactHeight=veryShort;compactSearch=narrowSearch;
-        RootGrid.Margin=narrow?new Thickness(10):new Thickness(16);
-        SidebarColumn.Width=new GridLength(narrow?80:196);
-        SidePanel.Margin=narrow?new Thickness(0,0,12,0):new Thickness(0,0,24,0);
-        SidePanel.Padding=new Thickness(narrow?8:12);
-        Brand.Margin=narrow?new Thickness(0,8,0,24):new Thickness(8,10,0,35);
+        RootGrid.Margin=narrow?new Thickness(10):new Thickness(18);
+        SidebarColumn.Width=new GridLength(narrow?64:184);
+        SidePanel.Margin=narrow?new Thickness(0,0,12,0):new Thickness(0,0,20,0);
+        SidePanel.Padding=new Thickness(narrow?8:10);
+        Brand.Margin=narrow?new Thickness(0,6,0,18):new Thickness(6,8,0,24);
         Brand.HorizontalAlignment=narrow?HorizontalAlignment.Center:HorizontalAlignment.Stretch;
         Brand.Visibility=veryShort?Visibility.Collapsed:Visibility.Visible;
-        BrandLogo.Width=narrow?32:40;BrandLogo.Height=narrow?32:40;BrandLogo.Margin=new Thickness(0,0,narrow?0:10,0);
+        BrandLogo.Width=narrow?30:34;BrandLogo.Height=narrow?30:34;BrandLogo.Margin=new Thickness(0,0,narrow?0:10,0);
         BrandText.Visibility=narrow?Visibility.Collapsed:Visibility.Visible;
         LibraryLabel.Visibility=narrow?Visibility.Collapsed:Visibility.Visible;
         foreach(var nav in Navigation.Children.OfType<Button>()){var name=nav.Tag?.ToString()??"";nav.Content=IconLabel(narrow?"":name,name=="Фильмы"?"IconMovies":"IconSeries");nav.HorizontalContentAlignment=narrow?HorizontalAlignment.Center:HorizontalAlignment.Left;nav.Padding=new Thickness(narrow?10:12,veryShort?5:10,narrow?10:12,veryShort?5:10);}
@@ -122,7 +122,7 @@ public partial class MainWindow
         foreach(var nav in Navigation.Children.OfType<Button>().Concat(new[]{DownloadsButton,SettingsButton}))nav.MinHeight=veryShort?28:42;
         if(SidebarFooter.Children[0] is Border divider)divider.Margin=new Thickness(10,veryShort?4:16,10,veryShort?4:14);
         AddTorrentButton.Content=IconLabel(tiny?"":narrow?"Добавить":"Добавить торрент","IconPlus");
-        HeaderArea.Margin=new Thickness(0,4,0,veryShort?6:shortView?14:25);
+        HeaderArea.Margin=new Thickness(0,2,0,veryShort?6:shortView?12:22);
         SearchBar.Margin=new Thickness(0,0,tiny?10:18,0);SearchBar.Height=shortView?40:44;
         Search.Padding=new Thickness(narrowSearch?10:42,8,narrowSearch?30:40,8);
         SearchMagnifier.Visibility=narrowSearch?Visibility.Collapsed:Visibility.Visible;

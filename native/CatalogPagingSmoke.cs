@@ -1,4 +1,5 @@
 using System.IO;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -23,6 +24,16 @@ public partial class MainWindow
         foreach(var row in rows)cardMetadata[row.Id]=Task.FromResult(row);
         async Task Settle(){var end=DateTime.UtcNow.AddSeconds(15);while(liveLoading&&DateTime.UtcNow<end)await Task.Delay(30);await Task.Delay(100);UpdateLayout();if(liveLoading)throw new Exception("Catalog fixture timed out");}
         void Check(bool ok,string label){if(!ok)throw new Exception(label);File.AppendAllText(Path.Combine(output,"checks.txt"),"PASS: "+label+Environment.NewLine);}
+        void CheckCards(string stage,int minimumColumns)
+        {
+            var cards=VisualElements<Button>(catalogList!).Where(x=>x.IsVisible&&x.Tag is MediaItem).ToArray();
+            Check(cards.Length>0,stage+": catalog realizes visible poster cards");
+            var bounds=cards.Select(x=>x.TransformToAncestor(Body).TransformBounds(new Rect(new Point(),x.RenderSize))).ToArray();
+            var firstRow=bounds.Count(x=>Math.Abs(x.Top-bounds.Min(b=>b.Top))<1);
+            Check(catalogColumns>=minimumColumns&&firstRow>=minimumColumns,$"{stage}: dense catalog has {firstRow} cards in a row ({catalogColumns} columns)");
+            Check(bounds.All(x=>x.Width>0&&x.Left>=-.5&&x.Right<=Body.ActualWidth+1),stage+": poster cards stay within the content width");
+            Check(VisualElements<UIElement>(catalogList!).All(x=>x.Effect==null),stage+": poster cards have no blur or shadow effects");
+        }
         Button Page(int page)=>FindVisual<Button>(Body,b=>AutomationProperties.GetName(b)=="Страница "+page)??throw new Exception("Missing page "+page);
         void Choose(string name,string key)
         {
@@ -34,6 +45,7 @@ public partial class MainWindow
         MaxWidth=1800;MaxHeight=1000;MinWidth=1280;MinHeight=300;
         Width=1280;Height=800;Render();await Settle();
         Check(liveItems.Count==40&&catalogDisplay.Count==40,"one catalog page displays 40 cards");
+        CheckCards("desktop",6);
         Check(FiltersPanel.Visibility==Visibility.Collapsed&&inlineCatalogFilters!.Children.Contains(topSaved!),"filters share the top pill toolbar with All and Saved");
         Check(!VisualElements<TextBlock>(PageHeader).Any(x=>x.Text=="Настроить подборку"),"no redundant selection heading");
         var genreMenuButton=FindVisual<Button>(PageHeader,x=>AutomationProperties.GetName(x)=="Жанр")!;
@@ -71,6 +83,7 @@ public partial class MainWindow
         MinWidth=360;Width=680;Height=500;await Task.Delay(150);UpdateLayout();Check(FiltersPanel.Visibility==Visibility.Collapsed&&inlineCatalogFilters?.Visibility==Visibility.Visible,"top filters remain available in narrow windows");
         Height=360;await Task.Delay(150);UpdateLayout();Check(inlineCatalogFilterScroll is {} filterScroll&&Body.ActualHeight>25&&(filterScroll.ScrollableHeight>0||inlineCatalogFilters!.ActualHeight<=filterScroll.ViewportHeight+1),$"short window keeps all filter choices reachable and retains space for cards (window={ActualHeight}, filters={inlineCatalogFilterScroll?.ActualHeight}, scroll={inlineCatalogFilterScroll?.ScrollableHeight}, cards={Body.ActualHeight})");
         Width=510;await Task.Delay(150);UpdateLayout();Check(inlineCatalogFilterScroll is {ScrollableHeight:>0}&&Body.ActualHeight>25,"overflowing filter choices scroll in a narrow short window without hiding the catalog");
+        CheckCards("narrow",1);
         MinWidth=1280;Width=1280;Height=800;await Task.Delay(100);UpdateLayout();
         current=rows[0] with{PageUrl=LiveCatalog.Base+"/movies/fixture-one"};requestedDetails.Add(current.Id);prefs.Favorites.Add(current.Id);
         SourceEntry Release(string id,string resolution,int seeds)=>new(id,"Фильм 1 (2024) "+resolution,"Fixture","https://example.test/"+id,"magnet:?xt=urn:btih:"+new string(id[0],40),null,1024,seeds);
@@ -86,6 +99,38 @@ public partial class MainWindow
         Check(savedFilm!=null&&VisualElements<System.Windows.Shapes.Path>(savedFilm).Any(x=>x.Fill!=null),"saved movie detail heart is filled too");
         await QualitySmoke(Check);
         await SearchDownloadsSmoke(output,Check);
+        await CheckModernQueueVirtualization(output,Check);
         Close();
+    }
+
+    async Task CheckModernQueueVirtualization(string output,Action<bool,string> check)
+    {
+        check(downloads.Items.Count==0&&!downloads.EngineCreated,"queue performance fixture starts without active downloads or a torrent engine");
+        var fixtures=Enumerable.Range(1,200).Select(id=>new DownloadItem
+        {
+            Name=$"Queue.Fixture.{id:000}.1080p.mkv",MediaTitle="Проверка очереди "+id,Paused=true,AddedUtc=DateTime.UtcNow.AddSeconds(-id),
+            Stats="25% · на паузе",Progress=25
+        }).ToArray();
+        try
+        {
+            foreach(var item in fixtures)downloads.Items.Add(item);
+            current=null;section="Загрузки";Width=1280;Height=800;Render();
+            await Task.Delay(150);UpdateLayout();
+            var queue=FindVisual<ListBox>(Body,x=>AutomationProperties.GetName(x)=="Очередь загрузок")??throw new Exception("Queue performance fixture is missing.");
+            check(queue.Items.Count==200&&VirtualizingPanel.GetIsVirtualizing(queue)&&VirtualizingPanel.GetVirtualizationMode(queue)==VirtualizationMode.Recycling&&ScrollViewer.GetCanContentScroll(queue),"200-item download queue keeps native recycling virtualization enabled");
+            var scroller=FindVisual<ScrollViewer>(queue,_=>true)??throw new Exception("Queue scrolling fixture is missing.");
+            scroller.ScrollToBottom();await Task.Delay(150);UpdateLayout();
+            var containers=VisualElements<ListBoxItem>(queue).Count();
+            check(containers>0&&containers<40,$"200-item download queue realizes only {containers} native row containers");
+            check(queue.ItemContainerGenerator.ContainerFromIndex(199) is ListBoxItem,"virtualized queue can scroll to its final download");
+            check(VisualElements<UIElement>(queue).All(x=>x.Effect==null),"download rows have no blur or shadow effects");
+            check(!downloads.EngineCreated&&fixtures.All(x=>x.Paused),"queue scrolling and styling do not create an engine or start paused downloads");
+            File.WriteAllText(Path.Combine(output,"queue-virtualization.json"),JsonSerializer.Serialize(new{Items=200,RealizedContainers=containers,Recycling=true,LastDownloadReachable=true,Effects=false,EngineCreated=downloads.EngineCreated}));
+        }
+        finally
+        {
+            foreach(var item in fixtures)downloads.Items.Remove(item);
+            current=null;section="Загрузки";Render();
+        }
     }
 }

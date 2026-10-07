@@ -28,47 +28,49 @@ public partial class MainWindow
         window.Resources["IconFile"]=FindResource("IconFile");
         window.SetResourceReference(Window.BackgroundProperty,"Bg");
         window.SetResourceReference(Window.ForegroundProperty,"Text");
-        var panel=new DockPanel{Margin=new(18)};
+        var panel=new DockPanel{Margin=new(22)};
         window.Content=panel;
 
-        var header=new DockPanel{Margin=new(0,0,0,10)};
+        var header=new DockPanel{Margin=new(0,0,0,14)};
         DockPanel.SetDock(header,Dock.Top);panel.Children.Add(header);
-        var heading=Text(item.DisplayName,20);heading.FontWeight=FontWeights.SemiBold;
+        var heading=Text(item.DisplayName,21);heading.FontWeight=FontWeights.SemiBold;
         heading.TextWrapping=TextWrapping.NoWrap;heading.TextTrimming=TextTrimming.CharacterEllipsis;
         heading.ToolTip=item.DisplayName;heading.Margin=new(0);
         header.Children.Add(heading);
 
-        var totals=new Border{CornerRadius=new(10),Padding=new(10,8,10,8),Margin=new(0,0,0,8)};
-        totals.SetResourceReference(Border.BackgroundProperty,"AccentSoft");
+        var totals=new Border{CornerRadius=new(12),Padding=new(12),Margin=new(0,0,0,12),BorderThickness=new(1)};
+        totals.SetResourceReference(Border.BackgroundProperty,"PanelAlt");totals.SetResourceReference(Border.BorderBrushProperty,"EdgeSoft");
         var summary=new StackPanel();totals.Child=summary;
-        var status=Text("",12);status.FontWeight=FontWeights.Medium;status.Margin=new(0,0,0,3);
-        var bytes=Text("",11,true);bytes.Margin=new(0,0,0,5);
+        var status=Text("",13);status.FontWeight=FontWeights.SemiBold;status.Margin=new(0,0,0,4);
+        var bytes=Text("",12,true);bytes.Margin=new(0,0,0,8);
         var totalProgress=new ProgressBar{Maximum=100,Height=4,BorderThickness=new(0)};
         totalProgress.SetResourceReference(Control.ForegroundProperty,"Accent");
-        totalProgress.SetResourceReference(Control.BackgroundProperty,"Edge");
-        var network=Text("",11,true);network.Margin=new(0,0,0,5);network.TextWrapping=TextWrapping.Wrap;
+        totalProgress.SetResourceReference(Control.BackgroundProperty,"EdgeSoft");
+        var network=Text("",11,true);network.Margin=new(0,0,0,8);network.TextWrapping=TextWrapping.Wrap;
         summary.Children.Add(status);summary.Children.Add(bytes);summary.Children.Add(network);summary.Children.Add(totalProgress);
         DockPanel.SetDock(totals,Dock.Top);panel.Children.Add(totals);
 
-        var filter=new TextBox{Height=34,Padding=new(10,6,10,6),Margin=new(0,0,0,9),ToolTip="Найти серию или файл по названию и папке"};
+        var filter=new TextBox{Height=36,Padding=new(36,7,10,7),Margin=new(0,0,0,10),ToolTip="Найти серию или файл по названию и папке · Ctrl+F"};
         filter.SetResourceReference(Control.ForegroundProperty,"Text");
         filter.SetResourceReference(Control.BackgroundProperty,"Panel");
-        filter.SetResourceReference(Control.BorderBrushProperty,"Edge");
+        filter.SetResourceReference(Control.BorderBrushProperty,"EdgeSoft");
         AutomationProperties.SetName(filter,"Найти файл в раздаче");
         var searchHost=new Grid();searchHost.Children.Add(filter);
+        var magnifier=new System.Windows.Shapes.Path{Data=(Geometry)FindResource("IconSearch"),Width=15,Height=15,Stretch=Stretch.Uniform,StrokeThickness=1.6,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,StrokeLineJoin=PenLineJoin.Round,HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center,Margin=new(12,0,0,10),IsHitTestVisible=false};
+        magnifier.SetResourceReference(Shape.StrokeProperty,"Muted");searchHost.Children.Add(magnifier);
         var placeholder=Text("Найти серию или файл…",12,true);
-        placeholder.Margin=new(11,0,11,9);placeholder.VerticalAlignment=VerticalAlignment.Center;
+        placeholder.Margin=new(36,0,11,10);placeholder.VerticalAlignment=VerticalAlignment.Center;
         placeholder.IsHitTestVisible=false;placeholder.TextWrapping=TextWrapping.NoWrap;
         searchHost.Children.Add(placeholder);
         DockPanel.SetDock(searchHost,Dock.Top);panel.Children.Add(searchHost);
 
         var footer=new DockPanel{LastChildFill=false,Margin=new(0,10,0,0)};
         DockPanel.SetDock(footer,Dock.Bottom);panel.Children.Add(footer);
-        var close=ActionButton("Закрыть","IconBack",()=>window.Close());
-        close.Margin=new(0);close.Padding=new(10,6,10,6);close.IsCancel=true;
+        var close=Button("Закрыть",()=>window.Close());close.Style=(Style)FindResource("QuietButton");AutomationProperties.SetName(close,"Закрыть");
+        close.Margin=new(0);close.Padding=new(12,6,12,6);close.MinHeight=34;close.IsCancel=true;
         DockPanel.SetDock(close,Dock.Right);footer.Children.Add(close);
         var folder=ActionButton("Папка","IconFolder",()=>OpenFolder(new Button{Tag=item},new RoutedEventArgs()));
-        folder.Margin=new(0,0,8,0);folder.Padding=new(10,6,10,6);folder.ToolTip=item.Folder;
+        folder.Margin=new(0,0,8,0);folder.Padding=new(12,6,12,6);folder.MinHeight=34;folder.ToolTip=item.Folder;
         folder.IsEnabled=!string.IsNullOrWhiteSpace(item.Folder);footer.Children.Add(folder);
 
         var rows=new ObservableCollection<DownloadFileRow>();
@@ -127,18 +129,21 @@ public partial class MainWindow
             var received=current.Sum(file=>(decimal)Math.Max(0,file.Size)*(decimal)(double.IsFinite(file.Progress)?Math.Clamp(file.Progress,0,100):0)/100);
             bytes.Text=size==0?"Состав и размеры файлов появятся вместе с метаданными.":$"Скачано {DownloadService.FormatBytes((long)Math.Min(received,long.MaxValue))} из {DownloadService.FormatBytes((long)Math.Min(size,long.MaxValue))}";
             network.Text=string.Join("\n",new[]{item.PeersText,item.Hint}.Where(s=>!string.IsNullOrWhiteSpace(s)));
-            network.Visibility=network.Text.Length==0?Visibility.Collapsed:Visibility.Visible;
+            status.ToolTip=string.Join("\n",new[]{item.Status,network.Text}.Where(s=>!string.IsNullOrWhiteSpace(s)));
             totalProgress.IsIndeterminate=item.Indeterminate;
             totalProgress.Value=size>0?(double)(received/size*100):0;
-            EmptyState();
+            EmptyState();Fit();
         }
         filter.TextChanged+=(_,_)=>{view.Refresh();if(list.Items.Count>0)list.ScrollIntoView(list.Items[0]);EmptyState();};
         void Fit()
         {
-            panel.Margin=new(window.ActualWidth<440?12:18);
-            heading.FontSize=window.ActualWidth<440?17:20;
-            bytes.Visibility=window.ActualHeight<380?Visibility.Collapsed:Visibility.Visible;
-            header.Margin=new(0,0,0,window.ActualHeight<380?7:10);
+            var compact=window.ActualHeight>0&&window.ActualHeight<380;
+            panel.Margin=new(window.ActualWidth<440||compact?12:22);
+            heading.FontSize=window.ActualWidth<440?17:21;
+            bytes.Visibility=compact?Visibility.Collapsed:Visibility.Visible;
+            network.Visibility=compact||network.Text.Length==0?Visibility.Collapsed:Visibility.Visible;
+            header.Margin=new(0,0,0,compact?7:14);
+            totals.Padding=new(compact?9:12);totals.Margin=new(0,0,0,compact?8:12);
         }
         window.SizeChanged+=(_,_)=>Fit();
         window.PreviewKeyDown+=(_,args)=>
@@ -155,20 +160,23 @@ public partial class MainWindow
         var template=new DataTemplate(typeof(DownloadFileRow));
         var frame=new FrameworkElementFactory(typeof(Border)){Name="FileFrame"};
         frame.SetResourceReference(Border.BackgroundProperty,"Panel");
-        frame.SetResourceReference(Border.BorderBrushProperty,"Edge");
+        frame.SetResourceReference(Border.BorderBrushProperty,"EdgeSoft");
         frame.SetValue(Border.BorderThicknessProperty,new Thickness(1));
-        frame.SetValue(Border.CornerRadiusProperty,new CornerRadius(9));
-        frame.SetValue(Border.PaddingProperty,new Thickness(10,8,10,8));
+        frame.SetValue(Border.CornerRadiusProperty,new CornerRadius(10));
+        frame.SetValue(Border.PaddingProperty,new Thickness(12,10,12,10));
         frame.SetValue(FrameworkElement.MarginProperty,new Thickness(0,0,0,6));
         var dock=new FrameworkElementFactory(typeof(DockPanel));frame.AppendChild(dock);
+        var iconHost=new FrameworkElementFactory(typeof(Border));
+        iconHost.SetResourceReference(Border.BackgroundProperty,"PanelAlt");iconHost.SetValue(Border.CornerRadiusProperty,new CornerRadius(8));
+        iconHost.SetValue(FrameworkElement.WidthProperty,30d);iconHost.SetValue(FrameworkElement.HeightProperty,34d);
+        iconHost.SetValue(FrameworkElement.VerticalAlignmentProperty,VerticalAlignment.Top);iconHost.SetValue(FrameworkElement.MarginProperty,new Thickness(0,0,10,0));iconHost.SetValue(DockPanel.DockProperty,Dock.Left);dock.AppendChild(iconHost);
         var icon=new FrameworkElementFactory(typeof(System.Windows.Shapes.Path));
         icon.SetResourceReference(System.Windows.Shapes.Path.DataProperty,"IconFile");
         icon.SetResourceReference(Shape.StrokeProperty,"Muted");
         icon.SetValue(Shape.StrokeThicknessProperty,1.6d);icon.SetValue(Shape.StretchProperty,Stretch.Uniform);
         icon.SetValue(FrameworkElement.WidthProperty,16d);icon.SetValue(FrameworkElement.HeightProperty,18d);
-        icon.SetValue(FrameworkElement.VerticalAlignmentProperty,VerticalAlignment.Top);
-        icon.SetValue(FrameworkElement.MarginProperty,new Thickness(0,2,9,0));icon.SetValue(DockPanel.DockProperty,Dock.Left);
-        dock.AppendChild(icon);
+        icon.SetValue(FrameworkElement.VerticalAlignmentProperty,VerticalAlignment.Center);icon.SetValue(FrameworkElement.HorizontalAlignmentProperty,HorizontalAlignment.Center);
+        iconHost.AppendChild(icon);
         var stack=new FrameworkElementFactory(typeof(StackPanel));dock.AppendChild(stack);
         FrameworkElementFactory Label(string binding,double size,string brush)
         {
@@ -177,15 +185,16 @@ public partial class MainWindow
             text.SetValue(TextBlock.TextTrimmingProperty,TextTrimming.CharacterEllipsis);return text;
         }
         var title=new FrameworkElementFactory(typeof(DockPanel));stack.AppendChild(title);
-        var state=Label("StateText",11,"Accent");state.SetValue(DockPanel.DockProperty,Dock.Right);
-        state.SetValue(FrameworkElement.MarginProperty,new Thickness(9,0,0,0));title.AppendChild(state);
+        var stateHost=new FrameworkElementFactory(typeof(Border));stateHost.SetResourceReference(Border.BackgroundProperty,"AccentSoft");stateHost.SetValue(Border.CornerRadiusProperty,new CornerRadius(5));
+        stateHost.SetValue(Border.PaddingProperty,new Thickness(6,2,6,2));stateHost.SetValue(DockPanel.DockProperty,Dock.Right);stateHost.SetValue(FrameworkElement.MarginProperty,new Thickness(9,0,0,0));title.AppendChild(stateHost);
+        var state=Label("StateText",10,"Accent");state.SetValue(TextBlock.FontWeightProperty,FontWeights.Medium);stateHost.AppendChild(state);
         var name=Label("Name",13,"Text");name.SetValue(TextBlock.FontWeightProperty,FontWeights.SemiBold);
         name.SetBinding(FrameworkElement.ToolTipProperty,new Binding("RelativePath"));title.AppendChild(name);
-        var path=Label("Directory",10,"Muted");path.SetValue(FrameworkElement.MarginProperty,new Thickness(0,2,0,4));
+        var path=Label("Directory",11,"Muted");path.SetValue(FrameworkElement.MarginProperty,new Thickness(0,3,0,6));
         path.SetBinding(FrameworkElement.ToolTipProperty,new Binding("RelativePath"));stack.AppendChild(path);
         var progress=new FrameworkElementFactory(typeof(ProgressBar));progress.SetValue(ProgressBar.MaximumProperty,100d);
         progress.SetValue(FrameworkElement.HeightProperty,4d);progress.SetValue(Control.BorderThicknessProperty,new Thickness(0));
-        progress.SetResourceReference(Control.ForegroundProperty,"Accent");progress.SetResourceReference(Control.BackgroundProperty,"Edge");
+        progress.SetResourceReference(Control.ForegroundProperty,"Accent");progress.SetResourceReference(Control.BackgroundProperty,"EdgeSoft");
         progress.SetBinding(ProgressBar.ValueProperty,new Binding("Progress"){Mode=BindingMode.OneWay});stack.AppendChild(progress);
         var amount=Label("DownloadedText",11,"Muted");amount.SetValue(FrameworkElement.MarginProperty,new Thickness(0,4,0,0));stack.AppendChild(amount);
         template.VisualTree=frame;
@@ -196,6 +205,8 @@ public partial class MainWindow
             if(stateName=="IsSelected")trigger.Setters.Add(new Setter(Border.BorderBrushProperty,new DynamicResourceExtension("Accent"),"FileFrame"));
             template.Triggers.Add(trigger);
         }
+        var focus=new DataTrigger{Binding=new Binding("IsKeyboardFocusWithin"){RelativeSource=new RelativeSource(RelativeSourceMode.FindAncestor,typeof(ListBoxItem),1)},Value=true};
+        focus.Setters.Add(new Setter(Border.BorderBrushProperty,new DynamicResourceExtension("Accent"),"FileFrame"));template.Triggers.Add(focus);
         return template;
     }
 

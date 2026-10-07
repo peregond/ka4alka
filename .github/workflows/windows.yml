@@ -1,7 +1,7 @@
 name: Windows release validation
 on:
   push:
-    branches: [codex/catalog-controls-0.28.2]
+    branches: [codex/modern-ui-0.29]
   pull_request:
   workflow_dispatch:
 permissions:
@@ -40,6 +40,7 @@ jobs:
             test-output/close-reliability/*.json
             test-output/close-reliability/error.txt
             test-output/catalog-paging/*
+            test-output/design-modern/*
             test-output/search-downloads/*
             test-output/download-end-to-end/*.json
             test-output/download-end-to-end/error.txt

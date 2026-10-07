@@ -126,8 +126,8 @@ public partial class MainWindow:Window
     void OpenFolder(object sender,RoutedEventArgs e){var d=(DownloadItem)((Button)sender).Tag;if(Directory.Exists(d.Folder))Process.Start(new ProcessStartInfo(d.Folder){UseShellExecute=true});}
     void ApplyTheme()
     {
-        var values=prefs.Light?new[]{"#F0F4FA","#FFFFFF","#101C32","#43536E","#9CAEC6","#D1E1FA","#1456C5","#FFFFFF","#DCE6F4","#E0EAFB","#134AB0","#FFFFFF","#0A398F","#E0EAFF"}:new[]{"#0B1220","#18243A","#F7FAFF","#BCCAE0","#566C90","#293F65","#9EC6FF","#0C2142","#101B2E","#223655","#8CB7FF","#102340","#B2D1FF","#243B60"};var keys=new[]{"Bg","Panel","Text","Muted","Edge","Selected","Accent","AccentInk","Sidebar","Hover","Primary","PrimaryInk","PrimaryHover","AccentSoft"};for(int i=0;i<keys.Length;i++){var brush=new SolidColorBrush((Color)ColorConverter.ConvertFromString(values[i]));brush.Freeze();Application.Current.Resources[keys[i]]=brush;}
-        Application.Current.Resources["Danger"]=new SolidColorBrush((Color)ColorConverter.ConvertFromString(prefs.Light?"#B42335":"#FF9AA5"));
+        var values=prefs.Light?new[]{"#F3F5F4","#FFFFFF","#17221E","#4C5B54","#BCCBC4","#D6EBE1","#09684C","#FFFFFF","#E9EFEC","#E4EEE8","#087552","#FFFFFF","#075B40","#D6EBE1","#F7F9F8","#DEE6E1"}:new[]{"#101315","#1C2226","#F5F7F8","#BEC7CD","#46504E","#263F35","#91E8CC","#082B20","#151A1D","#2A3235","#91E8CC","#082B20","#B3F3DF","#233E34","#171D21","#303A39"};var keys=new[]{"Bg","Panel","Text","Muted","Edge","Selected","Accent","AccentInk","Sidebar","Hover","Primary","PrimaryInk","PrimaryHover","AccentSoft","PanelAlt","EdgeSoft"};for(int i=0;i<keys.Length;i++){var brush=new SolidColorBrush((Color)ColorConverter.ConvertFromString(values[i]));brush.Freeze();Application.Current.Resources[keys[i]]=brush;}
+        Application.Current.Resources["Danger"]=new SolidColorBrush((Color)ColorConverter.ConvertFromString(prefs.Light?"#B42335":"#FFB2BB"));
         SidePanel.SetResourceReference(Border.BackgroundProperty,"Sidebar");
     }
     bool closing;
