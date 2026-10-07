@@ -37,7 +37,7 @@ try{
  $downloadUi=Start-Process (Join-Path $root ('dist/Kachalka-'+$short+'/Kachalka.exe')) -ArgumentList @('--end-to-end-smoke-test',('"'+$downloadEvidence+'"')) -PassThru
  if(-not $downloadUi.WaitForExit(60000)){ $downloadUi.Kill($true);throw 'Download and poster UI smoke timed out' }
  if(Test-Path (Join-Path $downloadEvidence 'error.txt')){throw (Get-Content (Join-Path $downloadEvidence 'error.txt') -Raw)}
- if(-not(Test-Path (Join-Path $downloadEvidence 'end-to-end.json'))){throw 'Download and poster UI evidence missing'}
+ if(-not(Test-Path (Join-Path $downloadEvidence 'end-to-end.json'))){if(Test-Path (Join-Path $state 'error.log')){Get-Content (Join-Path $state 'error.log')};throw ('Download and poster UI evidence missing; exit code '+$downloadUi.ExitCode)}
  Get-Content (Join-Path $downloadEvidence 'end-to-end.json')
  $uninstall=Join-Path $root '.tools/uninstall-files.nsh'
  ./installer/write-uninstall.ps1 -ApplicationDirectory ('dist/Kachalka-'+$short) -OutputPath $uninstall

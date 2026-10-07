@@ -64,8 +64,8 @@ public partial class MainWindow
                     catch(Exception error)when(error is OperationCanceledException or IOException or SocketException){ /* Cancelled image requests are expected when navigating between views. */ }
                 }
             });
-            liveRequest?.Cancel();section="Фильмы";Search.Text="Тестовый фильм";searchDelay.Stop();livePage=1;
-            liveKey="Фильмы|Тестовый фильм|1";
+            liveRequest?.Cancel();section="Фильмы";Search.Text="Тестовый фильм";searchDelay.Stop();livePage=1;submittedQuery=Search.Text;searchCategory="";favoritesOnly=false;ResetCatalogFilters();liveLoading=false;
+            liveKey=CurrentCatalogKey;
             var movie=new MediaItem(-987654321,"Тестовый фильм","Фильмы","",2026,"—","—","#526B69"){PageUrl="https://example.invalid/test",ImageUrl=posterUrl,Description="Локальная проверка интерфейса загрузки."};
             var release=new SourceEntry("local-test","Тестовый фильм (2026) WEB-DL 1080p","Локальный тест","",$"http://127.0.0.1:{port}/test-film.torrent","",256*1024,1);
             var larger=release with{Id="large-test",Title="Тестовый фильм (2026) WEB-DL 2160p",Size=3*1024*1024,Seeds=12};
@@ -100,6 +100,7 @@ public partial class MainWindow
             if(queuePoster?.Source==null||posterRequests==0||torrentRequests!=1)throw new Exception($"Restored download poster did not load through HTTP: images={posterRequests}, torrents={torrentRequests}.");
             File.WriteAllText(Path.Combine(output,"end-to-end.json"),JsonSerializer.Serialize(new{CardOpened=true,ReleaseChosen=true,TorrentFetched=true,DownloadStarted=true,ConfiguredFolderUsed=true,NoReleaseDialog=true,RestoredQueueMetadata=true,RestoredPosterFetchedOverHttp=true,PosterRequests=posterRequests,TorrentRequests=torrentRequests,QueueCount=downloads.Items.Count,Name=restoredItem.Name,MediaTitle=restoredItem.MediaTitle,ImageUrl=restoredItem.ImageUrl,Status=restoredItem.Status}));
         }
+        catch(Exception error){File.WriteAllText(Path.Combine(output,"error.txt"),error.ToString());throw;}
         finally
         {
             fixtureTimeout.Cancel();server.Stop();if(serve!=null)try{await serve;}catch(Exception error)when(error is OperationCanceledException or SocketException){}
