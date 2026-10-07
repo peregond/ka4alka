@@ -1,10 +1,12 @@
 Unicode true
+!define MUI_ICON "../native/Assets/app.ico"
+!define MUI_UNICON "../native/Assets/app.ico"
 !include "MUI2.nsh"
 !include "LogicLib.nsh"
 !include "x64.nsh"
 !include "WinVer.nsh"
 !ifndef VERSION
-  !define VERSION "0.26.1"
+  !define VERSION "0.27.0"
 !endif
 !ifndef APP_DIR
   !error "Supply APP_DIR with the published application folder"

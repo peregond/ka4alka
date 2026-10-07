@@ -7,11 +7,15 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>Kachalka</AssemblyName>
     <Product>Качалка</Product>
-    <Version>0.26.1</Version>
+    <Version>0.27.0</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets/app.ico</ApplicationIcon>
     <ServerGarbageCollection>false</ServerGarbageCollection>
   </PropertyGroup>
   <ItemGroup><PackageReference Include="MonoTorrent" Version="3.0.2" /><PackageReference Include="HtmlAgilityPack" Version="1.13.0" /></ItemGroup>
   <ItemGroup><ProjectReference Include="../update-core/Kachalka.UpdateCore.csproj" /></ItemGroup>
   <ItemGroup><EmbeddedResource Include="../web-index/app/data/seed.json" LogicalName="Kachalka.catalog-seed.json" /></ItemGroup>
+  <ItemGroup><Resource Include="Fonts/*.ttf" /></ItemGroup>
+  <ItemGroup><Resource Include="Assets/logo.png" /><Resource Include="Assets/app.ico" /></ItemGroup>
+  <ItemGroup><None Update="Fonts/LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" TargetPath="licenses/Inter-OFL.txt" /></ItemGroup>
 </Project>

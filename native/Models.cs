@@ -93,6 +93,7 @@ public class DownloadItem : INotifyPropertyChanged
     public string? ReleasePageUrl {get;set;}
     public string? ReleaseUrl {get;set;}
     [JsonIgnore] public string DisplayName=>string.IsNullOrWhiteSpace(MediaTitle)?Name:MediaTitle;
+    [JsonIgnore] public bool HasMediaCard=>DownloadMetadata.Card(this)!=null;
     [JsonIgnore] public long DownloadRate {get;set;}
     [JsonIgnore] public long UploadRate {get;set;}
     [JsonIgnore] public long? TotalBytes {get;set;}

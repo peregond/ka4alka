@@ -9,6 +9,18 @@ namespace Kachalka;
 
 public static class DownloadMetadata
 {
+    public static MediaItem? Card(DownloadItem item)
+    {
+        var section=item.MediaSection;
+        if(section is not ("Фильмы" or "Сериалы")||!Uri.TryCreate(item.MediaPageUrl,UriKind.Absolute,out var page)||page.Scheme!="https"||page.Host!="w6.zona.plus"||!page.IsDefaultPort||page.UserInfo.Length>0||page.Query.Length>0||page.Fragment.Length>0)return null;
+        var prefix=section=="Фильмы"?"/movies/":"/tvseries/";
+        if(!page.AbsolutePath.StartsWith(prefix,StringComparison.Ordinal))return null;
+        var slug=Uri.UnescapeDataString(page.AbsolutePath[prefix.Length..].TrimEnd('/'));
+        if(!Regex.IsMatch(slug,@"^[-\p{L}\p{N}]{1,120}$"))return null;
+        var id=-(BitConverter.ToInt32(SHA256.HashData(Encoding.UTF8.GetBytes(page.AbsoluteUri)),0)&int.MaxValue);
+        return new(id,item.DisplayName,section,"",item.MediaYear,"—","—","#526B69")
+        {PageUrl=page.AbsoluteUri,OnlineId=(section=="Фильмы"?"movies:":"series:")+slug,ImageUrl=item.ImageUrl};
+    }
     static readonly JsonSerializerOptions Json=new(){PropertyNameCaseInsensitive=true};
     static readonly Regex Year=new(@"^(?:19|20)\d{2}\b",RegexOptions.CultureInvariant);
     static readonly Regex ReleaseTag=new(@"^(?:s\d{1,3}(?:e\d{1,3})?|e\d{1,3}|\d{1,2}\s+(?:сезон|season)|season|сезон|серия|серии|episode|ep|complete|полный|все|web|webrip|hdtv|dvdrip|hdrip|bdrip|bluray|bdremux|remux|720p?|1080[pi]?|2160[pi]?|4k|uhd|x264|x265|h264|h265|hevc|avc|mkv|mp4|avi|repack|extended|uncut|directors|hdr|hdr10|dv|dub|mvo)\b",RegexOptions.CultureInvariant|RegexOptions.IgnoreCase);
@@ -49,6 +61,7 @@ public static class DownloadMetadata
 
     static MediaItem? Unique(IEnumerable<MediaItem> items)
     {
+        static bool Rating(string value)=>double.TryParse(value.Replace(',','.'),System.Globalization.NumberStyles.Float,System.Globalization.CultureInfo.InvariantCulture,out var score)&&score is >0 and <=10;
         var groups=items.GroupBy(media=>!string.IsNullOrWhiteSpace(media.PageUrl)?media.Section+"|"+media.PageUrl:
             media.Section+"|"+media.Year+"|"+Normalize(media.Title)).ToArray();
         if(groups.Length!=1)return null;
@@ -58,7 +71,9 @@ public static class DownloadMetadata
         var image=rows.Select(media=>media.ImageUrl).FirstOrDefault(url=>!string.IsNullOrWhiteSpace(url));
         var original=rows.Select(media=>media.OriginalTitle).FirstOrDefault(title=>!string.IsNullOrWhiteSpace(title))??
             rows.Where(media=>!Regex.IsMatch(media.Title,@"[А-Яа-яЁё]")&&Normalize(media.Title)!=Normalize(preferred.Title)).Select(media=>media.Title).FirstOrDefault();
-        return preferred with{ImageUrl=!string.IsNullOrWhiteSpace(preferred.ImageUrl)?preferred.ImageUrl:image,OriginalTitle=preferred.OriginalTitle??original};
+        return preferred with{ImageUrl=!string.IsNullOrWhiteSpace(preferred.ImageUrl)?preferred.ImageUrl:image,OriginalTitle=preferred.OriginalTitle??original,
+            Kinopoisk=rows.FirstOrDefault(media=>Rating(media.Kinopoisk))?.Kinopoisk??"—",Imdb=rows.FirstOrDefault(media=>Rating(media.Imdb))?.Imdb??"—",
+            Description=rows.FirstOrDefault(media=>!string.IsNullOrWhiteSpace(media.Description))?.Description};
     }
 
     static bool TitleMatches(string value,MediaItem media)
@@ -101,6 +116,9 @@ public static class DownloadMetadata
             Title=Regex.IsMatch(best.Title,@"[А-Яа-яЁё]")?best.Title:media.Title,
             ImageUrl=!string.IsNullOrWhiteSpace(best.ImageUrl)?best.ImageUrl:media.ImageUrl,
             OriginalTitle=best.OriginalTitle??media.OriginalTitle,
+            Kinopoisk=best.Kinopoisk!="—"?best.Kinopoisk:media.Kinopoisk,
+            Imdb=best.Imdb!="—"?best.Imdb:media.Imdb,
+            Description=!string.IsNullOrWhiteSpace(best.Description)?best.Description:media.Description,
             PageUrl=best.PageUrl??media.PageUrl,Year=best.Year>0?best.Year:media.Year
         };
     }

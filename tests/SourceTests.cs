@@ -11,6 +11,16 @@ public static class SourceTests
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken ct)=>Task.FromException<HttpResponseMessage>(new HttpRequestException("offline"));
     }
+    sealed class RutorMirrorHandler:HttpMessageHandler
+    {
+        public List<string> Hosts {get;}=[];
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken ct)
+        {
+            Hosts.Add(request.RequestUri!.Host);
+            if(Hosts.Count==1)return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.ServiceUnavailable));
+            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK){Content=new StringContent("<div id='index'><table><tr><td><a href='/torrent/1/test'>Film (2026)</a><a href='magnet:?xt=urn:btih:0123456789012345678901234567890123456789'>magnet</a></td><td>1 GB</td><td><span class='green'>5</span></td></tr></table></div>")});
+        }
+    }
     sealed class OnlineFixtureHandler:HttpMessageHandler
     {
         public List<Uri> Requests {get;}=[];
@@ -32,6 +42,11 @@ public static class SourceTests
     public static async Task Run(bool live,bool allSections=false)
     {
         static void Check(bool value,string name){if(!value)throw new Exception(name);Console.WriteLine("PASS: "+name);}
+        var mirrorHandler=new RutorMirrorHandler();using(var mirrorClient=new SourceClient(mirrorHandler))
+        {
+            var mirrored=await new LiveCatalog(mirrorClient).Releases("Film",CancellationToken.None);
+            Check(mirrorHandler.Hosts.SequenceEqual(new[]{"rutor.info","rutor.is"})&&mirrored.Count==1&&mirrored[0].Seeds==5,"RuTor recovers actual releases through its second public mirror when the primary fails");
+        }
         var coverPath=Path.GetFullPath(Path.Combine("test-output","cover-recovery-"+Guid.NewGuid().ToString("N")+".img"));
         Directory.CreateDirectory(Path.GetDirectoryName(coverPath)!);
         static string DecodeCover(byte[] bytes)=>Encoding.ASCII.GetString(bytes)=="valid-image"?"decoded":throw new InvalidDataException("Invalid image");
@@ -85,6 +100,8 @@ public static class SourceTests
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
         var nnmBytes=Encoding.GetEncoding(1251).GetBytes(nnmHtml);
         var nnmMovie=NnmClubSource.Parse(nnmBytes,movie);
+        var screenBytes=Encoding.GetEncoding(1251).GetBytes("<table>"+NnmRow("Экранки","До последнего грамма / The Weight (2026) Screener [H.264/1080p]","viewtopic.php?t=1888983","download.php?id=1431328","5695089292","136")+"</table>");
+        Check(NnmClubSource.Parse(screenBytes,new MediaItem(-9,"До последнего грамма","Фильмы","",2026,"—","—","#526B69"){OriginalTitle="The Weight"}).Count==1,"NNM-Club accepts the real Screener release in the Экранки category while preserving title/year matching");
         Check(nnmMovie.Count==1&&nnmMovie[0].Source=="NNM-Club"&&nnmMovie[0].Id=="NNM-Club:456"&&
               nnmMovie[0].PageUrl=="https://nnmclub.to/forum/viewtopic.php?t=123"&&
               nnmMovie[0].TorrentUrl=="https://nnmclub.to/forum/download.php?id=456"&&

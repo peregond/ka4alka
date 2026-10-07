@@ -1,6 +1,18 @@
 using Kachalka;
 static class ReleaseProbe
 {
+    public static async Task AffectedFilms()
+    {
+        using var client=new SourceClient();
+        foreach(var title in new[]{"До последнего грамма","Объект преступления"})
+        {
+            var film=BundledCatalog.Search("Фильмы",title).Single(item=>item.Title==title);
+            if(string.IsNullOrWhiteSpace(film.OriginalTitle)||film.Imdb=="—")throw new Exception("Affected film is missing confirmed metadata: "+title);
+            var result=await ReleaseSearch.RunAsync(new[]{new ReleaseSource("NNM-Club",ct=>new NnmClubSource(client).Search(film,ct))},ct:CancellationToken.None);
+            Console.WriteLine($"PROBE film={title}; original={film.OriginalTitle}; IMDb={film.Imdb}; releases={result.Items.Length}; source={result.Sources.Single().State}");
+            if(title=="До последнего грамма"&&result.Items.Length==0)throw new Exception("The verified NNM Screener release was not found.");
+        }
+    }
     public static async Task Run()
     {
         using var client=new SourceClient();var catalog=new LiveCatalog(client);

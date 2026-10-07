@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Globalization;
+using System.IO;
 using System.Text.Json;
 using HtmlAgilityPack;
 namespace Kachalka;
@@ -66,10 +67,11 @@ public sealed class LiveCatalog(SourceClient client)
     {
         var key=Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(item.PageUrl!)));
         var cache=System.IO.Path.Combine(Preferences.DataDir,"details",key+".json");
+        static string ValidScore(string value)=>Regex.IsMatch(value,@"^\d{1,2}([.,]\d)?$")&&double.TryParse(value.Replace(',','.'),NumberStyles.Float,CultureInfo.InvariantCulture,out var score)&&score is >0 and <=10?value:"—";
         try
         {
             var h=Html(await client.Read(SourceClient.WebUri(item.PageUrl!),4*1024*1024,ct));
-            string Score(string name){var v=Text(h.DocumentNode.SelectSingleNode("//*["+Class(name)+"]"));return Regex.IsMatch(v,@"^\d{1,2}([.,]\d)?$")?v:"—";}
+            string Score(string name)=>ValidScore(Text(h.DocumentNode.SelectSingleNode("//*["+Class(name)+"]")));
             var original=HtmlEntity.DeEntitize(h.DocumentNode.SelectSingleNode("//meta[@itemprop='alternativeHeadline']")?.GetAttributeValue("content","")??"").Trim();
             var genres=(h.DocumentNode.SelectNodes("//*[@itemprop='genre']")??new HtmlNodeCollection(null)).Select(Text).Distinct().ToArray();
             HtmlNode[] Links(string prefix)=>(h.DocumentNode.SelectNodes("//a[contains(@href,'/filter/"+prefix+"-')]")??new HtmlNodeCollection(null)).ToArray();
@@ -81,12 +83,25 @@ public sealed class LiveCatalog(SourceClient client)
         catch(Exception) when(!ct.IsCancellationRequested&&System.IO.File.Exists(cache))
         {
             var saved=JsonSerializer.Deserialize<DetailSnapshot>(await System.IO.File.ReadAllTextAsync(cache,ct))!;
-            return item with{Kinopoisk=saved.Kinopoisk,Imdb=saved.Imdb,Description=saved.Description,OriginalTitle=saved.OriginalTitle,Genre=saved.Genre,Country=saved.Country,GenreKeys=saved.GenreKeys??[],CountryKeys=saved.CountryKeys??[]};
+            return item with{Kinopoisk=ValidScore(saved.Kinopoisk)=="—"?item.Kinopoisk:saved.Kinopoisk,Imdb=ValidScore(saved.Imdb)=="—"?item.Imdb:saved.Imdb,Description=saved.Description,OriginalTitle=saved.OriginalTitle??item.OriginalTitle,Genre=saved.Genre,Country=saved.Country,GenreKeys=saved.GenreKeys??[],CountryKeys=saved.CountryKeys??[]};
         }
     }
     public async Task<IReadOnlyList<SourceEntry>> Releases(string title,CancellationToken ct)
     {
-        var bytes=await client.Read(new Uri("https://rutor.info/search/0/0/000/0/"+Uri.EscapeDataString(title)),4*1024*1024,ct);return ParseRutor(bytes);
+        Exception? failure=null;
+        foreach(var host in new[]{"rutor.info","rutor.is"})
+        {
+            try
+            {
+                using var timeout=CancellationTokenSource.CreateLinkedTokenSource(ct);timeout.CancelAfter(TimeSpan.FromSeconds(7));
+                var bytes=await client.Read(new Uri("https://"+host+"/search/0/0/000/0/"+Uri.EscapeDataString(title)),4*1024*1024,timeout.Token);
+                var rows=ParseRutor(bytes);if(rows.Count>0)return rows;
+                if(Html(bytes).DocumentNode.SelectSingleNode("//div[@id='index']")==null)throw new InvalidDataException("RuTor returned no search index.");
+                return rows;
+            }
+            catch(Exception error)when(!ct.IsCancellationRequested){failure=error;}
+        }
+        ct.ThrowIfCancellationRequested();throw failure??new InvalidDataException("RuTor unavailable.");
     }
     public static bool Matches(MediaItem item,SourceEntry entry)
     {
