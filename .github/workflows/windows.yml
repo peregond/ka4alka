@@ -1,7 +1,7 @@
 name: Windows release validation
 on:
   push:
-    branches: [codex/dark-default-0.28.1]
+    branches: [codex/catalog-controls-0.28.2]
   pull_request:
   workflow_dispatch:
 permissions:

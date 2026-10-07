@@ -54,7 +54,15 @@ public partial class MainWindow
             Render();await Settle();CheckText("Интерстеллар","refresh-results");
             prefs.Light=false;ApplyTheme();Render();await Settle();CheckText("Интерстеллар","typing-dark");Shot("search-dark");
             Width=510;Height=520;await Settle();CheckText("Интерстеллар","small-short-window");Shot("search-small");
-            Width=360;await Settle();CheckText("Интерстеллар","minimum-width");Shot("search-minimum");Width=510;await Settle();
+            Width=360;await Settle();CheckText("Интерстеллар","minimum-width");Shot("search-minimum");
+            foreach(var kind in new[]{"Фильмы","Сериалы","Загрузки"})
+            {
+                section=kind;current=kind=="Загрузки"?null:new MediaItem(-88000-(kind=="Сериалы"?1:0),"Поиск в карточке",kind,"",2026,"—","—","#526B69");
+                Render();await Settle();FocusCatalogSearch();await Settle();
+                Check(SearchBar.IsVisible&&section==kind&&(kind=="Загрузки"||current!=null),"Focusing persistent search changed the current page.");
+                CheckText("Интерстеллар","minimum-width-"+kind);Shot("search-minimum-"+kind);
+            }
+            section="Фильмы";lastCatalogSection="Фильмы";current=null;Render();Width=510;await Settle();
             var windowCount=Application.Current.Windows.Count;
             Search.Text="Интерстелла";Search.Text="Интерстеллар";
             SettingsButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));submittedQuery=Search.Text.Trim();searchCategory="";liveKey=CurrentCatalogKey;Render();await Task.Delay(450);await Settle();

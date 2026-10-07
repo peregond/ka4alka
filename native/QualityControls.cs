@@ -23,6 +23,32 @@ public partial class MainWindow
     }
     void ApplyKnownQuality(MediaItem item)=>item.SetReleaseQuality(KnownQuality(item),QualityMinimum);
 
+    FrameworkElement CatalogQualityControls(Action changed)
+    {
+        var controls=new WrapPanel{VerticalAlignment=VerticalAlignment.Center};
+        void Save(bool hide,int minimum)
+        {
+            var oldHide=prefs.HidePoorQuality;var oldMinimum=prefs.MinimumReleaseHeight;
+            prefs.HidePoorQuality=hide;prefs.MinimumReleaseHeight=minimum;
+            try{prefs.Save();}catch(Exception error){prefs.HidePoorQuality=oldHide;prefs.MinimumReleaseHeight=oldMinimum;Status.Text="Не удалось сохранить фильтр: "+error.Message;return;}
+            changed();
+        }
+        var toggle=ActionButton("Без плохого качества","IconFilter",()=>Save(!prefs.HidePoorQuality,QualityMinimum),"PillButton");
+        toggle.SetResourceReference(Control.BackgroundProperty,prefs.HidePoorQuality?"Selected":"Panel");
+        toggle.ToolTip=prefs.HidePoorQuality?"Включено: экранки и видео ниже выбранного минимума скрыты. Нажми, чтобы показать.":"Выключено: показываем любое качество. Нажми, чтобы скрыть экранки и видео ниже выбранного минимума.";
+        AutomationProperties.SetName(toggle,"Скрыть плохое качество");AutomationProperties.SetItemStatus(toggle,prefs.HidePoorQuality?"Включён":"Выключен");controls.Children.Add(toggle);
+        var minimum=Button((QualityMinimum==1080?"Full HD":"HD Ready")+" ▾",()=>{});minimum.Style=(Style)FindResource("PillButton");
+        minimum.ToolTip="Минимальное качество: экранки скрываются при любом разрешении. Неизвестное качество остаётся видимым.";
+        AutomationProperties.SetName(minimum,"Минимальное качество");
+        var menu=new ContextMenu{PlacementTarget=minimum,Placement=System.Windows.Controls.Primitives.PlacementMode.Bottom};
+        foreach(var choice in new[]{(Height:720,Label:"HD Ready · от 720p"),(Height:1080,Label:"Full HD · от 1080p")})
+        {
+            var option=new MenuItem{Header=choice.Label,Tag=choice.Height,IsCheckable=true,IsChecked=QualityMinimum==choice.Height};
+            option.Click+=(_,_)=>{menu.IsOpen=false;Save(prefs.HidePoorQuality,choice.Height);};menu.Items.Add(option);
+        }
+        minimum.ContextMenu=menu;minimum.Click+=(_,_)=>menu.IsOpen=true;controls.Children.Add(minimum);return controls;
+    }
+
     FrameworkElement QualityControls(Action changed)
     {
         var controls=new WrapPanel{Margin=new(0,0,0,4),VerticalAlignment=VerticalAlignment.Center};

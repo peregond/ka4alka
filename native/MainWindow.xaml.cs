@@ -61,7 +61,7 @@ public partial class MainWindow:Window
     void Render()
     {
         if(!ready)return;try{catalogList=null;detailHero=null;detailPoster=null;detailSynopsis=null;detailTitle=null;detailDescription=null;descriptionToggle=null;inlineCatalogFilters=null;inlineCatalogFilterScroll=null;PageHeader.Children.Clear();Body.Children.Clear();Body.RowDefinitions.Clear();SyncTimer();UpdateFilterRail();
-        SearchBar.Visibility=current==null&&(section is "Фильмы" or "Сериалы")?Visibility.Visible:Visibility.Collapsed;
+        SearchBar.Visibility=current!=null||section is "Фильмы" or "Сериалы" or "Загрузки"?Visibility.Visible:Visibility.Collapsed;
         ContextLabel.Visibility=SearchBar.Visibility==Visibility.Visible||section=="Загрузки"?Visibility.Collapsed:Visibility.Visible;ContextLabel.Text=section;
         downloadView=null;downloadList=null;
         foreach(Button b in Navigation.Children){var selected=!SearchActive&&b.Tag?.ToString()==section;b.SetResourceReference(System.Windows.Controls.Button.BackgroundProperty,selected?"Selected":"Sidebar");b.SetResourceReference(Control.ForegroundProperty,selected?"Text":"Muted");b.FontWeight=selected?FontWeights.SemiBold:FontWeights.Normal;}

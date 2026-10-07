@@ -31,7 +31,7 @@ public partial class MainWindow
     const uint MonitorDefaultNearest=2,SwpNoSize=0x0001,SwpNoZOrder=0x0004,SwpNoActivate=0x0010;
     IntPtr activeMonitor;
     double activeScaleX,activeScaleY;
-    bool sizingQueued,compactWidth,compactHeight,tinyWidth,veryCompactHeight,layoutInitialized;
+    bool sizingQueued,compactWidth,compactHeight,tinyWidth,veryCompactHeight,compactSearch,layoutInitialized;
     ListBox? catalogList;
     IReadOnlyList<MediaItem> catalogDisplay=[];
     int catalogColumns;
@@ -101,9 +101,10 @@ public partial class MainWindow
         var tiny=ActualWidth>0&&ActualWidth<780;
         var shortView=ActualHeight>0&&ActualHeight<560;
         var veryShort=ActualHeight>0&&ActualHeight<360;
+        var narrowSearch=ActualWidth>0&&ActualWidth<560;
         FitDownloadsToolbar();
-        if(layoutInitialized&&narrow==compactWidth&&tiny==tinyWidth&&shortView==compactHeight&&veryShort==veryCompactHeight){UpdateFilterRail();return;}
-        layoutInitialized=true;compactWidth=narrow;tinyWidth=tiny;compactHeight=shortView;veryCompactHeight=veryShort;
+        if(layoutInitialized&&narrow==compactWidth&&tiny==tinyWidth&&shortView==compactHeight&&veryShort==veryCompactHeight&&narrowSearch==compactSearch){UpdateFilterRail();return;}
+        layoutInitialized=true;compactWidth=narrow;tinyWidth=tiny;compactHeight=shortView;veryCompactHeight=veryShort;compactSearch=narrowSearch;
         RootGrid.Margin=narrow?new Thickness(10):new Thickness(16);
         SidebarColumn.Width=new GridLength(narrow?80:196);
         SidePanel.Margin=narrow?new Thickness(0,0,12,0):new Thickness(0,0,24,0);
@@ -123,6 +124,11 @@ public partial class MainWindow
         AddTorrentButton.Content=IconLabel(tiny?"":narrow?"Добавить":"Добавить торрент","IconPlus");
         HeaderArea.Margin=new Thickness(0,4,0,veryShort?6:shortView?14:25);
         SearchBar.Margin=new Thickness(0,0,tiny?10:18,0);SearchBar.Height=shortView?40:44;
+        Search.Padding=new Thickness(narrowSearch?10:42,8,narrowSearch?30:40,8);
+        SearchMagnifier.Visibility=narrowSearch?Visibility.Collapsed:Visibility.Visible;
+        SearchPlaceholder.Text=narrowSearch?"Поиск":"Найти фильм или сериал";SearchPlaceholder.Margin=new Thickness(narrowSearch?10:42,0,0,0);
+        SearchSubmitButton.Content=narrowSearch?IconLabel("","IconSearch"):"Поиск";
+        SearchSubmitButton.Padding=new Thickness(narrowSearch?8:10,6,narrowSearch?8:10,6);
         foreach(var subtitle in PageHeader.Children.OfType<TextBlock>().Where(x=>Equals(x.Tag,"CatalogSubtitle")))subtitle.Visibility=shortView?Visibility.Collapsed:Visibility.Visible;
         UpdateFilterRail();
         UpdateCatalogColumns();RefreshSidebarUpdate();

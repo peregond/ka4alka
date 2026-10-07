@@ -1,4 +1,5 @@
 using Kachalka;
+using System.Text.Json;
 static class ReleaseQualityTests
 {
     public static void Run()
@@ -16,5 +17,27 @@ static class ReleaseQualityTests
         Check(!item.OnlyPoorQuality&&changed==2,"catalog quality updates existing bound cards when a good release arrives");
         var download=new DownloadItem{MediaTitle="Фильм",Name="file.mkv",ReleaseTitle="Фильм HDCAM 1080p"};
         Check(download.PoorQuality,"queue quality uses release title rather than friendly film title or filename");
+        var originalData=Environment.GetEnvironmentVariable("KACHALKA_DATA");
+        var settingsFolder=Path.Combine(Preferences.DataDir,"quality-settings");
+        try
+        {
+            Environment.SetEnvironmentVariable("KACHALKA_DATA",settingsFolder);
+            Check(new Preferences().HidePoorQuality&&Preferences.Load().HidePoorQuality,"new installations hide poor quality by default");
+            Directory.CreateDirectory(settingsFolder);
+            var settings=Path.Combine(settingsFolder,"settings.json");
+            File.WriteAllText(settings,JsonSerializer.Serialize(new{MinimumReleaseHeight=1080}));
+            var missing=Preferences.Load();
+            Check(missing.HidePoorQuality&&missing.MinimumReleaseHeight==1080,"older settings without a quality preference use the enabled default and retain the quality minimum");
+            File.WriteAllText(settings,JsonSerializer.Serialize(new{HidePoorQuality=false,MinimumReleaseHeight=720}));
+            var disabled=Preferences.Load();
+            Check(disabled.HidePoorQuality&&disabled.QualityFilterConfigured,"upgrading old serialized defaults enables quality filtering once");
+            disabled.HidePoorQuality=false;
+            disabled.Save();Check(!Preferences.Load().HidePoorQuality,"disabled quality choice survives saving and reloading");
+            Check(Preferences.Load().QualityFilterConfigured,"saved quality choice records that the one-time default migration is complete");
+            disabled.HidePoorQuality=true;disabled.MinimumReleaseHeight=1080;disabled.Save();
+            var enabled=Preferences.Load();
+            Check(enabled.HidePoorQuality&&enabled.MinimumReleaseHeight==1080,"enabled quality choice and minimum survive saving and reloading");
+        }
+        finally{Environment.SetEnvironmentVariable("KACHALKA_DATA",originalData);}
     }
 }
