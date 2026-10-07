@@ -4,6 +4,7 @@ import html
 import json
 import re
 import urllib.request
+import urllib.parse
 
 
 def probe(label, url, encoding='utf-8'):
@@ -24,7 +25,8 @@ def probe(label, url, encoding='utf-8'):
         result = {'source': label, 'status': status, 'url': final,
                   'title': re.findall(r'<title[^>]*>(.*?)</title>', text, re.I | re.S)[:1],
                   'names': [html.unescape(re.sub('<[^>]+>', '', value)).strip()[:240] for value in titles[:10]],
-                  'snippets': snippets[:4], 'rows': matching_rows[:2], 'ratings': ratings[:10] if 'detail' in label else []}
+                  'snippets': snippets[:4], 'rows': matching_rows[:2], 'ratings': ratings[:10] if 'detail' in label else [],
+                  'json': text[:5000] if 'suggestion' in label else None}
     except Exception as error:
         result = {'source': label, 'error': str(error)}
     return result
@@ -46,6 +48,15 @@ if __name__ == '__main__':
             (title+' kinozal', 'https://kinozal.tv/browse.php?s='+cp, 'cp1251'),
             (title+' bitru', 'https://bitru.org/search.php?search='+query),
         ])
+    for title, query in [('The Weight','the weight'), ('Object','l objet du delit')]:
+        jobs.append((title+' imdb suggestion', 'https://v3.sg.media-imdb.com/suggestion/x/'+urllib.parse.quote(query)+'.json'))
+    for title, _ in terms:
+        jobs.append((title+' kinopoisk suggestion', 'https://www.kinopoisk.ru/api/suggest/v2/?query='+urllib.parse.quote(title)))
+    jobs.extend([
+        ('BitRu home', 'https://bitru.org/'),
+        ('Rustorka The Weight', 'https://rustorka.com/forum/tracker.php?nm='+urllib.parse.quote('До последнего грамма'), 'cp1251'),
+        ('TorLook The Weight', 'https://torlook.info/?q='+urllib.parse.quote('До последнего грамма')),
+    ])
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
         for result in pool.map(lambda args: probe(*args), jobs):
             print(json.dumps(result, ensure_ascii=False), flush=True)
