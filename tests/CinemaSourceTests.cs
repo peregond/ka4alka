@@ -18,7 +18,10 @@ public static class CinemaSourceTests
                 var detail=await catalog.Detail(film,deadline.Token);
                 var profile=await catalog.Person(person,deadline.Token,detail);
                 Console.WriteLine(person.Name+": "+profile.Filmography.Length+" confirmed works, biography "+profile.Description.Length+" characters");
-                if(profile.Filmography.Length<2||profile.Description.Length<50)continue;
+                if(profile.Filmography.Length<2||profile.Description.Length<50){
+                    var errors=Path.Combine(Preferences.DataDir,"error.log");if(File.Exists(errors))Console.WriteLine(await File.ReadAllTextAsync(errors,deadline.Token));
+                    continue;
+                }
                 await File.WriteAllTextAsync(Path.Combine(output,"verified.json"),JsonSerializer.Serialize(new{Film=film.Title,People=people,Person=profile.Person,Works=profile.Filmography.Length,Top=CinemaMetadata.Top(profile.Filmography).Length}),deadline.Token);
                 Console.WriteLine("PASS: live film credits and person filmography");return;
             }

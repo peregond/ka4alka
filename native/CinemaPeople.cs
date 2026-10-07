@@ -45,8 +45,9 @@ public sealed class CinemaPeople(SourceClient client)
         try{if(File.Exists(cache))saved=JsonSerializer.Deserialize<PersonProfile>(await File.ReadAllTextAsync(cache,ct));}catch(IOException){}catch(JsonException){}
         bool Matches(MediaItem film)=>film.People.Any(x=>Normalize(x.Name)==Normalize(person.Name)&&x.Role==person.Role);
         var films=known.Concat(saved?.Filmography??[]).Concat(origin==null?[]:[origin]).Where(Matches).DistinctBy(x=>x.Id).ToList();
-        if(saved!=null&&DateTime.UtcNow-File.GetLastWriteTimeUtc(cache)<TimeSpan.FromDays(7))return saved with{Person=person,Filmography=films.ToArray()};
+        if(saved is {Description.Length:>0,Filmography.Length:>1}&&DateTime.UtcNow-File.GetLastWriteTimeUtc(cache)<TimeSpan.FromDays(7))return saved with{Person=person,Filmography=films.ToArray()};
         string biography=saved?.Description??"",source=saved?.SourceUrl??"";
+        var confirmed=new System.Collections.Concurrent.ConcurrentBag<MediaItem>();
         try
         {
             using var deadline=CancellationTokenSource.CreateLinkedTokenSource(ct);deadline.CancelAfter(TimeSpan.FromSeconds(75));
@@ -64,7 +65,7 @@ public sealed class CinemaPeople(SourceClient client)
             using var article=JsonDocument.Parse(await client.Read(new Uri(parse),4*1024*1024,token));
             var candidates=Works(article.RootElement.GetProperty("parse").GetProperty("text").GetProperty("*").GetString()??"").OrderByDescending(x=>x.Year).Take(16).ToArray();
             var catalog=new LiveCatalog(client);using var slots=new SemaphoreSlim(3);
-            var resolved=await Task.WhenAll(candidates.Select(async work=>
+            await Task.WhenAll(candidates.Select(async work=>
             {
                 await slots.WaitAsync(token);
                 try
@@ -74,17 +75,18 @@ public sealed class CinemaPeople(SourceClient client)
                         var results=await catalog.Browse(section,work.Title,1,token);
                         var film=results.FirstOrDefault(x=>x.Year==work.Year&&Normalize(x.Title)==Normalize(work.Title));
                         if(film==null)continue;
-                        var detail=await catalog.Detail(film,token);if(Matches(detail))return detail;
+                        var detail=await catalog.Detail(film,token);if(Matches(detail)){confirmed.Add(detail);return;}
                     }
                 }
                 catch(Exception)when(!ct.IsCancellationRequested){ /* A single unavailable work does not invalidate confirmed films. */ }
                 finally{slots.Release();}
-                return null;
+                return;
             }));
-            films.AddRange(resolved.OfType<MediaItem>());
+
         }
         catch(OperationCanceledException)when(ct.IsCancellationRequested){throw;}
-        catch(Exception){ /* Keep verified local works and cached biography when the source is unavailable. */ }
+        catch(Exception error){ErrorLog.Write(error); /* Keep confirmed works and cached biography when the source is unavailable. */ }
+        films.AddRange(confirmed);
         var result=new PersonProfile(person,biography,films.DistinctBy(x=>x.Id).ToArray(),source.Length>0?source:null);
         if(result.Description.Length>0||result.Filmography.Length>0)
         {

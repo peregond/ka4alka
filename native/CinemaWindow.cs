@@ -38,6 +38,7 @@ public partial class MainWindow
     {
         var body=new StackPanel{Margin=new(22)};
         var dialog=new Window{Owner=this,Title=title,Width=680,Height=720,MinWidth=360,MinHeight=360,WindowStartupLocation=WindowStartupLocation.CenterOwner,Content=new ScrollViewer{Content=body,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled}};
+        dialog.PreviewKeyDown+=(_,eventArgs)=>{if(eventArgs.Key==System.Windows.Input.Key.Escape){dialog.Close();eventArgs.Handled=true;}};
         dialog.SetResourceReference(Window.BackgroundProperty,"Panel");dialog.SetResourceReference(Window.ForegroundProperty,"Text");
         var back=Button("← Назад к фильму",dialog.Close);back.Style=(Style)FindResource("QuietButton");back.HorizontalAlignment=HorizontalAlignment.Left;body.Children.Add(back);
         body.Children.Add(Text(title,26));body.Children.Add(Text(subtitle,12,true));return(dialog,body);
