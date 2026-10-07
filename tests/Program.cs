@@ -47,6 +47,7 @@ DownloadTests.Run();
 await DownloadOrderingTests.Run();
 await CatalogBatchTests.Run();
 CatalogPagingTests.Run();
+await SharedCatalogTests.Run();
 await UnifiedSearchTests.Run();
 if(args.Contains("--catalog-only"))return;
 await ReleaseSearchTests.Run();

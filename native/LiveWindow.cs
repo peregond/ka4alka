@@ -77,6 +77,12 @@ public partial class MainWindow
     int? catalogLastPage;
     CatalogChoice[] catalogGenres=CatalogChoices.Genres,catalogCountries=CatalogChoices.Countries;
     readonly Dictionary<string,CatalogPage> catalogPages=[];
+    DateTime catalogMemoryBoundary=SharedCatalog.BoundaryUtc(DateTime.UtcNow);
+    bool ExpireCatalogPages()
+    {
+        var boundary=SharedCatalog.BoundaryUtc(DateTime.UtcNow);if(boundary==catalogMemoryBoundary)return false;
+        catalogMemoryBoundary=boundary;catalogPages.Clear();catalogLastPage=null;if(!SearchActive)liveKey="";return true;
+    }
     string CurrentCatalogKey=>SearchActive?"Поиск|"+submittedQuery:section+"|"+livePage+"|"+CatalogSelection.Filter+"|"+CatalogSelection.Collection;
     CatalogSelection CatalogSelection=>new(catalogGenre,catalogCountry,catalogYear,catalogRating,catalogOrder switch{"По рейтингу"=>"rating","По популярности"=>"popular",_=>"date"},catalogCollection);
     void ResetCatalogFilters(){catalogYear=null;catalogGenre="";catalogCountry="";catalogRating=0;catalogOrder="Сначала новые";catalogCollection="all";catalogLastPage=null;}
@@ -93,6 +99,7 @@ public partial class MainWindow
     }
     void RenderLiveCatalog()
     {
+        ExpireCatalogPages();
         var selection=CatalogSelection;
         var key=CurrentCatalogKey;
         if(!favoritesOnly&&liveKey!=key){liveKey=key;_ = FetchCatalog(key,section,submittedQuery,livePage);}
@@ -201,7 +208,11 @@ public partial class MainWindow
                 if(catalogPages.TryGetValue(cacheKey,out var cached))result=cached;
                 else
                 {
-                    try{result=await new LiveCatalog(sourceClient).BrowsePage(category,page,selection,token,forceRefresh);}
+                    try
+                    {
+                        var shared=selection.IsDefault?await sharedCatalog.PageAsync(category,page,token,forceRefresh):null;
+                        result=shared??await new LiveCatalog(sourceClient).BrowsePage(category,page,selection,token,forceRefresh);
+                    }
                     catch(Exception) when(!token.IsCancellationRequested&&selection.IsDefault)
                     {
                         try
@@ -223,7 +234,7 @@ public partial class MainWindow
             {
                 var result=await UnifiedSearch.FindAsync(query,
                     (kind,t)=>searchProvider!=null?searchProvider(kind,query,t):CatalogBatches.ReadPage(c=>onlineIndex.Browse(kind,query,1,c),c=>new LiveCatalog(sourceClient).Browse(kind,query,1,c),false,t),
-                    kind=>catalogIndex.Search(kind,query).Concat(BundledCatalog.Search(kind,query)).ToArray(),token);
+                    kind=>catalogIndex.Search(kind,query).Concat(sharedCatalog.Search(kind,query)).Concat(BundledCatalog.Search(kind,query)).ToArray(),token);
                 items=result.Items;if(result.Offline)liveError="Часть источников недоступна · добавлены результаты из сохранённого каталога";
             }
             try{await catalogIndex.AddAsync(items,token);}catch(IOException){}catch(UnauthorizedAccessException){}
