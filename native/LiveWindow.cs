@@ -125,7 +125,7 @@ public partial class MainWindow
         topSaved=ActionButton("Сохранённое",favoritesOnly?"IconHeartFilled":"IconHeart",()=>{liveRequest?.Cancel();liveLoading=false;liveError="";liveKey="";favoritesOnly=true;catalogCollection="all";if(catalogOrder=="По популярности")catalogOrder="Сначала новые";catalogLastPage=null;livePage=1;Render();},"PillButton");topSaved.SetResourceReference(Control.BackgroundProperty,favoritesOnly?"Selected":"Panel");tabs.Children.Add(topSaved);
         }
         AddCatalogFilters(tabs);
-        tabs.Children.Add(QualityControls(()=>{livePage=1;Render();}));
+        tabs.Children.Add(CatalogQualityControls(()=>{livePage=1;Render();}));
         inlineCatalogFilters=tabs;
         inlineCatalogFilterScroll=new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=tabs,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};
         toolbar.Children.Add(inlineCatalogFilterScroll);PageHeader.Children.Add(toolbar);

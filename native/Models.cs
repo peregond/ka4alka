@@ -71,13 +71,23 @@ public class Preferences
     public bool AutoResumeDownloads {get;set;}=true;
     public bool CheckForUpdates {get;set;}=true;
     public bool AutoUpdate {get;set;}=true;
-    public bool HidePoorQuality {get;set;}
+    public bool HidePoorQuality {get;set;}=true;
+    public bool QualityFilterConfigured {get;set;}
     public int MinimumReleaseHeight {get;set;}=720;
     public HashSet<int> Favorites {get;set;}=[];
     public List<MediaItem> LiveFavorites {get;set;}=[];
     public static string DataDir=>Environment.GetEnvironmentVariable("KACHALKA_DATA") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"Kachalka");
-    public static Preferences Load(){try{return JsonSerializer.Deserialize<Preferences>(File.ReadAllText(Path.Combine(DataDir,"settings.json")))??new();}catch{return new();}}
-    public void Save(){Directory.CreateDirectory(DataDir);var p=Path.Combine(DataDir,"settings.json");File.WriteAllText(p+".tmp",JsonSerializer.Serialize(this));File.Move(p+".tmp",p,true);}
+    public static Preferences Load()
+    {
+        try
+        {
+            var prefs=JsonSerializer.Deserialize<Preferences>(File.ReadAllText(Path.Combine(DataDir,"settings.json")))??new();
+            if(!prefs.QualityFilterConfigured){prefs.HidePoorQuality=true;prefs.QualityFilterConfigured=true;}
+            return prefs;
+        }
+        catch{return new(){QualityFilterConfigured=true};}
+    }
+    public void Save(){QualityFilterConfigured=true;Directory.CreateDirectory(DataDir);var p=Path.Combine(DataDir,"settings.json");File.WriteAllText(p+".tmp",JsonSerializer.Serialize(this));File.Move(p+".tmp",p,true);}
 }
 public record DownloadFile(string Name,string FullPath,string IncompletePath,long Size,double Progress)
 {

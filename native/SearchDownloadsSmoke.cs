@@ -38,7 +38,27 @@ public partial class MainWindow
         ShowDownloads(this,new RoutedEventArgs());ShowCatalogSection("Фильмы");UpdateLayout();
         check(SearchActive&&Search.Text=="Поисковая искра"&&searchCategory=="Фильмы"&&calls==2,"returning from downloads restores submitted query and selected search type");
         ShowCatalogSection("Фильмы");await Task.Delay(150);UpdateLayout();
-        check(!SearchActive&&Search.Text==""&&CatalogSelection.IsDefault,"repeated active catalog navigation clears query and filters");searchProvider=null;
+        check(!SearchActive&&Search.Text==""&&CatalogSelection.IsDefault,"repeated active catalog navigation clears query and filters");
+        var contexts=new List<string>();
+        searchProvider=(kind,query,token)=>{contexts.Add(kind);return Task.FromResult<IReadOnlyList<MediaItem>>(kind=="Фильмы"?films:series);};
+        async Task WaitSearch()
+        {
+            var deadline=DateTime.UtcNow.AddSeconds(5);while(liveLoading&&DateTime.UtcNow<deadline)await Task.Delay(25);UpdateLayout();
+            check(!liveLoading&&liveItems.Count==50&&catalogDisplay.Any(x=>x.Section=="Фильмы")&&catalogDisplay.Any(x=>x.Section=="Сериалы"),"search from a persistent header returns both media types");
+        }
+        foreach(var card in new[]{films[0],series[0]})
+        {
+            section=card.Section;current=card;Render();UpdateLayout();
+            check(SearchBar.IsVisible&&Search.ActualWidth>0,"search stays visible in the "+card.Section+" detail");
+            Search.Text="Поиск из карточки";FocusCatalogSearch();
+            check(current==card&&Search.IsKeyboardFocusWithin,"search shortcut focuses the field without leaving the open card");
+            ClearSearchButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));UpdateLayout();
+            check(current==card&&Search.Text=="","clearing the persistent search retains the open card");
+            Search.Text="Поиск из "+card.Section;SearchSubmitButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await WaitSearch();
+            check(current==null&&searchCategory==""&&SearchActive&&section==card.Section,"submitting from a card opens unified search results");
+        }
+        check(contexts.Count==4&&contexts.Count(x=>x=="Фильмы")==2&&contexts.Count(x=>x=="Сериалы")==2,"each card search requests both catalogs");
+        searchProvider=null;submittedQuery="";searchCategory="";Search.Text="";current=null;section="Фильмы";lastCatalogSection="Фильмы";
 
         var releaseMovie=new MediaItem(99023,"Карточка с поиском раздач","Фильмы","драма",2025,"8.0","8.0","#526B69"){PageUrl=LiveCatalog.Base+"/movies/loading-fixture",Description="Описание уже загружено."};
         requestedDetails.Add(releaseMovie.Id);cardMetadata[releaseMovie.Id]=Task.FromResult(releaseMovie);
@@ -204,12 +224,34 @@ public partial class MainWindow
             foreach(var label in new[]{"Открыть карточку по постеру","Открыть карточку по названию"})
             {
                 var link=FindVisual<Button>(FirstRow(),b=>AutomationProperties.GetName(b)==label)!;
-                check(link.IsEnabled&&link.Cursor==Cursors.Hand,"download card link is visibly interactive: "+label);
+                check(link.IsEnabled&&link.Cursor==(label=="Открыть карточку по названию"?Cursors.Arrow:Cursors.Hand),"download card remains clickable with a plain title: "+label);
+                if(label=="Открыть карточку по названию")
+                {
+                    var text=FindVisual<TextBlock>(link,t=>t.Text==fixtures[^1].DisplayName)!;
+                    var expected=((SolidColorBrush)FindResource("Text")).Color;
+                    GetCursorPos(out var previous);
+                    try
+                    {
+                        Activate();var target=link.PointToScreen(new Point(link.ActualWidth/2,link.ActualHeight/2));SetCursorPos((int)target.X,(int)target.Y);Mouse.Synchronize();await SettleDownloads();
+                        var frame=FindVisual<Border>(link,b=>b.Name=="Frame")!;
+                        check(link.IsMouseOver&&text.Foreground is SolidColorBrush titleInk&&titleInk.Color==expected&&(text.TextDecorations==null||text.TextDecorations.Count==0)&&frame.Background is SolidColorBrush background&&background.Color.A==0,"hovering a download title keeps plain text colour and transparent background without an underline");
+                        Shot(FirstRow(),"downloads-plain-title-hover");
+                    }
+                    finally{SetCursorPos(previous.X,previous.Y);}
+                }
                 link.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await SettleDownloads();
                 check(current?.Id==linked.Id&&detailTitle?.Text==fixtures[^1].MediaTitle&&section=="Загрузки","download poster/title opens its associated internal card while retaining the queue as the return destination");
                 FindVisual<Button>(PageHeader,b=>AutomationProperties.GetName(b)=="Загрузки")!.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await SettleDownloads();
                 check(current==null&&Queue().Items.Count==fixtures.Length&&fixtures.All(x=>x.Paused),"returning from the internal card preserves the queue and its paused transfers");
             }
+            searchProvider=(kind,query,token)=>Task.FromResult<IReadOnlyList<MediaItem>>(kind=="Фильмы"?films:series);
+            Search.Text="Поиск из загрузок";FocusCatalogSearch();UpdateLayout();
+            check(section=="Загрузки"&&current==null&&SearchBar.IsVisible&&Search.IsKeyboardFocusWithin,"download search stays visible and focuses without leaving the queue");
+            ClearSearchButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));UpdateLayout();
+            check(section=="Загрузки"&&Queue().Items.Count==fixtures.Length&&Search.Text=="","clearing download search preserves the queue");
+            Search.Text="Поиск из загрузок";SearchSubmitButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await WaitSearch();
+            check(section is "Фильмы" or "Сериалы"&&current==null&&searchCategory==""&&downloads.Items.Count==fixtures.Length&&fixtures.All(x=>x.Paused),"submitting download search opens both-type results without changing queued tasks");
+            searchProvider=null;submittedQuery="";searchCategory="";Search.Text="";section="Загрузки";Render();await SettleDownloads();
             check(!downloads.EngineCreated,"download design and menu fixtures do not start a torrent engine");
         }
         finally{downloads.Items.Clear();prefs.Light=originalLight;prefs.DownloadSort=originalSort;downloadSort=originalSort;ApplyTheme();MinWidth=originalMinWidth;Width=1280;Height=800;}

@@ -22,9 +22,15 @@ public partial class MainWindow
             prefs.LiveFavorites=items.ToList();favoritesOnly=true;current=null;section="Фильмы";submittedQuery="";searchCategory="";Search.Text="";searchDelay.Stop();liveLoading=false;livePage=1;Render();UpdateLayout();
             check(catalogDisplay.Count==4&&catalogDisplay.Count(x=>x.OnlyPoorQuality)==1,"catalog marks only confirmed poor-only titles and keeps unknown quality unmarked");
             check(VisualElements<Border>(Body).Any(x=>x.IsVisible&&AutomationProperties.GetName(x)=="Плохое качество фильма"&&Equals(x.ToolTip,"Плохое качество")),"catalog poster shows the poor-quality badge and its tooltip");
-            FindVisual<CheckBox>(PageHeader,x=>AutomationProperties.GetName(x)=="Скрыть плохое качество")!.IsChecked=true;UpdateLayout();
+            var catalogToggle=FindVisual<Button>(PageHeader,x=>AutomationProperties.GetName(x)=="Скрыть плохое качество")??throw new Exception("Catalog quality toggle is missing.");
+            check(catalogToggle.Parent is WrapPanel qualityRow&&ReferenceEquals(qualityRow.Parent,topSaved?.Parent),"catalog quality controls share the row with Saved and the other catalog filters");
+            catalogToggle.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));UpdateLayout();
             check(catalogDisplay.Count==3&&Preferences.Load().HidePoorQuality,"top quality filter hides poor-only titles and persists the choice");
-            FindVisual<ComboBox>(PageHeader,x=>AutomationProperties.GetName(x)=="Минимальное качество")!.SelectedItem="Full HD";UpdateLayout();
+            check(AutomationProperties.GetItemStatus(FindVisual<Button>(PageHeader,x=>AutomationProperties.GetName(x)=="Скрыть плохое качество")!)=="Включён","enabled catalog quality filter exposes its active state");
+            var minimum=FindVisual<Button>(PageHeader,x=>AutomationProperties.GetName(x)=="Минимальное качество")??throw new Exception("Catalog minimum-quality menu is missing.");
+            minimum.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await Task.Delay(80);UpdateLayout();
+            check(minimum.ContextMenu is {IsOpen:true,ActualHeight:>0},"catalog quality minimum opens a visible menu in the filter row");
+            minimum.ContextMenu!.Items.OfType<MenuItem>().Single(x=>Equals(x.Tag,1080)).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));UpdateLayout();
             check(catalogDisplay.Count==2&&catalogDisplay.Any(x=>x.Id==items[3].Id)&&Preferences.Load().MinimumReleaseHeight==1080,"Full HD minimum hides 720p titles while retaining unknown-quality titles");
             prefs.HidePoorQuality=false;await catalogIndex.CacheReleasesAsync(items[3],[],[new("Fixture",SourceState.Empty,CheckedUtc:DateTime.UtcNow)]);
             favoritesOnly=false;liveItems=items;liveKey=CurrentCatalogKey;Render();UpdateLayout();
@@ -43,6 +49,8 @@ public partial class MainWindow
             {
                 MinWidth=360;Width=width;Height=640;await Task.Delay(50);current=selected;section="Фильмы";Render();UpdateLayout();
                 check(FindVisual<CheckBox>(Body,x=>AutomationProperties.GetName(x)=="Скрыть плохое качество") is {ActualHeight:>0}&&Body.ActualWidth>100,"quality controls remain available at window width "+width);
+                current=null;Render();UpdateLayout();
+                check(FindVisual<Button>(PageHeader,x=>AutomationProperties.GetName(x)=="Скрыть плохое качество") is {IsVisible:true,ActualWidth:>0,ActualHeight:>0}&&FindVisual<Button>(PageHeader,x=>AutomationProperties.GetName(x)=="Минимальное качество") is {IsVisible:true,ActualWidth:>0},"catalog quality buttons remain available in the filter row at window width "+width);
             }
         }
         finally

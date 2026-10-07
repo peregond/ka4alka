@@ -10,7 +10,9 @@ public partial class MainWindow
     internal Func<string,string,CancellationToken,Task<IReadOnlyList<MediaItem>>>? searchProvider;
     void SubmitSearch(object sender,RoutedEventArgs e)
     {
-        searchDelay.Stop();submittedQuery=Search.Text.Trim();searchCategory="";current=null;favoritesOnly=false;livePage=1;ResetCatalogFilters();liveKey="";Render();
+        searchDelay.Stop();
+        if(section is not ("Фильмы" or "Сериалы"))section=current?.Section is "Фильмы" or "Сериалы"?current.Section:lastCatalogSection;
+        lastCatalogSection=section;submittedQuery=Search.Text.Trim();searchCategory="";current=null;favoritesOnly=false;livePage=1;ResetCatalogFilters();liveKey="";Render();
     }
     void SearchKeyDown(object sender,KeyEventArgs e){if(e.Key==Key.Enter){SubmitSearch(sender,e);e.Handled=true;}}
     void SearchTabs(Panel panel)

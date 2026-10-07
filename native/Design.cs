@@ -24,9 +24,15 @@ public partial class MainWindow
     {
         var button=Button(label,action);button.Content=IconLabel(label,icon);button.Style=(Style)FindResource(style);System.Windows.Automation.AutomationProperties.SetName(button,label);return button;
     }
-    void ClearSearch(object sender,RoutedEventArgs e){Search.Clear();SubmitSearch(sender,e);Search.Focus();}
+    void ClearSearch(object sender,RoutedEventArgs e)
+    {
+        Search.Clear();
+        if(current!=null||section=="Загрузки"){searchDelay.Stop();submittedQuery="";searchCategory="";liveRequest?.Cancel();liveLoading=false;liveKey="";Render();}
+        else SubmitSearch(sender,e);
+        Search.Focus();
+    }
     void ToggleTheme(object sender,RoutedEventArgs e){prefs.Light=!prefs.Light;prefs.Save();ApplyTheme();Render();}
-    void FocusCatalogSearch(){if(section is not ("Фильмы" or "Сериалы"))ShowCatalogSection(lastCatalogSection);current=null;Render();Search.Focus();Search.SelectAll();}
+    void FocusCatalogSearch(){if(SearchBar.Visibility!=Visibility.Visible){ShowCatalogSection(lastCatalogSection);Render();}Search.Focus();Search.SelectAll();}
     void EnableShortcuts()
     {
         PreviewKeyDown+=(_,e)=>
