@@ -21,6 +21,7 @@ public partial class MainWindow
     DownloadItem? downloadReturnItem;
     TextBlock? downloadSummary;
     TextBlock? downloadHeading;
+    FrameworkElement? downloadHeadingHost,downloadToolbar;
     Button? downloadControls,downloadOrder;
     string downloadSort="newest";
     bool downloadCommandBusy;
@@ -34,9 +35,9 @@ public partial class MainWindow
         foreach(var item in downloads.Items){item.MinimumQualityHeight=QualityMinimum;item.Refresh();}
         RepairDownloadMetadata();
         downloadSort=DownloadSortChoices.Any(x=>x.Key==prefs.DownloadSort)?prefs.DownloadSort:"newest";
-        var heading=new DockPanel{Margin=new(0,0,8,8)};
+        var heading=new DockPanel{Margin=new(0,0,8,8)};downloadHeadingHost=heading;
         var title=Text("Очередь",25);downloadHeading=title;title.FontWeight=FontWeights.SemiBold;title.Margin=new(0);heading.Children.Add(title);PageHeader.Children.Add(heading);
-        var toolbar=new WrapPanel{Margin=new(0,4,0,10)};PageHeader.Children.Add(toolbar);
+        var toolbar=new WrapPanel{Margin=new(0,4,0,10)};downloadToolbar=toolbar;PageHeader.Children.Add(toolbar);
         var controls=ActionButton("Управление","IconSettings",()=>{},"QuietButton");downloadControls=controls;controls.Margin=new(0,0,8,4);controls.Padding=new(10,6,10,6);controls.ToolTip="Управление загрузками и раздачами";AutomationProperties.SetName(controls,"Управление загрузками");
         var commands=Menu();controls.ContextMenu=commands;
         foreach(var command in new[]{("Начать загрузки",false,false,"IconPlay"),("Остановить загрузки",false,true,"IconPause"),("Запустить раздачи",true,false,"IconPlay"),("Остановить раздачи",true,true,"IconPause")})
@@ -85,11 +86,14 @@ public partial class MainWindow
     {
         if(section!="Загрузки"||downloadControls==null||downloadOrder==null)return;
         var tiny=ActualWidth>0&&ActualWidth<560;var shortView=ActualHeight>0&&ActualHeight<560;
+        var veryShort=ActualHeight>0&&ActualHeight<360;
         downloadControls.Content=IconLabel(tiny?"":"Управление","IconSettings");
         var label=DownloadSortChoices.FirstOrDefault(x=>x.Key==downloadSort).Label??"Сначала новые";
         downloadOrder.Content=IconLabel(tiny?"":label,"IconFilter");downloadOrder.ToolTip="Сортировка: "+label;
         if(downloadHeading!=null)downloadHeading.FontSize=shortView?20:25;
-        if(downloadSummary!=null)downloadSummary.Margin=new(0,0,0,shortView?8:12);
+        if(downloadHeadingHost!=null)downloadHeadingHost.Visibility=veryShort?Visibility.Collapsed:Visibility.Visible;
+        if(downloadToolbar!=null)downloadToolbar.Margin=new(0,veryShort?0:4,0,veryShort?2:10);
+        if(downloadSummary!=null)downloadSummary.Margin=new(0,0,0,veryShort?4:shortView?8:12);
     }
     void UpdateDownloadSummary()
     {

@@ -34,6 +34,9 @@ public partial class MainWindow
                     section=page;current=null;Render();UpdateLayout();
                     if(ActualWidth>fit.MaxWidth+1||ActualHeight>fit.MaxHeight+1)throw new Exception("Window overflows scaled work area");
                     if(Body.ActualWidth<90||Body.ActualHeight<20)throw new Exception($"{page}: no usable content at {scale*100}%: body {Body.ActualWidth} x {Body.ActualHeight}, header {PageHeader.ActualHeight}, window {ActualWidth} x {ActualHeight}");
+                    var lastNavigationBottom=Navigation.TransformToAncestor(SidePanel).Transform(new Point(0,Navigation.ActualHeight)).Y;
+                    var footerTop=SidebarFooter.TransformToAncestor(SidePanel).Transform(new Point()).Y;
+                    if(lastNavigationBottom>footerTop+.5)throw new Exception($"Sidebar navigation overlaps footer at {scale*100}%");
                     foreach(var action in VisualElements<Button>(Body).Where(b=>b.IsVisible&&b.ActualWidth>0&&AutomationProperties.GetName(b) is "Продолжить" or "Удалить файлы" or "Подробнее"))
                     {
                         var box=action.TransformToAncestor(Body).TransformBounds(new Rect(new Point(),action.RenderSize));

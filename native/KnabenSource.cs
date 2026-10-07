@@ -113,7 +113,7 @@ public static class KnabenSource
             var page=SecurePage(String(row,"details"));
             var size=Long(row,"bytes");
             var seeds=Count(row,"seeders");
-            var entry=new SourceEntry("RuTracker:"+hash,title,"RuTracker",page,magnetUrl,null,size,seeds){Via="Knaben",Leechers=Count(row,"peers")};
+            var entry=new SourceEntry("RuTracker:"+hash,title,"RuTracker",page,magnetUrl,null,size,seeds){Via="Knaben",Leechers=Count(row,"leechers")};
             if(!LiveCatalog.Matches(item,entry))continue;
             if(item.Section=="Фильмы"&&item.Year>0&&!Regex.IsMatch(title,@"(?<!\d)"+item.Year+@"(?!\d)"))continue;
             entries.Add(entry);

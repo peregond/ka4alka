@@ -101,7 +101,7 @@ public sealed class DownloadService
           : await Engine.AddAsync(item.Source,item.Folder,settings);
         try
         {
-            if(item.Source.StartsWith("magnet:",StringComparison.OrdinalIgnoreCase)&&string.Equals(item.ReleaseSource,"The Pirate Bay",StringComparison.OrdinalIgnoreCase))
+            if(MagnetDiscovery.PublicSource(item.ReleaseSource))
                 await MagnetDiscovery.ConfigureAsync(manager,publicTrackers);
         }
         catch{await Engine.RemoveAsync(manager);throw;}
@@ -142,7 +142,7 @@ public sealed class DownloadService
             catch
             {
                 Items.Remove(item);
-                if(manager!=null){try{await manager.StopAsync();await Engine.RemoveAsync(manager);}catch{}managers.Remove(item.Id);meters.Remove(item.Id);}
+                if(manager!=null){try{await manager.StopAsync(TimeSpan.FromSeconds(2));await Engine.RemoveAsync(manager);}catch{}managers.Remove(item.Id);meters.Remove(item.Id);}
                 await ReleaseIdleEngine();
                 throw;
             }

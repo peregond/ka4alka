@@ -12,9 +12,11 @@ public static class MagnetDiscovery
         "udp://open.stealth.si:80/announce",
         "udp://exodus.desync.com:6969/announce"
     });
+    public static bool PublicSource(string? source)=>source is "The Pirate Bay" or "RuTor" or "NNM-Club" or "MegaPeer" or "BigFanGroup" or "Nyaa" or "EZTV" or "Internet Archive";
     public static async Task ConfigureAsync(TorrentManager manager,IEnumerable<string> fallbacks)
     {
-        // .torrent files and private torrents retain their original tracker policy.
+        // Private torrents retain their original tracker policy. Manual links and
+        // RuTracker magnets are excluded by the caller.
         if(manager.TrackerManager.Private)return;
         var trackers=manager.TrackerManager;
         // MonoTorrent puts every magnet tr= in one sequential tier. Give each

@@ -64,6 +64,13 @@ static class MagnetDiscoveryTests
                 Check(restored.Items.Single().Folder==service.Items.Single().Folder,"upgrading discovery preserves the original download folder");
             }
             finally{await restored.Close();}
+            await service.Remove(service.Items.Single());
+            var publicRelease=release with{Source="RuTor",TorrentUrl=null};
+            await service.Add(path,Path.Combine(root,"discovery-torrent-download"),release:publicRelease);
+            var publicManager=managers.Values.Single();
+            await Until(()=>publicManager.Progress==100,"public .torrent transfer discovers its seed through fallback trackers without an injected peer");
+            var publicFile=Directory.GetFiles(service.Items.Single().Folder,"discovery.bin",SearchOption.AllDirectories).Single();
+            Check(SHA256.HashData(await File.ReadAllBytesAsync(publicFile)).SequenceEqual(SHA256.HashData(payload)),"public source .torrent fallback preserves the selected payload bytes");
             var privateCreator=new TorrentCreator{Private=true};
             var privatePath=Path.Combine(root,"private-discovery.torrent");await privateCreator.CreateAsync(new TorrentFileSource(file),privatePath);
             using var privateEngine=new ClientEngine(Settings("private-discovery-cache",FreePort()));
