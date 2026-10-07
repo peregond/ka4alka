@@ -42,6 +42,16 @@ public static class SourceTests
     public static async Task Run(bool live,bool allSections=false)
     {
         static void Check(bool value,string name){if(!value)throw new Exception(name);Console.WriteLine("PASS: "+name);}
+        Check(CinemaPeople.PhotoUrl("https://upload.wikimedia.org/wikipedia/commons/person.jpg")!=null&&CinemaPeople.PhotoUrl("https://upload.wikimedia.org.evil.test/person.jpg")==null&&CinemaPeople.PhotoUrl("http://upload.wikimedia.org/person.jpg")==null,"portraits accept only HTTPS Wikimedia image addresses");
+        var portraitPerson=new CinemaPerson("Фото "+Guid.NewGuid(),"Актёры","");
+        var portraitFixture=Encoding.UTF8.GetBytes("""{"query":{"pages":{"123":{"title":"Участник","extract":"Российский актёр","thumbnail":{"source":"https://upload.wikimedia.org/wikipedia/commons/person.jpg"}}}}}""");
+        using(var fixture=new SourceClient(new FixtureHandler(portraitFixture)))
+            Check(await new CinemaPeople(fixture).Portrait(portraitPerson,CancellationToken.None)=="https://upload.wikimedia.org/wikipedia/commons/person.jpg","person photograph is resolved from the confirmed biography");
+        using(var offlinePortrait=new SourceClient(new OfflineHandler()))
+            Check(await new CinemaPeople(offlinePortrait).Portrait(portraitPerson,CancellationToken.None)!=null,"person photograph metadata remains available offline");
+        var ambiguousFixture=Encoding.UTF8.GetBytes("""{"query":{"pages":{"123":{"title":"Участник","extract":"Актёр","pageprops":{"disambiguation":""},"thumbnail":{"source":"https://upload.wikimedia.org/wikipedia/commons/wrong.jpg"}}}}}""");
+        using(var fixture=new SourceClient(new FixtureHandler(ambiguousFixture)))
+            Check(await new CinemaPeople(fixture).Portrait(portraitPerson with{Name=Guid.NewGuid().ToString()},CancellationToken.None)==null,"ambiguous biographies never supply another person's photograph");
         var seriesFixture=new MediaItem(-58291,"Сериал","Сериалы","",2025,"—","—","#526B69"){PageUrl="https://w6.zona.plus/tvseries/metadata-layout-fixture"};
         using(var seriesClient=new SourceClient(new FixtureHandler(Encoding.UTF8.GetBytes("<a itemprop='genre'>\n  боевик\n</a><a itemprop='genre'>\r\n криминал &nbsp;\n</a><a href='/tvseries/filter/country-rossiia'>\n Россия\n</a>"))))
         {

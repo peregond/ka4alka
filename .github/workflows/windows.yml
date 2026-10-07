@@ -1,7 +1,7 @@
 name: Windows release validation
 on:
   push:
-    branches: [release/0.30.0]
+    branches: [release/0.30.0, codex/cinema-cards-0.30]
   pull_request:
   workflow_dispatch:
 permissions:
@@ -35,6 +35,7 @@ jobs:
         with:
           name: windows-update-evidence
           path: |
+            test-output/cinema-ui/*
             test-output/windows-update/checks.txt
             test-output/dpi-reliability/*
             test-output/close-reliability/*.json

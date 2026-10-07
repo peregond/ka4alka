@@ -1,11 +1,14 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Automation;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.IO;
 namespace Kachalka;
 
 public partial class MainWindow
 {
-    void RenderCinemaConnections(StackPanel panel,MediaItem item)
+    void RenderCinemaConnections(StackPanel panel,MediaItem item,Panel? participantsHost=null)
     {
         var people=new StackPanel{Margin=new(0,0,0,20)};
         people.Children.Add(Text("Актёры и съёмочная группа",18));
@@ -16,10 +19,13 @@ public partial class MainWindow
             foreach(var person in group)
             {
                 var button=Button(person.Name,()=>OpenPerson(person,item));button.Style=(Style)FindResource("PillButton");
+                var tile=new StackPanel{Width=116};tile.Children.Add(PersonPortrait(person,104,130));tile.Children.Add(Text(person.Name,12));button.Content=tile;button.Margin=new(0,0,10,12);
                 AutomationProperties.SetName(button,"Открыть карточку: "+person.Name+", "+person.Role);row.Children.Add(button);
             }
         }
-        panel.Children.Add(people);
+        var participants=new Border{Name="CinemaParticipants",Child=new ScrollViewer{Content=people,MaxHeight=480,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled},CornerRadius=new(22),Padding=new(20),BorderThickness=new(1),VerticalAlignment=VerticalAlignment.Top};
+        participants.SetResourceReference(Border.BackgroundProperty,"Panel");participants.SetResourceReference(Border.BorderBrushProperty,"Edge");
+        if(participantsHost!=null)participantsHost.Children.Add(participants);else panel.Children.Add(participants);
         if(item.Awards.Length>0)
         {
             panel.Children.Add(Text("Награды и номинации",18));
@@ -55,43 +61,83 @@ public partial class MainWindow
             AutomationProperties.SetName(button,"Открыть "+film.Title);body.Children.Add(button);
         }
     }
+    CinemaPerson? activePerson;
+    MediaItem? personOrigin;
+    string? personSection;
+    CancellationTokenSource? personRequest;
+    (CinemaPerson Person,MediaItem Origin)? returnPerson;
     void OpenPerson(CinemaPerson person,MediaItem origin)
     {
-        var (dialog,body)=CinemaDialog(person.Name,person.Role);using var request=new CancellationTokenSource();
-        dialog.Closed+=(_,_)=>request.Cancel();
-        async Task Load()
+        activePerson=person;personOrigin=origin;section=origin.Section;personSection=section;current=origin;Render();
+    }
+    void CinemaBack()
+    {
+        if(returnPerson is {} previous){returnPerson=null;OpenPerson(previous.Person,previous.Origin);return;}
+        current=null;Render();
+    }
+    Border PersonPortrait(CinemaPerson person,double width,double height)
+    {
+        var grid=new Grid();var fallback=Text(string.Join("",person.Name.Split(' ',StringSplitOptions.RemoveEmptyEntries).Take(2).Select(x=>x[0])),24,true);
+        fallback.HorizontalAlignment=HorizontalAlignment.Center;fallback.VerticalAlignment=VerticalAlignment.Center;grid.Children.Add(fallback);
+        var image=new Image{Stretch=Stretch.UniformToFill};grid.Children.Add(image);
+        var frame=new Border{Width=width,Height=height,CornerRadius=new(11),ClipToBounds=true,Child=grid,Margin=new(0,0,0,8)};frame.SetResourceReference(Border.BackgroundProperty,"Selected");frame.SizeChanged+=(_,_)=>ClipPoster(frame);
+        CancellationTokenSource? request=null;
+        image.Unloaded+=(_,_)=>request?.Cancel();
+        image.Loaded+=async(_,_)=>
         {
-            var content=new StackPanel();body.Children.Add(content);
-            async Task Refresh()
+            request?.Cancel();using var pending=new CancellationTokenSource(TimeSpan.FromSeconds(30));request=pending;
+            try
             {
-                content.Children.Clear();content.Children.Add(Text("Загружаем биографию и фильмографию…",13,true));
-                try
-                {
-                    var profile=await new LiveCatalog(sourceClient).Person(person,request.Token,origin,liveItems.Concat(prefs.LiveFavorites));
-                    if(request.IsCancellationRequested)return;
-                    content.Children.Clear();content.Children.Add(Text(profile.Description.Length>0?profile.Description:"Биография пока недоступна.",13,true));
-                    if(profile.SourceUrl!=null)
-                    {
-                        var source=Button("Биография: Википедия",()=>System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(profile.SourceUrl){UseShellExecute=true}));source.Style=(Style)FindResource("QuietButton");content.Children.Add(source);
-                    }
-                    CinemaFilms(content,"Выбор зрителей · топ по Кинопоиску",CinemaMetadata.Top(profile.Filmography),dialog);
-                    content.Children.Add(Text("Рейтинг Кинопоиска среди фильмов, предоставленных источником.",11,true));
-                    var known=profile.Filmography.Select(x=>x.Id).ToHashSet();
-                    var awarded=liveItems.Concat(prefs.LiveFavorites).Append(origin).Where(x=>known.Contains(x.Id)&&x.Awards.Any(a=>a.Winner&&person.PageUrl.Length>0&&a.PersonUrl==person.PageUrl)).DistinctBy(x=>x.Id);
-                    CinemaFilms(content,"Фильмы с наградами за работу этого участника",awarded,dialog);
-                    CinemaFilms(content,"Фильмография",profile.Filmography.OrderByDescending(x=>x.Year),dialog);
-                }
-                catch(OperationCanceledException){}
-                catch
-                {
-                    if(request.IsCancellationRequested)return;
-                    content.Children.Clear();content.Children.Add(Text("Не удалось загрузить карточку человека.",13,true));
-                    content.Children.Add(Button("Повторить",()=>{_ = Refresh();}));
-                }
+                var url=await new CinemaPeople(sourceClient).Portrait(person,pending.Token);if(url==null)return;
+                var key=Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(url)));
+                var (bitmap,_)=await CoverCache.Load(Path.Combine(Preferences.DataDir,"portraits",key+".img"),2*1024*1024,
+                    ct=>sourceClient.Read(new Uri(url),2*1024*1024,ct),bytes=>{using var stream=new MemoryStream(bytes);var result=new BitmapImage();result.BeginInit();result.CacheOption=BitmapCacheOption.OnLoad;result.DecodePixelWidth=400;result.StreamSource=stream;result.EndInit();result.Freeze();return result;},pending.Token);
+                if(image.IsLoaded&&!pending.IsCancellationRequested)image.Source=bitmap;
             }
-            await Refresh();
+            catch(OperationCanceledException){}catch{}
+            finally{if(ReferenceEquals(request,pending))request=null;}
+        };
+        return frame;
+    }
+    void RenderPerson(CinemaPerson person,MediaItem origin)
+    {
+        PageHeader.Children.Add(ActionButton("Назад к фильму · "+origin.Title,"IconBack",()=>{activePerson=null;current=origin;Render();},"QuietButton"));
+        var body=new StackPanel{Margin=new(0,0,10,0)};
+        Body.Children.Add(new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=body,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});
+        var hero=new WrapPanel();hero.Children.Add(PersonPortrait(person,150,190));
+        var identity=new StackPanel{Margin=new(20,0,0,0),MaxWidth=450};identity.Children.Add(Text(person.Role,12,true));identity.Children.Add(Text(person.Name,30));identity.Children.Add(Text("Биография и фильмы участника",13,true));hero.Children.Add(identity);
+        var frame=new Border{Child=hero,CornerRadius=new(22),Padding=new(20),Margin=new(0,0,0,24),BorderThickness=new(1)};frame.SetResourceReference(Border.BackgroundProperty,"Panel");frame.SetResourceReference(Border.BorderBrushProperty,"Edge");body.Children.Add(frame);
+        var content=new StackPanel();body.Children.Add(content);var request=personRequest=new CancellationTokenSource();
+        async Task Refresh()
+        {
+            content.Children.Clear();content.Children.Add(Text("Загружаем биографию и фильмографию…",13,true));
+            try
+            {
+                var profile=await new LiveCatalog(sourceClient).Person(person,request.Token,origin,liveItems.Concat(prefs.LiveFavorites));
+                if(request.IsCancellationRequested)return;
+                content.Children.Clear();content.Children.Add(Text("Биография",18));content.Children.Add(Text(profile.Description.Length>0?profile.Description:"Биография пока недоступна.",13,true));
+                var sourceUrl=profile.SourceUrl??"https://ru.wikipedia.org/wiki/"+Uri.EscapeDataString(person.Name.Replace(' ','_'));
+                var source=Button("Биография и фотографии: Википедия / Wikimedia",()=>System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(sourceUrl){UseShellExecute=true}));source.Style=(Style)FindResource("QuietButton");content.Children.Add(source);
+                void Films(string title,IEnumerable<MediaItem> items)
+                {
+                    content.Children.Add(Text(title,18));var films=items.ToArray();if(films.Length==0){content.Children.Add(Text("Данные пока недоступны.",12,true));return;}
+                    foreach(var film in films)
+                    {
+                        var row=new Grid();row.ColumnDefinitions.Add(new(){Width=new GridLength(64)});row.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});
+                        var poster=new Image{Width=48,Height=72,DataContext=film,Stretch=Stretch.Uniform};poster.Loaded+=SourceCover;row.Children.Add(poster);
+                        var label=Text(film.Title+" · "+film.Year+(CinemaMetadata.Rating(film)>0?" · КП "+film.Kinopoisk:""),14);label.VerticalAlignment=VerticalAlignment.Center;Grid.SetColumn(label,1);row.Children.Add(label);
+                        var button=Button(film.Title,()=>{returnPerson=(person,origin);activePerson=null;current=film;section=film.Section;Render();});button.Content=row;button.HorizontalContentAlignment=HorizontalAlignment.Stretch;button.HorizontalAlignment=HorizontalAlignment.Stretch;AutomationProperties.SetName(button,"Открыть "+film.Title);content.Children.Add(button);
+                    }
+                }
+                Films("Выбор зрителей · топ по Кинопоиску",CinemaMetadata.Top(profile.Filmography));content.Children.Add(Text("Рейтинг Кинопоиска среди фильмов, предоставленных источником.",11,true));
+                var known=profile.Filmography.Select(x=>x.Id).ToHashSet();
+                Films("Фильмы с наградами за работу этого участника",liveItems.Concat(prefs.LiveFavorites).Append(origin).Where(x=>known.Contains(x.Id)&&x.Awards.Any(a=>a.Winner&&person.PageUrl.Length>0&&a.PersonUrl==person.PageUrl)).DistinctBy(x=>x.Id));
+                Films("Фильмография",profile.Filmography.OrderByDescending(x=>x.Year));
+            }
+            catch(OperationCanceledException){}
+            catch{if(!request.IsCancellationRequested){content.Children.Clear();content.Children.Add(Text("Не удалось загрузить карточку человека.",13,true));content.Children.Add(Button("Повторить",()=>{_=Refresh();}));}}
         }
-        dialog.Loaded+=async(_,_)=>await Load();dialog.ShowDialog();
+        _=Refresh();
     }
     void OpenCollection(CinemaCollection collection)
     {

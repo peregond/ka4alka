@@ -60,7 +60,10 @@ public partial class MainWindow:Window
     void PosterResized(object sender,SizeChangedEventArgs e){if(sender is Border poster){if(e.WidthChanged&&e.NewSize.Width>0){var height=e.NewSize.Width*1.5;if(double.IsNaN(poster.Height)||Math.Abs(poster.Height-height)>1)poster.Height=height;}ClipPoster(poster);}}
     void Render()
     {
-        if(!ready)return;try{catalogList=null;detailHero=null;detailPoster=null;detailSynopsis=null;detailTitle=null;detailDescription=null;descriptionToggle=null;inlineCatalogFilters=null;inlineCatalogFilterScroll=null;catalogToolbar=null;catalogRefreshButton=null;catalogRailPreview=null;discoveryHero=null;discoveryShelf=null;FilterControls.Children.Clear();PageHeader.Children.Clear();Body.Children.Clear();Body.RowDefinitions.Clear();SyncTimer();UpdateFilterRail();
+        if(!ready)return;personRequest?.Cancel();personRequest?.Dispose();personRequest=null;
+        if(activePerson!=null&&(current==null||current.Id!=personOrigin?.Id||section!=personSection))activePerson=null;
+        if(current==null||section is not ("Фильмы" or "Сериалы"))returnPerson=null;
+        try{catalogList=null;detailHero=null;detailPoster=null;detailSynopsis=null;detailTitle=null;detailDescription=null;descriptionToggle=null;inlineCatalogFilters=null;inlineCatalogFilterScroll=null;catalogToolbar=null;catalogRefreshButton=null;catalogRailPreview=null;discoveryHero=null;discoveryShelf=null;FilterControls.Children.Clear();PageHeader.Children.Clear();Body.Children.Clear();Body.RowDefinitions.Clear();SyncTimer();UpdateFilterRail();
         SearchBar.Visibility=current!=null||section is "Фильмы" or "Сериалы" or "Загрузки"?Visibility.Visible:Visibility.Collapsed;
         ContextLabel.Visibility=SearchBar.Visibility==Visibility.Visible||section=="Загрузки"?Visibility.Collapsed:Visibility.Visible;ContextLabel.Text=section;
         downloadView=null;downloadList=null;
@@ -70,6 +73,7 @@ public partial class MainWindow:Window
         DownloadsButton.SetResourceReference(Control.ForegroundProperty,section=="Загрузки"?"PrimaryInk":"Muted");SettingsButton.SetResourceReference(Control.ForegroundProperty,section=="Настройки"?"PrimaryInk":"Muted");
         if(section=="Настройки"){RenderSettings();return;}
         if(section=="Источники"){RenderSources();return;}
+        if(activePerson!=null&&personOrigin!=null){RenderPerson(activePerson,personOrigin);return;}
         if(current?.IsLive==true){RenderLiveDetail(current);return;}
         if(current!=null){Detail(current);return;}
         if(!demoCatalog&&section is "Фильмы" or "Сериалы"){RenderLiveCatalog();return;}
@@ -139,7 +143,7 @@ public partial class MainWindow:Window
     {
         if(closed)return;e.Cancel=true;if(closing)return;closing=true;
         DiagnosticLog.Write("closing",new{QueueCount=downloads.Items.Count});Status.Text="Сохраняем загрузки и закрываем приложение…";
-        IsEnabled=false;updateCancellation.Cancel();catalogRefreshTimer.Stop();refresh.Stop();searchDelay.Stop();liveRequest?.Cancel();sourceRequest?.Cancel();archiveRequest?.Cancel();broadcastRequest?.Cancel();
+        IsEnabled=false;personRequest?.Cancel();updateCancellation.Cancel();catalogRefreshTimer.Stop();refresh.Stop();searchDelay.Stop();liveRequest?.Cancel();sourceRequest?.Cancel();archiveRequest?.Cancel();broadcastRequest?.Cancel();
         foreach(var view in releaseViews.Values)view.Request?.Cancel();
         bool saved=false;
         try{prefs.Save();await downloads.Close();saved=true;DiagnosticLog.Write("closed",new{QueueSaved=true});}

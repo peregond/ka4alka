@@ -42,6 +42,11 @@ try{
    }
    Get-Content (Join-Path $scenarioEvidence $scenarioFile)
  }
+ $cinemaEvidence=Join-Path $root 'test-output/cinema-ui'
+ $cinemaUi=Start-Process (Join-Path $root ('dist/Kachalka-'+$short+'/Kachalka.exe')) -ArgumentList @('--cinema-smoke-test',('"'+$cinemaEvidence+'"')) -PassThru
+ if(-not $cinemaUi.WaitForExit(45000)){$cinemaUi.Kill($true);throw 'Cinema UI smoke timed out'}
+ if(Test-Path (Join-Path $cinemaEvidence 'error.txt')){throw (Get-Content (Join-Path $cinemaEvidence 'error.txt') -Raw)}
+ if(-not(Test-Path (Join-Path $cinemaEvidence 'checks.json'))){throw 'Cinema UI evidence missing'}
  ./tests/CacheDesignPosters.ps1
  $designEvidence=Join-Path $root 'test-output/design-modern'
  $designUi=Start-Process (Join-Path $root ('dist/Kachalka-'+$short+'/Kachalka.exe')) -ArgumentList @('--design-smoke-test',('"'+$designEvidence+'"')) -PassThru

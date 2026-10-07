@@ -268,7 +268,7 @@ public partial class MainWindow
         }
         ApplyKnownQuality(item);
         if(descriptionItemId!=item.Id){descriptionItemId=item.Id;descriptionExpanded=false;}
-        var back=ActionButton(section,"IconBack",()=>{current=null;Render();});back.Style=(Style)FindResource("QuietButton");back.HorizontalAlignment=HorizontalAlignment.Left;back.Margin=new(0,0,0,10);PageHeader.Children.Add(back);
+        var back=ActionButton(returnPerson?.Person.Name??section,"IconBack",CinemaBack);back.Style=(Style)FindResource("QuietButton");back.HorizontalAlignment=HorizontalAlignment.Left;back.Margin=new(0,0,0,10);PageHeader.Children.Add(back);
         var panel=new StackPanel{Margin=new(0,0,10,0)};Body.Children.Add(new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=panel,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});
         detailHero=new Grid();detailHero.ColumnDefinitions.Add(new(){Width=new GridLength(174)});detailHero.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});detailHero.RowDefinitions.Add(new(){Height=GridLength.Auto});detailHero.RowDefinitions.Add(new(){Height=GridLength.Auto});
         detailPoster=new Border{Width=150,Height=225,CornerRadius=new(11),ClipToBounds=true,Background=item.Cover,HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Top,Margin=new(0,0,24,0)};
@@ -288,8 +288,17 @@ public partial class MainWindow
         detailSynopsis=Text(item.Description??"Загружаем описание…",13,true);detailSynopsis.Name="DetailSynopsis";detailSynopsis.LineHeight=20;detailSynopsis.MaxHeight=descriptionExpanded?double.PositiveInfinity:60;detailSynopsis.TextTrimming=TextTrimming.CharacterEllipsis;detailSynopsis.Margin=new(0);detailDescription.Children.Add(detailSynopsis);
         descriptionToggle=Button(descriptionExpanded?"Свернуть описание":"Читать дальше",()=>{descriptionExpanded=!descriptionExpanded;Render();});descriptionToggle.Name="DescriptionToggle";descriptionToggle.Style=(Style)FindResource("QuietButton");descriptionToggle.HorizontalAlignment=HorizontalAlignment.Left;descriptionToggle.Padding=new(0,5,0,5);descriptionToggle.Margin=new(0);descriptionToggle.MinHeight=26;descriptionToggle.Visibility=Visibility.Collapsed;detailDescription.Children.Add(descriptionToggle);
         detailSynopsis.SizeChanged+=(sender,_)=>{if(ReferenceEquals(sender,detailSynopsis))UpdateDescriptionToggle();};
-        var heroFrame=new Border{Child=detailHero,Background=(Brush)FindResource("Panel"),BorderBrush=(Brush)FindResource("Edge"),BorderThickness=new(1),CornerRadius=new(22),Padding=new(20),Margin=new(0,0,0,24)};panel.Children.Add(heroFrame);UpdateDetailLayout();
-        RenderCinemaConnections(panel,item);
+        var heroFrame=new Border{Child=detailHero,Background=(Brush)FindResource("Panel"),BorderBrush=(Brush)FindResource("Edge"),BorderThickness=new(1),CornerRadius=new(22),Padding=new(20),Margin=new(0,0,0,24)};heroFrame.Name="CinemaFilm";heroFrame.VerticalAlignment=VerticalAlignment.Top;
+        var cards=new Grid{Name="CinemaCards",Margin=new(0,0,0,24)};cards.ColumnDefinitions.Add(new());cards.ColumnDefinitions.Add(new());cards.RowDefinitions.Add(new(){Height=GridLength.Auto});cards.RowDefinitions.Add(new(){Height=GridLength.Auto});panel.Children.Add(cards);cards.Children.Add(heroFrame);heroFrame.Margin=new(0);
+        RenderCinemaConnections(panel,item,cards);
+        void ArrangeCards()
+        {
+            var alongside=cards.ActualWidth>=1050;var participants=cards.Children.OfType<Border>().First(x=>x.Name=="CinemaParticipants");
+            cards.ColumnDefinitions[0].Width=new GridLength(alongside?1.35:1,GridUnitType.Star);cards.ColumnDefinitions[1].Width=alongside?new GridLength(1,GridUnitType.Star):new GridLength(0);
+            Grid.SetColumn(participants,alongside?1:0);Grid.SetRow(participants,alongside?0:1);participants.Margin=alongside?new(20,0,0,0):new(0,20,0,0);
+            UpdateDetailLayout();
+        }
+        cards.SizeChanged+=(_,_)=>ArrangeCards();ArrangeCards();
         var releasesTitle=Text("Раздачи",23);releasesTitle.FontWeight=FontWeights.SemiBold;releasesTitle.Margin=new(0,0,0,13);panel.Children.Add(releasesTitle);
         RenderReleaseLoading(panel,item);
         RenderSourceStatus(panel,item);
@@ -306,7 +315,7 @@ public partial class MainWindow
     void UpdateDetailLayout()
     {
         if(detailHero==null||detailPoster==null||detailTitle==null||detailDescription==null)return;
-        var narrow=Body.ActualWidth>0&&Body.ActualWidth<600;
+        var narrow=detailHero.ActualWidth>0&&detailHero.ActualWidth<520;
         var posterWidth=narrow?94d:150d;
         detailPoster.Width=posterWidth;detailPoster.Height=posterWidth*1.5;
         detailHero.ColumnDefinitions[0].Width=new GridLength(posterWidth+(narrow?18:24));

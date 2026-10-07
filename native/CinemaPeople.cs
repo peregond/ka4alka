@@ -37,6 +37,32 @@ public sealed class CinemaPeople(SourceClient client)
         }
         return works.DistinctBy(x=>(x.Title,x.Year)).ToArray();
     }
+    public static string? PhotoUrl(string? value)=>Uri.TryCreate(value,UriKind.Absolute,out var uri)&&uri.Scheme=="https"&&uri.Host=="upload.wikimedia.org"&&uri.IsDefaultPort&&uri.UserInfo.Length==0?uri.AbsoluteUri:null;
+    static readonly SemaphoreSlim portraitSlots=new(3);
+    public async Task<string?> Portrait(CinemaPerson person,CancellationToken ct)
+    {
+        var key=Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(person.Name)));
+        var path=Path.Combine(Preferences.DataDir,"people",key+".portrait.json");
+        try
+        {
+            if(File.Exists(path)&&DateTime.UtcNow-File.GetLastWriteTimeUtc(path)<TimeSpan.FromDays(7))
+                return PhotoUrl(JsonSerializer.Deserialize<string>(await File.ReadAllTextAsync(path,ct)));
+            await portraitSlots.WaitAsync(ct);
+            try
+            {
+                var url="https://ru.wikipedia.org/w/api.php?action=query&format=json&redirects=1&prop=extracts%7Cpageprops%7Cpageimages&exintro=1&explaintext=1&piprop=thumbnail&pithumbsize=400&titles="+Uri.EscapeDataString(person.Name);
+                using var json=JsonDocument.Parse(await client.Read(new Uri(url),1024*1024,ct));
+                var page=json.RootElement.GetProperty("query").GetProperty("pages").EnumerateObject().Select(x=>x.Value).SingleOrDefault(x=>!x.TryGetProperty("missing",out _)&&!x.TryGetProperty("invalid",out _));
+                string? photo=null;
+                if(page.ValueKind==JsonValueKind.Object&&!(page.TryGetProperty("pageprops",out var props)&&props.TryGetProperty("disambiguation",out _))&&page.TryGetProperty("extract",out var extract)&&Regex.IsMatch(extract.GetString()??"",@"(?i)акт[её]р|актрис|режисс[её]р|оператор|кинематограф")&&page.TryGetProperty("thumbnail",out var thumbnail))
+                    photo=PhotoUrl(thumbnail.GetProperty("source").GetString());
+                Directory.CreateDirectory(Path.GetDirectoryName(path)!);await File.WriteAllTextAsync(path,JsonSerializer.Serialize(photo),ct);return photo;
+            }
+            finally{portraitSlots.Release();}
+        }
+        catch(OperationCanceledException){throw;}
+        catch{return null;}
+    }
     public async Task<PersonProfile> Load(CinemaPerson person,MediaItem? origin,IEnumerable<MediaItem> known,CancellationToken ct)
     {
         var key=Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(person.Name+"|"+person.Role)));

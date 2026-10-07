@@ -23,32 +23,39 @@ public partial class MainWindow
         var folder=Path.Combine(Preferences.DataDir,"people");Directory.CreateDirectory(folder);
         var key=Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(person.Name+"|"+person.Role)));
         await File.WriteAllTextAsync(Path.Combine(folder,key+".json"),JsonSerializer.Serialize(new PersonProfile(person,biography,[original,next])));
+        var portraitUrl="https://upload.wikimedia.org/wikipedia/commons/cinema-smoke.png";
+        var portraitKey=Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(person.Name)));
+        await File.WriteAllTextAsync(Path.Combine(folder,portraitKey+".portrait.json"),JsonSerializer.Serialize(portraitUrl));
+        var portraitDir=Path.Combine(Preferences.DataDir,"portraits");Directory.CreateDirectory(portraitDir);
+        var portrait=new RenderTargetBitmap(20,30,96,96,PixelFormats.Pbgra32);var drawing=new DrawingVisual();using(var context=drawing.RenderOpen())context.DrawRectangle(Brushes.Teal,null,new Rect(0,0,20,30));portrait.Render(drawing);
+        var portraitEncoder=new PngBitmapEncoder();portraitEncoder.Frames.Add(BitmapFrame.Create(portrait));using(var stream=File.Create(Path.Combine(portraitDir,Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(portraitUrl)))+".img")))portraitEncoder.Save(stream);
         requestedDetails.Add(original.Id);requestedDetails.Add(next.Id);liveReleases[original.Id]=[];liveReleases[next.Id]=[];
         section="Фильмы";current=original;Render();UpdateLayout();
         var open=FindVisual<Button>(Body,x=>AutomationProperties.GetName(x)=="Открыть карточку: "+person.Name+", "+person.Role)??throw new Exception("Person action missing.");
-        Exception? failure=null;var checkedDialog=false;var limit=DateTime.UtcNow.AddSeconds(15);
-        var timer=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(100)};
-        timer.Tick+=(_,_)=>
+        open.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
+        var limit=DateTime.UtcNow.AddSeconds(15);
+        while((FindVisual<TextBlock>(Body,x=>x.Text==biography)==null||FindVisual<Image>(Body,x=>x.Source!=null)==null)&&DateTime.UtcNow<limit)await Task.Delay(100);
+        if(FindVisual<TextBlock>(Body,x=>x.Text==biography)==null)throw new Exception("Person page did not load cached biography.");
+        if(Application.Current.Windows.OfType<Window>().Any(x=>x.Owner==this&&x.Title==person.Name))throw new Exception("Person navigation opened a popup.");
+        void Shot(string name)
         {
-            var dialog=Application.Current.Windows.OfType<Window>().FirstOrDefault(x=>x.Owner==this&&x.Title==person.Name);
-            try
-            {
-                if(DateTime.UtcNow>limit)throw new Exception("Person dialog did not load cached biography.");
-                if(dialog==null||FindVisual<TextBlock>(dialog,x=>x.Text==biography)==null)return;
-                void Shot(string name)
-                {
-                    dialog.UpdateLayout();var bitmap=new RenderTargetBitmap((int)dialog.ActualWidth,(int)dialog.ActualHeight,96,96,PixelFormats.Pbgra32);bitmap.Render(dialog);
-                    var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(bitmap));using var stream=File.Create(Path.Combine(output,name+".png"));encoder.Save(stream);
-                }
-                Shot("person-wide");dialog.Width=390;dialog.Height=540;Shot("person-narrow");
-                var film=FindVisual<Button>(dialog,x=>AutomationProperties.GetName(x)=="Открыть "+next.Title)??throw new Exception("Filmography action missing.");
-                checkedDialog=true;timer.Stop();film.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
-            }
-            catch(Exception error){failure=error;timer.Stop();dialog?.Close();}
-        };
-        timer.Start();open.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));timer.Stop();
-        if(failure!=null)throw failure;
-        if(!checkedDialog||current?.Id!=next.Id)throw new Exception("Film → person → film UI navigation failed.");
+            UpdateLayout();var bitmap=new RenderTargetBitmap((int)ActualWidth,(int)ActualHeight,96,96,PixelFormats.Pbgra32);bitmap.Render(this);
+            var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(bitmap));using var stream=File.Create(Path.Combine(output,name+".png"));encoder.Save(stream);
+        }
+        if(FindVisual<Image>(Body,x=>x.Source!=null)==null)throw new Exception("Cached person photograph missing.");
+        MaxWidth=2000;MaxHeight=1200;Width=1440;Height=900;Shot("person-wide");Width=760;Height=720;Shot("person-narrow");
+        var film=FindVisual<Button>(Body,x=>AutomationProperties.GetName(x)=="Открыть "+next.Title)??throw new Exception("Filmography action missing.");
+        film.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
+        if(current?.Id!=next.Id||activePerson!=null)throw new Exception("Film → person → film navigation failed.");
+        CinemaBack();if(activePerson!=person)throw new Exception("Movie back did not restore person page.");
+        var back=FindVisual<Button>(PageHeader,x=>AutomationProperties.GetName(x).Contains("Назад к фильму")||FindVisual<TextBlock>(x,t=>t.Text.StartsWith("Назад к фильму"))!=null)??throw new Exception("Person back action missing.");
+        back.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));if(activePerson!=null||current?.Id!=original.Id)throw new Exception("Person back did not restore original movie.");
+        Width=1600;UpdateLayout();Shot("film-wide");
+        var cards=FindVisual<Grid>(Body,x=>x.Name=="CinemaCards")??throw new Exception("Film cards missing.");
+        var participants=FindVisual<Border>(Body,x=>x.Name=="CinemaParticipants")??throw new Exception("Participants card missing.");
+        if(Grid.GetColumn(participants)!=1)throw new Exception("Wide layout did not place participants next to the movie.");
+        Width=760;UpdateLayout();Shot("film-narrow");
+        if(Grid.GetRow(participants)!=1||Grid.GetColumn(participants)!=0)throw new Exception("Narrow layout did not stack participants.");
         await File.WriteAllTextAsync(Path.Combine(output,"checks.json"),JsonSerializer.Serialize(new{PersonCard=true,Biography=true,Filmography=true,WideAndNarrow=true,Navigation=true}));Close();
     }
 }
