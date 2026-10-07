@@ -27,7 +27,7 @@ public partial class MainWindow:Window
         {
             if(closed)return;
             var expired=ExpireCatalogPages();
-            if(current==null&&(section is "Фильмы" or "Сериалы")&&!SearchActive&&!favoritesOnly&&(expired||sharedCatalog.RefreshDue))
+            if(current==null&&(section is "Фильмы" or "Сериалы")&&!SearchActive&&!favoritesOnly&&(expired||CatalogSelection.IsDefault&&sharedCatalog.RefreshDue))
             {
                 catalogPages.Clear();catalogLastPage=null;liveKey="";Render();
             }
