@@ -1,7 +1,7 @@
 name: Windows release validation
 on:
   push:
-    branches: [codex/quality-sources-0.28]
+    branches: [codex/dark-default-0.28.1]
   pull_request:
   workflow_dispatch:
 permissions:

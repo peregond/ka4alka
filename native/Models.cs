@@ -63,7 +63,7 @@ public class Preferences
 {
     public string Folder { get;set; }=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),"Downloads","Качалка");
     public bool FolderConfigured {get;set;}
-    public bool Light {get;set;}=true;
+    public bool Light {get;set;}
     public int MaxDownloadKbps {get;set;}
     public int MaxUploadKbps {get;set;}
     public string DownloadSort {get;set;}="newest";

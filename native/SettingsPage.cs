@@ -33,9 +33,9 @@ public partial class MainWindow
             var h=Text(heading,18);h.FontWeight=FontWeights.SemiBold;panel.Children.Add(h);
             var d=Text(description,12,true);d.Margin=new(0,0,0,18);panel.Children.Add(d);return panel;
         }
-        var appearance=Card("Оформление","Выбери тему, в которой тебе удобнее.");
+        var appearance=Card("Оформление","Тёмная тема по умолчанию. Светлую можно включить вручную.");
         var themes=new WrapPanel();appearance.Children.Add(themes);
-        foreach(var light in new[]{true,false})
+        foreach(var light in new[]{false,true})
         {
             var selected=prefs.Light==light;
             var theme=Button((selected?"✓  ":"")+(light?"Светлая":"Тёмная"),()=>
