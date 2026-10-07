@@ -19,7 +19,7 @@ def probe(pair):
             rows = data if isinstance(data, list) else data.get('data', data.get('list', []))
             result.update(count=len(rows), rows=rows[:2])
         except (ValueError, AttributeError):
-            text = raw.decode('utf-8', errors='replace')
+            text = raw.decode('cp1251' if label.startswith('BigFanGroup') else 'utf-8', errors='replace')
             result.update(title=re.findall('<title[^>]*>(.*?)</title>', text, re.S)[:1], links=re.findall(r'href=["\']([^"\']*(?:magnet:|torrent|download|viewtopic|details)[^"\']*)', text)[:15], snippets=re.findall(r'.{0,100}(?:class="ttable|magnet:|Экран|Наруто|Интерстеллар).{0,1800}', text)[:2])
         return result
     except Exception as error:
@@ -29,16 +29,11 @@ def probe(pair):
 if __name__ == '__main__':
     q = urllib.parse.quote
     jobs = [
-        ('AniLiberty Naruto', 'https://anilibria.top/api/v1/anime/releases?f[search]='+q('Наруто')),
-        ('AniLiberty English', 'https://anilibria.top/api/v1/anime/releases?f[search]=Naruto'),
-        ('AniLibria v3', 'https://api.anilibria.tv/v3/title/search?search=Naruto&limit=3'),
-        ('TorrentBy film', 'https://torrent.by/search/?search='+q('Интерстеллар')+'&category=0'),
-        ('TorrentBy series', 'https://torrent.by/search/?search='+q('Южный Парк')+'&category=0'),
-        ('Kinozal current mirror', 'https://kinozal.me/browse.php?s='+urllib.parse.quote_from_bytes('Интерстеллар'.encode('cp1251'))),
-        ('RiperAM', 'https://riperam.org/forum/tracker.php?nm='+q('Интерстеллар')),
-        ('BigFanGroup', 'https://bigfangroup.org/forum/tracker.php?nm='+q('Интерстеллар')),
-        ('APIBay Russian film', 'https://apibay.org/q.php?q='+q('Брат')+'&cat=201,202,207'),
-        ('APIBay Russian series', 'https://apibay.org/q.php?q=South%20Park%20RUS&cat=205,208'),
+        ('BigFanGroup film', 'https://bigfangroup.org/browse.php?ajax=1&search='+urllib.parse.quote_from_bytes('Интерстеллар'.encode('cp1251'))+'&cat=0&incldead=1&year=0&format=0&s=seed&d=desc'),
+        ('BigFanGroup series', 'https://bigfangroup.org/browse.php?ajax=1&search='+urllib.parse.quote_from_bytes('Южный парк'.encode('cp1251'))+'&cat=0&incldead=1&year=0&format=0&s=seed&d=desc'),
+        ('AniLiberty search', 'https://aniliberty.top/api/v1/app/search/releases?search='+q('Наруто')),
+        ('AniLiberty release', 'https://aniliberty.top/api/v1/anime/releases/naruto'),
+        ('AniLibria release', 'https://anilibria.top/api/v1/anime/releases/naruto'),
     ]
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
         for result in pool.map(probe, jobs):
