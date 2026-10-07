@@ -12,7 +12,7 @@ namespace Kachalka;
 // A short cooldown keeps an unavailable or private Site from slowing every card.
 public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null)
 {
-    public static readonly Uri PublishedSite=new("https://kachalka-index-2026.peregon.chatgpt.site/");
+    public static readonly Uri PublishedSite=new("https://ka4alka-online-new.peregon.chatgpt.site/");
     readonly Uri site=baseUri??PublishedSite;
     long retryAfterTicks;
 
