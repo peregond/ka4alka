@@ -72,13 +72,13 @@ public partial class MainWindow
             var themeContent=new StackPanel();
             SolidColorBrush Swatch(string value)=>new((Color)ColorConverter.ConvertFromString(value));
             var preview=new Grid{Height=50};preview.ColumnDefinitions.Add(new(){Width=new GridLength(25)});preview.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});
-            var sidebar=new Border{Background=Swatch(light?"#E7EBEE":"#191C22"),CornerRadius=new(5,0,0,5)};preview.Children.Add(sidebar);
-            var selectedRow=new Border{Background=Swatch(light?"#197D72":"#8EE2CA"),Height=4,Margin=new(5,12,5,0),VerticalAlignment=VerticalAlignment.Top,CornerRadius=new(2)};sidebar.Child=selectedRow;
-            var previewBody=new Border{Background=Swatch(light?"#F8FAFB":"#24282F"),CornerRadius=new(0,5,5,0),Padding=new(6)};Grid.SetColumn(previewBody,1);preview.Children.Add(previewBody);
+            var sidebar=new Border{Background=Swatch(light?"#E7ECF8":"#0C1426"),CornerRadius=new(5,0,0,5)};preview.Children.Add(sidebar);
+            var selectedRow=new Border{Background=Swatch(light?"#4937CF":"#977FFF"),Height=4,Margin=new(5,12,5,0),VerticalAlignment=VerticalAlignment.Top,CornerRadius=new(2)};sidebar.Child=selectedRow;
+            var previewBody=new Border{Background=Swatch(light?"#F2F5FF":"#111B30"),CornerRadius=new(0,5,5,0),Padding=new(6)};Grid.SetColumn(previewBody,1);preview.Children.Add(previewBody);
             var previewRows=new StackPanel();previewBody.Child=previewRows;
-            previewRows.Children.Add(new Border{Background=Swatch(light?"#DDE4E8":"#404750"),Height=5,Margin=new(0,0,18,6),CornerRadius=new(2)});
+            previewRows.Children.Add(new Border{Background=Swatch(light?"#DDE4E8":"#324468"),Height=5,Margin=new(0,0,18,6),CornerRadius=new(2)});
             var posters=new UniformGrid{Columns=3,Height=26};previewRows.Children.Add(posters);
-            foreach(var color in new[]{light?"#C8D6DB":"#526873",light?"#BDDCD1":"#52746B",light?"#D7CFBF":"#776A54"})posters.Children.Add(new Border{Background=Swatch(color),CornerRadius=new(3),Margin=new(0,0,3,0)});
+            foreach(var color in new[]{light?"#C8D6DB":"#526873",light?"#CDC8FA":"#5C4E97",light?"#D7CFBF":"#776A54"})posters.Children.Add(new Border{Background=Swatch(color),CornerRadius=new(3),Margin=new(0,0,3,0)});
             themeContent.Children.Add(preview);
             var themeLabel=new Grid{Margin=new(2,9,2,1)};themeLabel.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});themeLabel.ColumnDefinitions.Add(new(){Width=GridLength.Auto});
             var label=Text(light?"Светлая":"Тёмная",12);label.Margin=new(0);label.FontWeight=selected?FontWeights.SemiBold:FontWeights.Medium;themeLabel.Children.Add(label);

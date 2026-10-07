@@ -1,13 +1,16 @@
 <Application x:Class="Kachalka.App" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:Kachalka">
  <Application.Resources>
-  <SolidColorBrush x:Key="Bg" Color="#101315"/><SolidColorBrush x:Key="Panel" Color="#1C2226"/><SolidColorBrush x:Key="Text" Color="#F5F7F8"/><SolidColorBrush x:Key="Muted" Color="#BEC7CD"/><SolidColorBrush x:Key="Edge" Color="#46504E"/><SolidColorBrush x:Key="Selected" Color="#263F35"/><SolidColorBrush x:Key="Accent" Color="#91E8CC"/><SolidColorBrush x:Key="AccentInk" Color="#082B20"/><SolidColorBrush x:Key="Sidebar" Color="#151A1D"/><SolidColorBrush x:Key="Hover" Color="#2A3235"/>
-  <SolidColorBrush x:Key="Primary" Color="#91E8CC"/><SolidColorBrush x:Key="PrimaryInk" Color="#082B20"/><SolidColorBrush x:Key="PrimaryHover" Color="#B3F3DF"/><SolidColorBrush x:Key="AccentSoft" Color="#233E34"/>
-  <SolidColorBrush x:Key="PanelAlt" Color="#171D21"/>
-  <SolidColorBrush x:Key="EdgeSoft" Color="#303A39"/>
+  <SolidColorBrush x:Key="Bg" Color="#080D1B"/><SolidColorBrush x:Key="Panel" Color="#111B30"/><SolidColorBrush x:Key="Text" Color="#F5F7FF"/><SolidColorBrush x:Key="Muted" Color="#B4BFD8"/><SolidColorBrush x:Key="Edge" Color="#415575"/><SolidColorBrush x:Key="Selected" Color="#26357D"/><SolidColorBrush x:Key="Accent" Color="#ADBBFF"/><SolidColorBrush x:Key="AccentInk" Color="#0B1332"/><SolidColorBrush x:Key="Sidebar" Color="#0C1426"/><SolidColorBrush x:Key="Hover" Color="#1C2C47"/>
+  <SolidColorBrush x:Key="Primary" Color="#5D43E8"/><SolidColorBrush x:Key="PrimaryInk" Color="#FFFFFF"/><SolidColorBrush x:Key="PrimaryHover" Color="#6E55FB"/><SolidColorBrush x:Key="AccentSoft" Color="#212B55"/>
+  <SolidColorBrush x:Key="PanelAlt" Color="#0D172A"/>
+  <SolidColorBrush x:Key="EdgeSoft" Color="#26344E"/>
+  <LinearGradientBrush x:Key="PrimaryFill" StartPoint="0,0" EndPoint="1,1"><GradientStop Color="#6232EF" Offset="0"/><GradientStop Color="#2764EF" Offset="1"/></LinearGradientBrush>
+  <RadialGradientBrush x:Key="AmbientGlow" Center="0.35,0" GradientOrigin="0.35,0" RadiusX="0.7" RadiusY="0.8"><GradientStop Color="#4D4923A1" Offset="0"/><GradientStop Color="#002A4DDC" Offset="1"/></RadialGradientBrush>
   <Style TargetType="Window">
    <Setter Property="Background" Value="{DynamicResource Bg}"/><Setter Property="Foreground" Value="{DynamicResource Text}"/><Setter Property="FontFamily" Value="pack://application:,,,/Kachalka;component/Fonts/#Inter"/><Setter Property="FontSize" Value="13"/><Setter Property="UseLayoutRounding" Value="True"/><Setter Property="TextOptions.TextFormattingMode" Value="Display"/>
   </Style>
 
+  <SolidColorBrush x:Key="RatingInk" Color="#FFD166"/>
   <SolidColorBrush x:Key="Danger" Color="#FFB2BB"/>
   <Style TargetType="ContextMenu">
    <Setter Property="Background" Value="{DynamicResource Panel}"/><Setter Property="Foreground" Value="{DynamicResource Text}"/><Setter Property="BorderBrush" Value="{DynamicResource Edge}"/><Setter Property="Padding" Value="5"/><Setter Property="MaxHeight" Value="450"/>
@@ -40,7 +43,7 @@
    <Setter Property="Foreground" Value="{DynamicResource Text}"/><Setter Property="Background" Value="{DynamicResource Panel}"/><Setter Property="BorderBrush" Value="{DynamicResource Edge}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="MinHeight" Value="38"/><Setter Property="Padding" Value="14,8"/><Setter Property="Margin" Value="0,0,8,8"/><Setter Property="Cursor" Value="Hand"/><Setter Property="FontWeight" Value="Medium"/><Setter Property="HorizontalContentAlignment" Value="Center"/><Setter Property="VerticalContentAlignment" Value="Center"/><Setter Property="FocusVisualStyle" Value="{x:Null}"/><Setter Property="Template" Value="{StaticResource ButtonTemplate}"/>
   </Style>
   <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-   <Setter Property="Background" Value="{DynamicResource Primary}"/><Setter Property="Foreground" Value="{DynamicResource PrimaryInk}"/><Setter Property="BorderBrush" Value="{DynamicResource Primary}"/><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="Padding" Value="16,8"/>
+   <Setter Property="Background" Value="{DynamicResource PrimaryFill}"/><Setter Property="Foreground" Value="{DynamicResource PrimaryInk}"/><Setter Property="BorderBrush" Value="{DynamicResource Primary}"/><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="Padding" Value="16,8"/>
    <Setter Property="Template"><Setter.Value>
     <ControlTemplate TargetType="Button">
      <Grid>

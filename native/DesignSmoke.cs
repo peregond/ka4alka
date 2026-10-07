@@ -60,9 +60,11 @@ public partial class MainWindow
             }
             cardMetadata[item.Id]=Task.FromResult(item);requestedDetails.Add(item.Id);cards.Add(item);
         }
-        catalogPages["Фильмы||1"]=new(cards.ToArray(),false,CatalogChoices.Genres,CatalogChoices.Countries);
+        catalogPages["Фильмы|sort-date|1"]=new(cards.ToArray(),false,CatalogChoices.Genres,CatalogChoices.Countries);
+        catalogPages["Фильмы||1"]=new(cards.OrderByDescending(CatalogScore).ToArray(),false,CatalogChoices.Genres,CatalogChoices.Countries);
         var shows=BundledCatalog.Page("Сериалы",1).Items.Select(x=>x with{PageUrl="https://example.invalid/design/catalog/"+x.Id,ImageUrl=null}).ToArray();
         foreach(var show in shows){cardMetadata[show.Id]=Task.FromResult(show);requestedDetails.Add(show.Id);}
+        catalogPages["Сериалы|sort-date|1"]=new(shows,false,CatalogChoices.Genres,CatalogChoices.Countries);
         catalogPages["Сериалы||1"]=new(shows,false,CatalogChoices.Genres,CatalogChoices.Countries);
         searchProvider=(kind,_,_)=>Task.FromResult<IReadOnlyList<MediaItem>>(kind=="Фильмы"?cards:shows);
         section="Фильмы";current=null;favoritesOnly=false;ResetCatalogFilters();livePage=1;Search.Text="";searchDelay.Stop();submittedQuery="";searchCategory="";
@@ -132,6 +134,8 @@ public partial class MainWindow
             prefs.Light=true;ApplyTheme();current=null;Render();await Settle();Shot("catalog-light");
             var catalogColumnsLight=catalogColumns;
             prefs.Light=false;ApplyTheme();Render();await Settle();Shot("catalog-dark");
+            if(FiltersPanel.Visibility!=Visibility.Visible||inlineCatalogFilterScroll?.Parent!=FilterControls||discoveryHero is not {ActualHeight:>180}||discoveryHero.Children.Count!=2||discoveryShelf is not {ActualWidth:>500})throw new Exception("Cinematic desktop catalog is missing its banners, curated row or right filters.");
+            if(VisualElements<UIElement>(Body).Any(x=>x.Effect!=null))throw new Exception("Cinematic catalog adds an expensive blur or shadow effect.");
             var preview=liveItems.FirstOrDefault(x=>x.ImageUrl!=null)?.ImageUrl;
             var movie=new MediaItem(-987654320,"За пределами тишины: невероятное путешествие через время, которое начинается с одного случайного письма","Фильмы","Приключения · Драма",2026,"8,7","8,5","#526B69")
             {

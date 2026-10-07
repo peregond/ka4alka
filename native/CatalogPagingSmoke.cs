@@ -37,7 +37,7 @@ public partial class MainWindow
         Button Page(int page)=>FindVisual<Button>(Body,b=>AutomationProperties.GetName(b)=="Страница "+page)??throw new Exception("Missing page "+page);
         void Choose(string name,string key)
         {
-            var button=FindVisual<Button>(PageHeader,x=>AutomationProperties.GetName(x)==name)??throw new Exception("Missing filter "+name);
+            var button=FindVisual<Button>(RootGrid,x=>AutomationProperties.GetName(x)==name)??throw new Exception("Missing filter "+name);
             var option=button.ContextMenu!.Items.OfType<MenuItem>().Single(x=>x.Tag?.ToString()==key);
             option.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
         }
@@ -48,7 +48,7 @@ public partial class MainWindow
         CheckCards("desktop",6);
         Check(FiltersPanel.Visibility==Visibility.Collapsed&&inlineCatalogFilters!.Children.Contains(topSaved!),"filters share the top pill toolbar with All and Saved");
         Check(!VisualElements<TextBlock>(PageHeader).Any(x=>x.Text=="Настроить подборку"),"no redundant selection heading");
-        var genreMenuButton=FindVisual<Button>(PageHeader,x=>AutomationProperties.GetName(x)=="Жанр")!;
+        var genreMenuButton=FindVisual<Button>(RootGrid,x=>AutomationProperties.GetName(x)=="Жанр")!;
         genreMenuButton.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Task.Delay(100);
         Check(genreMenuButton.ContextMenu is {IsOpen:true,ActualHeight:>0},"genre pill opens a visible dropdown menu");genreMenuButton.ContextMenu!.IsOpen=false;
         Check(!VisualElements<Button>(Body).Any(b=>b.Content?.ToString()?.Contains("Показать ещё")==true),"catalog has no load-more button");
@@ -80,6 +80,11 @@ public partial class MainWindow
         Choose("Порядок","По рейтингу");await Settle();Check(catalogDisplay.Select(x=>x.Id).SequenceEqual([2,3,1]),"saved cards sort by real rating");
         ResetCatalogFilters();topAll!.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Settle();Check(Page(2).IsEnabled&&catalogHasNext,"returning from saved cards restores catalog pagination");
         var bitmap=new RenderTargetBitmap((int)ActualWidth,(int)ActualHeight,96,96,PixelFormats.Pbgra32);bitmap.Render(this);var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(bitmap));using(var file=File.Create(Path.Combine(output,"catalog.png")))png.Save(file);
+        MinWidth=1760;Width=1760;Height=950;await Task.Delay(150);UpdateLayout();
+        Check(FiltersPanel.Visibility==Visibility.Visible&&inlineCatalogFilterScroll?.Parent==FilterControls&&discoveryHero is {ActualHeight:>180},"wide catalog shows cinematic banners and moves the existing filter controls into the right panel");
+        var wideGenre=FindVisual<Button>(RootGrid,b=>AutomationProperties.GetName(b)=="Жанр")!;
+        wideGenre.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Task.Delay(80);UpdateLayout();
+        Check(wideGenre.ContextMenu is {IsOpen:true,ActualHeight:>0},"right panel genre dropdown remains interactive after responsive relocation");wideGenre.ContextMenu!.IsOpen=false;
         MinWidth=360;Width=680;Height=500;await Task.Delay(150);UpdateLayout();Check(FiltersPanel.Visibility==Visibility.Collapsed&&inlineCatalogFilters?.Visibility==Visibility.Visible,"top filters remain available in narrow windows");
         Height=360;await Task.Delay(150);UpdateLayout();Check(inlineCatalogFilterScroll is {} filterScroll&&Body.ActualHeight>25&&(filterScroll.ScrollableHeight>0||inlineCatalogFilters!.ActualHeight<=filterScroll.ViewportHeight+1),$"short window keeps all filter choices reachable and retains space for cards (window={ActualHeight}, filters={inlineCatalogFilterScroll?.ActualHeight}, scroll={inlineCatalogFilterScroll?.ScrollableHeight}, cards={Body.ActualHeight})");
         Width=510;await Task.Delay(150);UpdateLayout();Check(inlineCatalogFilterScroll is {ScrollableHeight:>0}&&Body.ActualHeight>25,"overflowing filter choices scroll in a narrow short window without hiding the catalog");
@@ -95,7 +100,7 @@ public partial class MainWindow
         Check(VisualElements<Button>(Body).Select(x=>x.Tag).OfType<SourceEntry>().Select(x=>x.Quality).SequenceEqual(["4K","Full HD","HD Ready"]),"friendly quality names still sort by actual resolution");
         qualityBox.SelectedItem="Full HD";UpdateLayout();
         Check(VisualElements<Button>(Body).Select(x=>x.Tag).OfType<SourceEntry>().Select(x=>x.Quality).SequenceEqual(["Full HD"]),"Full HD filter keeps only matching releases");
-        var savedFilm=FindVisual<Button>(PageHeader,x=>AutomationProperties.GetName(x)=="Сохранено")??FindVisual<Button>(Body,x=>AutomationProperties.GetName(x)=="Сохранено");
+        var savedFilm=FindVisual<Button>(RootGrid,x=>AutomationProperties.GetName(x)=="Сохранено")??FindVisual<Button>(Body,x=>AutomationProperties.GetName(x)=="Сохранено");
         Check(savedFilm!=null&&VisualElements<System.Windows.Shapes.Path>(savedFilm).Any(x=>x.Fill!=null),"saved movie detail heart is filled too");
         await QualitySmoke(Check);
         await SearchDownloadsSmoke(output,Check);

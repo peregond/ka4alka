@@ -15,6 +15,13 @@ static class ReleaseQualityTests
         var item=new MediaItem(1,"Фильм","Фильмы","",2026,"—","—","#526B69");var changed=0;item.PropertyChanged+=(_,e)=>{if(e.PropertyName==nameof(MediaItem.OnlyPoorQuality))changed++;};
         item.SetReleaseQuality([Row("Film HDCAM")]);item.SetReleaseQuality([Row("Film HDCAM"),Row("Film 1080p")]);
         Check(!item.OnlyPoorQuality&&changed==2,"catalog quality updates existing bound cards when a good release arrives");
+        Check(item.BestQuality=="Full HD"&&item.HasQuality,"catalog quality chip uses an evidenced downloadable HD release");
+        item.SetReleaseQuality([Row("Film HDCAM 2160p"),Row("Film WEBRip")]);
+        Check(!item.HasQuality,"screen recordings and unknown resolution cannot create a 4K quality chip");
+        item.SetReleaseQuality([Row("Film 2160p") with{TorrentUrl=null}]);
+        Check(!item.HasQuality,"a metadata-only record cannot create a downloadable quality chip");
+        item.SetReleaseQuality([Row("Film 720p"),Row("Film 2160p")]);
+        Check(item.BestQuality=="4K","catalog selects the highest evidenced downloadable resolution");
         var download=new DownloadItem{MediaTitle="Фильм",Name="file.mkv",ReleaseTitle="Фильм HDCAM 1080p"};
         Check(download.PoorQuality,"queue quality uses release title rather than friendly film title or filename");
         var originalData=Environment.GetEnvironmentVariable("KACHALKA_DATA");

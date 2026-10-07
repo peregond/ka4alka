@@ -60,13 +60,14 @@ public partial class MainWindow:Window
     void PosterResized(object sender,SizeChangedEventArgs e){if(sender is Border poster){if(e.WidthChanged&&e.NewSize.Width>0){var height=e.NewSize.Width*1.5;if(double.IsNaN(poster.Height)||Math.Abs(poster.Height-height)>1)poster.Height=height;}ClipPoster(poster);}}
     void Render()
     {
-        if(!ready)return;try{catalogList=null;detailHero=null;detailPoster=null;detailSynopsis=null;detailTitle=null;detailDescription=null;descriptionToggle=null;inlineCatalogFilters=null;inlineCatalogFilterScroll=null;PageHeader.Children.Clear();Body.Children.Clear();Body.RowDefinitions.Clear();SyncTimer();UpdateFilterRail();
+        if(!ready)return;try{catalogList=null;detailHero=null;detailPoster=null;detailSynopsis=null;detailTitle=null;detailDescription=null;descriptionToggle=null;inlineCatalogFilters=null;inlineCatalogFilterScroll=null;catalogToolbar=null;catalogRailPreview=null;discoveryHero=null;discoveryShelf=null;FilterControls.Children.Clear();PageHeader.Children.Clear();Body.Children.Clear();Body.RowDefinitions.Clear();SyncTimer();UpdateFilterRail();
         SearchBar.Visibility=current!=null||section is "Фильмы" or "Сериалы" or "Загрузки"?Visibility.Visible:Visibility.Collapsed;
         ContextLabel.Visibility=SearchBar.Visibility==Visibility.Visible||section=="Загрузки"?Visibility.Collapsed:Visibility.Visible;ContextLabel.Text=section;
         downloadView=null;downloadList=null;
-        foreach(Button b in Navigation.Children){var selected=!SearchActive&&b.Tag?.ToString()==section;b.SetResourceReference(System.Windows.Controls.Button.BackgroundProperty,selected?"Selected":"Sidebar");b.SetResourceReference(Control.ForegroundProperty,selected?"Text":"Muted");b.FontWeight=selected?FontWeights.SemiBold:FontWeights.Normal;}
-        DownloadsButton.SetResourceReference(Control.BackgroundProperty,section=="Загрузки"?"Selected":"Sidebar");
-        SettingsButton.SetResourceReference(Control.BackgroundProperty,section=="Настройки"?"Selected":"Sidebar");
+        foreach(Button b in Navigation.Children){var selected=!SearchActive&&b.Tag?.ToString()==section;b.SetResourceReference(System.Windows.Controls.Button.BackgroundProperty,selected?"PrimaryFill":"Sidebar");b.SetResourceReference(Control.ForegroundProperty,selected?"PrimaryInk":"Muted");b.FontWeight=selected?FontWeights.SemiBold:FontWeights.Normal;}
+        DownloadsButton.SetResourceReference(Control.BackgroundProperty,section=="Загрузки"?"PrimaryFill":"Sidebar");
+        SettingsButton.SetResourceReference(Control.BackgroundProperty,section=="Настройки"?"PrimaryFill":"Sidebar");
+        DownloadsButton.SetResourceReference(Control.ForegroundProperty,section=="Загрузки"?"PrimaryInk":"Muted");SettingsButton.SetResourceReference(Control.ForegroundProperty,section=="Настройки"?"PrimaryInk":"Muted");
         if(section=="Настройки"){RenderSettings();return;}
         if(section=="Источники"){RenderSources();return;}
         if(current?.IsLive==true){RenderLiveDetail(current);return;}
@@ -126,8 +127,11 @@ public partial class MainWindow:Window
     void OpenFolder(object sender,RoutedEventArgs e){var d=(DownloadItem)((Button)sender).Tag;if(Directory.Exists(d.Folder))Process.Start(new ProcessStartInfo(d.Folder){UseShellExecute=true});}
     void ApplyTheme()
     {
-        var values=prefs.Light?new[]{"#F3F5F4","#FFFFFF","#17221E","#4C5B54","#BCCBC4","#D6EBE1","#09684C","#FFFFFF","#E9EFEC","#E4EEE8","#087552","#FFFFFF","#075B40","#D6EBE1","#F7F9F8","#DEE6E1"}:new[]{"#101315","#1C2226","#F5F7F8","#BEC7CD","#46504E","#263F35","#91E8CC","#082B20","#151A1D","#2A3235","#91E8CC","#082B20","#B3F3DF","#233E34","#171D21","#303A39"};var keys=new[]{"Bg","Panel","Text","Muted","Edge","Selected","Accent","AccentInk","Sidebar","Hover","Primary","PrimaryInk","PrimaryHover","AccentSoft","PanelAlt","EdgeSoft"};for(int i=0;i<keys.Length;i++){var brush=new SolidColorBrush((Color)ColorConverter.ConvertFromString(values[i]));brush.Freeze();Application.Current.Resources[keys[i]]=brush;}
+        var values=prefs.Light?new[]{"#EDF1FA","#FFFFFF","#14213D","#485770","#B7C3DA","#E2E7FF","#293CAB","#FFFFFF","#E7ECF8","#E2EAFB","#4937CF","#FFFFFF","#3825B5","#E2E7FF","#F2F5FF","#D6DFF0"}:new[]{"#080D1B","#111B30","#F5F7FF","#B4BFD8","#415575","#26357D","#ADBBFF","#0B1332","#0C1426","#1C2C47","#5D43E8","#FFFFFF","#6E55FB","#212B55","#0D172A","#26344E"};var keys=new[]{"Bg","Panel","Text","Muted","Edge","Selected","Accent","AccentInk","Sidebar","Hover","Primary","PrimaryInk","PrimaryHover","AccentSoft","PanelAlt","EdgeSoft"};for(int i=0;i<keys.Length;i++){var brush=new SolidColorBrush((Color)ColorConverter.ConvertFromString(values[i]));brush.Freeze();Application.Current.Resources[keys[i]]=brush;}
+        var primary=new LinearGradientBrush((Color)ColorConverter.ConvertFromString(prefs.Light?"#4937CF":"#6232EF"),(Color)ColorConverter.ConvertFromString(prefs.Light?"#245CD0":"#2764EF"),45);primary.Freeze();Application.Current.Resources["PrimaryFill"]=primary;
+        var glow=new RadialGradientBrush{Center=new(.35,0),GradientOrigin=new(.35,0),RadiusX=.7,RadiusY=.8};glow.GradientStops.Add(new((Color)ColorConverter.ConvertFromString(prefs.Light?"#204D67E5":"#604923A1"),0));glow.GradientStops.Add(new(Colors.Transparent,1));glow.Freeze();Application.Current.Resources["AmbientGlow"]=glow;
         Application.Current.Resources["Danger"]=new SolidColorBrush((Color)ColorConverter.ConvertFromString(prefs.Light?"#B42335":"#FFB2BB"));
+        Application.Current.Resources["RatingInk"]=new SolidColorBrush((Color)ColorConverter.ConvertFromString(prefs.Light?"#805200":"#FFD166"));
         SidePanel.SetResourceReference(Border.BackgroundProperty,"Sidebar");
     }
     bool closing;

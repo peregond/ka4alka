@@ -117,7 +117,7 @@ public partial class MainWindow
         {
             prefs.Light=initialLight;prefs.AutoResumeDownloads=initialResume;prefs.Folder=initialFolder;prefs.FolderConfigured=initialConfigured;prefs.Save();ApplyTheme();
             section="Фильмы";current=null;Search.Clear();searchDelay.Stop();submittedQuery="";searchCategory="";lastCatalogSection="Фильмы";
-            Width=Math.Min(1760,MaxWidth-24);Height=Math.Min(950,MaxHeight-24);liveKey="Фильмы||1";Render();await Settle();
+            Width=Math.Min(1760,MaxWidth-24);Height=Math.Min(950,MaxHeight-24);liveKey="";Render();await Settle();
         }
     }
 }

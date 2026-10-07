@@ -86,7 +86,7 @@ public partial class MainWindow
     bool ExpireCatalogPages()
     {
         var boundary=SharedCatalog.BoundaryUtc(DateTime.UtcNow);if(boundary==catalogMemoryBoundary)return false;
-        catalogMemoryBoundary=boundary;catalogPages.Clear();cardMetadata.Clear();catalogLastPage=null;if(!SearchActive)liveKey="";return true;
+        catalogMemoryBoundary=boundary;catalogPages.Clear();featuredRequests.Clear();featuredFallback.Clear();cardMetadata.Clear();catalogLastPage=null;if(!SearchActive)liveKey="";return true;
     }
     string CurrentCatalogKey=>SearchActive?"Поиск|"+submittedQuery:section+"|"+livePage+"|"+CatalogSelection.Filter+"|"+CatalogSelection.Collection;
     CatalogSelection CatalogSelection=>new(catalogGenre,catalogCountry,catalogYear,catalogRating,catalogOrder switch{"По рейтингу"=>"rating","По популярности"=>"popular",_=>"date"},catalogCollection);
@@ -111,12 +111,12 @@ public partial class MainWindow
         var headingRow=new DockPanel{Margin=new(5,0,8,5)};
         var count=Text(liveLoading?"Загружаем…":$"Страница {livePage}",11,true);count.VerticalAlignment=VerticalAlignment.Center;count.Margin=new(14,0,0,0);DockPanel.SetDock(count,Dock.Right);headingRow.Children.Add(count);
         var title=favoritesOnly?"Сохранённое":SearchActive?"Результаты поиска":catalogCollection=="popular"?"Популярное":catalogCollection=="rated"?"Кино с высоким рейтингом":section=="Фильмы"?"Все фильмы":"Все сериалы";
-        var heading=Text(title,compactHeight?22:28);heading.FontWeight=FontWeights.SemiBold;heading.Margin=new(0);headingRow.Children.Add(heading);PageHeader.Children.Add(headingRow);
-        var subtitle=Text(liveError.Length>0?liveError:favoritesOnly?"Кино, к которому хочется вернуться.":SearchActive?$"Результаты для «{submittedQuery}».":catalogCollection!="all"?"Подборка Zona · обновляется из общего каталога.":"Выбирай историю на сегодня.",13,true);subtitle.Tag="CatalogSubtitle";subtitle.Margin=new(5,3,0,12);subtitle.Visibility=compactHeight?Visibility.Collapsed:Visibility.Visible;PageHeader.Children.Add(subtitle);
-        var toolbar=new DockPanel{Margin=new(5,compactHeight?6:0,8,8)};
+        var heading=Text(title,compactHeight?22:28);heading.FontWeight=FontWeights.SemiBold;heading.Margin=new(0);headingRow.Children.Add(heading);if(!DiscoveryCatalog)PageHeader.Children.Add(headingRow);
+        var subtitle=Text(liveError.Length>0?liveError:favoritesOnly?"Кино, к которому хочется вернуться.":SearchActive?$"Результаты для «{submittedQuery}».":catalogCollection!="all"?"Подборка Zona · обновляется из общего каталога.":"Выбирай историю на сегодня.",13,true);subtitle.Tag="CatalogSubtitle";subtitle.Margin=new(5,3,0,12);subtitle.Visibility=compactHeight?Visibility.Collapsed:Visibility.Visible;if(!DiscoveryCatalog)PageHeader.Children.Add(subtitle);
+        var toolbar=new DockPanel{Margin=new(0,compactHeight?6:0,8,8)};catalogToolbar=toolbar;
         if(!favoritesOnly)
         {
-            var refresh=ActionButton("","IconRefresh",()=>{onlineIndex.RetryNow();catalogPages.Clear();catalogRefreshRequested=true;liveKey="";Render();});refresh.ToolTip="Обновить каталог";System.Windows.Automation.AutomationProperties.SetName(refresh,"Обновить каталог");refresh.Padding=new(10);refresh.Margin=new(0);DockPanel.SetDock(refresh,Dock.Right);toolbar.Children.Add(refresh);
+            var refresh=ActionButton("","IconRefresh",()=>{onlineIndex.RetryNow();catalogPages.Clear();featuredRequests.Clear();featuredFallback.Clear();catalogRefreshRequested=true;liveKey="";Render();});refresh.ToolTip="Обновить каталог";System.Windows.Automation.AutomationProperties.SetName(refresh,"Обновить каталог");refresh.Padding=new(10);refresh.Margin=new(0);DockPanel.SetDock(refresh,Dock.Right);toolbar.Children.Add(refresh);
         }
         var tabs=new WrapPanel();
         if(SearchActive)SearchTabs(tabs);
@@ -141,7 +141,7 @@ public partial class MainWindow
         ShowCatalog(cards);
         var list=catalogList!;
         Body.Children.Remove(list);ScrollViewer.SetVerticalScrollBarVisibility(list,ScrollBarVisibility.Disabled);ScrollViewer.SetHorizontalScrollBarVisibility(list,ScrollBarVisibility.Disabled);WheelScroll.SetIsEnabled(list,false);
-        var content=new StackPanel();content.Children.Add(list);
+        var content=new StackPanel();AddDiscovery(content,cards);content.Children.Add(list);AddRailPreview(cards);
         if(cards.Length==0)
         {
             var empty=new StackPanel{HorizontalAlignment=HorizontalAlignment.Center,MaxWidth=370,Margin=new(24)};
@@ -163,9 +163,10 @@ public partial class MainWindow
         foreach(var number in CatalogPaging.Numbers(livePage,catalogLastPage))PageButton(number.ToString(),number,true);
         PageButton("Далее",livePage+1,catalogHasNext&&livePage<CatalogPaging.Limit);
         footer.Children.Add(numbers);
-        if(liveError.Length>0&&!favoritesOnly){var retry=Button("Повторить загрузку",()=>{onlineIndex.RetryNow();catalogPages.Clear();catalogRefreshRequested=true;liveKey="";Render();});retry.Style=(Style)FindResource("QuietButton");footer.Children.Add(retry);}
+        if(liveError.Length>0&&!favoritesOnly){var retry=Button("Повторить загрузку",()=>{onlineIndex.RetryNow();catalogPages.Clear();featuredRequests.Clear();featuredFallback.Clear();catalogRefreshRequested=true;liveKey="";Render();});retry.Style=(Style)FindResource("QuietButton");footer.Children.Add(retry);}
         content.Children.Add(footer);
         Body.Children.Add(new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=content,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});
+        UpdateFilterRail();
     }
     void AddCatalogFilters(Panel target)
     {

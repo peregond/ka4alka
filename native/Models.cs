@@ -22,14 +22,23 @@ public record MediaItem(int Id, string Title, string Section, string Genre, int 
     [JsonIgnore] public string ImdbDisplay => "IMDb  "+(liveImdb??Imdb);
     [JsonIgnore] public bool KpAvailable => !string.IsNullOrWhiteSpace(liveKp??Kinopoisk)&&(liveKp??Kinopoisk)!="—";
     [JsonIgnore] public bool ImdbAvailable => !string.IsNullOrWhiteSpace(liveImdb??Imdb)&&(liveImdb??Imdb)!="—";
+    [JsonIgnore] public string CardRating => KpAvailable?(liveKp??Kinopoisk):ImdbAvailable?(liveImdb??Imdb):"—";
+    [JsonIgnore] public string CardRatingSource => KpAvailable?"Кинопоиск":ImdbAvailable?"IMDb":"Оценка пока недоступна";
+    [JsonIgnore] public string CardGenre => string.IsNullOrWhiteSpace(Genre)?Section=="Сериалы"?"Сериал":"Фильм":Genre;
+    string bestQuality="";
+    [JsonIgnore] public string BestQuality=>bestQuality;
+    [JsonIgnore] public bool HasQuality=>bestQuality.Length>0;
     [JsonIgnore] public string Scores => liveScores ?? (Cinema ? $"КП {Kinopoisk}   IMDb {Imdb}" : Section);
     public event PropertyChangedEventHandler? PropertyChanged;
     [JsonIgnore] public bool OnlyPoorQuality {get;private set;}
     public void SetReleaseQuality(IEnumerable<SourceEntry> entries,int minimum=720)
     {
-        var value=ReleaseQuality.OnlyPoor(entries,minimum);
-        if(value==OnlyPoorQuality)return;
-        OnlyPoorQuality=value;PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(OnlyPoorQuality)));
+        var rows=entries.ToArray();
+        var value=ReleaseQuality.OnlyPoor(rows,minimum);
+        var height=rows.Where(x=>(x.TorrentUrl!=null||x.Source=="Internet Archive")&&!ReleaseQuality.Poor(x,720)).Select(x=>ReleaseQuality.Height(x)??0).DefaultIfEmpty(0).Max();
+        var quality=height>=2160?"4K":height>=1080?"Full HD":height>=720?"HD Ready":"";
+        if(value!=OnlyPoorQuality){OnlyPoorQuality=value;PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(OnlyPoorQuality)));}
+        if(quality!=bestQuality){bestQuality=quality;PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(BestQuality)));PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(HasQuality)));}
     }
     public void SetScores(string kp,string imdb){liveKp=kp;liveImdb=imdb;liveScores=$"КП {kp}   IMDb {imdb}";PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(null));}
     [JsonIgnore] public string Subtitle => Cinema ? string.Join(" · ",new[]{Section=="Сериалы"?"Сериал":"Фильм",Year>0?Year.ToString():null,Genre}.Where(x=>!string.IsNullOrWhiteSpace(x))) : "Демонстрационный каталог";
