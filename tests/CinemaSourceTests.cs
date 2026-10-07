@@ -12,6 +12,8 @@ public static class CinemaSourceTests
         {
             var bytes=await client.Read(new Uri(film.PageUrl!),4*1024*1024,deadline.Token);
             await File.WriteAllBytesAsync(Path.Combine(output,"film-"+film.Id+".html"),bytes,deadline.Token);
+            var html=System.Text.Encoding.UTF8.GetString(bytes);
+            foreach(System.Text.RegularExpressions.Match match in System.Text.RegularExpressions.Regex.Matches(html,@"(?i)actor|director|режисс|оператор|в ролях"))Console.WriteLine("SOURCE: "+html.Substring(Math.Max(0,match.Index-250),Math.Min(1200,html.Length-Math.Max(0,match.Index-250))).Replace("\n"," "));
             var people=CinemaMetadata.People(bytes);Console.WriteLine(film.Title+": "+people.Length+" participants");
             foreach(var person in people.Take(2))
             {
