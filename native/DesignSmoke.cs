@@ -232,6 +232,13 @@ public partial class MainWindow
                 WidthChecks=checks,Screens=new[]{"sources-light","sources-dark","sources-510","search-light","search-dark","search-small","search-minimum","settings-light","settings-dark","settings-small","settings-minimum","catalog-light","catalog-dark","detail-wide-light","detail-wide-dark","detail-720","release-720","detail-510","release-510","short-description-expanded","series-season-filter","downloads-empty","downloads-light","downloads-dark","downloads-510"}
             },new JsonSerializerOptions{WriteIndented=true}));
         }
+        catch(Exception error)
+        {
+            // Closing the final WPF window can end the dispatcher before the outer
+            // startup handler resumes, so retain the actual assertion first.
+            File.WriteAllText(Path.Combine(output,"error.txt"),error.ToString());
+            throw;
+        }
         finally{prefs.Light=originalLight;searchProvider=null;Close();}
     }
 
