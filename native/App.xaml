@@ -3,7 +3,7 @@
   <SolidColorBrush x:Key="Bg" Color="#F0F4FA"/><SolidColorBrush x:Key="Panel" Color="#FFFFFF"/><SolidColorBrush x:Key="Text" Color="#101C32"/><SolidColorBrush x:Key="Muted" Color="#43536E"/><SolidColorBrush x:Key="Edge" Color="#9CAEC6"/><SolidColorBrush x:Key="Selected" Color="#D1E1FA"/><SolidColorBrush x:Key="Accent" Color="#1456C5"/><SolidColorBrush x:Key="AccentInk" Color="#FFFFFF"/><SolidColorBrush x:Key="Sidebar" Color="#DCE6F4"/><SolidColorBrush x:Key="Hover" Color="#E0EAFB"/>
   <SolidColorBrush x:Key="Primary" Color="#134AB0"/><SolidColorBrush x:Key="PrimaryInk" Color="#FFFFFF"/><SolidColorBrush x:Key="PrimaryHover" Color="#0A398F"/><SolidColorBrush x:Key="AccentSoft" Color="#E0EAFF"/>
   <Style TargetType="Window">
-   <Setter Property="Background" Value="{DynamicResource Bg}"/><Setter Property="Foreground" Value="{DynamicResource Text}"/><Setter Property="FontFamily" Value="/Kachalka;component/Fonts/#Inter, Segoe UI"/><Setter Property="FontSize" Value="13"/><Setter Property="UseLayoutRounding" Value="True"/><Setter Property="TextOptions.TextFormattingMode" Value="Display"/>
+   <Setter Property="Background" Value="{DynamicResource Bg}"/><Setter Property="Foreground" Value="{DynamicResource Text}"/><Setter Property="FontFamily" Value="pack://application:,,,/Kachalka;component/Fonts/#Inter"/><Setter Property="FontSize" Value="13"/><Setter Property="UseLayoutRounding" Value="True"/><Setter Property="TextOptions.TextFormattingMode" Value="Display"/>
   </Style>
 
   <SolidColorBrush x:Key="Danger" Color="#B42335"/>

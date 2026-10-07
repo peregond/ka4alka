@@ -195,7 +195,7 @@ public partial class MainWindow
                 check(VisualElements<System.Windows.Shapes.Path>(fileFrame).Any(icon=>icon.Data is{Bounds.IsEmpty:false}),"file details resolve the file icon geometry inside the owned dialog");Shot(dialog,"downloads-details-dark");
                 prefs.Light=true;ApplyTheme();dialog.UpdateLayout();Shot(dialog,"downloads-details-light");dialog.Width=360;dialog.Height=300;dialog.UpdateLayout();Shot(dialog,"downloads-details-minimum");check(files.ActualHeight>30,"file details remain usable in a minimum-size window");
             });
-            var font=new Typeface(new FontFamily("/Kachalka;component/Fonts/#Inter"),FontStyles.Normal,FontWeights.Normal,FontStretches.Normal);
+            var font=new Typeface(FontFamily,FontStyles.Normal,FontWeights.Normal,FontStretches.Normal);
             check(FontFamily.Source.Contains("Fonts/#Inter")&&font.TryGetGlyphTypeface(out var glyph)&&glyph.FamilyNames.Values.Any(name=>name=="Inter")&&glyph.CharacterToGlyphMap.ContainsKey('М'),"the packaged Inter font is used by the window and contains Cyrillic glyphs");
             check(Icon is BitmapSource&&BrandLogo.Source is BitmapSource,"application icon and transparent kettlebell logo load from packaged resources");
             Width=1280;Height=800;section="Загрузки";current=null;Render();await SettleDownloads();
