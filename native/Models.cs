@@ -24,6 +24,13 @@ public record MediaItem(int Id, string Title, string Section, string Genre, int 
     [JsonIgnore] public bool ImdbAvailable => !string.IsNullOrWhiteSpace(liveImdb??Imdb)&&(liveImdb??Imdb)!="—";
     [JsonIgnore] public string Scores => liveScores ?? (Cinema ? $"КП {Kinopoisk}   IMDb {Imdb}" : Section);
     public event PropertyChangedEventHandler? PropertyChanged;
+    [JsonIgnore] public bool OnlyPoorQuality {get;private set;}
+    public void SetReleaseQuality(IEnumerable<SourceEntry> entries,int minimum=720)
+    {
+        var value=ReleaseQuality.OnlyPoor(entries,minimum);
+        if(value==OnlyPoorQuality)return;
+        OnlyPoorQuality=value;PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(OnlyPoorQuality)));
+    }
     public void SetScores(string kp,string imdb){liveKp=kp;liveImdb=imdb;liveScores=$"КП {kp}   IMDb {imdb}";PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(null));}
     [JsonIgnore] public string Subtitle => Cinema ? string.Join(" · ",new[]{Section=="Сериалы"?"Сериал":"Фильм",Year>0?Year.ToString():null,Genre}.Where(x=>!string.IsNullOrWhiteSpace(x))) : "Демонстрационный каталог";
     [JsonIgnore] public Brush Cover { get { var b = new LinearGradientBrush((Color)ColorConverter.ConvertFromString(Color), (Color)ColorConverter.ConvertFromString("#20262E"), 75); b.Freeze(); return b; } }
@@ -64,6 +71,8 @@ public class Preferences
     public bool AutoResumeDownloads {get;set;}=true;
     public bool CheckForUpdates {get;set;}=true;
     public bool AutoUpdate {get;set;}=true;
+    public bool HidePoorQuality {get;set;}
+    public int MinimumReleaseHeight {get;set;}=720;
     public HashSet<int> Favorites {get;set;}=[];
     public List<MediaItem> LiveFavorites {get;set;}=[];
     public static string DataDir=>Environment.GetEnvironmentVariable("KACHALKA_DATA") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"Kachalka");
@@ -94,6 +103,8 @@ public class DownloadItem : INotifyPropertyChanged
     public string? ReleaseUrl {get;set;}
     [JsonIgnore] public string DisplayName=>string.IsNullOrWhiteSpace(MediaTitle)?Name:MediaTitle;
     [JsonIgnore] public bool HasMediaCard=>DownloadMetadata.Card(this)!=null;
+    [JsonIgnore] public int MinimumQualityHeight {get;set;}=720;
+    [JsonIgnore] public bool PoorQuality=>ReleaseQuality.Poor(new SourceEntry("",string.IsNullOrWhiteSpace(ReleaseTitle)?Name:ReleaseTitle,"","",null,null),MinimumQualityHeight);
     [JsonIgnore] public long DownloadRate {get;set;}
     [JsonIgnore] public long UploadRate {get;set;}
     [JsonIgnore] public long? TotalBytes {get;set;}

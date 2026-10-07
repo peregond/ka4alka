@@ -1,13 +1,13 @@
 name: Windows release validation
 on:
   push:
-    branches: [codex/cards-sources-0.27]
+    branches: [codex/quality-sources-0.28]
   pull_request:
   workflow_dispatch:
 permissions:
   contents: read
 concurrency:
-  group: windows-${{ github.head_ref || github.ref_name }}
+  group: windows-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 jobs:
   windows:

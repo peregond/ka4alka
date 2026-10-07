@@ -31,6 +31,7 @@ public partial class MainWindow
     void RenderDownloads()
     {
         downloads.Update();downloadMenus.Clear();
+        foreach(var item in downloads.Items){item.MinimumQualityHeight=QualityMinimum;item.Refresh();}
         RepairDownloadMetadata();
         downloadSort=DownloadSortChoices.Any(x=>x.Key==prefs.DownloadSort)?prefs.DownloadSort:"newest";
         var heading=new DockPanel{Margin=new(0,0,8,8)};
