@@ -26,7 +26,7 @@ public record MediaItem(int Id, string Title, string Section, string Genre, int 
     [JsonIgnore] public bool ImdbAvailable => !string.IsNullOrWhiteSpace(liveImdb??Imdb)&&(liveImdb??Imdb)!="—";
     [JsonIgnore] public string CardRating => KpAvailable?(liveKp??Kinopoisk):ImdbAvailable?(liveImdb??Imdb):"—";
     [JsonIgnore] public string CardRatingSource => KpAvailable?"Кинопоиск":ImdbAvailable?"IMDb":"Оценка пока недоступна";
-    static string InlineMetadata(string value)=>string.Join(", ",value.Split(',').Select(part=>Regex.Replace(part,@"\s+"," ").Trim()).Where(part=>part.Length>0));
+    static string InlineMetadata(string? value)=>string.Join(", ",(value??"").Split(',').Select(part=>Regex.Replace(part,@"\s+"," ").Trim()).Where(part=>part.Length>0));
     [JsonIgnore] public string CardGenre {get{var value=InlineMetadata(liveGenre??Genre);return value.Length==0?Section=="Сериалы"?"Сериал":"Фильм":value;}}
     string bestQuality="";
     [JsonIgnore] public string BestQuality=>bestQuality;

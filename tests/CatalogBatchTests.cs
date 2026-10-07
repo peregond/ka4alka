@@ -35,6 +35,8 @@ static class CatalogBatchTests
         Check(capped.Items.Length==20&&!capped.HasMore,"end of source page limit drains buffer without offering impossible requests");
         using var canceled=new CancellationTokenSource();canceled.Cancel();
         try{await CatalogBatches.Load(first,Fetch,ct:canceled.Token);throw new Exception("Canceled catalog batch ran");}catch(OperationCanceledException){Check(first.Items.Length==100,"cancellation leaves previous catalog intact");}
+        var missingGenre=new MediaItem(-502,"Сериал","Сериалы",null!,2025,"—","—","#526B69");
+        Check(missingGenre.CardGenre=="Сериал"&&missingGenre.Subtitle=="Сериал · 2025","old saved cards with a missing genre retain their category and layout");
         var show=new MediaItem(-501,"Сериал","Сериалы","  боевик\r\n ,\n    криминал, \tдрама\u00a0 ",2025,"8.2","8.0","#526B69");
         Check(show.CardGenre=="боевик, криминал, драма"&&!show.Subtitle.Contains('\n'),"multiline cached series genres stay on one compact metadata line");
         show.SetScores("8.3","8.1","\nдетектив\n , \r\n триллер\n");
