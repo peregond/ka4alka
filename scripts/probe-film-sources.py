@@ -18,10 +18,13 @@ def probe(label, url, encoding='utf-8'):
         # Log public metadata and markup relevant to the parser, never cookies or auth.
         snippets = re.findall(r'.{0,80}(?:alternativeHeadline|entity-rating|ratingValue|topictitle|class="nam"|magnet:|imdb\.com|kinopoisk\.ru|results-item-rating).{0,280}', text, re.I)
         titles = re.findall(r'<a[^>]+href=["\'][^"\']*(?:torrent/|viewtopic\.php|details\.php)[^"\']*["\'][^>]*>(.*?)</a>', text, re.I | re.S)
+        rows = re.findall(r'<tr\b[^>]*>([\s\S]*?)</tr>', text, re.I)
+        matching_rows = [re.sub(r'\s+', ' ', row)[:6500] for row in rows if 'До последнего грамма' in html.unescape(row) or 'Объект преступления' in html.unescape(row)]
+        ratings = re.findall(r'.{0,100}(?:rating|imdb|kinopoisk|Кинопоиск|IMDb).{0,500}', text, re.I)
         result = {'source': label, 'status': status, 'url': final,
                   'title': re.findall(r'<title[^>]*>(.*?)</title>', text, re.I | re.S)[:1],
                   'names': [html.unescape(re.sub('<[^>]+>', '', value)).strip()[:240] for value in titles[:10]],
-                  'snippets': snippets[:20]}
+                  'snippets': snippets[:4], 'rows': matching_rows[:2], 'ratings': ratings[:10] if 'detail' in label else []}
     except Exception as error:
         result = {'source': label, 'error': str(error)}
     return result
