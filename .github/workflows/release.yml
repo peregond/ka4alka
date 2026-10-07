@@ -12,7 +12,7 @@ on:
 permissions:
   contents: write
 concurrency:
-  group: kachalka-release
+  group: kachalka-release-0.30.0
   cancel-in-progress: false
 jobs:
   release:
@@ -55,6 +55,14 @@ jobs:
             [System.IO.File]::WriteAllText($key,$env:RELEASE_SIGNING_KEY)
             ./build-release.ps1 -Version $env:RELEASE_VERSION -SigningKeyPath $key -MakeNsis 'C:/Program Files (x86)/NSIS/makensis.exe'
           } finally { Remove-Item $key -ErrorAction SilentlyContinue }
+      - name: Verify person card and film navigation at two window sizes
+        shell: pwsh
+        run: |
+          $env:KACHALKA_DATA=Join-Path $env:RUNNER_TEMP 'kachalka-cinema-smoke'
+          $output=Join-Path $pwd 'test-output/cinema-ui'
+          $process=Start-Process dist/Kachalka-0.30/Kachalka.exe -ArgumentList @('--cinema-smoke-test',$output) -PassThru
+          if(-not $process.WaitForExit(60000)){$process.Kill();throw 'Person card UI smoke timed out'}
+          if($process.ExitCode -ne 0 -or (Test-Path "$output/error.txt") -or -not (Test-Path "$output/checks.json")){throw 'Person card UI smoke failed'}
       - name: Verify upgrade from previously published 0.29.1
         shell: pwsh
         run: ./tests/WindowsPublishedUpgrade.ps1 -FromVersion 0.29.1 -ReleaseDirectory ('dist/release-'+$env:RELEASE_VERSION)
@@ -111,6 +119,8 @@ jobs:
         with:
           name: production-windows-update-evidence
           path: |
+            test-output/cinema-ui/*
+            test-output/cinema-source/*
             test-output/windows-update/checks.txt
             test-output/dpi-reliability/*
             test-output/close-reliability/*.json
