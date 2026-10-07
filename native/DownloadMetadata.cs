@@ -59,9 +59,9 @@ public static class DownloadMetadata
         item.MediaTitle=media.Title;item.MediaSection=media.Section;item.ImageUrl=image;item.MediaPageUrl=page;item.MediaYear=year;item.Refresh();return true;
     }
 
+    static bool Rating(string value)=>double.TryParse(value.Replace(',','.'),System.Globalization.NumberStyles.Float,System.Globalization.CultureInfo.InvariantCulture,out var score)&&score is >0 and <=10;
     static MediaItem? Unique(IEnumerable<MediaItem> items)
     {
-        static bool Rating(string value)=>double.TryParse(value.Replace(',','.'),System.Globalization.NumberStyles.Float,System.Globalization.CultureInfo.InvariantCulture,out var score)&&score is >0 and <=10;
         var groups=items.GroupBy(media=>!string.IsNullOrWhiteSpace(media.PageUrl)?media.Section+"|"+media.PageUrl:
             media.Section+"|"+media.Year+"|"+Normalize(media.Title)).ToArray();
         if(groups.Length!=1)return null;
@@ -110,14 +110,14 @@ public static class DownloadMetadata
     {
         var best=Unique(known.Where(candidate=>candidate.Section==media.Section&&
             (SamePage(candidate.PageUrl,media.PageUrl)||string.IsNullOrWhiteSpace(media.PageUrl)&&candidate.Id==media.Id&&candidate.Year==media.Year&&Normalize(candidate.Title)==Normalize(media.Title))));
-        if(best==null)return media;
+        if(best==null)return media with{Kinopoisk=Rating(media.Kinopoisk)?media.Kinopoisk:"—",Imdb=Rating(media.Imdb)?media.Imdb:"—"};
         return media with
         {
             Title=Regex.IsMatch(best.Title,@"[А-Яа-яЁё]")?best.Title:media.Title,
             ImageUrl=!string.IsNullOrWhiteSpace(best.ImageUrl)?best.ImageUrl:media.ImageUrl,
             OriginalTitle=best.OriginalTitle??media.OriginalTitle,
-            Kinopoisk=best.Kinopoisk!="—"?best.Kinopoisk:media.Kinopoisk,
-            Imdb=best.Imdb!="—"?best.Imdb:media.Imdb,
+            Kinopoisk=best.Kinopoisk!="—"?best.Kinopoisk:Rating(media.Kinopoisk)?media.Kinopoisk:"—",
+            Imdb=best.Imdb!="—"?best.Imdb:Rating(media.Imdb)?media.Imdb:"—",
             Description=!string.IsNullOrWhiteSpace(best.Description)?best.Description:media.Description,
             PageUrl=best.PageUrl??media.PageUrl,Year=best.Year>0?best.Year:media.Year
         };
