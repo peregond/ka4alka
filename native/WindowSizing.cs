@@ -149,6 +149,12 @@ public partial class MainWindow
             inlineCatalogFilterScroll.VerticalScrollBarVisibility=ScrollBarVisibility.Disabled;
             inlineCatalogFilterScroll.MaxHeight=double.PositiveInfinity;
             if(catalogRailPreview!=null&&!FilterControls.Children.Contains(catalogRailPreview))FilterControls.Children.Add(catalogRailPreview);
+            if(catalogRefreshButton!=null)
+            {
+                catalogToolbar.Children.Remove(catalogRefreshButton);
+                if(!FilterControls.Children.Contains(catalogRefreshButton))FilterControls.Children.Insert(1,catalogRefreshButton);
+                catalogRefreshButton.Content=IconLabel("Обновить каталог","IconRefresh");catalogRefreshButton.HorizontalAlignment=HorizontalAlignment.Left;
+            }
             catalogToolbar.Visibility=Visibility.Collapsed;
         }
         else
@@ -156,6 +162,12 @@ public partial class MainWindow
             FilterControls.Children.Remove(inlineCatalogFilterScroll);
             if(!catalogToolbar.Children.Contains(inlineCatalogFilterScroll))catalogToolbar.Children.Add(inlineCatalogFilterScroll);
             inlineCatalogFilterScroll.VerticalScrollBarVisibility=ScrollBarVisibility.Auto;
+            if(catalogRefreshButton!=null)
+            {
+                FilterControls.Children.Remove(catalogRefreshButton);
+                if(!catalogToolbar.Children.Contains(catalogRefreshButton))catalogToolbar.Children.Insert(0,catalogRefreshButton);
+                catalogRefreshButton.Content=IconLabel("","IconRefresh");
+            }
             catalogToolbar.Visibility=Visibility.Visible;
             var header=PageHeader.ActualHeight-inlineCatalogFilterScroll.ActualHeight;
             inlineCatalogFilterScroll.MaxHeight=Math.Clamp(CenterRegion.ActualHeight-header-90,40,180);

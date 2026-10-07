@@ -8,6 +8,7 @@ namespace Kachalka;
 public partial class MainWindow
 {
     DockPanel? catalogToolbar;
+    Button? catalogRefreshButton;
     StackPanel? catalogRailPreview;
     Grid? discoveryHero;
     ContentControl? discoveryShelf;
@@ -71,7 +72,7 @@ public partial class MainWindow
         var frame=new Border{CornerRadius=new(16),BorderThickness=new(1),ClipToBounds=true};
         frame.SetResourceReference(Border.BorderBrushProperty,"Edge");frame.SizeChanged+=(_,_)=>ClipPoster(frame);
         var grid=new Grid();frame.Child=grid;
-        var image=new Image{DataContext=item,Width=0,Height=0,Opacity=0};image.Loaded+=SourceCover;grid.Children.Add(image);
+        var image=new Image{DataContext=item,Width=0,Height=0,Opacity=0,Tag="FeaturePoster"};image.Loaded+=SourceCover;image.DataContextChanged+=SourceCoverChanged;image.Loaded+=async(_,_)=>await ImproveFeaturePoster(image,item);grid.Children.Add(image);
         var picture=new ImageBrush{Stretch=Stretch.UniformToFill,AlignmentX=AlignmentX.Center,AlignmentY=AlignmentY.Top};
         BindingOperations.SetBinding(picture,ImageBrush.ImageSourceProperty,new Binding("Source"){Source=image});
         var backdrop=new Border{Background=picture};grid.Children.Add(backdrop);

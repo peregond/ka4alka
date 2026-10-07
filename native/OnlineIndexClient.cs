@@ -75,7 +75,7 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null)
         return new MediaItem(id,title,section,"",Integer(row,"year"),Score(String(row,"kinopoisk")),Score(String(row,"imdb")),"#526B69")
         {
             OnlineId=onlineId,PageUrl=url,ImageUrl=Https(String(row,"poster")),
-            OriginalTitle=String(row,"originalTitle"),Description=String(row,"description")
+            OriginalTitle=String(row,"originalTitle"),ImdbId=String(row,"imdbId"),Description=String(row,"description")
         };
     }
 
@@ -109,6 +109,7 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null)
         {
             OnlineId=fresh.OnlineId,Title=fresh.Title,Year=fresh.Year>0?fresh.Year:item.Year,
             ImageUrl=fresh.ImageUrl??item.ImageUrl,OriginalTitle=fresh.OriginalTitle??item.OriginalTitle,
+            ImdbId=fresh.ImdbId??item.ImdbId,
             Description=fresh.Description??item.Description,
             Kinopoisk=fresh.Kinopoisk=="—"?item.Kinopoisk:fresh.Kinopoisk,
             Imdb=fresh.Imdb=="—"?item.Imdb:fresh.Imdb

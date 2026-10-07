@@ -116,7 +116,7 @@ public partial class MainWindow
         var toolbar=new DockPanel{Margin=new(0,compactHeight?6:0,8,8)};catalogToolbar=toolbar;
         if(!favoritesOnly)
         {
-            var refresh=ActionButton("","IconRefresh",()=>{onlineIndex.RetryNow();catalogPages.Clear();featuredRequests.Clear();featuredFallback.Clear();catalogRefreshRequested=true;liveKey="";Render();});refresh.ToolTip="Обновить каталог";System.Windows.Automation.AutomationProperties.SetName(refresh,"Обновить каталог");refresh.Padding=new(10);refresh.Margin=new(0);DockPanel.SetDock(refresh,Dock.Right);toolbar.Children.Add(refresh);
+            var refresh=ActionButton("","IconRefresh",()=>{onlineIndex.RetryNow();catalogPages.Clear();featuredRequests.Clear();featuredFallback.Clear();catalogRefreshRequested=true;liveKey="";Render();});catalogRefreshButton=refresh;refresh.ToolTip="Обновить каталог";System.Windows.Automation.AutomationProperties.SetName(refresh,"Обновить каталог");refresh.Padding=new(10);refresh.Margin=new(0);DockPanel.SetDock(refresh,Dock.Right);toolbar.Children.Add(refresh);
         }
         var tabs=new WrapPanel();
         if(SearchActive)SearchTabs(tabs);

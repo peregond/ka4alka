@@ -141,6 +141,7 @@ public partial class MainWindow
             prefs.Light=false;ApplyTheme();Render();await Settle();Shot("catalog-dark");
             if(ActualWidth<1700||ActualHeight<900||FiltersPanel.Visibility!=Visibility.Visible||inlineCatalogFilterScroll?.Parent!=FilterControls||discoveryHero is not {ActualHeight:>180}||discoveryHero.Children.Count!=2||discoveryShelf is not {ActualWidth:>500})throw new Exception($"Cinematic desktop catalog is missing its banners, curated row or right filters ({ActualWidth}x{ActualHeight}, rail={FiltersPanel.Visibility}, hero={discoveryHero?.ActualHeight}, shelf={discoveryShelf?.ActualWidth}).");
             if(VisualElements<UIElement>(Body).Any(x=>x.Effect!=null))throw new Exception("Cinematic catalog adds an expensive blur or shadow effect.");
+            var featurePosterWidths=VisualElements<Image>(discoveryHero!).Select(x=>(x.Source as BitmapSource)?.PixelWidth??0).ToArray();
             var preview=liveItems.FirstOrDefault(x=>x.ImageUrl!=null)?.ImageUrl;
             var movie=new MediaItem(-987654320,"За пределами тишины: невероятное путешествие через время, которое начинается с одного случайного письма","Фильмы","Приключения · Драма",2026,"8,7","8,5","#526B69")
             {
@@ -253,7 +254,7 @@ public partial class MainWindow
             File.WriteAllText(Path.Combine(output,"design.json"),JsonSerializer.Serialize(new
             {
                 CatalogFallback=designCatalogFallback,CatalogCacheFile=designCatalogFile,CatalogCount=liveItems.Count,CachedPosters=designCachedPosters,CatalogColumns=catalogColumnsLight,
-                ExternalSourcesRequired=false,FixtureHasCachedPoster=preview!=null,FilterPersistedAfterRender=true,FilterPersistedAfterResize=true,DownloadStarted=false,EngineCreated=downloads.EngineCreated,
+                ExternalSourcesRequired=false,FixtureHasCachedPoster=preview!=null,FeaturePosterWidths=featurePosterWidths,FilterPersistedAfterRender=true,FilterPersistedAfterResize=true,DownloadStarted=false,EngineCreated=downloads.EngineCreated,
                 ShortDescriptionLength=shortDescription.Length,ShortDescriptionExpanded=true,ShortDescriptionExpandedHeight=shortDescriptionExpandedHeight,SeriesSeasonFilter=true,
                 DownloadTelemetryFitsNarrowWindow=true,DownloadTextFollowsTheme=true,
                 SearchAndSettings=searchSettings,

@@ -48,6 +48,7 @@ if(args.Contains("--probe-public"))
 DownloadTests.Run();
 DownloadFolderTests.Run();
 ReleaseQualityTests.Run();
+FeaturePosterTests.Run();
 AdditionalSourceTests.Run();
 await DownloadOrderingTests.Run();
 await CatalogBatchTests.Run();
