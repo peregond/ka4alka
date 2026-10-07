@@ -45,6 +45,7 @@ if(args.Contains("--probe-public"))
  return;
 }
 DownloadTests.Run();
+DownloadFolderTests.Run();
 ReleaseQualityTests.Run();
 AdditionalSourceTests.Run();
 await DownloadOrderingTests.Run();

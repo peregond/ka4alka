@@ -68,7 +68,8 @@ public partial class MainWindow
             resume.IsChecked=!initialResume;resume.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
             Check(Preferences.Load().AutoResumeDownloads==!initialResume,"Resume preference did not persist.");
             var folder=Path.Combine(output,"configured-folder");Directory.CreateDirectory(folder);SetDownloadFolder(folder);Render();await Settle();
-            Check(FindVisual<TextBlock>(Body,t=>t.Name=="SettingsFolder")?.Text==folder&&Preferences.Load().Folder==folder,"Settings did not show saved download folder.");
+            var actualFolder=Path.Combine(folder,"Ka4alka");
+            Check(Directory.Exists(actualFolder)&&FindVisual<TextBlock>(Body,t=>t.Name=="SettingsFolder")?.Text==actualFolder&&Preferences.Load().Folder==actualFolder,"Settings did not create and show saved Ka4alka download folder.");
             Width=Math.Min(1220,MaxWidth-24);Height=Math.Min(900,MaxHeight-24);await Settle();Shot("settings-light");
             var dark=FindVisual<Button>(Body,b=>AutomationProperties.GetName(b)=="Тёмная тема")??throw new Exception("Dark theme action missing.");
             dark.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await Settle();Shot("settings-dark");

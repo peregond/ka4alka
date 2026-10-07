@@ -61,7 +61,7 @@ public static class Catalog
 }
 public class Preferences
 {
-    public string Folder { get;set; }=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),"Downloads","Качалка");
+    public string Folder { get;set; }=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),"Downloads","Ka4alka");
     public bool FolderConfigured {get;set;}
     public bool Light {get;set;}
     public int MaxDownloadKbps {get;set;}

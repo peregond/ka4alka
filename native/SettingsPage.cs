@@ -50,12 +50,12 @@ public partial class MainWindow
             theme.SetResourceReference(Control.BorderBrushProperty,selected?"Accent":"Edge");
             AutomationProperties.SetName(theme,light?"Светлая тема":"Тёмная тема");themes.Children.Add(theme);
         }
-        var files=Card("Папка загрузок","Новые загрузки сохраняются сюда. У уже добавленных задач остаётся прежняя папка.");
+        var files=Card("Папка загрузок","В выбранной папке создаётся Ka4alka для новых загрузок. У уже добавленных задач остаётся прежняя папка.");
         var folder=Text(prefs.Folder,14);folder.Name="SettingsFolder";folder.Margin=new(0,0,0,14);files.Children.Add(folder);
         var folderActions=new WrapPanel();files.Children.Add(folderActions);
         folderActions.Children.Add(ActionButton("Изменить папку","IconSettings",()=>
         {
-            var picker=new OpenFolderDialog{Title="Папка для новых загрузок",InitialDirectory=Directory.Exists(prefs.Folder)?prefs.Folder:Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)};
+            var picker=new OpenFolderDialog{Title="Выберите папку — внутри будет создана Ka4alka для загрузок",InitialDirectory=Directory.Exists(prefs.Folder)?prefs.Folder:Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)};
             if(picker.ShowDialog(this)!=true)return;
             try{SetDownloadFolder(picker.FolderName);folder.Text=prefs.Folder;Status.Text="Папка загрузок сохранена.";}
             catch(Exception error){Status.Text="Не удалось сохранить папку: "+error.Message;}

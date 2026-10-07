@@ -23,7 +23,8 @@ public partial class MainWindow
     }
     public async Task EndToEndSmokeTest(string output)
     {
-        Directory.CreateDirectory(output);prefs.Folder=Path.Combine(output,"download");Directory.CreateDirectory(prefs.Folder);prefs.FolderConfigured=true;
+        Directory.CreateDirectory(output);var selectedFolder=Path.GetFullPath(Path.Combine(output,"download"));Directory.CreateDirectory(selectedFolder);SetDownloadFolder(selectedFolder);
+        if(prefs.Folder!=Path.Combine(selectedFolder,"Ka4alka")||Preferences.Load().Folder!=prefs.Folder||!EnsureDownloadFolder())throw new Exception("Selected parent did not create and persist the Ka4alka download folder.");
         var payload=Path.Combine(output,"test-film.bin");await File.WriteAllBytesAsync(payload,Enumerable.Range(0,256*1024).Select(x=>(byte)(x%251)).ToArray());
         var torrentPath=Path.Combine(output,"test-film.torrent");await new TorrentCreator().CreateAsync(new TorrentFileSource(payload),torrentPath);
         var bytes=await File.ReadAllBytesAsync(torrentPath);
