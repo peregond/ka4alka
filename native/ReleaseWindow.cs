@@ -8,7 +8,7 @@ public partial class MainWindow
     sealed class ReleasePickerState
     {
         public Dictionary<string,string> Filters {get;}=[];
-        public string Sort {get;set;}="Больше сидов";
+        public string Sort {get;set;}="Сначала русские источники";
         public bool More {get;set;}
         public HashSet<string> Expanded {get;}=[];
         public int VisibleCount {get;set;}=60;
@@ -17,6 +17,7 @@ public partial class MainWindow
 
     static int QualityRank(SourceEntry entry)=>entry.Quality switch{"4K"=>3,"Full HD"=>2,"HD Ready"=>1,_=>0};
     static int SeedRank(SourceEntry entry)=>entry.Seeds switch{>0=>entry.Seeds.Value,null=>0,_=>-1};
+    static bool RussianSource(SourceEntry entry)=>entry.Source is "RuTor" or "RuTracker" or "NNM-Club" or "MegaPeer" or "BigFanGroup";
     static string VideoLabel(SourceEntry entry)
     {
         var parts=new[]{entry.Type,entry.Codec,entry.Hdr}.Where(x=>x!="Не указано").ToArray();
@@ -31,6 +32,7 @@ public partial class MainWindow
             if(releasePickerStates.Count>=40)releasePickerStates.Remove(releasePickerStates.Keys.First());
             state=new();releasePickerStates[filmId]=state;
         }
+        panel.Children.Add(QualityControls(()=>{state.VisibleCount=60;RefreshDetail(filmId);}));
         var controls=new WrapPanel{Margin=new(0,4,0,0)};panel.Children.Add(controls);
         var more=new WrapPanel{Visibility=state.More?Visibility.Visible:Visibility.Collapsed,Margin=new(0,0,0,2)};panel.Children.Add(more);
         var filters=new Dictionary<string,ComboBox>();
@@ -57,7 +59,7 @@ public partial class MainWindow
         Filter("HDR",releases.Select(x=>x.Hdr),true);
         var sortField=new StackPanel{Width=176};
         var sortCaption=Text("Сортировка",11,true);sortCaption.Margin=new(0,0,0,4);sortField.Children.Add(sortCaption);
-        var sorts=new[]{"Больше сидов","Меньше размер","Выше качество","По названию","По видео","По субтитрам","По озвучке"}.Concat(isSeries?["По сезону и серии"]:[]).ToArray();
+        var sorts=new[]{"Сначала русские источники","Больше сидов","Меньше размер","Выше качество","По названию","По видео","По субтитрам","По озвучке"}.Concat(isSeries?["По сезону и серии"]:[]).ToArray();
         var sort=new ComboBox{ItemsSource=sorts,SelectedItem=state.Sort,MinWidth=0,Margin=new(0,0,10,12)};
         if(sort.SelectedIndex<0)sort.SelectedIndex=0;
         AutomationProperties.SetName(sort,"Сортировка раздач");
@@ -76,12 +78,12 @@ public partial class MainWindow
             var additional=new[]{"Источник","Тип","Кодек","HDR"}.Count(x=>filters[x].SelectedItem?.ToString()!="Все");
             toggle.Content=state.More?"Скрыть дополнительные фильтры":"Ещё фильтры"+(additional>0?$" · {additional}":"");
             AutomationProperties.SetName(toggle,state.More?"Скрыть дополнительные фильтры раздач":"Показать дополнительные фильтры раздач");
-            reset.Visibility=filters.Values.Any(x=>x.SelectedItem?.ToString()!="Все")||sort.SelectedIndex!=0?Visibility.Visible:Visibility.Collapsed;
+            reset.Visibility=prefs.HidePoorQuality||filters.Values.Any(x=>x.SelectedItem?.ToString()!="Все")||sort.SelectedIndex!=0?Visibility.Visible:Visibility.Collapsed;
         }
         void SaveSelection()
         {
             foreach(var pair in filters)state.Filters[pair.Key]=pair.Value.SelectedItem?.ToString()??"Все";
-            state.Sort=sort.SelectedItem?.ToString()??"Больше сидов";
+            state.Sort=sort.SelectedItem?.ToString()??"Сначала русские источники";
         }
         Grid RowGrid()
         {
@@ -107,6 +109,7 @@ public partial class MainWindow
             var title=Text(entry.Title,14);title.FontWeight=FontWeights.SemiBold;title.Margin=new(0,0,0,8);body.Children.Add(title);
             var source=Text(entry.Source+(entry.Via==null?"":" · через "+entry.Via),11,true);source.Margin=new(0,0,0,12);body.Children.Add(source);
             var summary=new WrapPanel{Margin=new(0,0,0,8)};
+            if(ReleaseQuality.Poor(entry,QualityMinimum))summary.Children.Add(PoorQualityBadge());
             void Badge(string value,bool accent=false)
             {
                 var text=new TextBlock{Text=value,FontSize=11,FontWeight=accent?FontWeights.SemiBold:FontWeights.Normal};
@@ -143,13 +146,14 @@ public partial class MainWindow
         {
             SaveSelection();UpdateActions();results.Children.Clear();
             IEnumerable<SourceEntry> filtered=releases;
+            if(prefs.HidePoorQuality)filtered=filtered.Where(x=>!ReleaseQuality.Poor(x,QualityMinimum));
             foreach(var key in new[]{"Источник","Сезон","Серия","Качество","Тип","Озвучка","Субтитры","Кодек","HDR"})
             {
                 if(!filters.ContainsKey(key))continue;
                 var value=state.Filters[key];if(value=="Все")continue;
                 filtered=key switch{"Источник"=>filtered.Where(x=>x.Source==value),"Сезон"=>filtered.Where(x=>x.Series.SeasonLabel==value),"Серия"=>filtered.Where(x=>x.Series.EpisodeLabel==value),"Качество"=>filtered.Where(x=>x.Quality==value),"Тип"=>filtered.Where(x=>x.Type==value),"Озвучка"=>filtered.Where(x=>x.Voice==value),"Субтитры"=>filtered.Where(x=>x.Subs==value),"Кодек"=>filtered.Where(x=>x.Codec==value),_=>filtered.Where(x=>x.Hdr==value)};
             }
-            filtered=state.Sort switch{"Меньше размер"=>filtered.OrderBy(x=>x.Size??long.MaxValue),"Выше качество"=>filtered.OrderByDescending(QualityRank).ThenByDescending(SeedRank),"По названию"=>filtered.OrderBy(x=>x.Title,StringComparer.CurrentCultureIgnoreCase),"По сезону и серии"=>filtered.OrderBy(x=>x.Series.Season??int.MaxValue).ThenBy(x=>x.Series.Episode??int.MaxValue),"По видео"=>filtered.OrderBy(x=>x.Type=="Не указано").ThenBy(x=>x.Type),"По субтитрам"=>filtered.OrderBy(x=>x.Subs=="Не указано").ThenBy(x=>x.Subs),"По озвучке"=>filtered.OrderBy(x=>x.Voice=="Не указано").ThenBy(x=>x.Voice),_=>filtered.OrderByDescending(SeedRank)};
+            filtered=state.Sort switch{"Сначала русские источники"=>filtered.OrderByDescending(RussianSource).ThenByDescending(SeedRank),"Меньше размер"=>filtered.OrderBy(x=>x.Size??long.MaxValue),"Выше качество"=>filtered.OrderByDescending(QualityRank).ThenByDescending(SeedRank),"По названию"=>filtered.OrderBy(x=>x.Title,StringComparer.CurrentCultureIgnoreCase),"По сезону и серии"=>filtered.OrderBy(x=>x.Series.Season??int.MaxValue).ThenBy(x=>x.Series.Episode??int.MaxValue),"По видео"=>filtered.OrderBy(x=>x.Type=="Не указано").ThenBy(x=>x.Type),"По субтитрам"=>filtered.OrderBy(x=>x.Subs=="Не указано").ThenBy(x=>x.Subs),"По озвучке"=>filtered.OrderBy(x=>x.Voice=="Не указано").ThenBy(x=>x.Voice),_=>filtered.OrderByDescending(SeedRank)};
             var visible=filtered.ToArray();var displayed=visible.Take(state.VisibleCount).ToArray();
             var countLabel=displayed.Length<visible.Length?$"Показано {displayed.Length} из {visible.Length}":visible.Length<releases.Count?$"Вариантов: {visible.Length} из {releases.Count}":$"Вариантов: {visible.Length}";
             var count=Text(countLabel,12,true);count.Margin=new(0,0,0,12);results.Children.Add(count);
@@ -190,6 +194,7 @@ public partial class MainWindow
                 var title=Text(entry.Title,12);title.FontWeight=FontWeights.Medium;title.Margin=new(0,0,0,4);title.ToolTip=entry.Title;identity.Children.Add(title);
                 if(isSeries){var episode=Text(entry.Series.SeasonLabel+" · "+entry.Series.EpisodeLabel,11,true);episode.Margin=new(0,0,0,4);identity.Children.Add(episode);}
                 var source=Text(entry.Source+(entry.Via==null?"":" · через "+entry.Via),11,true);source.Margin=new(0);identity.Children.Add(source);row.Children.Add(identity);
+                if(ReleaseQuality.Poor(entry,QualityMinimum))identity.Children.Add(PoorQualityBadge());
                 row.Children.Add(Cell(entry.Seeds?.ToString()??"—",1));var quality=Cell(entry.Quality,2);quality.FontWeight=FontWeights.SemiBold;row.Children.Add(quality);
                 row.Children.Add(Cell(VideoLabel(entry),3,true));row.Children.Add(Cell(entry.Subs,4,true));row.Children.Add(Cell(entry.Voice,5));
                 row.Children.Add(Cell(entry.Size.HasValue?DownloadService.FormatBytes(entry.Size.Value):"—",6));
@@ -202,7 +207,7 @@ public partial class MainWindow
         foreach(var box in filters.Values)box.SelectionChanged+=(_,_)=>{if(!changingFilters){state.VisibleCount=60;Show();}};
         sort.SelectionChanged+=(_,_)=>{if(!changingFilters){state.VisibleCount=60;Show();}};
         toggle.Click+=(_,_)=>{state.More=!state.More;more.Visibility=state.More?Visibility.Visible:Visibility.Collapsed;UpdateActions();};
-        reset.Click+=(_,_)=>{changingFilters=true;foreach(var box in filters.Values)box.SelectedIndex=0;sort.SelectedIndex=0;changingFilters=false;state.VisibleCount=60;Show();};
+        reset.Click+=(_,_)=>{changingFilters=true;foreach(var box in filters.Values)box.SelectedIndex=0;sort.SelectedIndex=0;changingFilters=false;state.VisibleCount=60;prefs.HidePoorQuality=false;prefs.Save();SaveSelection();Render();};
         panel.SizeChanged+=(_,_)=>{var next=Body.ActualWidth<1000;if(next==compact)return;compact=next;Show();};
         Show();
     }

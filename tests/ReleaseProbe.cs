@@ -4,6 +4,14 @@ static class ReleaseProbe
     public static async Task AffectedFilms()
     {
         using var client=new SourceClient();
+        foreach(var media in new[]{new MediaItem(-101,"Интерстеллар","Фильмы","",2014,"—","—","#526B69"){OriginalTitle="Interstellar"},new MediaItem(-102,"Южный парк","Сериалы","",1997,"—","—","#526B69"){OriginalTitle="South Park"}})
+        {
+            var native=NativeReleaseSources.Create(client,media).Where(x=>x.Name is "BigFanGroup" or "The Pirate Bay");
+            var scan=await ReleaseSearch.RunAsync(native,ct:CancellationToken.None);
+            foreach(var source in scan.Sources){Console.WriteLine($"PROBE media={media.Title}; source={source.Name}; state={source.State}; releases={source.Count}");if(source.State!=SourceState.Ready)throw new Exception("New public source did not return actual matched video releases: "+source.Name+" / "+media.Title);}
+            var torrent=scan.Items.First(x=>x.Source=="BigFanGroup");var path=await client.TorrentFile(torrent,CancellationToken.None);
+            Console.WriteLine($"PROBE validated public BigFanGroup torrent for {media.Title}: {new System.IO.FileInfo(path).Length} bytes");
+        }
         foreach(var title in new[]{"До последнего грамма","Объект преступления"})
         {
             var film=BundledCatalog.Search("Фильмы",title).Single(item=>item.Title==title);
