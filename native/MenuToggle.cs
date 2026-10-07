@@ -8,15 +8,21 @@ public partial class MainWindow
     static void AttachMenuToggle(Button owner,ContextMenu menu)
     {
         owner.ContextMenu=menu;
-        owner.Click+=(_,_)=>menu.IsOpen=!menu.IsOpen;
-        // A popup captures the mouse. Consume a second press on its owner before
-        // WPF dismisses the popup and forwards that press as a fresh button click.
-        menu.AddHandler(Mouse.PreviewMouseDownOutsideCapturedElementEvent,new MouseButtonEventHandler((_,e)=>
+        bool ownerDismissed=false;
+        // WPF releases the popup's capture and closes it on mouse-down before
+        // the underlying Button.Click arrives on mouse-up. Remember that exact
+        // dismissal instead of treating the later click as a request to reopen.
+        menu.Closed+=(_,_)=>
         {
-            if(e.ChangedButton!=MouseButton.Left||!menu.IsOpen)return;
             var point=Mouse.GetPosition(owner);
-            if(!new Rect(0,0,owner.ActualWidth,owner.ActualHeight).Contains(point))return;
-            e.Handled=true;menu.IsOpen=false;
-        }),true);
+            ownerDismissed=Mouse.LeftButton==MouseButtonState.Pressed&&new Rect(0,0,owner.ActualWidth,owner.ActualHeight).Contains(point);
+        };
+        owner.Click+=(_,_)=>
+        {
+            if(ownerDismissed){ownerDismissed=false;return;}
+            menu.IsOpen=!menu.IsOpen;
+        };
+        owner.PreviewKeyDown+=(_,_)=>ownerDismissed=false;
+        owner.MouseLeave+=(_,_)=>{if(Mouse.LeftButton==MouseButtonState.Released)ownerDismissed=false;};
     }
 }
