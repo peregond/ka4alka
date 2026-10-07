@@ -1,5 +1,7 @@
 using System.IO;
+using System.ComponentModel;
 using System.Net.Http;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
@@ -13,6 +15,16 @@ public partial class MainWindow
     CancellationTokenSource? sourceRequest;
     readonly SemaphoreSlim coverSlots=new(2);
     readonly Dictionary<string,BitmapImage> coverCache=[];
+    readonly ConditionalWeakTable<Image,CoverRequest> coverRequests=new();
+    sealed class CoverRequest
+    {
+        public DownloadItem? Subject;
+        public EventHandler<PropertyChangedEventArgs>? Changed;
+        public object? Context;
+        public string? Url;
+        public CancellationTokenSource? Request;
+        public DateTime RetryAfterUtc;
+    }
     int savedCovers;
     IReadOnlyList<SourceEntry> sourceResults=[];
     string sourceQuery="",sourceCategory="Фильмы";
@@ -46,37 +58,82 @@ public partial class MainWindow
     }
     async void SourceDownload(object sender,RoutedEventArgs e)
     {
-        var button=(Button)sender;var item=(SourceEntry)button.Tag;var media=current?.Cinema==true?current:null;button.IsEnabled=false;
+        var button=(Button)sender;var item=(SourceEntry)button.Tag;var media=current?.Cinema==true?current:null;
+        if(media!=null)media=DownloadMetadata.EnrichMedia(media,prefs.LiveFavorites.Concat(liveItems).Concat(catalogIndex.Recent(media.Section,200)).Append(media));
+        button.IsEnabled=false;
         try{if(!EnsureDownloadFolder()){Status.Text="Папка для загрузок не выбрана. Её можно выбрать в настройках.";return;}
             Status.Text="Проверяем раздачу…";using var timeout=new CancellationTokenSource(TimeSpan.FromSeconds(30));var source=await sourceClient.TorrentFile(item,timeout.Token);
-            await downloads.Add(source,prefs.Folder,media,item.ImageUrl);section="Загрузки";current=null;Render();Status.Text=item.Seeds==0?"Раздача добавлена, но источник показывает 0 сидов. Ждём участников.":"Раздача добавлена. Ищем участников.";
+            if(media!=null&&cardMetadata.TryGetValue(media.Id,out var metadata)&&metadata.IsCompletedSuccessfully)media=DownloadMetadata.EnrichMedia(media,[metadata.Result]);
+            await downloads.Add(source,prefs.Folder,media,item.ImageUrl,item);section="Загрузки";current=null;Render();Status.Text=item.Seeds==0?"Раздача добавлена, но источник показывает 0 сидов. Ждём участников.":"Раздача добавлена. Ищем участников.";
         }catch(Exception error){var message=error is HttpRequestException?"Не удалось получить раздачу из источника.":error.Message;Status.Text=message;MessageBox.Show(this,message,"Не удалось начать загрузку",MessageBoxButton.OK,MessageBoxImage.Warning);}finally{button.IsEnabled=true;}
     }
     void SourcePage(object sender,RoutedEventArgs e){var item=(SourceEntry)((Button)sender).Tag;if(string.IsNullOrEmpty(item.PageUrl))return;System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(SourceClient.WebUri(item.PageUrl).AbsoluteUri){UseShellExecute=true});}
     async void SourceCover(object sender,RoutedEventArgs e)
     {
-        var image=(Image)sender;var item=image.DataContext;var url=item is SourceEntry entry?entry.ImageUrl:item is MediaItem media?media.ImageUrl:item is DownloadItem download?download.ImageUrl:null;if(item is MediaItem card&&card.IsLive)_=UpdateCardRatings(card);if(string.IsNullOrEmpty(url))return;
+        var image=(Image)sender;var state=ObserveDownloadCover(image);var item=image.DataContext;var url=CoverUrl(item);
+        if(item is MediaItem card&&card.IsLive)_=UpdateCardRatings(card);
+        if(string.IsNullOrWhiteSpace(url))
+        {
+            CancelCover(state);state.Context=item;state.Url=null;state.RetryAfterUtc=default;image.Source=null;return;
+        }
+        var same=ReferenceEquals(state.Context,item)&&state.Url==url;
+        if(same&&(state.Request!=null||image.Source!=null||DateTime.UtcNow<state.RetryAfterUtc))return;
+        CancelCover(state);state.Context=item;state.Url=url;state.RetryAfterUtc=default;
+        if(!same)image.Source=null;
         if(coverCache.TryGetValue(url,out var cached)){image.Source=cached;return;}
-        var token=item is MediaItem or DownloadItem?CancellationToken.None:sourceRequest?.Token??CancellationToken.None;
+        var sourceToken=item is MediaItem or DownloadItem?CancellationToken.None:sourceRequest?.Token??CancellationToken.None;
+        var request=state.Request=CancellationTokenSource.CreateLinkedTokenSource(sourceToken);request.CancelAfter(TimeSpan.FromSeconds(30));var token=request.Token;
         try
         {
             await coverSlots.WaitAsync(token);
             try
             {
-                if(!image.IsLoaded)return;
+                if(!image.IsLoaded||!ReferenceEquals(image.DataContext,item)||CoverUrl(image.DataContext)!=url)return;
                 var cachePath=item is MediaItem or DownloadItem?Path.Combine(Preferences.DataDir,"covers",Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(url)))+".img"):null;
                 var (bitmap,downloaded)=await CoverCache.Load(cachePath,1024*1024,
                     ct=>sourceClient.Read(SourceClient.WebUri(url),1024*1024,ct),
                     bytes=>{using var stream=new MemoryStream(bytes);var result=new BitmapImage();result.BeginInit();result.CacheOption=BitmapCacheOption.OnLoad;result.DecodePixelWidth=item is MediaItem or DownloadItem?280:100;result.StreamSource=stream;result.EndInit();result.Freeze();return result;},token);
                 if(coverCache.Count>=48)coverCache.Remove(coverCache.Keys.First());coverCache[url]=bitmap;
-                if(ReferenceEquals(image.DataContext,item))image.Source=bitmap;
+                if(image.IsLoaded&&ReferenceEquals(image.DataContext,item)&&CoverUrl(image.DataContext)==url&&ReferenceEquals(state.Request,request))image.Source=bitmap;
                 if(downloaded&&cachePath!=null)try{if(++savedCovers%20==0)foreach(var old in new DirectoryInfo(Path.GetDirectoryName(cachePath)!).GetFiles("*.img").OrderByDescending(x=>x.LastWriteTimeUtc).Skip(200))old.Delete();}catch(IOException){}catch(UnauthorizedAccessException){}
             }
             finally{coverSlots.Release();}
         }
-        catch{ /* Keep the native placeholder when a cover cannot be loaded. */ }
+        catch{if(ReferenceEquals(state.Request,request))state.RetryAfterUtc=DateTime.UtcNow.AddMinutes(2);}
+        finally{if(ReferenceEquals(state.Request,request))state.Request=null;request.Dispose();}
     }
-    void SourceCoverChanged(object sender,DependencyPropertyChangedEventArgs e){var image=(Image)sender;image.Source=null;if(image.IsLoaded)SourceCover(image,new RoutedEventArgs());}
+    static string? CoverUrl(object? item)=>item switch{SourceEntry source=>source.ImageUrl,MediaItem media=>media.ImageUrl,DownloadItem download=>download.ImageUrl,_=>null};
+    static void CancelCover(CoverRequest state){var request=state.Request;state.Request=null;request?.Cancel();}
+    CoverRequest ObserveDownloadCover(Image image)
+    {
+        var state=coverRequests.GetValue(image,key=>
+        {
+            var created=new CoverRequest();
+            created.Changed=(sender,args)=>
+            {
+                if((args.PropertyName is null or "" or nameof(DownloadItem.ImageUrl))&&key.IsLoaded&&ReferenceEquals(key.DataContext,sender))SourceCover(key,new RoutedEventArgs());
+            };
+            key.Unloaded+=(_,_)=>
+            {
+                if(created.Subject!=null)PropertyChangedEventManager.RemoveHandler(created.Subject,created.Changed!,string.Empty);
+                created.Subject=null;CancelCover(created);
+            };
+            return created;
+        });
+        var subject=image.DataContext as DownloadItem;
+        if(!ReferenceEquals(state.Subject,subject))
+        {
+            if(state.Subject!=null)PropertyChangedEventManager.RemoveHandler(state.Subject,state.Changed!,string.Empty);
+            state.Subject=subject;
+            if(subject!=null)PropertyChangedEventManager.AddHandler(subject,state.Changed!,string.Empty);
+        }
+        return state;
+    }
+    void SourceCoverChanged(object sender,DependencyPropertyChangedEventArgs e)
+    {
+        var image=(Image)sender;var state=ObserveDownloadCover(image);CancelCover(state);state.Context=null;state.Url=null;state.RetryAfterUtc=default;image.Source=null;
+        if(image.IsLoaded)SourceCover(image,new RoutedEventArgs());
+    }
     void AddIndexer()
     {
         var w=new Window{Title="Torznab-источник",Owner=this,Width=560,SizeToContent=SizeToContent.Height,WindowStartupLocation=WindowStartupLocation.CenterOwner};var p=new StackPanel{Margin=new(24)};w.Content=p;

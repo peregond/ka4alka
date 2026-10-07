@@ -15,14 +15,14 @@ public partial class MainWindow
     Button? downloadControls,downloadOrder;
     string downloadSort="newest";
     bool downloadCommandBusy;
+    bool downloadMetadataBusy,downloadMetadataSortPending;
+    string downloadMetadataFingerprint="";
     readonly List<ContextMenu> downloadMenus=[];
     static readonly (string Key,string Label,DownloadSort Sort)[] DownloadSortChoices=[("newest","Сначала новые",DownloadSort.Newest),("name","По названию",DownloadSort.Name),("speed","По скорости",DownloadSort.Speed),("size","По размеру",DownloadSort.Size),("progress","По готовности",DownloadSort.Progress)];
     void RenderDownloads()
     {
         downloads.Update();downloadMenus.Clear();
-        var known=prefs.LiveFavorites.Concat(catalogIndex.Recent("Фильмы",200)).Concat(catalogIndex.Recent("Сериалы",200)).Concat(Catalog.Items).ToArray();
-        var associated=false;foreach(var item in downloads.Items)associated|=DownloadOrdering.AssociateMedia(item,known);
-        if(associated)try{downloads.Save();}catch(Exception error){Status.Text="Не удалось сохранить обложки: "+error.Message;}
+        RepairDownloadMetadata();
         downloadSort=DownloadSortChoices.Any(x=>x.Key==prefs.DownloadSort)?prefs.DownloadSort:"newest";
         var heading=new DockPanel{Margin=new(0,0,8,8)};
         var title=Text("Очередь",25);downloadHeading=title;title.FontWeight=FontWeights.SemiBold;title.Margin=new(0);heading.Children.Add(title);PageHeader.Children.Add(heading);
@@ -84,13 +84,40 @@ public partial class MainWindow
     }
     void RefreshDownloadView()
     {
-        if(section!="Загрузки"||downloadView==null)return;UpdateDownloadSummary();
-        if(downloadSort is not ("speed" or "progress" or "size"))return;
+        if(section!="Загрузки"||downloadView==null)return;RepairDownloadMetadata();UpdateDownloadSummary();
+        if(downloadSort is not ("speed" or "progress" or "size")&&!(downloadSort=="name"&&downloadMetadataSortPending))return;
         // Keep the row under the pointer stable while the user chooses an action.
         if(downloadList?.IsMouseOver==true||downloadList?.IsKeyboardFocusWithin==true||downloadMenus.Any(menu=>menu.IsOpen))return;
         var order=DownloadSortChoices.First(x=>x.Key==downloadSort).Sort;
-        if(downloadView.Cast<DownloadItem>().Select(x=>x.Id).SequenceEqual(DownloadOrdering.Sort(downloads.Items,order).Select(x=>x.Id)))return;
+        if(downloadView.Cast<DownloadItem>().Select(x=>x.Id).SequenceEqual(DownloadOrdering.Sort(downloads.Items,order).Select(x=>x.Id))){downloadMetadataSortPending=false;return;}
         var selected=downloadList?.SelectedItem;downloadView.Refresh();if(downloadList!=null&&selected!=null)downloadList.SelectedItem=selected;
+        downloadMetadataSortPending=false;
+    }
+    async void RepairDownloadMetadata()
+    {
+        if(closed||downloadMetadataBusy||downloads.Items.Count==0)return;
+        // Retry when a magnet learns its real name or the local catalog gains
+        // metadata, rather than rereading the persisted indexes every tick.
+        var known=prefs.LiveFavorites.Concat(catalogIndex.Recent("Фильмы",200)).Concat(catalogIndex.Recent("Сериалы",200)).Concat(Catalog.Items).ToArray();
+        var identity=System.Text.Json.JsonSerializer.Serialize(new
+        {
+            CatalogRevision=catalogIndex.Revision,
+            Queue=downloads.Items.Select(item=>new{item.Id,item.Name,item.InfoHash,item.MediaTitle,item.MediaSection,item.MediaYear,item.ImageUrl,item.MediaPageUrl,item.ReleaseTitle,item.ReleaseId,item.ReleaseSource,item.ReleasePageUrl,item.ReleaseUrl}),
+            Catalog=known.Select(item=>new{item.Id,item.Title,item.OriginalTitle,item.Year,item.Section,item.ImageUrl,item.PageUrl})
+        });
+        var fingerprint=Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(identity)));
+        if(downloadMetadataFingerprint==fingerprint)return;
+        downloadMetadataFingerprint=fingerprint;downloadMetadataBusy=true;
+        try
+        {
+            if(await DownloadMetadata.RepairAsync(downloads,known,updateCancellation.Token)>0&&!closed)
+            {
+                downloadMetadataSortPending=true;RefreshDownloadView();
+            }
+        }
+        catch(OperationCanceledException)when(closed||updateCancellation.IsCancellationRequested){}
+        catch(Exception error){if(!closed)Status.Text="Не удалось восстановить обложки: "+error.Message;}
+        finally{downloadMetadataBusy=false;}
     }
     ContextMenu Menu()
     {
@@ -103,20 +130,6 @@ public partial class MainWindow
         return entry;
     }
     void OpenDownloadMenu(Button button){var menu=button.ContextMenu;if(menu==null)return;menu.PlacementTarget=button;menu.IsOpen=true;}
-    void DownloadActions(object sender,RoutedEventArgs e)
-    {
-        var button=(Button)sender;var item=(DownloadItem)button.Tag;
-        if(button.ContextMenu is {} old)downloadMenus.Remove(old);
-        var menu=Menu();button.ContextMenu=menu;
-        var remove=MenuEntry("Удалить из загрузок","IconQueueRemove");remove.Tag=item;DisableBusy(remove,item);remove.SetResourceReference(Control.ForegroundProperty,"Muted");remove.ToolTip="Удалить из очереди, сохранив скачанные файлы";remove.Click+=RemoveDownload;menu.Items.Add(remove);
-        var delete=MenuEntry("Удалить файлы","IconTrash");delete.Tag=item;DisableBusy(delete,item);delete.SetResourceReference(Control.ForegroundProperty,"Danger");delete.ToolTip="Удалить загрузку вместе со скачанными и частичными файлами";delete.Click+=DeleteDownloadFiles;menu.Items.Add(delete);
-        OpenDownloadMenu(button);
-    }
-    void DisableBusy(MenuItem action,DownloadItem item)
-    {
-        var style=new Style(typeof(MenuItem),(Style)FindResource(typeof(MenuItem)));
-        var busy=new DataTrigger{Binding=new Binding("Busy"){Source=item},Value=true};busy.Setters.Add(new Setter(UIElement.IsEnabledProperty,false));style.Triggers.Add(busy);action.Style=style;
-    }
     void DownloadLimits()
     {
         var dialog=new Window{Title="Лимиты скорости",Owner=this,Width=Math.Min(440,Math.Max(320,ActualWidth-32)),MaxHeight=Math.Max(260,SystemParameters.WorkArea.Height-40),SizeToContent=SizeToContent.Height,WindowStartupLocation=WindowStartupLocation.CenterOwner,ResizeMode=ResizeMode.NoResize};

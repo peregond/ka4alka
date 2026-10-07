@@ -1,9 +1,36 @@
 using System.IO;
+using System.Windows;
+using System.Windows.Automation;
+using System.Windows.Controls;
 
 namespace Kachalka;
 
 public partial class MainWindow
 {
+    Border? releaseLoadingIndicator;
+    int releaseLoadingItemId;
+
+    void RenderReleaseLoading(StackPanel target,MediaItem item)
+    {
+        releaseLoadingItemId=item.Id;
+        var content=new StackPanel();
+        var label=Text("Ищем раздачи…",13);label.FontWeight=FontWeights.SemiBold;label.Margin=new(0,0,0,7);
+        label.SetResourceReference(TextBlock.ForegroundProperty,"Accent");content.Children.Add(label);
+        var progress=new ProgressBar{IsIndeterminate=true,Height=5,BorderThickness=new(0)};
+        progress.SetResourceReference(Control.ForegroundProperty,"Accent");progress.SetResourceReference(Control.BackgroundProperty,"Edge");
+        AutomationProperties.SetName(progress,"Поиск раздач: прогресс");content.Children.Add(progress);
+        releaseLoadingIndicator=new Border{Child=content,Padding=new(12,10,12,10),CornerRadius=new(10),Margin=new(0,0,0,12),Visibility=Visibility.Collapsed};
+        releaseLoadingIndicator.SetResourceReference(Border.BackgroundProperty,"AccentSoft");
+        AutomationProperties.SetName(releaseLoadingIndicator,"Поиск раздач");target.Children.Add(releaseLoadingIndicator);
+        RefreshReleaseLoadingIndicator();
+    }
+    void RefreshReleaseLoadingIndicator()
+    {
+        if(releaseLoadingIndicator==null)return;
+        var checking=current?.IsLive==true&&current.Id==releaseLoadingItemId&&releaseViews.TryGetValue(current.Id,out var view)&&view.Checking;
+        releaseLoadingIndicator.Visibility=checking?Visibility.Visible:Visibility.Collapsed;
+    }
+
     async Task FetchDetails(MediaItem item)
     {
         if(!releaseViews.TryGetValue(item.Id,out var view))releaseViews[item.Id]=view=new();

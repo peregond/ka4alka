@@ -266,14 +266,15 @@ public partial class MainWindow
         descriptionToggle=Button(descriptionExpanded?"Свернуть описание":"Читать дальше",()=>{descriptionExpanded=!descriptionExpanded;Render();});descriptionToggle.Name="DescriptionToggle";descriptionToggle.Style=(Style)FindResource("QuietButton");descriptionToggle.HorizontalAlignment=HorizontalAlignment.Left;descriptionToggle.Padding=new(0,5,0,5);descriptionToggle.Margin=new(0);descriptionToggle.MinHeight=26;descriptionToggle.Visibility=Visibility.Collapsed;detailDescription.Children.Add(descriptionToggle);
         detailSynopsis.SizeChanged+=(sender,_)=>{if(ReferenceEquals(sender,detailSynopsis))UpdateDescriptionToggle();};
         var heroFrame=new Border{Child=detailHero,Background=(Brush)FindResource("Panel"),BorderBrush=(Brush)FindResource("Edge"),BorderThickness=new(1),CornerRadius=new(22),Padding=new(20),Margin=new(0,0,0,24)};panel.Children.Add(heroFrame);UpdateDetailLayout();
-        var releasesTitle=Text("Варианты загрузки",23);releasesTitle.FontWeight=FontWeights.SemiBold;releasesTitle.Margin=new(0,0,0,13);panel.Children.Add(releasesTitle);
+        var releasesTitle=Text("Раздачи",23);releasesTitle.FontWeight=FontWeights.SemiBold;releasesTitle.Margin=new(0,0,0,13);panel.Children.Add(releasesTitle);
+        RenderReleaseLoading(panel,item);
         RenderSourceStatus(panel,item);
-        if(!liveReleases.TryGetValue(item.Id,out var releases)){panel.Children.Add(Text("Ищем доступные раздачи…",13,true));return;}
-        if(releases.Count==0)
+        if(!liveReleases.TryGetValue(item.Id,out var releases)||releases.Count==0)
         {
             var checking=releaseViews.TryGetValue(item.Id,out var scan)&&scan.Checking;
-            var empty=new StackPanel{Margin=new(22)};var noReleases=Text(checking?"Ищем доступные раздачи…":"Подходящих раздач пока нет",17);noReleases.FontWeight=FontWeights.SemiBold;empty.Children.Add(noReleases);empty.Children.Add(Text(checking?"Варианты появятся по мере ответа источников.":"Можно повторить поиск позже или выбрать другую историю.",13,true));
-            if(!checking){var retry=ActionButton("Повторить поиск","IconRefresh",()=>RetryReleases(item));retry.HorizontalAlignment=HorizontalAlignment.Left;retry.Margin=new(0,6,0,0);empty.Children.Add(retry);}
+            if(checking)return;
+            var empty=new StackPanel{Margin=new(22)};var noReleases=Text("Подходящих раздач пока нет",17);noReleases.FontWeight=FontWeights.SemiBold;empty.Children.Add(noReleases);empty.Children.Add(Text("Можно повторить поиск позже или выбрать другую историю.",13,true));
+            var retry=ActionButton("Повторить поиск","IconRefresh",()=>RetryReleases(item));retry.HorizontalAlignment=HorizontalAlignment.Left;retry.Margin=new(0,6,0,0);empty.Children.Add(retry);
             panel.Children.Add(new Border{Child=empty,Background=(Brush)FindResource("Panel"),CornerRadius=new(18)});return;
         }
         RenderReleasePicker(panel,releases);

@@ -1,6 +1,4 @@
 using System.Globalization;
-using System.Text;
-using System.Text.RegularExpressions;
 
 namespace Kachalka;
 
@@ -64,22 +62,5 @@ public static class DownloadOrdering
         return true;
     }
 
-    // An exact catalog association can fill an old queue entry's missing poster.
-    // Do not infer a film from loose substring or torrent-tag matches: remakes
-    // and identically named series must keep their placeholder when ambiguous.
-    public static bool AssociateMedia(DownloadItem item,IEnumerable<MediaItem> catalog)
-    {
-        if(!string.IsNullOrWhiteSpace(item.ImageUrl))return false;
-        var title=Normalize(item.DisplayName);if(title.Length==0)return false;
-        var matches=catalog.Where(media=>media.Cinema&&
-            (string.IsNullOrWhiteSpace(item.MediaSection)||media.Section==item.MediaSection)&&
-            (Normalize(media.Title)==title||!string.IsNullOrWhiteSpace(media.OriginalTitle)&&Normalize(media.OriginalTitle)==title))
-            .GroupBy(media=>(media.Section,media.Year,Title:Normalize(media.Title),Original:Normalize(media.OriginalTitle??""))).ToArray();
-        if(matches.Length!=1)return false;
-        var match=matches[0].FirstOrDefault(media=>!string.IsNullOrWhiteSpace(media.ImageUrl));
-        if(match==null)return false;
-        item.ImageUrl=match.ImageUrl;item.MediaTitle=match.Title;item.MediaSection=match.Section;item.Refresh();return true;
-    }
-
-    static string Normalize(string value)=>Regex.Replace(value.Normalize(NormalizationForm.FormKC).Replace('ё','е').Replace('Ё','Е').ToUpperInvariant(),@"[^\p{L}\p{N}]+"," ").Trim();
+    public static bool AssociateMedia(DownloadItem item,IEnumerable<MediaItem> catalog)=>DownloadMetadata.Associate(item,catalog);
 }

@@ -1,7 +1,7 @@
 name: Windows release validation
 on:
   push:
-    branches: [codex/downloads-redesign-0.24]
+    branches: [codex/download-actions-covers-0.25]
   pull_request:
   workflow_dispatch:
 permissions:
@@ -38,4 +38,6 @@ jobs:
             test-output/windows-update/checks.txt
             test-output/catalog-paging/*
             test-output/search-downloads/*
+            test-output/download-end-to-end/*.json
+            test-output/download-end-to-end/error.txt
             test-output/windows-update/data/updates/*/result.txt
