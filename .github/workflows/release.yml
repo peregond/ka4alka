@@ -12,7 +12,7 @@ on:
 permissions:
   contents: write
 concurrency:
-  group: kachalka-release
+  group: kachalka-release-0.29.2
   cancel-in-progress: false
 jobs:
   release:

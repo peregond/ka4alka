@@ -16,7 +16,7 @@ public static class InstallerScreen {
   EnumChildWindows(parent,(window,state)=>{
    var name=new StringBuilder(32);GetClassName(window,name,name.Capacity);
    int style=GetWindowLong(window,-16)&15;
-   if(name.ToString()=="Button"&&(style==2||style==3)){found=window;return false;}
+   if(name.ToString().Equals("Button",StringComparison.OrdinalIgnoreCase)&&(style==2||style==3)){found=window;return false;}
    return true;
   },IntPtr.Zero);return found;
  }
