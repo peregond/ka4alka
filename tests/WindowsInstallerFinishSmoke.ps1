@@ -85,7 +85,9 @@ try {
  $bitmap=[System.Drawing.Bitmap]::new($rect.Right-$rect.Left,$rect.Bottom-$rect.Top);$draw=[System.Drawing.Graphics]::FromImage($bitmap);$context=$draw.GetHdc()
  try{if(-not[InstallerScreen]::PrintWindow($process.MainWindowHandle,$context,2)){throw 'Cannot capture installer finish page'}}finally{$draw.ReleaseHdc($context);$draw.Dispose()}
  try{$bitmap.Save((Join-Path $Output 'installer-finish.png'),[System.Drawing.Imaging.ImageFormat]::Png)}finally{$bitmap.Dispose()}
- ([System.Windows.Automation.InvokePattern]$finish.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern)).Invoke()
+ $finishHandle=[InstallerScreen]::GetDlgItem($process.MainWindowHandle,1)
+ if($finishHandle -eq [IntPtr]::Zero -or -not[InstallerScreen]::IsWindowEnabled($finishHandle)){throw 'Installer Finish button is unavailable'}
+ [InstallerScreen]::SendMessage($finishHandle,0x00F5,[IntPtr]::Zero,[IntPtr]::Zero) | Out-Null
  if(-not $process.WaitForExit(15000)-or $process.ExitCode -ne 0){throw 'Interactive installer did not finish cleanly'}
  'PASS: interactive EXE finish page has readable folder/firewall/startup guidance and an optional launch checkbox'
 } finally {if(-not $process.HasExited){$process.Kill($true)};$process.Dispose()}
