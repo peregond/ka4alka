@@ -8,7 +8,7 @@ public partial class MainWindow
     sealed class ReleasePickerState
     {
         public Dictionary<string,string> Filters {get;}=[];
-        public string Sort {get;set;}="Сначала русские источники";
+        public string Sort {get;set;}="Русские источники";
         public bool More {get;set;}
         public HashSet<string> Expanded {get;}=[];
         public int VisibleCount {get;set;}=60;
@@ -59,7 +59,7 @@ public partial class MainWindow
         Filter("HDR",releases.Select(x=>x.Hdr),true);
         var sortField=new StackPanel{Width=176};
         var sortCaption=Text("Сортировка",11,true);sortCaption.Margin=new(0,0,0,4);sortField.Children.Add(sortCaption);
-        var sorts=new[]{"Сначала русские источники","Больше сидов","Меньше размер","Выше качество","По названию","По видео","По субтитрам","По озвучке"}.Concat(isSeries?["По сезону и серии"]:[]).ToArray();
+        var sorts=new[]{"Русские источники","Больше сидов","Меньше размер","Выше качество","По названию","По видео","По субтитрам","По озвучке"}.Concat(isSeries?["По сезону и серии"]:[]).ToArray();
         var sort=new ComboBox{ItemsSource=sorts,SelectedItem=state.Sort,MinWidth=0,Margin=new(0,0,10,12)};
         if(sort.SelectedIndex<0)sort.SelectedIndex=0;
         AutomationProperties.SetName(sort,"Сортировка раздач");
@@ -83,7 +83,7 @@ public partial class MainWindow
         void SaveSelection()
         {
             foreach(var pair in filters)state.Filters[pair.Key]=pair.Value.SelectedItem?.ToString()??"Все";
-            state.Sort=sort.SelectedItem?.ToString()??"Сначала русские источники";
+            state.Sort=sort.SelectedItem?.ToString()??"Русские источники";
         }
         Grid RowGrid()
         {
@@ -153,7 +153,7 @@ public partial class MainWindow
                 var value=state.Filters[key];if(value=="Все")continue;
                 filtered=key switch{"Источник"=>filtered.Where(x=>x.Source==value),"Сезон"=>filtered.Where(x=>x.Series.SeasonLabel==value),"Серия"=>filtered.Where(x=>x.Series.EpisodeLabel==value),"Качество"=>filtered.Where(x=>x.Quality==value),"Тип"=>filtered.Where(x=>x.Type==value),"Озвучка"=>filtered.Where(x=>x.Voice==value),"Субтитры"=>filtered.Where(x=>x.Subs==value),"Кодек"=>filtered.Where(x=>x.Codec==value),_=>filtered.Where(x=>x.Hdr==value)};
             }
-            filtered=state.Sort switch{"Сначала русские источники"=>filtered.OrderByDescending(RussianSource).ThenByDescending(SeedRank),"Меньше размер"=>filtered.OrderBy(x=>x.Size??long.MaxValue),"Выше качество"=>filtered.OrderByDescending(QualityRank).ThenByDescending(SeedRank),"По названию"=>filtered.OrderBy(x=>x.Title,StringComparer.CurrentCultureIgnoreCase),"По сезону и серии"=>filtered.OrderBy(x=>x.Series.Season??int.MaxValue).ThenBy(x=>x.Series.Episode??int.MaxValue),"По видео"=>filtered.OrderBy(x=>x.Type=="Не указано").ThenBy(x=>x.Type),"По субтитрам"=>filtered.OrderBy(x=>x.Subs=="Не указано").ThenBy(x=>x.Subs),"По озвучке"=>filtered.OrderBy(x=>x.Voice=="Не указано").ThenBy(x=>x.Voice),_=>filtered.OrderByDescending(SeedRank)};
+            filtered=state.Sort switch{"Русские источники"=>filtered.OrderByDescending(RussianSource).ThenByDescending(SeedRank),"Меньше размер"=>filtered.OrderBy(x=>x.Size??long.MaxValue),"Выше качество"=>filtered.OrderByDescending(QualityRank).ThenByDescending(SeedRank),"По названию"=>filtered.OrderBy(x=>x.Title,StringComparer.CurrentCultureIgnoreCase),"По сезону и серии"=>filtered.OrderBy(x=>x.Series.Season??int.MaxValue).ThenBy(x=>x.Series.Episode??int.MaxValue),"По видео"=>filtered.OrderBy(x=>x.Type=="Не указано").ThenBy(x=>x.Type),"По субтитрам"=>filtered.OrderBy(x=>x.Subs=="Не указано").ThenBy(x=>x.Subs),"По озвучке"=>filtered.OrderBy(x=>x.Voice=="Не указано").ThenBy(x=>x.Voice),_=>filtered.OrderByDescending(SeedRank)};
             var visible=filtered.ToArray();var displayed=visible.Take(state.VisibleCount).ToArray();
             var countLabel=displayed.Length<visible.Length?$"Показано {displayed.Length} из {visible.Length}":visible.Length<releases.Count?$"Вариантов: {visible.Length} из {releases.Count}":$"Вариантов: {visible.Length}";
             var count=Text(countLabel,12,true);count.Margin=new(0,0,0,12);results.Children.Add(count);

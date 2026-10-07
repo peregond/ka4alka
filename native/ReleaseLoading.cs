@@ -49,9 +49,9 @@ public partial class MainWindow
             if(view.Saved)cachedReleaseViews.Add(item.Id);else cachedReleaseViews.Remove(item.Id);
             liveReleases[item.Id]=ReleaseSearch.WithSaved(fresh,saved);view.Sources=checks.Values.ToArray();
             qualitySnapshots.Remove(item.Id);ApplyKnownQuality(item);if(current?.Id==item.Id)ApplyKnownQuality(current);
-            foreach(var card in liveItems.Concat(prefs.LiveFavorites).Concat(catalogDisplay).Where(x=>x.Id==item.Id).Distinct())ApplyKnownQuality(card);
+            foreach(var card in liveItems.Concat(prefs.LiveFavorites).Concat(catalogDisplay).Where(x=>x.Id==item.Id))ApplyKnownQuality(card);
             RefreshDetail(item.Id);
-            if(!view.Checking&&prefs.HidePoorQuality&&current==null&&section is "Фильмы" or "Сериалы"&&catalogDisplay.Any(x=>x.Id==item.Id&&x.OnlyPoorQuality))Render();
+            if(!view.Checking&&prefs.HidePoorQuality&&current==null&&(section is "Фильмы" or "Сериалы")&&catalogDisplay.Any(x=>x.Id==item.Id&&x.OnlyPoorQuality))Render();
         }
         void IndexRows(IEnumerable<SourceEntry> rows,SourceState state)
         {
