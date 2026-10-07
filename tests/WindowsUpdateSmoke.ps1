@@ -27,6 +27,21 @@ try{
  if($LASTEXITCODE -ne 0){throw 'Updater tests failed'}
  ./tests/StableUpdateComponents.ps1
  ./build.ps1 -Test -OutputDir ('dist/Kachalka-'+$short)
+ foreach($scenario in @('dpi','close')){
+   $scenarioEvidence=Join-Path $root ('test-output/'+$scenario+'-reliability')
+   $scenarioUi=Start-Process (Join-Path $root ('dist/Kachalka-'+$short+'/Kachalka.exe')) -ArgumentList @('--'+$scenario+'-smoke-test',('"'+$scenarioEvidence+'"')) -PassThru
+   if(-not $scenarioUi.WaitForExit(45000)){$scenarioUi.Kill($true);throw ($scenario+' UI smoke timed out')}
+   if(Test-Path (Join-Path $scenarioEvidence 'error.txt')){throw (Get-Content (Join-Path $scenarioEvidence 'error.txt') -Raw)}
+   $scenarioFile=if($scenario -eq 'dpi'){'dpi-viewports.json'}else{'closed.json'}
+   if(-not(Test-Path (Join-Path $scenarioEvidence $scenarioFile))){throw ($scenario+' UI evidence missing')}
+   if($scenario -eq 'close'){
+     $closeResult=Get-Content (Join-Path $scenarioEvidence $scenarioFile) -Raw | ConvertFrom-Json
+     if(-not $closeResult.QueueSaved -or $closeResult.ElapsedSeconds -gt 10){throw 'Native window close delayed or lost queue'}
+     # This unfinished task belongs only to the close regression fixture.
+     '[]' | Set-Content (Join-Path $state 'queue.json') -Encoding utf8NoBOM
+   }
+   Get-Content (Join-Path $scenarioEvidence $scenarioFile)
+ }
  $catalogEvidence=Join-Path $root 'test-output/catalog-paging'
  $ui=Start-Process (Join-Path $root ('dist/Kachalka-'+$short+'/Kachalka.exe')) -ArgumentList @('--catalog-paging-smoke-test',('"'+$catalogEvidence+'"')) -PassThru
  if(-not $ui.WaitForExit(60000)){ $ui.Kill($true);throw 'Catalog UI smoke timed out' }

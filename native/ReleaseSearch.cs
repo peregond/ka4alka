@@ -41,6 +41,7 @@ public static class ReleaseSearch
             catch(OperationCanceledException) when(!ct.IsCancellationRequested){check=new(provider.Name,SourceState.TimedOut,CheckedUtc:DateTime.UtcNow);}
             catch(Exception) when(!ct.IsCancellationRequested){check=new(provider.Name,SourceState.Unavailable,CheckedUtc:DateTime.UtcNow);}
             ct.ThrowIfCancellationRequested();
+            DiagnosticLog.Write("source-search",new{Source=check.Name,State=check.State.ToString(),check.Count});
             lock(sync){groups[index]=items;checks[index]=check;remaining--;progress?.Report(Snapshot());}
         }).ToArray();
         await Task.WhenAll(tasks);ct.ThrowIfCancellationRequested();

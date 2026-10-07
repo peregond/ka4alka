@@ -102,7 +102,7 @@ public partial class MainWindow
             if(!IsCurrent())return;
             view.Checking=false;Publish();
             // Do not change the cache timestamp when every provider fails. Partial success keeps saved alternatives.
-            if(fresh.Count>0)try{await catalogIndex.CacheReleasesAsync(item,ReleaseSearch.WithSaved(fresh,saved),view.Sources);}catch(IOException){}catch(UnauthorizedAccessException){}
+            if(fresh.Count>0||ReleaseAvailability.ConfirmedEmpty(fresh,result.Sources))try{await catalogIndex.CacheReleasesAsync(item,fresh.Count==0?[]:ReleaseSearch.WithSaved(fresh,saved),result.Sources);}catch(IOException){}catch(UnauthorizedAccessException){}
         }
         catch(OperationCanceledException) when(token.IsCancellationRequested){}
         catch(Exception) when(!token.IsCancellationRequested){checks["Поиск источников"]=new("Поиск источников",SourceState.Unavailable,CheckedUtc:DateTime.UtcNow);}

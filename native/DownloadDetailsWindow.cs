@@ -46,7 +46,8 @@ public partial class MainWindow
         var totalProgress=new ProgressBar{Maximum=100,Height=4,BorderThickness=new(0)};
         totalProgress.SetResourceReference(Control.ForegroundProperty,"Accent");
         totalProgress.SetResourceReference(Control.BackgroundProperty,"Edge");
-        summary.Children.Add(status);summary.Children.Add(bytes);summary.Children.Add(totalProgress);
+        var network=Text("",11,true);network.Margin=new(0,0,0,5);network.TextWrapping=TextWrapping.Wrap;
+        summary.Children.Add(status);summary.Children.Add(bytes);summary.Children.Add(network);summary.Children.Add(totalProgress);
         DockPanel.SetDock(totals,Dock.Top);panel.Children.Add(totals);
 
         var filter=new TextBox{Height=34,Padding=new(10,6,10,6),Margin=new(0,0,0,9),ToolTip="Найти серию или файл по названию и папке"};
@@ -121,11 +122,13 @@ public partial class MainWindow
             }
             while(rows.Count>current.Length)rows.RemoveAt(rows.Count-1);
             var completed=current.Count(file=>file.Progress>=100);
-            status.Text=current.Length==0?"Получаем список файлов…":$"Готово файлов: {completed} из {current.Length}";
+            status.Text=current.Length==0?item.Status:$"Готово файлов: {completed} из {current.Length}";
             var size=current.Sum(file=>(decimal)Math.Max(0,file.Size));
             var received=current.Sum(file=>(decimal)Math.Max(0,file.Size)*(decimal)(double.IsFinite(file.Progress)?Math.Clamp(file.Progress,0,100):0)/100);
             bytes.Text=size==0?"Состав и размеры файлов появятся вместе с метаданными.":$"Скачано {DownloadService.FormatBytes((long)Math.Min(received,long.MaxValue))} из {DownloadService.FormatBytes((long)Math.Min(size,long.MaxValue))}";
-            totalProgress.IsIndeterminate=current.Length==0;
+            network.Text=string.Join("\n",new[]{item.PeersText,item.Hint}.Where(s=>!string.IsNullOrWhiteSpace(s)));
+            network.Visibility=network.Text.Length==0?Visibility.Collapsed:Visibility.Visible;
+            totalProgress.IsIndeterminate=item.Indeterminate;
             totalProgress.Value=size>0?(double)(received/size*100):0;
             EmptyState();
         }

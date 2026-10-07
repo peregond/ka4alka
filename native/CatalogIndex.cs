@@ -69,7 +69,7 @@ public sealed class CatalogIndex
 
     public async Task CacheReleasesAsync(MediaItem item,IReadOnlyList<SourceEntry> releases,IReadOnlyList<SourceCheck>? sources=null)
     {
-        if(!Valid(item)||releases.Count==0)return;
+        if(!Valid(item)||releases.Count==0&&!ReleaseAvailability.ConfirmedEmpty(releases,sources))return;
         await writer.WaitAsync();
         try
         {

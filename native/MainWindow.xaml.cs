@@ -134,11 +134,12 @@ public partial class MainWindow:Window
     async void OnClosing(object? sender,CancelEventArgs e)
     {
         if(closed)return;e.Cancel=true;if(closing)return;closing=true;
+        DiagnosticLog.Write("closing",new{QueueCount=downloads.Items.Count});Status.Text="Сохраняем загрузки и закрываем приложение…";
         IsEnabled=false;updateCancellation.Cancel();catalogRefreshTimer.Stop();refresh.Stop();searchDelay.Stop();liveRequest?.Cancel();sourceRequest?.Cancel();archiveRequest?.Cancel();broadcastRequest?.Cancel();
         foreach(var view in releaseViews.Values)view.Request?.Cancel();
         bool saved=false;
-        try{prefs.Save();await downloads.Close();saved=true;}
-        catch(Exception ex){MessageBox.Show(ex.Message,"Не удалось сохранить очередь");}
+        try{prefs.Save();await downloads.Close();saved=true;DiagnosticLog.Write("closed",new{QueueSaved=true});}
+        catch(Exception ex){ErrorLog.Write(ex);MessageBox.Show(ex.Message,"Не удалось сохранить очередь");}
         finally
         {
             closed=true;

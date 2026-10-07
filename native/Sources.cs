@@ -9,6 +9,7 @@ public record SourceConfig(string Name,string Endpoint,string ApiKey="");
 public record SourceEntry(string Id,string Title,string Source,string PageUrl,string? TorrentUrl,string? ImageUrl,long? Size=null,int? Seeds=null)
 {
     public string? Via {get;init;}
+    public int? Leechers {get;init;}
     public SeriesReleaseInfo Series => SeriesReleaseInfo.Parse(Title);
     public string Quality => System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(2160[pi]?\b|\b4[ .-]?K\b|\bUHD\b)")?"4K":System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(1080[pi]?\b|\bFull[ .-]?HD\b)")?"Full HD":System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(720p?\b|HD[ .-]?Ready\b)")?"HD Ready":"Не указано";
     public string Type => System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(Blu.?Ray|BDRip|BDRemux)")?"BluRay":System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(WEB.?DL|WEBRip)")?"WEB-DL":"Не указано";

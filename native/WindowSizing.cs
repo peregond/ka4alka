@@ -17,6 +17,11 @@ public static class WindowSizing
         var height=Math.Max(1,Math.Min(950,maxHeight-24));
         return new(width,height,Math.Min(620,width),Math.Min(420,height),maxWidth,maxHeight);
     }
+    public static WindowDimensions FitPixels(double width,double height,double scaleX,double scaleY)
+    {
+        if(!double.IsFinite(scaleX)||!double.IsFinite(scaleY)||scaleX<=0||scaleY<=0)throw new ArgumentOutOfRangeException(nameof(scaleX));
+        return Fit(width/scaleX,height/scaleY);
+    }
     public static int PosterColumns(double contentWidth)=>contentWidth>=1190?7:contentWidth>=900?6:Math.Clamp((int)Math.Floor(contentWidth/155),1,5);
 }
 
@@ -26,7 +31,7 @@ public partial class MainWindow
     const uint MonitorDefaultNearest=2,SwpNoSize=0x0001,SwpNoZOrder=0x0004,SwpNoActivate=0x0010;
     IntPtr activeMonitor;
     double activeScaleX,activeScaleY;
-    bool sizingQueued,compactWidth,compactHeight,tinyWidth,layoutInitialized;
+    bool sizingQueued,compactWidth,compactHeight,tinyWidth,veryCompactHeight,layoutInitialized;
     ListBox? catalogList;
     IReadOnlyList<MediaItem> catalogDisplay=[];
     int catalogColumns;
@@ -70,12 +75,17 @@ public partial class MainWindow
         var changed=first||monitor!=activeMonitor||Math.Abs(scaleX-activeScaleX)>0.01||Math.Abs(scaleY-activeScaleY)>0.01;
         if(!changed&&Width<=MaxWidth&&Height<=MaxHeight)return;
         activeMonitor=monitor;activeScaleX=scaleX;activeScaleY=scaleY;
-        var fit=WindowSizing.Fit(info.Work.Width/scaleX,info.Work.Height/scaleY);
+        var fit=WindowSizing.FitPixels(info.Work.Width,info.Work.Height,scaleX,scaleY);
         MaxWidth=fit.MaxWidth;MaxHeight=fit.MaxHeight;
         MinWidth=fit.MinWidth;MinHeight=fit.MinHeight;
         if(WindowState==WindowState.Normal){Width=first?fit.Width:Math.Min(Width,fit.Width);Height=first?fit.Height:Math.Min(Height,fit.Height);}
         ApplyCompactLayout();
-        Dispatcher.BeginInvoke(DispatcherPriority.Loaded,new Action(()=>PlaceWithinWorkArea(handle,info.Work,first)));
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded,new Action(()=>
+        {
+            var currentInfo=new MonitorInfo{Size=(uint)Marshal.SizeOf<MonitorInfo>()};
+            var currentMonitor=MonitorFromWindow(handle,MonitorDefaultNearest);
+            if(GetMonitorInfo(currentMonitor,ref currentInfo))PlaceWithinWorkArea(handle,currentInfo.Work,first);
+        }));
     }
     static void PlaceWithinWorkArea(IntPtr handle,NativeRect work,bool center)
     {
@@ -90,24 +100,28 @@ public partial class MainWindow
         var narrow=ActualWidth>0&&ActualWidth<950;
         var tiny=ActualWidth>0&&ActualWidth<780;
         var shortView=ActualHeight>0&&ActualHeight<560;
+        var veryShort=ActualHeight>0&&ActualHeight<360;
         FitDownloadsToolbar();
-        if(layoutInitialized&&narrow==compactWidth&&tiny==tinyWidth&&shortView==compactHeight){UpdateFilterRail();return;}
-        layoutInitialized=true;compactWidth=narrow;tinyWidth=tiny;compactHeight=shortView;
+        if(layoutInitialized&&narrow==compactWidth&&tiny==tinyWidth&&shortView==compactHeight&&veryShort==veryCompactHeight){UpdateFilterRail();return;}
+        layoutInitialized=true;compactWidth=narrow;tinyWidth=tiny;compactHeight=shortView;veryCompactHeight=veryShort;
         RootGrid.Margin=narrow?new Thickness(10):new Thickness(16);
         SidebarColumn.Width=new GridLength(narrow?80:196);
         SidePanel.Margin=narrow?new Thickness(0,0,12,0):new Thickness(0,0,24,0);
         SidePanel.Padding=new Thickness(narrow?8:12);
         Brand.Margin=narrow?new Thickness(0,8,0,24):new Thickness(8,10,0,35);
         Brand.HorizontalAlignment=narrow?HorizontalAlignment.Center:HorizontalAlignment.Stretch;
+        Brand.Visibility=veryShort?Visibility.Collapsed:Visibility.Visible;
         BrandLogo.Width=narrow?32:40;BrandLogo.Height=narrow?32:40;BrandLogo.Margin=new Thickness(0,0,narrow?0:10,0);
         BrandText.Visibility=narrow?Visibility.Collapsed:Visibility.Visible;
         LibraryLabel.Visibility=narrow?Visibility.Collapsed:Visibility.Visible;
-        foreach(var nav in Navigation.Children.OfType<Button>()){var name=nav.Tag?.ToString()??"";nav.Content=IconLabel(narrow?"":name,name=="Фильмы"?"IconMovies":"IconSeries");nav.HorizontalContentAlignment=narrow?HorizontalAlignment.Center:HorizontalAlignment.Left;nav.Padding=new Thickness(narrow?10:12,10,narrow?10:12,10);}
+        foreach(var nav in Navigation.Children.OfType<Button>()){var name=nav.Tag?.ToString()??"";nav.Content=IconLabel(narrow?"":name,name=="Фильмы"?"IconMovies":"IconSeries");nav.HorizontalContentAlignment=narrow?HorizontalAlignment.Center:HorizontalAlignment.Left;nav.Padding=new Thickness(narrow?10:12,veryShort?5:10,narrow?10:12,veryShort?5:10);}
         DownloadsButton.Content=IconLabel(narrow?"":"Загрузки","IconDownload");SettingsButton.Content=IconLabel(narrow?"":"Настройки","IconSettings");
         DownloadsButton.HorizontalContentAlignment=SettingsButton.HorizontalContentAlignment=narrow?HorizontalAlignment.Center:HorizontalAlignment.Left;
-        DownloadsButton.Padding=SettingsButton.Padding=new Thickness(narrow?10:12,10,narrow?10:12,10);
+        DownloadsButton.Padding=SettingsButton.Padding=new Thickness(narrow?10:12,veryShort?5:10,narrow?10:12,veryShort?5:10);
+        foreach(var nav in Navigation.Children.OfType<Button>().Concat(new[]{DownloadsButton,SettingsButton}))nav.MinHeight=veryShort?28:42;
+        if(SidebarFooter.Children[0] is Border divider)divider.Margin=new Thickness(10,veryShort?4:16,10,veryShort?4:14);
         AddTorrentButton.Content=IconLabel(tiny?"":narrow?"Добавить":"Добавить торрент","IconPlus");
-        HeaderArea.Margin=new Thickness(0,4,0,shortView?14:25);
+        HeaderArea.Margin=new Thickness(0,4,0,veryShort?6:shortView?14:25);
         SearchBar.Margin=new Thickness(0,0,tiny?10:18,0);SearchBar.Height=shortView?40:44;
         foreach(var subtitle in PageHeader.Children.OfType<TextBlock>().Where(x=>Equals(x.Tag,"CatalogSubtitle")))subtitle.Visibility=shortView?Visibility.Collapsed:Visibility.Visible;
         UpdateFilterRail();
