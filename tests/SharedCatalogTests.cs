@@ -28,7 +28,7 @@ static class SharedCatalogTests
         Check(parsed.Items.Length==2300&&parsed.Items[0].Year==2026&&parsed.Items[^1].Year==1992,"shared catalog validates both libraries and places newer releases before older titles");
         foreach(var invalid in new[]{Feed(DateTime.UtcNow.AddDays(1)),Feed(DateTime.UtcNow,2),JsonSerializer.SerializeToUtf8Bytes(new{schemaVersion=1,generatedAtUtc=DateTime.UtcNow,items=rows.Take(1)})})
         {
-            bool rejected=false;try{SharedCatalog.Parse(invalid,DateTime.UtcNow);}catch(IOException){rejected=true;}
+            bool rejected=false;try{SharedCatalog.Parse(invalid,DateTime.UtcNow);}catch(InvalidDataException){rejected=true;}
             Check(rejected,"malformed, future or incomplete daily feed cannot replace the complete library");
         }
         var prior=Environment.GetEnvironmentVariable("KACHALKA_DATA");
@@ -43,6 +43,9 @@ static class SharedCatalogTests
             Check(shared.Search("Сериалы","Новое кино 20").Count>0,"newly indexed series are available to the existing unified search");
             var offline=new FeedHandler([],true);using var offlineClient=new SourceClient(offline);var reopened=new SharedCatalog(offlineClient);
             Check((await reopened.PageAsync("Сериалы",1,default))?.Items.Length==40&&offline.Calls==0,"a fresh persisted library remains available after restart without a network request");
+            File.WriteAllBytes(Path.Combine(folder,"catalog-shared.json"),Feed(DateTime.UtcNow,2));
+            var repaired=new SharedCatalog(client);
+            Check((await repaired.PageAsync("Фильмы",1,default))?.Items.Length==40&&handler.Calls==2,"an invalid persisted catalog is replaced by a complete current feed without breaking browsing");
             File.WriteAllBytes(Path.Combine(folder,"catalog-shared.json"),Feed(DateTime.UtcNow.AddDays(-2)));
             var expired=new SharedCatalog(offlineClient);
             Check((await expired.PageAsync("Фильмы",1,default))?.Items.Length==40&&offline.Calls==1,"failed daily refresh keeps the previous complete library instead of clearing it");

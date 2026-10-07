@@ -44,7 +44,7 @@ public sealed class SharedCatalog(SourceClient client)
             {
                 restored=true;
                 try{if(File.Exists(path)&&new FileInfo(path).Length<=4*1024*1024){var saved=Parse(await File.ReadAllBytesAsync(path,ct),now);items=saved.Items;generatedUtc=saved.GeneratedUtc;}}
-                catch(Exception error)when(error is IOException or JsonException or InvalidOperationException or KeyNotFoundException or UnauthorizedAccessException){}
+                catch(Exception error)when(error is IOException or InvalidDataException or JsonException or InvalidOperationException or KeyNotFoundException or UnauthorizedAccessException){}
             }
             if(force||generatedUtc<BoundaryUtc(now)&&now>=retryAfterUtc)
             {
