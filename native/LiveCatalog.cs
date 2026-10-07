@@ -73,10 +73,11 @@ public sealed class LiveCatalog(SourceClient client)
             var h=Html(await client.Read(SourceClient.WebUri(item.PageUrl!),4*1024*1024,ct));
             string Score(string name)=>ValidScore(Text(h.DocumentNode.SelectSingleNode("//*["+Class(name)+"]")));
             var original=HtmlEntity.DeEntitize(h.DocumentNode.SelectSingleNode("//meta[@itemprop='alternativeHeadline']")?.GetAttributeValue("content","")??"").Trim();
-            var genres=(h.DocumentNode.SelectNodes("//*[@itemprop='genre']")??new HtmlNodeCollection(null)).Select(Text).Distinct().ToArray();
+            string InlineText(HtmlNode node)=>Regex.Replace(Text(node),@"\s+"," ").Trim();
+            var genres=(h.DocumentNode.SelectNodes("//*[@itemprop='genre']")??new HtmlNodeCollection(null)).Select(InlineText).Where(x=>x.Length>0).Distinct().ToArray();
             HtmlNode[] Links(string prefix)=>(h.DocumentNode.SelectNodes("//a[contains(@href,'/filter/"+prefix+"-')]")??new HtmlNodeCollection(null)).ToArray();
             string[] Keys(string prefix)=>Links(prefix).Select(n=>n.GetAttributeValue("href","").Split("/filter/"+prefix+"-")[1]).Distinct().ToArray();
-            var result=item with{Kinopoisk=Score("entity-rating-kp"),Imdb=Score("entity-rating-imdb"),Description=Text(h.DocumentNode.SelectSingleNode("//*[@itemprop='description' and not(self::meta)]")),OriginalTitle=original.Length==0?null:original,Genre=string.Join(", ",genres),Country=string.Join(", ",Links("country").Select(Text).Distinct()),GenreKeys=Keys("genre"),CountryKeys=Keys("country")};
+            var result=item with{Kinopoisk=Score("entity-rating-kp"),Imdb=Score("entity-rating-imdb"),Description=Text(h.DocumentNode.SelectSingleNode("//*[@itemprop='description' and not(self::meta)]")),OriginalTitle=original.Length==0?null:original,Genre=string.Join(", ",genres),Country=string.Join(", ",Links("country").Select(InlineText).Where(x=>x.Length>0).Distinct()),GenreKeys=Keys("genre"),CountryKeys=Keys("country")};
             try{System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(cache)!);await System.IO.File.WriteAllTextAsync(cache,JsonSerializer.Serialize(new DetailSnapshot(result.Kinopoisk,result.Imdb,result.Description??"",result.OriginalTitle,result.Genre,result.Country,result.GenreKeys,result.CountryKeys)),ct);}catch(System.IO.IOException){}
             return result;
         }
