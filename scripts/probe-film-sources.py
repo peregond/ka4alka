@@ -26,7 +26,8 @@ def probe(label, url, encoding='utf-8'):
                   'title': re.findall(r'<title[^>]*>(.*?)</title>', text, re.I | re.S)[:1],
                   'names': [html.unescape(re.sub('<[^>]+>', '', value)).strip()[:240] for value in titles[:10]],
                   'snippets': snippets[:4], 'rows': matching_rows[:2], 'ratings': ratings[:10] if 'detail' in label else [],
-                  'json': text[:5000] if 'suggestion' in label else None}
+                  'json': text[:5000] if 'suggestion' in label else None,
+                  'forms': [{'action':re.findall(r'action=["\']([^"\']+)', form[:400],re.I), 'fields':re.findall(r'\bname=["\']([^"\']+)', form,re.I)} for form in re.findall(r'<form\b[\s\S]*?</form>',text,re.I)[:3]] if label=='BitRu home' else []}
     except Exception as error:
         result = {'source': label, 'error': str(error)}
     return result
@@ -56,6 +57,9 @@ if __name__ == '__main__':
         ('BitRu home', 'https://bitru.org/'),
         ('Rustorka The Weight', 'https://rustorka.com/forum/tracker.php?nm='+urllib.parse.quote('До последнего грамма'), 'cp1251'),
         ('TorLook The Weight', 'https://torlook.info/?q='+urllib.parse.quote('До последнего грамма')),
+        ('The Weight imdb detail', 'https://www.imdb.com/title/tt10794054/'),
+        ('Object imdb detail', 'https://www.imdb.com/title/tt37535559/'),
+        ('The Weight kinopoisk search', 'https://www.kinopoisk.ru/s/type/film/find/'+urllib.parse.quote('До последнего грамма')+'/'),
     ])
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
         for result in pool.map(lambda args: probe(*args), jobs):
