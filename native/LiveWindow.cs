@@ -73,7 +73,7 @@ public partial class MainWindow
     async Task UpdateCardRatings(MediaItem item)
     {
         var task=Metadata(item);
-        try{var data=await task;if(!closed)item.SetScores(data.Kinopoisk,data.Imdb);}
+        try{var data=await task;if(!closed)item.SetScores(data.Kinopoisk,data.Imdb,data.Genre);}
         catch{if(cardMetadata.TryGetValue(item.Id,out var latest)&&ReferenceEquals(task,latest))cardMetadata.Remove(item.Id); /* A missing rating stays unavailable. */ }
     }
     string catalogGenre="",catalogCountry="",catalogCollection="all";

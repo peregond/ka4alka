@@ -76,7 +76,7 @@ public partial class MainWindow
         BindingOperations.SetBinding(picture,ImageBrush.ImageSourceProperty,new Binding("Source"){Source=image});
         var backdrop=new Border{Background=picture};grid.Children.Add(backdrop);
         grid.Children.Add(new Border{Background=new LinearGradientBrush(new GradientStopCollection{new(Color.FromArgb(230,7,12,29),0),new(Color.FromArgb(75,7,12,29),.6),new(Color.FromArgb(20,7,12,29),1)},0)});
-        grid.Children.Add(new Border{Background=new LinearGradientBrush(new GradientStopCollection{new(Colors.Transparent,0),new(Color.FromArgb(230,7,12,29),1)},90)});
+        grid.Children.Add(new Border{Background=new LinearGradientBrush(new GradientStopCollection{new(Color.FromArgb(0,7,12,29),0),new(Color.FromArgb(230,7,12,29),1)},90)});
         var content=new StackPanel{VerticalAlignment=VerticalAlignment.Bottom,Margin=new(20,18,20,18)};grid.Children.Add(content);
         var eyebrow=new TextBlock{Text=primary?"В ЦЕНТРЕ ВНИМАНИЯ":"СТОИТ ПОСМОТРЕТЬ",FontSize=10,FontWeight=FontWeights.SemiBold,Foreground=new SolidColorBrush(Color.FromRgb(185,200,255)),Margin=new(0,0,0,8)};content.Children.Add(eyebrow);
         var title=new TextBlock{Text=item.Title,FontSize=primary?25:22,FontWeight=FontWeights.Bold,Foreground=Brushes.White,TextWrapping=TextWrapping.Wrap,TextTrimming=TextTrimming.CharacterEllipsis,MaxHeight=65,ToolTip=item.Title,Margin=new(0,0,0,6)};content.Children.Add(title);

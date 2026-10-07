@@ -84,7 +84,10 @@ public partial class MainWindow
         }
         async Task Size(double width,double height)
         {
-            Width=Math.Min(width,MaxWidth-24);Height=Math.Min(height,MaxHeight-24);await Settle();
+            // Windows Server's virtual monitor also limits native max-track size.
+            // A fixture minimum forces this specific viewport without changing app defaults.
+            MinWidth=Math.Min(width,MaxWidth-24);MinHeight=Math.Min(height,MaxHeight-24);
+            Width=MinWidth;Height=MinHeight;await Settle();
         }
         void Shot(string name)
         {
@@ -129,12 +132,14 @@ public partial class MainWindow
             await Size(1760,950);
             Render();await Settle();
             var wheelScrolling=await CheckWheelScrolling();
+            MinWidth=360;MinHeight=300;
             var searchSettings=await CheckSearchAndSettings(output);
+            await Size(1760,950);
             Search.Text="";searchDelay.Stop();liveKey=CurrentCatalogKey;
             prefs.Light=true;ApplyTheme();current=null;Render();await Settle();Shot("catalog-light");
             var catalogColumnsLight=catalogColumns;
             prefs.Light=false;ApplyTheme();Render();await Settle();Shot("catalog-dark");
-            if(FiltersPanel.Visibility!=Visibility.Visible||inlineCatalogFilterScroll?.Parent!=FilterControls||discoveryHero is not {ActualHeight:>180}||discoveryHero.Children.Count!=2||discoveryShelf is not {ActualWidth:>500})throw new Exception("Cinematic desktop catalog is missing its banners, curated row or right filters.");
+            if(ActualWidth<1700||ActualHeight<900||FiltersPanel.Visibility!=Visibility.Visible||inlineCatalogFilterScroll?.Parent!=FilterControls||discoveryHero is not {ActualHeight:>180}||discoveryHero.Children.Count!=2||discoveryShelf is not {ActualWidth:>500})throw new Exception($"Cinematic desktop catalog is missing its banners, curated row or right filters ({ActualWidth}x{ActualHeight}, rail={FiltersPanel.Visibility}, hero={discoveryHero?.ActualHeight}, shelf={discoveryShelf?.ActualWidth}).");
             if(VisualElements<UIElement>(Body).Any(x=>x.Effect!=null))throw new Exception("Cinematic catalog adds an expensive blur or shadow effect.");
             var preview=liveItems.FirstOrDefault(x=>x.ImageUrl!=null)?.ImageUrl;
             var movie=new MediaItem(-987654320,"За пределами тишины: невероятное путешествие через время, которое начинается с одного случайного письма","Фильмы","Приключения · Драма",2026,"8,7","8,5","#526B69")

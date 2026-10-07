@@ -17,14 +17,14 @@ public record MediaItem(int Id, string Title, string Section, string Genre, int 
     public string Country {get;init;}="";
     [JsonIgnore] public bool IsLive => PageUrl!=null;
     [JsonIgnore] public bool Cinema => Section is "Фильмы" or "Сериалы";
-    string? liveScores,liveKp,liveImdb;
+    string? liveScores,liveKp,liveImdb,liveGenre;
     [JsonIgnore] public string KpDisplay => "КП  "+(liveKp??Kinopoisk);
     [JsonIgnore] public string ImdbDisplay => "IMDb  "+(liveImdb??Imdb);
     [JsonIgnore] public bool KpAvailable => !string.IsNullOrWhiteSpace(liveKp??Kinopoisk)&&(liveKp??Kinopoisk)!="—";
     [JsonIgnore] public bool ImdbAvailable => !string.IsNullOrWhiteSpace(liveImdb??Imdb)&&(liveImdb??Imdb)!="—";
     [JsonIgnore] public string CardRating => KpAvailable?(liveKp??Kinopoisk):ImdbAvailable?(liveImdb??Imdb):"—";
     [JsonIgnore] public string CardRatingSource => KpAvailable?"Кинопоиск":ImdbAvailable?"IMDb":"Оценка пока недоступна";
-    [JsonIgnore] public string CardGenre => string.IsNullOrWhiteSpace(Genre)?Section=="Сериалы"?"Сериал":"Фильм":Genre;
+    [JsonIgnore] public string CardGenre => string.IsNullOrWhiteSpace(liveGenre??Genre)?Section=="Сериалы"?"Сериал":"Фильм":liveGenre??Genre;
     string bestQuality="";
     [JsonIgnore] public string BestQuality=>bestQuality;
     [JsonIgnore] public bool HasQuality=>bestQuality.Length>0;
@@ -40,7 +40,7 @@ public record MediaItem(int Id, string Title, string Section, string Genre, int 
         if(value!=OnlyPoorQuality){OnlyPoorQuality=value;PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(OnlyPoorQuality)));}
         if(quality!=bestQuality){bestQuality=quality;PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(BestQuality)));PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(HasQuality)));}
     }
-    public void SetScores(string kp,string imdb){liveKp=kp;liveImdb=imdb;liveScores=$"КП {kp}   IMDb {imdb}";PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(null));}
+    public void SetScores(string kp,string imdb,string? genre=null){if(!string.IsNullOrWhiteSpace(genre))liveGenre=genre;liveKp=kp;liveImdb=imdb;liveScores=$"КП {kp}   IMDb {imdb}";PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(null));}
     [JsonIgnore] public string Subtitle => Cinema ? string.Join(" · ",new[]{Section=="Сериалы"?"Сериал":"Фильм",Year>0?Year.ToString():null,Genre}.Where(x=>!string.IsNullOrWhiteSpace(x))) : "Демонстрационный каталог";
     [JsonIgnore] public Brush Cover { get { var b = new LinearGradientBrush((Color)ColorConverter.ConvertFromString(Color), (Color)ColorConverter.ConvertFromString("#20262E"), 75); b.Freeze(); return b; } }
 }
