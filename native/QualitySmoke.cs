@@ -21,7 +21,7 @@ public partial class MainWindow
             check(new CatalogIndex(Preferences.DataDir).CachedReleaseSnapshot(items[0]) is {Items.Length:1},"known poor-quality releases survive cache reload");
             prefs.LiveFavorites=items.ToList();favoritesOnly=true;current=null;section="Фильмы";submittedQuery="";searchCategory="";Search.Text="";searchDelay.Stop();liveLoading=false;livePage=1;Render();UpdateLayout();
             check(catalogDisplay.Count==4&&catalogDisplay.Count(x=>x.OnlyPoorQuality)==1,"catalog marks only confirmed poor-only titles and keeps unknown quality unmarked");
-            check(VisualElements<Border>(Body).Any(x=>x.IsVisible&&AutomationProperties.GetName(x)=="Плохое качество фильма"&&Equals(x.ToolTip,"Плохое качество")),"catalog poster shows the poor-quality badge and its tooltip");
+            check(VisualElements<Border>(Body).Any(x=>x.IsVisible&&AutomationProperties.GetName(x)=="Качество на обложке"&&Equals(x.ToolTip,"Экранка")),"catalog poster shows the poor-quality badge and its tooltip");
             var catalogToggle=FindVisual<Button>(RootGrid,x=>AutomationProperties.GetName(x)=="Скрыть плохое качество")??throw new Exception("Catalog quality toggle is missing.");
             check(catalogToggle.Parent is WrapPanel qualityRow&&ReferenceEquals(qualityRow.Parent,topSaved?.Parent),"catalog quality controls share the row with Saved and the other catalog filters");
             catalogToggle.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));UpdateLayout();
@@ -42,9 +42,9 @@ public partial class MainWindow
             current=selected;Render();UpdateLayout();
             check(VisualElements<Button>(Body).Select(x=>x.Tag).OfType<SourceEntry>().Count()==2,"the global filter carries into film detail and retains Full HD and unknown releases");
             FindVisual<CheckBox>(Body,x=>AutomationProperties.GetName(x)=="Скрыть плохое качество")!.IsChecked=false;UpdateLayout();
-            check(VisualElements<Button>(Body).Select(x=>x.Tag).OfType<SourceEntry>().Count()==4&&VisualElements<TextBlock>(Body).Any(x=>x.Text=="💩"&&Equals(x.ToolTip,"Плохое качество")),"disabling the filter restores all releases with poor-quality tooltips");
+            check(VisualElements<Button>(Body).Select(x=>x.Tag).OfType<SourceEntry>().Count()==4&&VisualElements<TextBlock>(Body).Any(x=>x.Text=="Экранка"&&x.ToolTip is string tooltip&&tooltip.Contains("плохое качество")),"disabling the filter restores all releases with poor-quality tooltips");
             prefs.HidePoorQuality=true;prefs.Save();downloads.Items.Add(queued);current=null;section="Загрузки";Render();UpdateLayout();
-            check(downloadList?.Items.Contains(queued)==true&&VisualElements<TextBlock>(Body).Any(x=>x.IsVisible&&AutomationProperties.GetName(x)=="Плохое качество загрузки"&&Equals(x.ToolTip,"Плохое качество")),"existing poor-quality downloads stay in the queue and carry a visible badge");
+            check(downloadList?.Items.Contains(queued)==true&&VisualElements<Border>(Body).Any(x=>x.IsVisible&&AutomationProperties.GetName(x)=="Качество загрузки"&&Equals(x.ToolTip,"Экранка")),"existing poor-quality downloads stay in the queue and carry a visible badge");
             foreach(var width in new[]{360d,510d,1280d})
             {
                 MinWidth=360;Width=width;Height=640;await Task.Delay(50);current=selected;section="Фильмы";Render();UpdateLayout();

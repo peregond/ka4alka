@@ -17,7 +17,9 @@ public static class ReleaseQuality
         if(!match.Success)match=Dimensions.Match(entry.Title);
         return match.Success&&int.TryParse(match.Groups[1].Value,out var height)&&height is >=100 and <=8640?height:null;
     }
-    public static bool Poor(SourceEntry entry,int minimum=720)=>Screen.IsMatch(entry.Title)||
+    public static bool IsScreen(SourceEntry entry)=>Screen.IsMatch(entry.Title);
+    public static string Label(SourceEntry entry)=>IsScreen(entry)?"Экранка":Height(entry) is int height?height>=2160?"4K":height>=1080?"Full HD":height>=720?"HD Ready":"SD":StandardDefinition.IsMatch(entry.Title)?"SD":"";
+    public static bool Poor(SourceEntry entry,int minimum=720)=>IsScreen(entry)||
         (Height(entry) is int height?height<(minimum==1080?1080:720):StandardDefinition.IsMatch(entry.Title));
 
     public static bool OnlyPoor(IEnumerable<SourceEntry> entries,int minimum=720)

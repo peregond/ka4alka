@@ -67,7 +67,7 @@ public partial class MainWindow
         var more=ActionButton("Все","IconChevron",all);more.FontSize=11;more.Padding=new(5);more.Margin=new(0);more.MinHeight=26;more.SetResourceReference(Control.ForegroundProperty,"Accent");DockPanel.SetDock(more,Dock.Right);row.Children.Add(more);
         var heading=Text(label,22);heading.FontWeight=FontWeights.SemiBold;heading.Margin=new(0);row.Children.Add(heading);target.Children.Add(row);
     }
-    Border FeatureBanner(MediaItem item,bool primary)
+    Button FeatureBanner(MediaItem item,bool primary)
     {
         var frame=new Border{CornerRadius=new(16),BorderThickness=new(1),ClipToBounds=true};
         frame.SetResourceReference(Border.BorderBrushProperty,"Edge");frame.SizeChanged+=(_,_)=>ClipPoster(frame);
@@ -82,12 +82,15 @@ public partial class MainWindow
         var eyebrow=new TextBlock{Text=primary?"В ЦЕНТРЕ ВНИМАНИЯ":"СТОИТ ПОСМОТРЕТЬ",FontSize=10,FontWeight=FontWeights.SemiBold,Foreground=new SolidColorBrush(Color.FromRgb(185,200,255)),Margin=new(0,0,0,8)};content.Children.Add(eyebrow);
         var title=new TextBlock{Text=item.Title,FontSize=primary?25:22,FontWeight=FontWeights.SemiBold,Foreground=Brushes.White,TextWrapping=TextWrapping.Wrap,TextTrimming=TextTrimming.CharacterEllipsis,MaxHeight=65,ToolTip=item.Title,Margin=new(0,0,0,6)};content.Children.Add(title);
         content.Children.Add(new TextBlock{Text=string.Join(" · ",new[]{item.Year>0?item.Year.ToString():"",item.CardGenre}.Where(x=>x.Length>0)),Foreground=new SolidColorBrush(Color.FromRgb(202,212,237)),FontSize=12,TextTrimming=TextTrimming.CharacterEllipsis,Margin=new(0,0,0,12)});
-        var actions=new WrapPanel();content.Children.Add(actions);
-        void Open(){current=item;Render();}
-        var details=ActionButton(primary?"Выбрать раздачу":"Подробнее",primary?"IconDownload":"IconChevron",Open,primary?"PrimaryButton":"QuietButton");details.FontSize=12;details.Margin=new(0,0,8,0);details.Padding=new(12,9,12,9);details.MinHeight=36;
-        if(!primary){details.Foreground=Brushes.White;details.Background=new SolidColorBrush(Color.FromArgb(140,35,46,85));details.BorderBrush=new SolidColorBrush(Color.FromArgb(160,120,139,204));}
-        actions.Children.Add(details);
-        return frame;
+        var action=new Border{CornerRadius=new(9),Padding=new(12,9,12,9),HorizontalAlignment=HorizontalAlignment.Left,BorderThickness=new(1)};
+        action.SetResourceReference(Border.BackgroundProperty,primary?"PrimaryFill":"AccentSoft");action.SetResourceReference(Border.BorderBrushProperty,primary?"Primary":"Edge");
+        var actionLabel=IconLabel("Подробнее","IconChevron");actionLabel.IsHitTestVisible=false;
+        foreach(var label in VisualElements<TextBlock>(actionLabel))label.Foreground=Brushes.White;
+        foreach(var glyph in VisualElements<System.Windows.Shapes.Path>(actionLabel))glyph.Stroke=Brushes.White;
+        action.Child=actionLabel;content.Children.Add(action);
+        var button=new Button{Content=frame,Tag=item,Style=(Style)FindResource("PosterButton"),Padding=new(0),Margin=new(0),HorizontalContentAlignment=HorizontalAlignment.Stretch,VerticalContentAlignment=VerticalAlignment.Stretch,ToolTip="Открыть «"+item.Title+"»"};
+        System.Windows.Automation.AutomationProperties.SetName(button,"Открыть "+item.Title);
+        button.Click+=OpenCard;return button;
     }
     void UpdateDiscoveryLayout()
     {

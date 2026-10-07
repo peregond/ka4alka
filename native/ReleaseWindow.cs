@@ -109,7 +109,7 @@ public partial class MainWindow
             var title=Text(entry.Title,14);title.FontWeight=FontWeights.SemiBold;title.Margin=new(0,0,0,8);body.Children.Add(title);
             var source=Text(entry.Source+(entry.Via==null?"":" · через "+entry.Via),11,true);source.Margin=new(0,0,0,12);body.Children.Add(source);
             var summary=new WrapPanel{Margin=new(0,0,0,8)};
-            if(ReleaseQuality.Poor(entry,QualityMinimum))summary.Children.Add(PoorQualityBadge());
+            if(ReleaseQuality.Poor(entry,QualityMinimum))summary.Children.Add(PoorQualityBadge(ReleaseQuality.Label(entry)));
             void Badge(string value,bool accent=false)
             {
                 var text=new TextBlock{Text=value,FontSize=11,FontWeight=accent?FontWeights.SemiBold:FontWeights.Normal};
@@ -196,7 +196,7 @@ public partial class MainWindow
                 var title=Text(entry.Title,12);title.FontWeight=FontWeights.Medium;title.Margin=new(0,0,0,4);title.ToolTip=entry.Title;identity.Children.Add(title);
                 if(isSeries){var episode=Text(entry.Series.SeasonLabel+" · "+entry.Series.EpisodeLabel,11,true);episode.Margin=new(0,0,0,4);identity.Children.Add(episode);}
                 var source=Text(entry.Source+(entry.Via==null?"":" · через "+entry.Via),11,true);source.Margin=new(0);identity.Children.Add(source);row.Children.Add(identity);
-                if(ReleaseQuality.Poor(entry,QualityMinimum))identity.Children.Add(PoorQualityBadge());
+                if(ReleaseQuality.Poor(entry,QualityMinimum))identity.Children.Add(PoorQualityBadge(ReleaseQuality.Label(entry)));
                 var participants=Cell((entry.Seeds?.ToString()??"—")+" / "+(entry.Leechers?.ToString()??"—"),1);participants.ToolTip=$"Отдают: {entry.Seeds?.ToString()??"неизвестно"} · Скачивают: {entry.Leechers?.ToString()??"неизвестно"}";row.Children.Add(participants);var quality=Cell(entry.Quality,2);quality.FontWeight=FontWeights.SemiBold;row.Children.Add(quality);
                 row.Children.Add(Cell(VideoLabel(entry),3,true));row.Children.Add(Cell(entry.Subs,4,true));row.Children.Add(Cell(entry.Voice,5));
                 row.Children.Add(Cell(entry.Size.HasValue?DownloadService.FormatBytes(entry.Size.Value):"—",6));

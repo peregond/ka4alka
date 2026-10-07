@@ -22,17 +22,24 @@ static class ReleaseQualityTests
         Check(!item.HasQuality,"a metadata-only record cannot create a downloadable quality chip");
         item.SetReleaseQuality([Row("Film 720p"),Row("Film 2160p")]);
         Check(item.BestQuality=="4K","catalog selects the highest evidenced downloadable resolution");
+        item.SetReleaseQuality([Row("Film HDCAM 2160p")]);
+        Check(item.PosterQuality=="Экранка"&&item.HasPosterQuality&&!item.HasQuality,"screen capture uses a text poster badge instead of an advertised 4K resolution");
+        item.SetReleaseQuality([Row("Film WEB-DL 480p")]);
+        Check(item.PosterQuality=="SD","low-resolution clean video is not falsely labelled as a screen capture");
+        item.SetReleaseQuality([Row("Film HDCAM"),Row("Film WEB-DL")]);
+        Check(!item.HasPosterQuality,"unknown clean video does not invent a quality badge");
         var download=new DownloadItem{MediaTitle="Фильм",Name="file.mkv",ReleaseTitle="Фильм HDCAM 1080p"};
-        Check(download.PoorQuality,"queue quality uses release title rather than friendly film title or filename");
+        Check(download.PosterQuality=="Экранка"&&download.PoorQuality,"queue quality uses release title rather than friendly film title or filename");
         var originalData=Environment.GetEnvironmentVariable("KACHALKA_DATA");
         var settingsFolder=Path.Combine(Preferences.DataDir,"quality-settings");
         try
         {
             Environment.SetEnvironmentVariable("KACHALKA_DATA",settingsFolder);
-            Check(new Preferences().HidePoorQuality&&Preferences.Load().HidePoorQuality,"new installations hide poor quality by default");
+            Check(!new Preferences().Light&&!Preferences.Load().Light&&new Preferences().HidePoorQuality&&Preferences.Load().HidePoorQuality,"new installations hide poor quality by default");
             Directory.CreateDirectory(settingsFolder);
             var settings=Path.Combine(settingsFolder,"settings.json");
-            File.WriteAllText(settings,JsonSerializer.Serialize(new{MinimumReleaseHeight=1080}));
+            File.WriteAllText(settings,JsonSerializer.Serialize(new{Light=true,MinimumReleaseHeight=1080}));
+            Check(Preferences.Load().Light,"an explicitly selected light theme survives upgrades");
             var missing=Preferences.Load();
             Check(missing.HidePoorQuality&&missing.MinimumReleaseHeight==1080,"older settings without a quality preference use the enabled default and retain the quality minimum");
             File.WriteAllText(settings,JsonSerializer.Serialize(new{HidePoorQuality=false,MinimumReleaseHeight=720}));

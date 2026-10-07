@@ -31,6 +31,9 @@ public record MediaItem(int Id, string Title, string Section, string Genre, int 
     string bestQuality="";
     [JsonIgnore] public string BestQuality=>bestQuality;
     [JsonIgnore] public bool HasQuality=>bestQuality.Length>0;
+    string posterQuality="";
+    [JsonIgnore] public string PosterQuality=>posterQuality;
+    [JsonIgnore] public bool HasPosterQuality=>posterQuality.Length>0;
     [JsonIgnore] public string Scores => liveScores ?? (Cinema ? $"КП {Kinopoisk}   IMDb {Imdb}" : Section);
     public event PropertyChangedEventHandler? PropertyChanged;
     [JsonIgnore] public bool OnlyPoorQuality {get;private set;}
@@ -40,6 +43,9 @@ public record MediaItem(int Id, string Title, string Section, string Genre, int 
         var value=ReleaseQuality.OnlyPoor(rows,minimum);
         var height=rows.Where(x=>(x.TorrentUrl!=null||x.Source=="Internet Archive")&&!ReleaseQuality.Poor(x,720)).Select(x=>ReleaseQuality.Height(x)??0).DefaultIfEmpty(0).Max();
         var quality=height>=2160?"4K":height>=1080?"Full HD":height>=720?"HD Ready":"";
+        var available=rows.Where(x=>x.TorrentUrl!=null||x.Source=="Internet Archive").ToArray();
+        var label=quality.Length>0?quality:available.Length>0&&available.All(ReleaseQuality.IsScreen)?"Экранка":value?"SD":"";
+        if(label!=posterQuality){posterQuality=label;PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(PosterQuality)));PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(HasPosterQuality)));}
         if(value!=OnlyPoorQuality){OnlyPoorQuality=value;PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(OnlyPoorQuality)));}
         if(quality!=bestQuality){bestQuality=quality;PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(BestQuality)));PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(HasQuality)));}
     }
@@ -75,7 +81,7 @@ public class Preferences
 {
     public string Folder { get;set; }=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),"Downloads","Ka4alka");
     public bool FolderConfigured {get;set;}
-    public bool Light {get;set;}
+    public bool Light {get;set;}=false;
     public int MaxDownloadKbps {get;set;}
     public int MaxUploadKbps {get;set;}
     public string DownloadSort {get;set;}="newest";
@@ -126,6 +132,8 @@ public class DownloadItem : INotifyPropertyChanged
     [JsonIgnore] public string DisplayName=>string.IsNullOrWhiteSpace(MediaTitle)?Name:MediaTitle;
     [JsonIgnore] public bool HasMediaCard=>DownloadMetadata.Card(this)!=null;
     [JsonIgnore] public int MinimumQualityHeight {get;set;}=720;
+    [JsonIgnore] public string PosterQuality=>ReleaseQuality.Label(new SourceEntry("",string.IsNullOrWhiteSpace(ReleaseTitle)?Name:ReleaseTitle,"","",null,null));
+    [JsonIgnore] public bool HasPosterQuality=>PosterQuality.Length>0;
     [JsonIgnore] public bool PoorQuality=>ReleaseQuality.Poor(new SourceEntry("",string.IsNullOrWhiteSpace(ReleaseTitle)?Name:ReleaseTitle,"","",null,null),MinimumQualityHeight);
     [JsonIgnore] public long DownloadRate {get;set;}
     [JsonIgnore] public long UploadRate {get;set;}

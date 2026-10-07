@@ -117,6 +117,25 @@ public partial class MainWindow
             catch(Exception error){prefs.AutoResumeDownloads=previous;resume.IsChecked=previous;Feedback(resumeNotice,"Не удалось сохранить настройки: "+error.Message,true);}
         }
         resume.Click+=(_,_)=>SaveResume();
+        var system=Card("Windows","Автозапуск и подключения участников раздачи.","IconSettings");
+        var startupNotice=Notice(system);
+        var startup=new CheckBox{Name="SettingsStartup",Content=Text("Открывать Качалку при входе в Windows"),IsChecked=WindowsIntegration.StartupEnabled,Style=(Style)FindResource("SettingsSwitch"),Margin=new(0,0,0,12)};
+        AutomationProperties.SetName(startup,"Запускать Качалку вместе с Windows");system.Children.Add(startup);
+        startup.Click+=(_,_)=>
+        {
+            try{WindowsIntegration.SetStartup(startup.IsChecked==true);Feedback(startupNotice,startup.IsChecked==true?"Качалка будет открываться при входе в Windows.":"Автозапуск выключен.");}
+            catch(Exception error){startup.IsChecked=WindowsIntegration.StartupEnabled;Feedback(startupNotice,"Не удалось изменить автозапуск: "+error.Message,true);}
+        };
+        Divider(system);
+        system.Children.Add(Text("Брандмауэр",13));
+        system.Children.Add(Text("Разреши входящие TCP и UDP для Качалки в частных сетях. Windows попросит права администратора. Это может помочь поиску участников раздачи; в общедоступных сетях исключение не применяется.",12,true));
+        var firewallNotice=Notice(system);
+        var firewall=AsyncButton("Разрешить в брандмауэре",async()=>
+        {
+            try{Feedback(firewallNotice,await WindowsIntegration.AllowFirewallAsync()?"Исключение для Качалки добавлено.":"Запрос отменён. Настройки брандмауэра не изменены.");}
+            catch(Exception error){ErrorLog.Write(error);Feedback(firewallNotice,error.Message,true);}
+        });
+        AutomationProperties.SetName(firewall,"Разрешить Качалку в брандмауэре");firewall.HorizontalAlignment=HorizontalAlignment.Left;system.Children.Add(firewall);
         RenderUpdateSettings(Card("Обновления","Приложение всегда под рукой в актуальной версии.","IconRefresh"));
         var diagnostics=Card("Помощь и диагностика","Отчёт поможет разобраться с ошибкой. Пути к личным папкам и ключи доступа скрываются.","IconInfo");
         var diagnosticActions=new WrapPanel();diagnostics.Children.Add(diagnosticActions);

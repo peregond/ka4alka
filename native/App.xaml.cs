@@ -8,7 +8,7 @@ public partial class App : Application
         base.OnStartup(e);
         var key=Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(Preferences.DataDir)))[..16];
         instance=new Mutex(true,@"Local\Kachalka-"+key,out bool first);
-        if(!first){MessageBox.Show("Качалка уже запущена.","Качалка");Shutdown();return;}
+        if(!first){if(!e.Args.Contains("--startup"))MessageBox.Show("Качалка уже запущена.","Качалка");Shutdown();return;}
         installPresence=new Mutex(false,@"Local\Kachalka-Install");
         DispatcherUnhandledException += (_, args) => { ErrorLog.Write(args.Exception); MessageBox.Show(args.Exception.Message, "Качалка"); args.Handled = true; };
         var window=new MainWindow();
@@ -30,7 +30,7 @@ public partial class App : Application
         if(!e.Args.Any(arg=>arg.StartsWith("--",StringComparison.Ordinal)&&arg.EndsWith("-smoke-test",StringComparison.Ordinal)))
         {
             bool prompted=false;
-            window.ContentRendered+=async(_,_)=>{if(prompted)return;prompted=true;window.EnsureDownloadFolder();await window.CheckUpdatesAsync();};
+            window.ContentRendered+=async(_,_)=>{if(prompted)return;prompted=true;window.EnsureFirstRunSetup();await window.CheckUpdatesAsync();};
         }
         if(e.Args.Length==2&&e.Args[0]=="--design-smoke-test"){bool running=false;window.ContentRendered+=async(_,_)=>{if(running)return;running=true;try{await window.DesignSmokeTest(e.Args[1]);}catch(Exception error){System.IO.Directory.CreateDirectory(e.Args[1]);System.IO.File.WriteAllText(System.IO.Path.Combine(e.Args[1],"error.txt"),error.ToString());window.Close();}};}
         if(e.Args.Length==2&&e.Args[0]=="--live-smoke-test"){bool running=false;window.ContentRendered+=async(_,_)=>{if(running)return;running=true;try{await window.LiveSmokeTest(e.Args[1]);}catch(Exception error){System.IO.Directory.CreateDirectory(e.Args[1]);System.IO.File.WriteAllText(System.IO.Path.Combine(e.Args[1],"error.txt"),error.ToString());window.Close();}};}

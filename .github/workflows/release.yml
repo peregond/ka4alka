@@ -5,21 +5,21 @@ on:
       version:
         description: Version matching native/Kachalka.csproj
         required: true
-        default: '0.29.1'
+        default: '0.29.2'
   push:
-    branches: [codex/ui-polish-0.29.1]
+    branches: [codex/ui-actions-0.29.2]
     paths: [.github/workflows/release.yml, 'native/**', 'update-core/**', 'updater/**', 'update-tests/**', 'tests/**', 'installer/**', build-release.ps1, package-release.ps1]
 permissions:
   contents: write
 concurrency:
-  group: kachalka-release
+  group: kachalka-release-0.29.2
   cancel-in-progress: false
 jobs:
   release:
     runs-on: windows-latest
     timeout-minutes: 25
     env:
-      RELEASE_VERSION: ${{ inputs.version || '0.29.1' }}
+      RELEASE_VERSION: ${{ inputs.version || '0.29.2' }}
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
     steps:
       - uses: actions/checkout@v4
@@ -53,9 +53,9 @@ jobs:
             [System.IO.File]::WriteAllText($key,$env:RELEASE_SIGNING_KEY)
             ./build-release.ps1 -Version $env:RELEASE_VERSION -SigningKeyPath $key -MakeNsis 'C:/Program Files (x86)/NSIS/makensis.exe'
           } finally { Remove-Item $key -ErrorAction SilentlyContinue }
-      - name: Verify upgrade from previously published 0.29.0
+      - name: Verify upgrade from previously published 0.29.1
         shell: pwsh
-        run: ./tests/WindowsPublishedUpgrade.ps1 -FromVersion 0.29.0 -ReleaseDirectory ('dist/release-'+$env:RELEASE_VERSION)
+        run: ./tests/WindowsPublishedUpgrade.ps1 -FromVersion 0.29.1 -ReleaseDirectory ('dist/release-'+$env:RELEASE_VERSION)
       - name: Upload verified files to draft GitHub Release
         shell: pwsh
         env:
@@ -91,7 +91,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $names=@('catalog-dark','catalog-light','detail-wide-dark','detail-wide-light','settings-dark','settings-light','downloads-dark','downloads-light')
+          $names=@('catalog-dark','catalog-light','detail-wide-dark','detail-wide-light','settings-dark','settings-light','downloads-dark','downloads-light','installer-finish')
           $previews=@()
           foreach($name in $names){
             $source=Join-Path 'test-output/design-modern' ($name+'.png')
