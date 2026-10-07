@@ -55,6 +55,8 @@ if __name__ == '__main__':
         jobs.append((title+' kinopoisk suggestion', 'https://www.kinopoisk.ru/api/suggest/v2/?query='+urllib.parse.quote(title)))
     jobs.extend([
         ('BitRu home', 'https://bitru.org/'),
+        ('BitRu The Weight search', 'https://bitru.org/browse.php?s='+urllib.parse.quote('До последнего грамма')),
+        ('BitRu Object search', 'https://bitru.org/browse.php?s='+urllib.parse.quote('Объект преступления')),
         ('Rustorka The Weight', 'https://rustorka.com/forum/tracker.php?nm='+urllib.parse.quote('До последнего грамма'), 'cp1251'),
         ('TorLook The Weight', 'https://torlook.info/?q='+urllib.parse.quote('До последнего грамма')),
         ('The Weight imdb detail', 'https://www.imdb.com/title/tt10794054/'),
@@ -64,3 +66,12 @@ if __name__ == '__main__':
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
         for result in pool.map(lambda args: probe(*args), jobs):
             print(json.dumps(result, ensure_ascii=False), flush=True)
+    try:
+        import gzip
+        with urllib.request.urlopen('https://datasets.imdbws.com/title.ratings.tsv.gz',timeout=30) as response:
+            with gzip.GzipFile(fileobj=response) as stream:
+                found=[]
+                for line in stream:
+                    if line.startswith((b'tt10794054\t',b'tt37535559\t')):found.append(line.decode().strip())
+        print(json.dumps({'source':'Official IMDb ratings dataset','ratings':found},ensure_ascii=False),flush=True)
+    except Exception as error:print(json.dumps({'source':'Official IMDb ratings dataset','error':str(error)}),flush=True)
