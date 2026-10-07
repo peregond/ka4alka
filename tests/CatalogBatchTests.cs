@@ -35,6 +35,18 @@ static class CatalogBatchTests
         Check(capped.Items.Length==20&&!capped.HasMore,"end of source page limit drains buffer without offering impossible requests");
         using var canceled=new CancellationTokenSource();canceled.Cancel();
         try{await CatalogBatches.Load(first,Fetch,ct:canceled.Token);throw new Exception("Canceled catalog batch ran");}catch(OperationCanceledException){Check(first.Items.Length==100,"cancellation leaves previous catalog intact");}
+        foreach(var rate in new[]{60,120})
+        {
+            var position=0d;var velocity=0d;var monotonic=true;
+            for(var frame=0;frame<rate;frame++)
+            {
+                var motion=WheelScroll.Advance(position,velocity,48,1d/rate);
+                monotonic&=motion.Position>=position&&motion.Position<=48;
+                if(frame==0)Check(motion.Position<5,"smooth wheel starts gently instead of jumping on its first frame");
+                position=motion.Position;velocity=motion.Velocity;
+            }
+            Check(monotonic&&Math.Abs(position-48)<.01,"smooth wheel stays within bounds and reaches the same distance at "+rate+" Hz");
+        }
         Check(WheelScroll.Distance(120,3,500)==48&&WheelScroll.Distance(30,3,500)==12,"wheel uses small pixel steps and preserves precision deltas");
         Check(WheelScroll.Distance(120,0,500)==0&&WheelScroll.Distance(120,-1,500)==425,"wheel respects disabled scrolling and system page preference");
         Check(WheelScroll.Destination(200,248,-48,1000,true)==152,"wheel reversal discards pending motion in old direction");

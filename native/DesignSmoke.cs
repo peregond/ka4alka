@@ -89,10 +89,10 @@ public partial class MainWindow
             MinWidth=Math.Min(width,MaxWidth-24);MinHeight=Math.Min(height,MaxHeight-24);
             Width=MinWidth;Height=MinHeight;await Settle();
         }
-        void Shot(string name)
+        void Shot(string name,double rasterScale=1)
         {
             UpdateLayout();
-            var bitmap=new RenderTargetBitmap(Math.Max(1,(int)Math.Ceiling(ActualWidth)),Math.Max(1,(int)Math.Ceiling(ActualHeight)),96,96,PixelFormats.Pbgra32);bitmap.Render(this);
+            var bitmap=new RenderTargetBitmap(Math.Max(1,(int)Math.Ceiling(ActualWidth*rasterScale)),Math.Max(1,(int)Math.Ceiling(ActualHeight*rasterScale)),96*rasterScale,96*rasterScale,PixelFormats.Pbgra32);bitmap.Render(this);
             var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(bitmap));using var stream=File.Create(Path.Combine(output,name+".png"));png.Save(stream);
         }
         ComboBox QualityFilter()=>FindVisual<ComboBox>(Body,x=>AutomationProperties.GetName(x)=="Раздачи: Качество")??throw new Exception("Quality filter is missing.");
@@ -138,15 +138,28 @@ public partial class MainWindow
             await Settle();liveKey=CurrentCatalogKey;
             await Size(1760,950);
             Render();await Settle();
+            if(TextOptions.GetTextFormattingMode(this)!=TextFormattingMode.Ideal||TextOptions.GetTextRenderingMode(this)!=TextRenderingMode.Grayscale)throw new Exception("Text does not use smooth grayscale fractional metrics.");
             var wheelScrolling=await CheckWheelScrolling();
             MinWidth=360;MinHeight=300;
             var searchSettings=await CheckSearchAndSettings(output);
             await Size(1760,950);
             System.Windows.Input.Keyboard.ClearFocus();
             Search.Text="";searchDelay.Stop();liveKey=CurrentCatalogKey;
+            foreach(var (item,index) in liveItems.Take(2).Select((item,index)=>(item,index)))
+            {
+                liveReleases[item.Id]=[new("quality-preview-"+index,item.Title+(index==0?" WEB-DL 1080p":" WEB-DL 2160p"),"Preview fixture","","https://example.invalid/preview.torrent",null)];
+                releaseViews[item.Id]=new(){ReceivedUtc=DateTime.UtcNow};
+            }
             prefs.Light=true;ApplyTheme();current=null;Render();await Settle();Shot("catalog-light");
+            Shot("catalog-light-125",1.25);
             var catalogColumnsLight=catalogColumns;
             prefs.Light=false;ApplyTheme();Render();await Settle();Shot("catalog-dark");
+            foreach(var scale in new[]{1.2,1.25,1.5})Shot("catalog-dark-"+(int)(scale*100),scale);
+            foreach(var badge in VisualElements<Border>(Body).Where(x=>x.Name=="PosterQualityBadge"&&x.IsVisible))
+            {
+                if(badge.HorizontalAlignment!=HorizontalAlignment.Left||badge.VerticalAlignment!=VerticalAlignment.Top||badge.Parent is not Grid poster||poster.Children.OfType<Image>().Count()!=1)throw new Exception("Quality badge is not on the poster's top-left corner.");
+            }
+            if(!VisualElements<Border>(Body).Any(x=>x.Name=="PosterQualityBadge"&&x.IsVisible))throw new Exception("Known quality badge is missing.");
             if(ActualWidth<1700||ActualHeight<900||FiltersPanel.Visibility!=Visibility.Visible||inlineCatalogFilterScroll?.Parent!=FilterControls||discoveryHero is not {ActualHeight:>180}||discoveryHero.Children.Count!=2||discoveryShelf is not {ActualWidth:>500})throw new Exception($"Cinematic desktop catalog is missing its banners, curated row or right filters ({ActualWidth}x{ActualHeight}, rail={FiltersPanel.Visibility}, hero={discoveryHero?.ActualHeight}, shelf={discoveryShelf?.ActualWidth}).");
             if(VisualElements<UIElement>(Body).Any(x=>x.Effect!=null))throw new Exception("Cinematic catalog adds an expensive blur or shadow effect.");
             var featurePosterWidths=VisualElements<Image>(discoveryHero!).Select(x=>(x.Source as BitmapSource)?.PixelWidth??0).ToArray();
@@ -268,6 +281,7 @@ public partial class MainWindow
                 ExternalSourcesRequired=false,FixtureHasCachedPoster=preview!=null,FeaturePosterWidths=featurePosterWidths,FilterPersistedAfterRender=true,FilterPersistedAfterResize=true,DownloadStarted=false,EngineCreated=downloads.EngineCreated,
                 ShortDescriptionLength=shortDescription.Length,ShortDescriptionExpanded=true,ShortDescriptionExpandedHeight=shortDescriptionExpandedHeight,SeriesSeasonFilter=true,
                 DownloadTelemetryFitsNarrowWindow=true,DownloadTextFollowsTheme=true,
+                TextRendering="Grayscale",TextFormatting="Ideal",FractionalRasterScales=new[]{1.2,1.25,1.5},QualityBadgeOnPoster=true,
                 SearchAndSettings=searchSettings,
                 WheelScrolling=wheelScrolling,
                 SourceFailureVisible=true,SourceProgressPreservesOpenFilter=true,SourceProgressPreservesScroll=true,SourceRetryState=true,

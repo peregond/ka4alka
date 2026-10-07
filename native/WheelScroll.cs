@@ -17,6 +17,21 @@ public static class WheelScroll
     public static void SetIsEnabled(DependencyObject element,bool value)=>element.SetValue(IsEnabledProperty,value);
     public static bool GetIsEnabled(DependencyObject element)=>(bool)element.GetValue(IsEnabledProperty);
     internal static bool IsMoving(ScrollViewer viewer)=>(viewer.GetValue(MotionProperty) as Motion)?.Running==true;
+    // The native smoke test exercises both paths even on a headless Windows runner.
+    internal static bool? SmoothOverride;
+    internal static bool SmoothingEnabled=>SmoothOverride??SystemParameters.ClientAreaAnimation;
+
+    public static (double Position,double Velocity) Advance(double position,double velocity,double target,double seconds)
+    {
+        // An exact critically damped spring preserves velocity between wheel events.
+        // Unlike restarting a short ease-out, the first frame starts gently.
+        const double frequency=28;
+        seconds=Math.Clamp(seconds,0,.05);
+        var displacement=position-target;
+        var travel=(velocity+frequency*displacement)*seconds;
+        var decay=Math.Exp(-frequency*seconds);
+        return(target+(displacement+travel)*decay,(velocity-frequency*travel)*decay);
+    }
 
     // Coordinates are WPF device-independent pixels, so the step scales with Windows DPI.
     public static double Distance(int delta,int lines,double viewport)=>delta/120d*(lines<0?Math.Max(0,viewport)*.85:Math.Clamp(lines,0,6)*16d);
@@ -68,22 +83,22 @@ public static class WheelScroll
     sealed class Motion
     {
         readonly ScrollViewer viewer;
-        readonly DispatcherTimer timer;
         DispatcherOperation? immediate;
-        double start,target;
-        long began;
-        public bool Running=>timer.IsEnabled||immediate?.Status==DispatcherOperationStatus.Pending;
+        double position,target,velocity;
+        long lastTick;
+        TimeSpan lastFrame;
+        bool rendering;
+        public bool Running=>rendering||immediate?.Status==DispatcherOperationStatus.Pending;
         public Motion(ScrollViewer viewer)
         {
             this.viewer=viewer;
-            timer=new(DispatcherPriority.Background,viewer.Dispatcher){Interval=TimeSpan.FromMilliseconds(16)};
-            timer.Tick+=Tick;viewer.Unloaded+=(_,_)=>Stop();
+            viewer.Unloaded+=(_,_)=>Stop();
         }
         public void Move(double distance)
         {
-            if(!SystemParameters.ClientAreaAnimation)
+            if(!SmoothingEnabled)
             {
-                timer.Stop();
+                StopRendering();
                 // ScrollViewer applies scroll commands during layout. Accumulate
                 // input arriving before that layout instead of reading a stale offset.
                 var pending=immediate?.Status==DispatcherOperationStatus.Pending;
@@ -97,21 +112,30 @@ public static class WheelScroll
                 }));
                 return;
             }
-            var next=Destination(viewer.VerticalOffset,target,distance,viewer.ScrollableHeight,Running);
+            if(!rendering)position=viewer.VerticalOffset;
+            var next=Destination(position,target,distance,viewer.ScrollableHeight,Running);
+            if(Math.Sign(next-position)!=Math.Sign(velocity))velocity=0;
             immediate?.Abort();immediate=null;
-            start=viewer.VerticalOffset;target=next;began=Stopwatch.GetTimestamp();
-            if(Math.Abs(target-start)<.1){Stop();return;}
-            timer.Start();
+            target=next;
+            if(Math.Abs(target-position)<.1){Stop();return;}
+            if(rendering)return;
+            lastTick=Stopwatch.GetTimestamp();lastFrame=TimeSpan.MinValue;
+            rendering=true;CompositionTarget.Rendering+=Tick;
         }
         void Tick(object? sender,EventArgs e)
         {
             if(!viewer.IsLoaded||!viewer.IsVisible){Stop();return;}
-            var progress=Math.Min(1,Stopwatch.GetElapsedTime(began).TotalMilliseconds/120);
+            if(e is RenderingEventArgs frame){if(frame.RenderingTime==lastFrame)return;lastFrame=frame.RenderingTime;}
+            var seconds=Stopwatch.GetElapsedTime(lastTick).TotalSeconds;lastTick=Stopwatch.GetTimestamp();
             target=Math.Clamp(target,0,viewer.ScrollableHeight);
-            var eased=1-Math.Pow(1-progress,3);
-            viewer.ScrollToVerticalOffset(start+(target-start)*eased);
-            if(progress>=1)Stop();
+            // Keep the fractional position between frames; virtualizing panels may
+            // round the displayed offset, which must not stall the spring near rest.
+            var next=Advance(position,velocity,target,seconds);velocity=next.Velocity;
+            position=Math.Clamp(next.Position,0,viewer.ScrollableHeight);
+            viewer.ScrollToVerticalOffset(position);
+            if(Math.Abs(target-next.Position)<.25&&Math.Abs(velocity)<4){viewer.ScrollToVerticalOffset(target);Stop();}
         }
-        public void Stop(){timer.Stop();immediate?.Abort();immediate=null;}
+        void StopRendering(){if(rendering){CompositionTarget.Rendering-=Tick;rendering=false;}velocity=0;}
+        public void Stop(){StopRendering();immediate?.Abort();immediate=null;}
     }
 }

@@ -7,7 +7,7 @@
   <LinearGradientBrush x:Key="PrimaryFill" StartPoint="0,0" EndPoint="1,1"><GradientStop Color="#6232EF" Offset="0"/><GradientStop Color="#2764EF" Offset="1"/></LinearGradientBrush>
   <RadialGradientBrush x:Key="AmbientGlow" Center="0.35,0" GradientOrigin="0.35,0" RadiusX="0.7" RadiusY="0.8"><GradientStop Color="#4D4923A1" Offset="0"/><GradientStop Color="#002A4DDC" Offset="1"/></RadialGradientBrush>
   <Style TargetType="Window">
-   <Setter Property="Background" Value="{DynamicResource Bg}"/><Setter Property="Foreground" Value="{DynamicResource Text}"/><Setter Property="FontFamily" Value="pack://application:,,,/Kachalka;component/Fonts/#Inter"/><Setter Property="FontSize" Value="13"/><Setter Property="UseLayoutRounding" Value="True"/><Setter Property="TextOptions.TextFormattingMode" Value="Display"/>
+   <Setter Property="Background" Value="{DynamicResource Bg}"/><Setter Property="Foreground" Value="{DynamicResource Text}"/><Setter Property="FontFamily" Value="pack://application:,,,/Kachalka;component/Fonts/#Inter"/><Setter Property="FontSize" Value="13"/><Setter Property="UseLayoutRounding" Value="True"/><Setter Property="TextOptions.TextFormattingMode" Value="Ideal"/><Setter Property="TextOptions.TextRenderingMode" Value="Grayscale"/>
   </Style>
 
   <SolidColorBrush x:Key="RatingInk" Color="#FFD166"/>
