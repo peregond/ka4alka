@@ -57,7 +57,10 @@ public partial class MainWindow
         {
             // An ordinary rounded Border is the rendering reference. This checks the
             // actual alpha contour, including clipping and any interaction overlays.
-            var reference=new Border{Width=element.ActualWidth,Height=element.ActualHeight,CornerRadius=new(radius),BorderThickness=new(thickness),Background=Brushes.White,BorderBrush=Brushes.White,UseLayoutRounding=true,SnapsToDevicePixels=true};
+            // The visible stroke follows pixel snapping. The explicit artwork
+            // geometry does not: its last raster row can legitimately cover
+            // half a pixel at fractional scales, so compare an unsnapped fill.
+            var reference=new Border{Width=element.ActualWidth,Height=element.ActualHeight,CornerRadius=new(radius),BorderThickness=new(thickness),Background=Brushes.White,BorderBrush=Brushes.White,UseLayoutRounding=thickness>0,SnapsToDevicePixels=thickness>0};
             var size=new Size(reference.Width,reference.Height);reference.Measure(size);reference.Arrange(new Rect(size));reference.UpdateLayout();
             var actual=Raster(element,scale);var expected=Raster(reference,scale);
             if(actual.PixelWidth!=expected.PixelWidth||actual.PixelHeight!=expected.PixelHeight)throw new Exception(stage+": rounded contour has the wrong dimensions.");
