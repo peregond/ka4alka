@@ -75,6 +75,6 @@ public partial class MainWindow
             next.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await settle();
             check(livePage==2&&catalogRegion=="foreign"&&liveItems.Count>0&&liveItems.All(item=>CatalogRegions.IsForeign(item,home))&&!liveItems.Select(item=>item.Id).Intersect(foreignFirst).Any(),"Foreign discovery pagination keeps the regional selection without repeating page 1");
         }
-        await Default();
+        await Default();await CheckDiscoveryShelfQuality(check);
     }
 }

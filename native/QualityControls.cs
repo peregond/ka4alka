@@ -32,11 +32,20 @@ public partial class MainWindow
     readonly Dictionary<int,DateTime> catalogQualityAttempts=[];
     CancellationTokenSource? catalogQualityRequest;
     string catalogQualityCheckKey="";
+    sealed class CatalogQualityQueue(bool force)
+    {
+        public readonly Queue<MediaItem> Pending=[];
+        public readonly HashSet<int> Scheduled=[];
+        public readonly bool Force=force;
+        public int FallbackBudget=4;
+    }
+    CatalogQualityQueue? catalogQualityQueue;
+    Func<MediaItem,CancellationToken,Task<IReadOnlyList<SourceEntry>>>? catalogQualityProvider;
     bool forceCatalogQualityCheck;
     bool CatalogQualityChecking=>catalogQualityRequest is {IsCancellationRequested:false};
     void CancelCatalogQualityCheck()
     {
-        catalogQualityRequest?.Cancel();catalogQualityRequest=null;catalogQualityCheckKey="";
+        catalogQualityRequest?.Cancel();catalogQualityRequest=null;catalogQualityCheckKey="";catalogQualityQueue=null;
     }
     void ResetCatalogQualityChecks()
     {
@@ -52,22 +61,23 @@ public partial class MainWindow
     void StartCatalogQualityCheck(IReadOnlyList<MediaItem> currentPage)
     {
         if(prefs.CatalogQualityHeight==0||closed||current!=null||activePerson!=null){CancelCatalogQualityCheck();return;}
-        // Only this page is checked. Navigation cancels its work; a render or a
-        // failed provider cannot restart the same request in an endless loop.
-        var items=currentPage.Where(x=>x.IsLive).DistinctBy(x=>x.Id).Take(CatalogPaging.Size).ToArray();
-        var key=CurrentCatalogKey+"|"+favoritesOnly+"|"+prefs.CatalogQualityHeight+"|"+string.Join(',',items.Select(x=>x.Id));
-        if(catalogQualityCheckKey==key)return;
-        CancelCatalogQualityCheck();catalogQualityCheckKey=key;
-        if(items.Length==0||Environment.GetCommandLineArgs().Any(x=>x.EndsWith("-smoke-test",StringComparison.Ordinal)))return;
-        var force=forceCatalogQualityCheck;forceCatalogQualityCheck=false;
-        var pending=items.Where(x=>force||!FreshQuality(x)&&(!catalogQualityAttempts.TryGetValue(x.Id,out var attempted)||attempted<DateTime.UtcNow.AddMinutes(-5))).ToArray();
-        if(pending.Length==0)return;
+        // Main-page identity defines the request lifetime. Late discovery rows
+        // join that same bounded queue, so progress does not cancel its work.
+        var page=currentPage.Where(x=>x.IsLive).DistinctBy(x=>x.Id).Take(CatalogPaging.Size).ToArray();
+        var key=CurrentCatalogKey+"|"+favoritesOnly+"|"+prefs.CatalogQualityHeight+"|"+string.Join(',',page.Select(x=>x.Id));
+        if(catalogQualityCheckKey!=key){CancelCatalogQualityCheck();catalogQualityCheckKey=key;}
+        var items=DiscoveryQualityCandidates(page);
+        if(items.Length==0||catalogQualityProvider==null&&Environment.GetCommandLineArgs().Any(x=>x.EndsWith("-smoke-test",StringComparison.Ordinal)))return;
+        var work=catalogQualityQueue??=new CatalogQualityQueue(forceCatalogQualityCheck);forceCatalogQualityCheck=false;
+        foreach(var item in items)
+            if(work.Scheduled.Count<CatalogPaging.Size*4&&work.Scheduled.Add(item.Id)&&(work.Force||!FreshQuality(item)&&(!catalogQualityAttempts.TryGetValue(item.Id,out var attempted)||attempted<DateTime.UtcNow.AddMinutes(-5))))work.Pending.Enqueue(item);
+        if(catalogQualityRequest!=null||work.Pending.Count==0)return;
         var request=catalogQualityRequest=new CancellationTokenSource(TimeSpan.FromSeconds(60));
-        _ = CheckCatalogQuality(pending,prefs.CatalogQualityHeight,request,key,force);
+        _ = CheckCatalogQuality(work,prefs.CatalogQualityHeight,request,key);
     }
-    async Task CheckCatalogQuality(MediaItem[] items,int height,CancellationTokenSource request,string key,bool force)
+    async Task CheckCatalogQuality(CatalogQualityQueue work,int height,CancellationTokenSource request,string key)
     {
-        var token=request.Token;var fallbackBudget=4;
+        var token=request.Token;
         bool IsCurrent()=>!closed&&!token.IsCancellationRequested&&ReferenceEquals(catalogQualityRequest,request)&&catalogQualityCheckKey==key&&current==null&&activePerson==null;
         async Task Check(MediaItem item)
         {
@@ -75,7 +85,7 @@ public partial class MainWindow
             try
             {
                 token.ThrowIfCancellationRequested();
-                if(!force&&FreshQuality(item))return;
+                if(!work.Force&&FreshQuality(item))return;
                 var saved=KnownQuality(item);var indexed=Array.Empty<SourceEntry>();
                 SourceCheck indexState;
                 using(var deadline=CancellationTokenSource.CreateLinkedTokenSource(token))
@@ -83,7 +93,7 @@ public partial class MainWindow
                     deadline.CancelAfter(TimeSpan.FromSeconds(8));
                     try
                     {
-                        indexed=(await onlineIndex.Releases(item,deadline.Token).WaitAsync(deadline.Token)).ToArray();
+                        indexed=(await (catalogQualityProvider==null?onlineIndex.Releases(item,deadline.Token):catalogQualityProvider(item,deadline.Token)).WaitAsync(deadline.Token)).ToArray();
                         var now=DateTime.UtcNow;indexState=new("Онлайн-индекс",indexed.Length>0?SourceState.Ready:SourceState.Empty,indexed.Length,now,now);
                     }
                     catch(OperationCanceledException)when(token.IsCancellationRequested){throw;}
@@ -92,7 +102,7 @@ public partial class MainWindow
                 }
                 token.ThrowIfCancellationRequested();
                 var fresh=indexed;var sources=new[]{indexState};
-                if(!ReleaseQuality.HasResolution(ReleaseSearch.WithSaved(indexed,saved),height)&&Interlocked.Decrement(ref fallbackBudget)>=0)
+                if(!ReleaseQuality.HasResolution(ReleaseSearch.WithSaved(indexed,saved),height)&&Interlocked.Decrement(ref work.FallbackBudget)>=0)
                 {
                     // A small fallback budget avoids a full multi-tracker source
                     // scan for every poster, and does not fetch movie metadata.
@@ -117,7 +127,17 @@ public partial class MainWindow
             }
             finally{catalogQualitySlots.Release();}
         }
-        try{await Task.Yield();await Task.WhenAll(items.Select(Check));}
+        async Task Worker()
+        {
+            while(IsCurrent()&&work.Pending.Count>0)
+            {
+                var item=work.Pending.Dequeue();
+                try{await Check(item);}
+                catch(System.IO.IOException){}
+                catch(UnauthorizedAccessException){}
+            }
+        }
+        try{await Task.Yield();await Task.WhenAll(Worker(),Worker());}
         catch(OperationCanceledException)when(token.IsCancellationRequested){}
         catch(System.IO.IOException){}
         catch(UnauthorizedAccessException){}
@@ -125,6 +145,7 @@ public partial class MainWindow
         finally
         {
             var active=ReferenceEquals(catalogQualityRequest,request);
+            if(token.IsCancellationRequested)work.Pending.Clear();
             if(active)catalogQualityRequest=null;
             request.Dispose();
             if(active&&!closed&&current==null&&activePerson==null&&(section is "Фильмы" or "Сериалы")&&!VisualElements<Button>(RootGrid).Any(x=>x.ContextMenu?.IsOpen==true))RenderCatalogKeepingPosition();

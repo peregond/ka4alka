@@ -78,6 +78,7 @@ public partial class MainWindow
         if(!discoveryRegions.ContainsKey(key)&&discoveryRegions.Count>=4)discoveryRegions.Remove(discoveryRegions.Keys.First());
         discoveryRegions[key]=new(foreign.Where(item=>CatalogRegions.IsForeign(item,homeCountry)).DistinctBy(item=>item.Id).Take(40).ToArray(),native.Where(item=>CatalogRegions.IsNative(item,homeCountry)).DistinctBy(item=>item.Id).Take(40).ToArray(),loading);
         if(closed||!DiscoveryCatalog||section!=category||prefs.HomeCountry!=homeCountry)return;
+        StartDiscoveryQualityCheck();
         var page=DiscoveryRegionalItems(category,homeCountry,liveItems.ToArray());
         if(discoveryShelves.TryGetValue(DiscoveryShelfKind.Foreign,out var foreignShelf))foreignShelf.Set(page.Foreign,page.Loading);
         if(discoveryShelves.TryGetValue(DiscoveryShelfKind.Native,out var nativeShelf))nativeShelf.Set(page.Native,page.Loading);

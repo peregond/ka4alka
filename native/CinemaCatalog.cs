@@ -87,6 +87,7 @@ public partial class MainWindow
             if(request.IsCancellationRequested||generation!=featuredGeneration||closed)return;
             if(page.Items.Length>0){catalogPages[category+"||1"]=page;featuredFallback.Remove(category);}
             else featuredFallback.Add(category);
+            if(DiscoveryCatalog&&section==category)StartDiscoveryQualityCheck();
         }
         catch(OperationCanceledException)when(request.IsCancellationRequested&&generation!=featuredGeneration){return;}
         catch{if(generation==featuredGeneration&&!closed)featuredFallback.Add(category);}
