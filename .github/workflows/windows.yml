@@ -10,6 +10,22 @@ concurrency:
   group: windows-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 jobs:
+  portraits:
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Verify live participant photographs
+        run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --probe-portraits
+      - name: Upload portrait-source evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: participant-photo-evidence
+          path: test-output/transfer-*/portrait-source/*
   windows:
     runs-on: windows-latest
     timeout-minutes: 20
@@ -20,8 +36,6 @@ jobs:
           dotnet-version: '10.0.x'
       - name: Install NSIS
         run: ./scripts/install-nsis.ps1
-      - name: Verify live participant photographs
-        run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --probe-portraits
       - name: Validate installer and signed update on Windows
         if: ${{ !cancelled() }}
         shell: pwsh

@@ -19,7 +19,7 @@ public static class PortraitSourceProbe
             (Person:new CinemaPerson("Джеймс Кэмерон","Режиссёры",""),Film:"Аватар",Year:2009,Original:"Avatar"),
             (Person:new CinemaPerson("Том Холланд","Актёры",""),Film:"Человек-паук: Нет пути домой",Year:2021,Original:"Spider-Man: No Way Home"),
             (Person:new CinemaPerson("Ребекка Фергюсон","Актёры",""),Film:"Укрытие",Year:2023,Original:"Silo"),
-            (Person:new CinemaPerson("Иван Янковский","Актёры",""),Film:"Временные трудности",Year:2018,Original:"")
+            (Person:new CinemaPerson("Сергей Безруков","Актёры",""),Film:"Высоцкий. Спасибо, что живой",Year:2011,Original:"")
         };
         var evidence=new List<object>();
         var failures=new List<Exception>();
@@ -66,9 +66,10 @@ public static class PortraitSourceProbe
         {
             using var timeout=CancellationTokenSource.CreateLinkedTokenSource(ct);timeout.CancelAfter(TimeSpan.FromSeconds(20));
             var title=sourceUrl!=null&&Uri.TryCreate(sourceUrl,UriKind.Absolute,out var page)?Uri.UnescapeDataString(page.AbsolutePath["/wiki/".Length..]).Replace('_',' '):person.Name;
-            var api="https://ru.wikipedia.org/w/api.php?action=query&format=json&redirects=1&prop=pageprops%7Cpageimages&ppprop=wikibase_item&piprop=thumbnail&pithumbsize=400&titles="+Uri.EscapeDataString(title);
+            var api="https://ru.wikipedia.org/w/api.php?action=query&format=json&redirects=1&prop=extracts%7Cpageprops%7Cpageimages&exintro=1&explaintext=1&ppprop=wikibase_item&piprop=thumbnail&pithumbsize=400&titles="+Uri.EscapeDataString(title);
             var bytes=await client.Read(new Uri(api),1024*1024,timeout.Token);var json=Encoding.UTF8.GetString(bytes);
             Console.WriteLine("PORTRAIT DIAGNOSTIC Wikipedia "+title+": "+json[..Math.Min(json.Length,4096)]);
+            Console.WriteLine("PORTRAIT DIAGNOSTIC production identity parser accepted "+CinemaPeople.ParseIdentities(bytes,person).Length+" candidate(s) for "+person.Name);
             using var document=JsonDocument.Parse(bytes);
             if(!document.RootElement.TryGetProperty("query",out var query)||!query.TryGetProperty("pages",out var pages))return;
             foreach(var candidate in pages.EnumerateObject().Select(x=>x.Value))

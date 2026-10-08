@@ -18,14 +18,28 @@ public partial class MainWindow
         poster.Freeze();
         BitmapSource Raster(FrameworkElement element,double scale)
         {
-            var bitmap=new RenderTargetBitmap((int)Math.Ceiling(element.ActualWidth*scale),(int)Math.Ceiling(element.ActualHeight*scale),96*scale,96*scale,PixelFormats.Pbgra32);
-            // A nested artwork grid has the border's inset as a visual offset.
-            // Paint its local bounds at the origin so the contour comparison
-            // measures the artwork rather than that parent layout offset.
-            var bounds=new Rect(0,0,element.ActualWidth,element.ActualHeight);
-            var brush=new VisualBrush(element){AutoLayoutContent=false,ViewboxUnits=BrushMappingMode.Absolute,Viewbox=bounds,ViewportUnits=BrushMappingMode.Absolute,Viewport=bounds,Stretch=Stretch.Fill};
-            var drawing=new DrawingVisual();using(var context=drawing.RenderOpen())context.DrawRectangle(brush,null,bounds);
-            bitmap.Render(drawing);return bitmap;
+            var size=new Size(element.ActualWidth,element.ActualHeight);
+            var bitmap=new RenderTargetBitmap((int)Math.Ceiling(size.Width*scale),(int)Math.Ceiling(size.Height*scale),96*scale,96*scale,PixelFormats.Pbgra32);
+            var parent=VisualTreeHelper.GetParent(element) as Border;
+            FrameworkElement root=element;
+            while(VisualTreeHelper.GetParent(root) is FrameworkElement ancestor)root=ancestor;
+            var detached=parent?.Child==element;
+            try
+            {
+                // A nested Grid's visual offset remains part of a direct or brush
+                // capture. Detach this isolated fixture and actually arrange it
+                // at the origin, retaining its production clip and children.
+                if(detached)
+                {
+                    parent!.Child=null;element.Measure(size);element.Arrange(new Rect(size));element.UpdateLayout();
+                    if(VisualTreeHelper.GetOffset(element).Length>0.001)throw new Exception("Banner artwork fixture could not be arranged at the origin.");
+                }
+                bitmap.Render(element);return bitmap;
+            }
+            finally
+            {
+                if(detached){parent!.Child=element;root.UpdateLayout();}
+            }
         }
         void Save(BitmapSource bitmap,string name)
         {
@@ -43,14 +57,26 @@ public partial class MainWindow
             var stride=actual.PixelWidth*4;var pixels=new byte[stride*actual.PixelHeight];var target=new byte[pixels.Length];
             actual.CopyPixels(pixels,stride,0);expected.CopyPixels(target,stride,0);
             var corner=(int)Math.Ceiling((radius+3)*scale);
+            void Fail(string message)
+            {
+                Save(actual,stage+"-failed");Save(expected,stage+"-expected");
+                var width=Math.Min(actual.PixelWidth,corner+4);
+                int[][] Rows(byte[] data)=>Enumerable.Range(0,Math.Min(4,actual.PixelHeight)).Select(y=>Enumerable.Range(0,width).Select(x=>(int)data[y*stride+x*4+3]).ToArray()).ToArray();
+                File.WriteAllText(Path.Combine(output,stage+"-failure.json"),JsonSerializer.Serialize(new
+                {
+                    Message=message,Scale=scale,ElementType=element.GetType().Name,ElementSize=element.RenderSize.ToString(),RestoredOffset=VisualTreeHelper.GetOffset(element).ToString(),
+                    Clip=element.Clip?.ToString(),ClipBounds=element.Clip?.Bounds.ToString(),ActualAlphaRows=Rows(pixels),ExpectedAlphaRows=Rows(target)
+                },new JsonSerializerOptions{WriteIndented=true}));
+                throw new Exception(message);
+            }
             foreach(var right in new[]{false,true})foreach(var bottom in new[]{false,true})
             {
                 for(var y=0;y<corner;y++)for(var x=0;x<corner;x++)
                 {
                     var px=right?actual.PixelWidth-1-x:x;var py=bottom?actual.PixelHeight-1-y:y;
                     var index=py*stride+px*4+3;var alpha=pixels[index];var expectedAlpha=target[index];
-                    if(expectedAlpha==0&&alpha>8)throw new Exception($"{stage}: artwork or ring spills outside the rounded corner at {px},{py} (alpha {alpha}).");
-                    if(expectedAlpha==255&&alpha<240)throw new Exception($"{stage}: a rounded corner is cut off at {px},{py} (alpha {alpha}).");
+                    if(expectedAlpha==0&&alpha>8)Fail($"{stage}: artwork or ring spills outside the rounded corner at {px},{py} (alpha {alpha}).");
+                    if(expectedAlpha==255&&alpha<240)Fail($"{stage}: a rounded corner is cut off at {px},{py} (alpha {alpha}).");
                 }
             }
         }

@@ -57,7 +57,7 @@ jobs:
             [System.IO.File]::WriteAllText($key,$env:RELEASE_SIGNING_KEY)
             ./build-release.ps1 -Version $env:RELEASE_VERSION -SigningKeyPath $key -MakeNsis 'C:/Program Files (x86)/NSIS/makensis.exe'
           } finally { Remove-Item $key -ErrorAction SilentlyContinue }
-      - name: Verify person card and film navigation at two window sizes
+      - name: Verify person card and film navigation at three window sizes
         shell: pwsh
         run: |
           $env:KACHALKA_DATA=Join-Path $env:RUNNER_TEMP 'kachalka-cinema-smoke'

@@ -231,7 +231,7 @@ public partial class MainWindow
             descriptionButton.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Settle();
             var expandedSynopsis=detailSynopsis??throw new Exception("Short description: synopsis disappeared after expansion.");
             if(!double.IsPositiveInfinity(expandedSynopsis.MaxHeight)||expandedSynopsis.ActualHeight<=80||expandedSynopsis.Text!=shortDescription)
-                throw new Exception("Short description: expansion did not reveal the complete text beyond 60 px.");
+                throw new Exception("Short description: expansion did not reveal the complete text beyond 80 px.");
             var shortDescriptionExpandedHeight=Math.Round(expandedSynopsis.ActualHeight);
             FindVisual<ScrollViewer>(Body,_=>true)?.ScrollToTop();await Settle();Shot("short-description-expanded");
             var show=movie with{Id=-987654318,Title="Разделение",OriginalTitle="Severance",Section="Сериалы",PageUrl="https://example.invalid/design/show"};
