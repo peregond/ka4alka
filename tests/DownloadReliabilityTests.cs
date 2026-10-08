@@ -30,7 +30,7 @@ static class DownloadReliabilityTests
         var oldData=Environment.GetEnvironmentVariable("KACHALKA_DATA");
         Environment.SetEnvironmentVariable("KACHALKA_DATA",Path.Combine(root,"reliability-state"));
         var seedFolder=Path.Combine(root,"reliability-seed");Directory.CreateDirectory(seedFolder);
-        var bytes=RandomNumberGenerator.GetBytes(2*1024*1024);var seedFile=Path.Combine(seedFolder,"reliable.bin");await File.WriteAllBytesAsync(seedFile,bytes);
+        var bytes=RandomNumberGenerator.GetBytes(4*1024*1024);var seedFile=Path.Combine(seedFolder,"reliable.bin");await File.WriteAllBytesAsync(seedFile,bytes);
         var torrent=Path.Combine(root,"reliable.torrent");await new TorrentCreator().CreateAsync(new TorrentFileSource(seedFile),torrent);
         var seedPort=Port();using var seed=new ClientEngine(Settings("reliability-seed-cache",seedPort));
         long free=4L*1024*1024*1024;
@@ -51,6 +51,10 @@ static class DownloadReliabilityTests
             var manager=Managers(service)[blocked.Id];await Until(()=>manager.State==TorrentState.Downloading,"released disk pause enters actual download mode");
             await manager.AddPeerAsync(new PeerInfo(new Uri($"ipv4://127.0.0.1:{seedPort}")));
             await Until(()=>manager.Progress>0&&manager.Progress<100,"transfer receives real pieces before simulated network loss");
+            // Freeze the receiving side before tearing down the peer. This
+            // prevents queued loopback writes from completing a small fixture
+            // while the seeder's asynchronous stop is still running.
+            await manager.PauseAsync();await manager.StopAsync(TimeSpan.FromSeconds(2));
             await seed.StopAllAsync();service.SetNetworkAvailable(false);service.Update();
             Check(blocked.Status=="Нет подключения к сети"&&!blocked.Paused&&service.GetDiagnostics(blocked).NetworkAvailable==false,"network loss is explained while preserving active queue intent");
             // Another user-paused task must not be restarted with the active one.
