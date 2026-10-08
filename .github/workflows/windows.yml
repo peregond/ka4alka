@@ -20,6 +20,8 @@ jobs:
           dotnet-version: '10.0.x'
       - name: Install NSIS
         run: ./scripts/install-nsis.ps1
+      - name: Verify live participant photographs
+        run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --probe-portraits
       - name: Validate installer and signed update on Windows
         shell: pwsh
         run: |
@@ -35,6 +37,7 @@ jobs:
         with:
           name: windows-update-evidence
           path: |
+            test-output/transfer-*/portrait-source/*
             test-output/cache-reliability/*
             test-output/cinema-ui/*
             test-output/windows-update/checks.txt

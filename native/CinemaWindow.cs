@@ -95,11 +95,11 @@ public partial class MainWindow
         var scrollers=new List<ScrollViewer>();
         bool InViewport()
         {
-            if(!image.IsLoaded||image.ActualWidth<=0||image.ActualHeight<=0)return false;
+            if(!frame.IsLoaded||frame.ActualWidth<=0||frame.ActualHeight<=0)return false;
             try
             {
                 for(DependencyObject? parent=VisualTreeHelper.GetParent(image);parent!=null;parent=VisualTreeHelper.GetParent(parent))
-                    if(parent is ScrollViewer scroll&&!image.TransformToAncestor(scroll).TransformBounds(new Rect(new Point(),image.RenderSize)).IntersectsWith(new Rect(0,0,scroll.ActualWidth,scroll.ActualHeight)))return false;
+                    if(parent is ScrollViewer scroll&&!frame.TransformToAncestor(scroll).TransformBounds(new Rect(new Point(),frame.RenderSize)).IntersectsWith(new Rect(0,0,scroll.ActualWidth,scroll.ActualHeight)))return false;
                 return true;
             }
             catch(InvalidOperationException){return false;}
@@ -112,8 +112,14 @@ public partial class MainWindow
             attempted=true;using var pending=new CancellationTokenSource();request=pending;retry.Visibility=Visibility.Collapsed;progress.Visibility=Visibility.Visible;frame.ToolTip="Загружаем фотографию…";
             try
             {
-                var url=await new CinemaPeople(sourceClient).Portrait(person,pending.Token);
-                if(url==null){frame.ToolTip="У источника пока нет фотографии.";return;}
+                var portrait=await new CinemaPeople(sourceClient).ResolvePortrait(person,pending.Token,origin);
+                var url=portrait.Url;
+                if(url==null)
+                {
+                    var unavailable=portrait.Status==PortraitStatus.Unavailable;
+                    retry.Visibility=unavailable?Visibility.Visible:Visibility.Collapsed;
+                    frame.ToolTip=unavailable?"Не удалось загрузить фотографию. Можно повторить.":"У источника пока нет фотографии.";return;
+                }
                 var key=Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(url)));portraitPath=Path.Combine(Preferences.DataDir,"portraits",key+".img");
                 await coverSlots.WaitAsync(pending.Token);
                 try
@@ -127,23 +133,28 @@ public partial class MainWindow
             }
             catch(OperationCanceledException)when(pending.IsCancellationRequested){}
             catch{if(image.IsLoaded&&!pending.IsCancellationRequested){retry.Visibility=Visibility.Visible;frame.ToolTip="Не удалось загрузить фотографию. Можно повторить.";}}
-            finally{progress.Visibility=Visibility.Collapsed;if(ReferenceEquals(request,pending))request=null;}
+            finally
+            {
+                progress.Visibility=Visibility.Collapsed;if(ReferenceEquals(request,pending))request=null;
+                if(pending.IsCancellationRequested&&image.Source==null){attempted=false;if(image.IsLoaded)_=Dispatcher.BeginInvoke(new Action(VisiblePhoto));}
+            }
         }
         void VisiblePhoto(){if(portraitPath!=null&&InViewport())CacheFiles.Touch(portraitPath);_ = LoadPhoto();}
         void Scrolled(object sender,ScrollChangedEventArgs args)=>VisiblePhoto();
+        void ViewportResized(object sender,SizeChangedEventArgs args)=>VisiblePhoto();
         image.Loaded+=(_,_)=>
         {
             for(DependencyObject? parent=VisualTreeHelper.GetParent(image);parent!=null;parent=VisualTreeHelper.GetParent(parent))
-                if(parent is ScrollViewer scroll){scrollers.Add(scroll);scroll.ScrollChanged+=Scrolled;}
-            VisiblePhoto();
+                if(parent is ScrollViewer scroll){scrollers.Add(scroll);scroll.ScrollChanged+=Scrolled;scroll.SizeChanged+=ViewportResized;}
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded,new Action(VisiblePhoto));
         };
         image.SizeChanged+=(_,_)=>VisiblePhoto();
-        image.Unloaded+=(_,_)=>{request?.Cancel();foreach(var scroll in scrollers)scroll.ScrollChanged-=Scrolled;scrollers.Clear();};
+        image.Unloaded+=(_,_)=>{request?.Cancel();foreach(var scroll in scrollers){scroll.ScrollChanged-=Scrolled;scroll.SizeChanged-=ViewportResized;}scrollers.Clear();};
         return frame;
     }
     void RenderPerson(CinemaPerson person,MediaItem origin)
     {
-        PageHeader.Children.Add(ActionButton("Назад к фильму","IconBack",()=>{activePerson=null;current=origin;Render();},"QuietButton"));
+        PageHeader.Children.Add(ActionButton("Назад к фильму","IconBack",()=>{activePerson=null;current=personOrigin??origin;Render();},"QuietButton"));
         var body=new StackPanel{Margin=new(0,0,10,0)};
         Body.Children.Add(new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=body,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});
         var hero=new WrapPanel();hero.Children.Add(PersonPortrait(person,150,190,origin));
@@ -168,7 +179,7 @@ public partial class MainWindow
                         var row=new Grid();row.ColumnDefinitions.Add(new(){Width=new GridLength(64)});row.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});
                         var poster=new Image{Width=48,Height=72,DataContext=film,Stretch=Stretch.Uniform};poster.Loaded+=SourceCover;row.Children.Add(poster);
                         var label=Text(film.Title+" · "+film.Year+(CinemaMetadata.Rating(film)>0?" · КП "+film.Kinopoisk:""),14);label.VerticalAlignment=VerticalAlignment.Center;Grid.SetColumn(label,1);row.Children.Add(label);
-                        var button=Button(film.Title,()=>{returnPerson=(person,origin);activePerson=null;current=film;section=film.Section;Render();});button.Content=row;button.HorizontalContentAlignment=HorizontalAlignment.Stretch;button.HorizontalAlignment=HorizontalAlignment.Stretch;AutomationProperties.SetName(button,"Открыть "+film.Title);content.Children.Add(button);
+                        var button=Button(film.Title,()=>{returnPerson=(person,personOrigin??origin);activePerson=null;current=film;section=film.Section;Render();});button.Content=row;button.HorizontalContentAlignment=HorizontalAlignment.Stretch;button.HorizontalAlignment=HorizontalAlignment.Stretch;AutomationProperties.SetName(button,"Открыть "+film.Title);content.Children.Add(button);
                     }
                 }
                 Films("Выбор зрителей · топ по Кинопоиску",CinemaMetadata.Top(profile.Filmography));content.Children.Add(Text("Рейтинг Кинопоиска среди фильмов, предоставленных источником.",11,true));

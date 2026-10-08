@@ -5,27 +5,29 @@ on:
       version:
         description: Version matching native/Kachalka.csproj
         required: true
-        default: '0.31.0'
+        default: '0.32.0'
   push:
-    branches: [release/0.31.0]
+    branches: [release/0.32.0]
     paths: [.github/workflows/release.yml, 'native/**', 'update-core/**', 'updater/**', 'update-tests/**', 'tests/**', 'installer/**', build-release.ps1, package-release.ps1]
 permissions:
   contents: write
 concurrency:
-  group: kachalka-release-0.31.0
+  group: kachalka-release-0.32.0
   cancel-in-progress: false
 jobs:
   release:
     runs-on: windows-latest
     timeout-minutes: 25
     env:
-      RELEASE_VERSION: ${{ inputs.version || '0.31.0' }}
+      RELEASE_VERSION: ${{ inputs.version || '0.32.0' }}
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+      - name: Verify live participant photographs
+        run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --probe-portraits
       - name: Verify live cinema navigation
         run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --verify-cinema-source
       - name: Verify metadata and actual release for affected new films
@@ -60,12 +62,12 @@ jobs:
         run: |
           $env:KACHALKA_DATA=Join-Path $env:RUNNER_TEMP 'kachalka-cinema-smoke'
           $output=Join-Path $pwd 'test-output/cinema-ui'
-          $process=Start-Process dist/Kachalka-0.31/Kachalka.exe -ArgumentList @('--cinema-smoke-test',$output) -PassThru
+          $process=Start-Process dist/Kachalka-0.32/Kachalka.exe -ArgumentList @('--cinema-smoke-test',$output) -PassThru
           if(-not $process.WaitForExit(60000)){$process.Kill();throw 'Person card UI smoke timed out'}
           if($process.ExitCode -ne 0 -or (Test-Path "$output/error.txt") -or -not (Test-Path "$output/checks.json")){throw 'Person card UI smoke failed'}
-      - name: Verify upgrade from previously published 0.30.0
+      - name: Verify upgrade from previously published 0.31.0
         shell: pwsh
-        run: ./tests/WindowsPublishedUpgrade.ps1 -FromVersion 0.30.0 -ReleaseDirectory ('dist/release-'+$env:RELEASE_VERSION)
+        run: ./tests/WindowsPublishedUpgrade.ps1 -FromVersion 0.31.0 -ReleaseDirectory ('dist/release-'+$env:RELEASE_VERSION)
       - name: Upload verified files to draft GitHub Release
         shell: pwsh
         env:
@@ -119,6 +121,7 @@ jobs:
         with:
           name: production-windows-update-evidence
           path: |
+            test-output/transfer-*/portrait-source/*
             test-output/cache-reliability/*
             test-output/cinema-ui/*
             test-output/cinema-source/*

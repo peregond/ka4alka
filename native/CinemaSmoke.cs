@@ -36,13 +36,20 @@ public partial class MainWindow
         var limit=DateTime.UtcNow.AddSeconds(15);
         while((FindVisual<TextBlock>(Body,x=>x.Text==biography)==null||FindVisual<Image>(Body,x=>x.Source!=null)==null)&&DateTime.UtcNow<limit)await Task.Delay(100);
         if(FindVisual<TextBlock>(Body,x=>x.Text==biography)==null)throw new Exception("Person page did not load cached biography.");
+        var biographyNode=FindVisual<TextBlock>(Body,x=>x.Text==biography);var biographyRequest=personRequest;
+        RefreshDetail(original.Id);
+        if(!ReferenceEquals(biographyNode,FindVisual<TextBlock>(Body,x=>x.Text==biography))||!ReferenceEquals(biographyRequest,personRequest))throw new Exception("Movie-source progress restarted the open person page.");
         if(Application.Current.Windows.OfType<Window>().Any(x=>x.Owner==this&&x.Title==person.Name))throw new Exception("Person navigation opened a popup.");
         void Shot(string name)
         {
             UpdateLayout();var bitmap=new RenderTargetBitmap((int)ActualWidth,(int)ActualHeight,96,96,PixelFormats.Pbgra32);bitmap.Render(this);
             var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(bitmap));using var stream=File.Create(Path.Combine(output,name+".png"));encoder.Save(stream);
         }
-        if(FindVisual<Image>(Body,x=>x.Source!=null)==null)throw new Exception("Cached person photograph missing.");
+        if(FindVisual<Image>(Body,x=>x.Source!=null)==null)
+        {
+            var missing=VisualElements<Image>(Body).Select(x=>new{Photo=AutomationProperties.GetName(x),x.IsLoaded,x.ActualWidth,x.ActualHeight,Bounds=x.TransformToAncestor(Body).TransformBounds(new Rect(new Point(),x.RenderSize)),Tooltip=(VisualTreeHelper.GetParent(VisualTreeHelper.GetParent(x)) as FrameworkElement)?.ToolTip?.ToString()});
+            await File.WriteAllTextAsync(Path.Combine(output,"portrait-missing.json"),JsonSerializer.Serialize(missing));throw new Exception("Cached person photograph missing: "+JsonSerializer.Serialize(missing));
+        }
         designFixedViewport=true;MaxWidth=2000;MaxHeight=1200;MinWidth=1440;Width=1440;Height=900;await Task.Delay(150);Shot("person-wide");MinWidth=760;Width=760;Height=720;await Task.Delay(150);Shot("person-narrow");
         var film=FindVisual<Button>(Body,x=>AutomationProperties.GetName(x)=="Открыть "+next.Title)??throw new Exception("Filmography action missing.");
         film.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));

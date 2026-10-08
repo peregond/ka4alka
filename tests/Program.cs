@@ -46,7 +46,9 @@ if(args.Contains("--probe-public"))
  return;
 }
 if(args.Contains("--verify-cinema-source")){await CinemaSourceTests.Run();return;}
+if(args.Contains("--probe-portraits")){await PortraitSourceProbe.Run(root);return;}
 if(args.Contains("--metadata-only")){await MediaMetadataTests.Run();return;}
+if(args.Contains("--portraits-only")){await CinemaPortraitTests.Run();return;}
 await CacheStorageTests.Run(root);
 if(args.Contains("--cache-only"))return;
 DownloadTests.Run();
@@ -62,6 +64,7 @@ await UnifiedSearchTests.Run();
 if(args.Contains("--catalog-only"))return;
 await ReleaseSearchTests.Run();
 await MediaMetadataTests.Run();
+await CinemaPortraitTests.Run();
 await UXReliabilityTests.Run(root);
 await WindowsIntegrationTests.Run();
 await MagnetDiscoveryTests.Run(root);

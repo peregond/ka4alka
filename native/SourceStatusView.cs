@@ -25,7 +25,7 @@ public partial class MainWindow
     }
     void RefreshDetail(int id)
     {
-        if(closed||current?.Id!=id)return;RefreshLoadingIndicator();
+        if(closed||activePerson!=null||current?.Id!=id)return;RefreshLoadingIndicator();
         // Keep an open selector stable while providers finish in the background.
         var open=VisualElements<ComboBox>(Body).FirstOrDefault(x=>x.IsDropDownOpen);
         if(open!=null)

@@ -8,7 +8,7 @@ namespace Kachalka;
 
 // Linkless Zona credits are resolved through Wikipedia; each catalog work is
 // accepted only after the film's own credits confirm the same name and role.
-public sealed class CinemaPeople(SourceClient client)
+public sealed partial class CinemaPeople(SourceClient client)
 {
     static string Normalize(string text)=>Regex.Replace(text.ToLowerInvariant().Replace('ё','е'),@"[^\p{L}\p{N}]+"," ").Trim();
     static string Text(HtmlNode? node)=>Regex.Replace(HtmlEntity.DeEntitize(node?.InnerText??""),@"\s+"," ").Trim();
@@ -38,31 +38,8 @@ public sealed class CinemaPeople(SourceClient client)
         return works.DistinctBy(x=>(x.Title,x.Year)).ToArray();
     }
     public static string? PhotoUrl(string? value)=>Uri.TryCreate(value,UriKind.Absolute,out var uri)&&uri.Scheme=="https"&&uri.Host=="upload.wikimedia.org"&&uri.IsDefaultPort&&uri.UserInfo.Length==0?uri.AbsoluteUri:null;
-    static readonly SemaphoreSlim portraitSlots=new(3);
-    public async Task<string?> Portrait(CinemaPerson person,CancellationToken ct)
-    {
-        var key=Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(person.Name)));
-        var path=Path.Combine(Preferences.DataDir,"people",key+".portrait.json");
-        try
-        {
-            if(File.Exists(path)&&DateTime.UtcNow-File.GetLastWriteTimeUtc(path)<TimeSpan.FromDays(7))
-                return PhotoUrl(JsonSerializer.Deserialize<string>(await CacheFiles.ReadAllTextAsync(path,ct)));
-            await portraitSlots.WaitAsync(ct);
-            try
-            {
-                var url="https://ru.wikipedia.org/w/api.php?action=query&format=json&redirects=1&prop=extracts%7Cpageprops%7Cpageimages&exintro=1&explaintext=1&piprop=thumbnail&pithumbsize=400&titles="+Uri.EscapeDataString(person.Name);
-                using var json=JsonDocument.Parse(await client.Read(new Uri(url),1024*1024,ct));
-                var page=json.RootElement.GetProperty("query").GetProperty("pages").EnumerateObject().Select(x=>x.Value).SingleOrDefault(x=>!x.TryGetProperty("missing",out _)&&!x.TryGetProperty("invalid",out _));
-                string? photo=null;
-                if(page.ValueKind==JsonValueKind.Object&&!(page.TryGetProperty("pageprops",out var props)&&props.TryGetProperty("disambiguation",out _))&&page.TryGetProperty("extract",out var extract)&&Regex.IsMatch(extract.GetString()??"",@"(?i)акт[её]р|актрис|режисс[её]р|оператор|кинематограф")&&page.TryGetProperty("thumbnail",out var thumbnail))
-                    photo=PhotoUrl(thumbnail.GetProperty("source").GetString());
-                Directory.CreateDirectory(Path.GetDirectoryName(path)!);await CacheFiles.WriteAllTextAsync(path,JsonSerializer.Serialize(photo),ct);return photo;
-            }
-            finally{portraitSlots.Release();}
-        }
-        catch(OperationCanceledException){throw;}
-        catch{return null;}
-    }
+    public async Task<string?> Portrait(CinemaPerson person,CancellationToken ct)=>
+        (await ResolvePortrait(person,ct)).Url;
     public async Task<PersonProfile> Load(CinemaPerson person,MediaItem? origin,IEnumerable<MediaItem> known,CancellationToken ct)
     {
         var key=Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(person.Name+"|"+person.Role)));
@@ -78,15 +55,9 @@ public sealed class CinemaPeople(SourceClient client)
         {
             using var deadline=CancellationTokenSource.CreateLinkedTokenSource(ct);deadline.CancelAfter(TimeSpan.FromSeconds(75));
             var token=deadline.Token;
-            var url="https://ru.wikipedia.org/w/api.php?action=query&format=json&redirects=1&prop=extracts%7Cpageprops&exintro=1&explaintext=1&titles="+Uri.EscapeDataString(person.Name);
-            using var json=JsonDocument.Parse(await client.Read(new Uri(url),4*1024*1024,token));
-            var pages=json.RootElement.GetProperty("query").GetProperty("pages").EnumerateObject().Select(x=>x.Value).ToArray();
-            var page=pages.SingleOrDefault(x=>!x.TryGetProperty("missing",out _)&&!x.TryGetProperty("invalid",out _));
-            if(page.ValueKind!=JsonValueKind.Object||page.TryGetProperty("pageprops",out var props)&&props.TryGetProperty("disambiguation",out _))throw new InvalidDataException("Нет однозначной биографии участника.");
-            var title=page.GetProperty("title").GetString()!;
-            biography=page.TryGetProperty("extract",out var extract)?extract.GetString()??"":"";
-            if(!Regex.IsMatch(biography,@"(?i)акт[её]р|актрис|режисс[её]р|оператор|кинематограф|кинорежисс"))throw new InvalidDataException("Статья не описывает участника кино.");
-            source="https://ru.wikipedia.org/wiki/"+Uri.EscapeDataString(title.Replace(' ','_'));
+            var resolved=await ResolveIdentity(person,origin,token);
+            var identity=resolved.Profile??throw new InvalidDataException("Нет однозначной биографии участника.");
+            var title=identity.Title;biography=identity.Description;source=identity.SourceUrl;
             var parse="https://ru.wikipedia.org/w/api.php?action=parse&format=json&prop=text&redirects=1&page="+Uri.EscapeDataString(title);
             using var article=JsonDocument.Parse(await client.Read(new Uri(parse),4*1024*1024,token));
             var candidates=Works(article.RootElement.GetProperty("parse").GetProperty("text").GetProperty("*").GetString()??"").OrderByDescending(x=>x.Year).Take(16).ToArray();

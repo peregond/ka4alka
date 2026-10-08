@@ -88,7 +88,9 @@ public sealed class LiveCatalog(SourceClient client)
         if(saved!=null&&MediaMetadata.HasFullDetails(saved)&&DateTime.UtcNow-File.GetLastWriteTimeUtc(cache)<TimeSpan.FromHours(6))return saved;
         try
         {
-            var bytes=await client.Read(SourceClient.WebUri(item.PageUrl!),4*1024*1024,ct);
+            using var sourceDeadline=CancellationTokenSource.CreateLinkedTokenSource(ct);
+            sourceDeadline.CancelAfter(TimeSpan.FromSeconds(12));
+            var bytes=await client.Read(SourceClient.WebUri(item.PageUrl!),4*1024*1024,sourceDeadline.Token);
             var h=Html(bytes);
             string Score(string name)=>ValidScore(Text(h.DocumentNode.SelectSingleNode("//*["+Class(name)+"]")));
             var original=HtmlEntity.DeEntitize(h.DocumentNode.SelectSingleNode("//meta[@itemprop='alternativeHeadline']")?.GetAttributeValue("content","")??"").Trim();

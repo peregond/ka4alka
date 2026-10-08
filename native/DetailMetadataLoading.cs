@@ -33,6 +33,9 @@ public partial class MainWindow
     {
         if(detailMetadataViews.TryGetValue(item.Id,out var prior)&&!force)return prior.Task;
         prior?.Request.Cancel();
+        if(detailMetadataViews.Count>=100)
+            foreach(var old in detailMetadataViews.Where(x=>x.Key!=current?.Id&&x.Value.Task.IsCompleted).Take(detailMetadataViews.Count-99).ToArray())
+            {old.Value.Request.Dispose();detailMetadataViews.Remove(old.Key);resolvedPriorityMetadata.Remove(old.Key);}
         var view=new DetailMetadataView{Loading=true,Request=CancellationTokenSource.CreateLinkedTokenSource(metadataLifetime.Token)};
         detailMetadataViews[item.Id]=view;
         bool IsCurrent()=>!closed&&!view.Request.IsCancellationRequested&&detailMetadataViews.TryGetValue(item.Id,out var active)&&ReferenceEquals(active,view);
@@ -42,6 +45,8 @@ public partial class MainWindow
             item.SetScores(fresh.Kinopoisk,fresh.Imdb,fresh.Genre);
             liveItems=liveItems.Select(x=>x.Id==fresh.Id?fresh:x).ToArray();
             if(current?.Id==item.Id){current=MediaMetadata.Merge(current,fresh);ApplyKnownQuality(current);}
+            if(personOrigin?.Id==fresh.Id)personOrigin=MediaMetadata.Merge(personOrigin,fresh);
+            if(returnPerson is {} previous&&previous.Origin.Id==fresh.Id)returnPerson=(previous.Person,MediaMetadata.Merge(previous.Origin,fresh));
             RefreshDetail(item.Id);
         }
         async Task<MediaItem> Load()

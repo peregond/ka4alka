@@ -44,7 +44,7 @@ public static class SourceTests
         static void Check(bool value,string name){if(!value)throw new Exception(name);Console.WriteLine("PASS: "+name);}
         Check(CinemaPeople.PhotoUrl("https://upload.wikimedia.org/wikipedia/commons/person.jpg")!=null&&CinemaPeople.PhotoUrl("https://upload.wikimedia.org.evil.test/person.jpg")==null&&CinemaPeople.PhotoUrl("http://upload.wikimedia.org/person.jpg")==null,"portraits accept only HTTPS Wikimedia image addresses");
         var portraitPerson=new CinemaPerson("Фото "+Guid.NewGuid(),"Актёры","");
-        var portraitFixture=Encoding.UTF8.GetBytes("""{"query":{"pages":{"123":{"title":"Участник","extract":"Российский актёр","thumbnail":{"source":"https://upload.wikimedia.org/wikipedia/commons/person.jpg"}}}}}""");
+        var portraitFixture=JsonSerializer.SerializeToUtf8Bytes(new{query=new{pages=new Dictionary<string,object>{{"123",new{title=portraitPerson.Name,extract="Российский актёр",thumbnail=new{source="https://upload.wikimedia.org/wikipedia/commons/person.jpg"}}}}}});
         using(var fixture=new SourceClient(new FixtureHandler(portraitFixture)))
             Check(await new CinemaPeople(fixture).Portrait(portraitPerson,CancellationToken.None)=="https://upload.wikimedia.org/wikipedia/commons/person.jpg","person photograph is resolved from the confirmed biography");
         using(var offlinePortrait=new SourceClient(new OfflineHandler()))
