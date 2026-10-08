@@ -10,6 +10,26 @@ concurrency:
   group: windows-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 jobs:
+  cinema-diagnostics:
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Diagnose current cinema HTTP source paths
+        run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --diagnose-cinema-source
+      - name: Verify current film participant navigation
+        run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --verify-cinema-source
+      - name: Preserve fresh cinema source diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cinema-source-diagnostics
+          path: |
+            test-output/cinema-source-diagnostics/*
+            test-output/cinema-source/*
   portraits:
     runs-on: windows-latest
     timeout-minutes: 5
