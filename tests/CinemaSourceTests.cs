@@ -6,11 +6,23 @@ public static class CinemaSourceTests
     public static async Task Run()
     {
         using var client=new SourceClient();using var deadline=new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        async Task<T> ReadSource<T>(Func<Task<T>> read)
+        {
+            for(var attempt=1;;attempt++)
+            {
+                try{return await read();}
+                catch(Exception error)when(attempt<3&&!deadline.IsCancellationRequested&&error is HttpRequestException or TaskCanceledException)
+                {
+                    Console.WriteLine($"RETRY: live cinema HTTP request ({attempt}/3): {error.Message}");
+                    await Task.Delay(TimeSpan.FromMilliseconds(500*attempt),deadline.Token);
+                }
+            }
+        }
         var catalog=new LiveCatalog(client);var output=Path.GetFullPath("test-output/cinema-source");Directory.CreateDirectory(output);
-        var films=await catalog.Browse("Фильмы","Терминатор",1,deadline.Token);
+        var films=await ReadSource(()=>catalog.Browse("Фильмы","Терминатор",1,deadline.Token));
         foreach(var film in films.Take(3))
         {
-            var bytes=await client.Read(new Uri(film.PageUrl!),4*1024*1024,deadline.Token);
+            var bytes=await ReadSource(()=>client.Read(new Uri(film.PageUrl!),4*1024*1024,deadline.Token));
             await File.WriteAllBytesAsync(Path.Combine(output,"film-"+film.Id+".html"),bytes,deadline.Token);
             var people=CinemaMetadata.People(bytes);Console.WriteLine(film.Title+": "+people.Length+" participants");
             foreach(var person in people.Take(2))

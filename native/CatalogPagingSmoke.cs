@@ -95,6 +95,8 @@ public partial class MainWindow
         Check(Body.ActualHeight>25,"short window preserves space for catalog cards below filters");
         Width=510;await Task.Delay(150);UpdateLayout();CheckCatalogFilterLine(Check,"narrow-short");
         Check(inlineCatalogFilterScroll is {ScrollableWidth:>0,ScrollableHeight:0}&&Body.ActualHeight>25,"overflowing filter choices scroll horizontally without adding rows or hiding the catalog");
+        Render();await Settle();
+        Check(Equals(FindVisual<Button>(RootGrid,b=>AutomationProperties.GetName(b)=="Год выхода")?.Content,"Год ▾"),"compact filter captions survive a catalog refresh in a narrow window");
         inlineCatalogFilterScroll!.ScrollToRightEnd();await Task.Delay(80);UpdateLayout();
         var narrowQuality=FindVisual<Button>(RootGrid,b=>AutomationProperties.GetName(b)=="Качество каталога")??throw new Exception("Missing single quality menu in narrow catalog.");
         var qualityBounds=narrowQuality.TransformToAncestor(inlineCatalogFilterScroll).TransformBounds(new Rect(new Point(),narrowQuality.RenderSize));
