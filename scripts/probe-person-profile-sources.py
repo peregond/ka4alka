@@ -75,8 +75,8 @@ def probe(url):
 
 
 urls = [
-            'https://kino-teatr.ua/ru/main/persons/order_by/fio.asc.phtml?lastname=' + urllib.parse.quote(name)
-            for name in ['Во', 'Скотт', 'Waugh']]
+            'https://kino-teatr.ua/ru/main/persons/lastname/' + urllib.parse.quote('Во') + '/page/' + str(page) + '.phtml'
+            for page in range(2, 10)]
 with ThreadPoolExecutor(max_workers=4) as pool:
     results = list(pool.map(probe, urls))
 pathlib.Path('test-output/person-profile-source/responses.json').write_text(json.dumps(results, ensure_ascii=False), encoding='utf-8')
