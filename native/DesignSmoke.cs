@@ -24,7 +24,7 @@ public partial class MainWindow
         if(downloads.Items.Count!=0)throw new InvalidOperationException("Design smoke needs an empty test download queue.");
         designFixedViewport=true;
         // Prevent completion of the startup request from replacing the local fixture.
-        liveKey="design-smoke-preparing";liveRequest?.Cancel();searchDelay.Stop();
+        liveKey="design-smoke-preparing";liveRequest?.Cancel();ResetDiscoveryData();searchDelay.Stop();
         var folder=Path.Combine(Preferences.DataDir,"catalog");
         IReadOnlyList<MediaItem> cached=[];
         if(Directory.Exists(folder))
@@ -60,12 +60,14 @@ public partial class MainWindow
             cardMetadata[item.Id]=Task.FromResult(item);requestedDetails.Add(item.Id);return item;
         }
         var cards=cached.Select(CachePoster).ToList();
+        PrepareDiscoverySmokeRegions("Фильмы",cards);
         catalogPages["Фильмы|sort-date|1"]=new(cards.ToArray(),false,CatalogChoices.Genres,CatalogChoices.Countries);
         catalogPages["Фильмы||1"]=new(cards.OrderByDescending(CatalogScore).ToArray(),false,CatalogChoices.Genres,CatalogChoices.Countries);
         var shows=BundledCatalog.Page("Сериалы",1).Items.Select((x,index)=>CachePoster(x with{PageUrl="https://example.invalid/design/catalog/"+x.Id,Genre=index%3==0?"\nбоевик\r\n, \n криминал, \n драма\n":index%3==1?"детектив":""})).ToArray();
         foreach(var show in shows){cardMetadata[show.Id]=Task.FromResult(show);requestedDetails.Add(show.Id);}
         catalogPages["Сериалы|sort-date|1"]=new(shows,false,CatalogChoices.Genres,CatalogChoices.Countries);
         catalogPages["Сериалы||1"]=new(shows,false,CatalogChoices.Genres,CatalogChoices.Countries);
+        PrepareDiscoverySmokeRegions("Сериалы",shows);
         searchProvider=(kind,_,_)=>Task.FromResult<IReadOnlyList<MediaItem>>(kind=="Фильмы"?cards:shows);
         section="Фильмы";current=null;favoritesOnly=false;ResetCatalogFilters();livePage=1;Search.Text="";searchDelay.Stop();submittedQuery="";searchCategory="";
         liveItems=cards;liveKey="design-smoke-prepared";liveLoading=false;liveError="";
@@ -76,6 +78,7 @@ public partial class MainWindow
         Directory.CreateDirectory(output);
         var originalLight=prefs.Light;
         var checks=new List<object>();
+        var releaseToolbarChecks=new List<object>();
         // Render a full desktop viewport even when the hosted runner's monitor is smaller.
         MaxWidth=1800;MaxHeight=1000;MinWidth=360;MinHeight=300;
         async Task Settle()
@@ -152,9 +155,13 @@ public partial class MainWindow
                 releaseViews[item.Id]=new(){ReceivedUtc=DateTime.UtcNow};
             }
             prefs.Light=true;ApplyTheme();current=null;Render();await Settle();Shot("catalog-light");
+            var backgroundLight=CheckBackgroundTheme();
+            CheckDiscoveryShelves((ok,message)=>{if(!ok)throw new Exception(message);},"light-movie-shelves");
             Shot("catalog-light-125",1.25);
             var catalogColumnsLight=catalogColumns;
             prefs.Light=false;ApplyTheme();Render();await Settle();Shot("catalog-dark");
+            var backgroundDark=CheckBackgroundTheme();
+            CheckDiscoveryShelves((ok,message)=>{if(!ok)throw new Exception(message);},"dark-movie-shelves");
             foreach(var scale in new[]{1.2,1.25,1.5})Shot("catalog-dark-"+(int)(scale*100),scale);
             foreach(var badge in VisualElements<Border>(Body).Where(x=>x.Name=="PosterQualityBadge"&&x.IsVisible))
             {
@@ -179,8 +186,8 @@ public partial class MainWindow
             CheckSeriesLayout();
             // Reproduce metadata arriving after the row was already measured.
             foreach(var item in liveItems.Take(8))item.SetScores(item.Kinopoisk,item.Imdb,"\nбоевик\r\n, \n криминал, \n драма\n");
-            await Settle();CheckSeriesLayout();Shot("series-catalog-dark");
-            prefs.Light=true;ApplyTheme();Render();await Settle();CheckSeriesLayout();Shot("series-catalog-light");
+            await Settle();CheckSeriesLayout();CheckDiscoveryShelves((ok,message)=>{if(!ok)throw new Exception(message);},"dark-series-shelves");Shot("series-catalog-dark");
+            prefs.Light=true;ApplyTheme();Render();await Settle();CheckSeriesLayout();CheckDiscoveryShelves((ok,message)=>{if(!ok)throw new Exception(message);},"light-series-shelves");
             section="Фильмы";liveItems=movies;liveKey=CurrentCatalogKey;prefs.Light=false;ApplyTheme();Render();await Settle();
             var preview=liveItems.FirstOrDefault(x=>x.ImageUrl!=null)?.ImageUrl;
             var movie=new MediaItem(-987654320,"За пределами тишины: невероятное путешествие через время, которое начинается с одного случайного письма","Фильмы","Приключения · Драма",2026,"8,7","8,5","#526B69")
@@ -198,24 +205,43 @@ public partial class MainWindow
             prefs.Light=true;ApplyTheme();Render();await Settle();CheckQualityInk();Shot("detail-wide-light");
             QualityFilter().SelectedItem="Full HD";await Settle();CheckFilter("selected");
             Render();await Settle();CheckFilter("rendered");
+            releaseToolbarChecks.Add(CheckReleaseToolbar("collapsed-desktop",false,false));
+            var moreReleaseFilters=FindVisual<Button>(Body,x=>AutomationProperties.GetName(x)=="Показать дополнительные фильтры раздач")??throw new Exception("Additional release filters are missing.");
+            moreReleaseFilters.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Settle();
+            var sourceFilter=FindVisual<ComboBox>(Body,x=>AutomationProperties.GetName(x)=="Раздачи: Источник")??throw new Exception("Per-tracker release filter is missing.");
+            sourceFilter.SelectedItem="Тестовый источник";await Settle();CheckFilter("source-filter");
             var sourceToggle=FindVisual<Button>(Body,b=>AutomationProperties.GetName(b)=="Показать состояние источников")??throw new Exception("Source status toggle missing.");
             sourceToggle.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Settle();
             if(!sourceView.Expanded||!VisualElements<TextBlock>(Body).Any(x=>x.Text.Contains("Не ответил вовремя")))throw new Exception("Per-source timeout is not visible.");
+            releaseToolbarChecks.Add(CheckReleaseToolbar("expanded-light",false,true));
             VisualElements<TextBlock>(Body).Last(x=>x.Text=="Временно недоступен").BringIntoView();await Settle();Shot("sources-light");
             prefs.Light=false;ApplyTheme();RefreshDetail(movie.Id);await Settle();Shot("sources-dark");
             var qualityBefore=QualityFilter();qualityBefore.IsDropDownOpen=true;await Settle();
             sourceView.Checking=true;RefreshDetail(movie.Id);
             if(!ReferenceEquals(qualityBefore,QualityFilter())||!qualityBefore.IsDropDownOpen)throw new Exception("Source progress interrupted an open filter.");
+            if(FindVisual<Button>(Body,b=>AutomationProperties.GetName(b)=="Обновить варианты загрузки")?.IsEnabled!=false||releaseLoadingIndicator?.Visibility!=Visibility.Visible)
+                throw new Exception("Source toolbar did not update in place while a filter remained open.");
             qualityBefore.IsDropDownOpen=false;await Settle();CheckFilter("after-source-progress");
             var sourceRetry=FindVisual<Button>(Body,b=>AutomationProperties.GetName(b)=="Обновить варианты загрузки")??throw new Exception("Source retry action missing.");
             if(sourceRetry.IsEnabled)throw new Exception("Source retry should be disabled during a scan.");
             sourceView.Checking=false;RefreshDetail(movie.Id);await Settle();CheckFilter("source-complete");
+            if(FindVisual<ComboBox>(Body,x=>AutomationProperties.GetName(x)=="Раздачи: Источник")?.SelectedItem?.ToString()!="Тестовый источник")throw new Exception("Source progress lost the per-tracker filter.");
+            releaseToolbarChecks.Add(CheckReleaseToolbar("completed-dark",false,true));
             if(FindVisual<Button>(Body,b=>AutomationProperties.GetName(b)=="Обновить варианты загрузки")?.IsEnabled!=true)throw new Exception("Source retry did not enable after completion.");
             var sourceScroller=FindVisual<ScrollViewer>(Body,_=>true)??throw new Exception("Detail scroller missing.");sourceScroller.ScrollToVerticalOffset(60);await Settle();var sourceOffset=sourceScroller.VerticalOffset;
             RefreshDetail(movie.Id);await Settle();
             if(Math.Abs((FindVisual<ScrollViewer>(Body,_=>true)?.VerticalOffset??0)-sourceOffset)>1)throw new Exception("Source progress lost the reading position.");
-            await Size(510,820);VisualElements<TextBlock>(Body).Last(x=>x.Text=="Временно недоступен").BringIntoView();await Settle();Shot("sources-510");
+            await Size(510,820);VisualElements<TextBlock>(Body).Last(x=>x.Text=="Временно недоступен").BringIntoView();await Settle();releaseToolbarChecks.Add(CheckReleaseToolbar("expanded-510",false,true));Shot("sources-510");
             sourceView.Expanded=false;prefs.Light=true;ApplyTheme();Render();await Settle();
+            releaseToolbarChecks.Add(CheckReleaseToolbar("collapsed-510",false,false));
+            var noSourcesMovie=movie with{Id=-987654317,Title="Проверка недоступных раздач",PageUrl="https://example.invalid/design/source-timeout"};
+            requestedDetails.Add(noSourcesMovie.Id);cardMetadata[noSourcesMovie.Id]=Task.FromResult(noSourcesMovie);liveReleases[noSourcesMovie.Id]=[];
+            var noSourcesView=new ReleaseView{Checking=true,Sources=[new("Первый источник",SourceState.Searching),new("Второй источник",SourceState.Searching)]};releaseViews[noSourcesMovie.Id]=noSourcesView;
+            current=noSourcesMovie;Render();await Settle();releaseToolbarChecks.Add(CheckReleaseToolbar("empty-checking",true,false));
+            noSourcesView.Checking=false;noSourcesView.Sources=[new("Первый источник",SourceState.TimedOut),new("Второй источник",SourceState.Unavailable)];RefreshDetail(noSourcesMovie.Id);await Settle();
+            releaseToolbarChecks.Add(CheckReleaseToolbar("empty-unavailable",false,false));
+            if(releaseSourceSummary?.Text!="Не ответили: 2"||!VisualElements<TextBlock>(Body).Any(x=>x.Text=="Подходящих раздач пока нет"))throw new Exception("Unavailable sources did not leave an honest retryable empty state.");
+            current=movie;Render();await Settle();
             foreach(var width in new[]{720d,510d})
             {
                 await Size(width,820);CheckFilter("resize-"+width);CheckHero("resize-"+width);
@@ -299,7 +325,9 @@ public partial class MainWindow
                 CatalogFallback=designCatalogFallback,CatalogCacheFile=designCatalogFile,CatalogCount=liveItems.Count,CachedPosters=designCachedPosters,CatalogColumns=catalogColumnsLight,
                 ExternalSourcesRequired=false,FixtureHasCachedPoster=preview!=null,FeaturePosterWidths=featurePosterWidths,FilterPersistedAfterRender=true,FilterPersistedAfterResize=true,DownloadStarted=false,EngineCreated=downloads.EngineCreated,
                 ShortDescriptionLength=shortDescription.Length,ShortDescriptionExpanded=true,ShortDescriptionExpandedHeight=shortDescriptionExpandedHeight,SeriesSeasonFilter=true,
+                ReleaseToolbarChecks=releaseToolbarChecks,
                 DownloadTelemetryFitsNarrowWindow=true,DownloadTextFollowsTheme=true,
+                BackgroundTheme=new{Light=backgroundLight,Dark=backgroundDark},
                 TextRendering="Grayscale",TextFormatting="Ideal",FractionalRasterScales=new[]{1.2,1.25,1.5},QualityBadgeOnPoster=true,SeriesPosterAlignment=true,MultilineSeriesMetadataContained=true,
                 SearchAndSettings=searchSettings,
                 UiActions=uiActions,

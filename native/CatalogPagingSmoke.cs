@@ -11,7 +11,7 @@ public partial class MainWindow
 {
     public async Task CatalogPagingSmokeTest(string output)
     {
-        Directory.CreateDirectory(output);liveRequest?.Cancel();searchDelay.Stop();
+        Directory.CreateDirectory(output);liveRequest?.Cancel();ResetDiscoveryData();searchDelay.Stop();
         section="Фильмы";Search.Text="";searchDelay.Stop();current=null;favoritesOnly=false;ResetCatalogFilters();livePage=1;liveKey="";
         var rows=Enumerable.Range(1,120).Select(id=>new MediaItem(id,"Фильм "+id,"Фильмы",id%2==0?"комедия":"драма",2024,"8.2","8.0","#526B69")
             {GenreKeys=[id%2==0?"komediia":"drama"],CountryKeys=[id%3==0?"rossiia":"ssha"],Country=id%3==0?"Россия":"США"}).ToArray();
@@ -22,6 +22,7 @@ public partial class MainWindow
                 catalogPages["Фильмы|"+selection.Filter+"|"+page]=new(filtered.Skip((page-1)*40).Take(40).ToArray(),page*40<filtered.Length,CatalogChoices.Genres,CatalogChoices.Countries);
         }
         foreach(var row in rows)cardMetadata[row.Id]=Task.FromResult(row);
+        PrepareDiscoverySmokeRegions("Фильмы",rows);
         async Task Settle(){var end=DateTime.UtcNow.AddSeconds(15);while(liveLoading&&DateTime.UtcNow<end)await Task.Delay(30);await Task.Delay(100);UpdateLayout();if(liveLoading)throw new Exception("Catalog fixture timed out");}
         void Check(bool ok,string label){if(!ok)throw new Exception(label);File.AppendAllText(Path.Combine(output,"checks.txt"),"PASS: "+label+Environment.NewLine);}
         void CheckCards(string stage,int minimumColumns)
@@ -47,19 +48,19 @@ public partial class MainWindow
         Check(liveItems.Count==40&&catalogDisplay.Count==40,"one catalog page displays 40 cards");
         CheckCards("desktop",6);
         CheckCatalogFilterLine(Check,"desktop");
-        Check(inlineCatalogFilters!.Children.Contains(topSaved!),"catalog filters share one line with All and Saved below search");
+        CheckDiscoveryShelves(Check,"desktop-movies");
+        await CheckDiscoveryShelfActions(rows,Settle,Check);
+        Check(SavedButton.IsVisible&&SavedButton.TransformToAncestor(SidebarContent).Transform(new Point()).Y<DownloadsButton.TransformToAncestor(SidebarContent).Transform(new Point()).Y&&!VisualElements<Button>(inlineCatalogFilters!).Any(button=>AutomationProperties.GetName(button)=="Сохранённое"),"Saved is a separate sidebar destination above Downloads without duplicating the catalog filter line");
         Check(!VisualElements<TextBlock>(PageHeader).Any(x=>x.Text=="Настроить подборку"),"no redundant selection heading");
         var genreMenuButton=FindVisual<Button>(RootGrid,x=>AutomationProperties.GetName(x)=="Жанр")!;
         genreMenuButton.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Task.Delay(100);
         Check(genreMenuButton.ContextMenu is {IsOpen:true,ActualHeight:>0},"genre pill opens a visible dropdown menu");genreMenuButton.ContextMenu!.IsOpen=false;
         Check(!VisualElements<Button>(Body).Any(b=>b.Content?.ToString()?.Contains("Показать ещё")==true),"catalog has no load-more button");
-        prefs.LiveFavorites=[];topSaved!.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Settle();
-        Check(favoritesOnly&&catalogDisplay.Count==0,"empty Saved section is shown without catalog rows");
-        Check(VisualElements<System.Windows.Shapes.Path>(topSaved!).Any(x=>x.Fill is SolidColorBrush brush&&brush.Color==Color.FromRgb(224,79,98)),"active Saved heart is filled red");
-        var emptyReset=FindVisual<Button>(Body,x=>AutomationProperties.GetName(x)=="Сбросить фильтры")??throw new Exception("Missing reset button in empty Saved");
-        emptyReset.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Settle();
-        Check(!favoritesOnly&&CatalogSelection.IsDefault&&livePage==1&&catalogDisplay.Count==40,"empty Saved reset returns to All with its first page");
-        Check(VisualElements<System.Windows.Shapes.Path>(topSaved!).All(x=>x.Fill==null),"Saved heart returns to outline in All");
+        prefs.LiveFavorites=[];prefs.Favorites=[];SavedButton.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Settle();
+        Check(section=="Сохранённое"&&catalogDisplay.Count==0,"empty Saved section opens its own gallery without catalog rows");
+        Check(FindVisual<TextBlock>(Body,text=>text.Text=="Сохрани историю на потом")!=null,"empty Saved explains how to add a film without irrelevant source filters");
+        ShowCatalogSection("Фильмы");await Settle();
+        Check(!favoritesOnly&&CatalogSelection.IsDefault&&livePage==1&&catalogDisplay.Count==40,"returning from the Saved destination restores the first catalog page");
         var scroll=FindVisual<ScrollViewer>(Body,_=>true)!;
         var first=liveItems.Select(x=>x.Id).ToArray();
         var poster=VisualElements<Button>(catalogList!).First(x=>x.Tag is MediaItem);
@@ -77,9 +78,9 @@ public partial class MainWindow
         ResetCatalogFilters();liveKey="";Render();await Settle();Choose("Подборка","popular");await Settle();Check(catalogCollection=="popular"&&CatalogSelection.Filter=="","popular collection uses public source order");
         Choose("Подборка","rated");await Settle();Check(CatalogSelection.Filter=="rating-8/sort-rating","high-rating collection uses source rating threshold");
         ResetCatalogFilters();prefs.LiveFavorites=[rows[0] with{Kinopoisk="6.0"},rows[1] with{Kinopoisk="9.0"},rows[2] with{Kinopoisk="8.0"}];
-        topSaved!.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Settle();
-        Choose("Порядок","По рейтингу");await Settle();Check(catalogDisplay.Select(x=>x.Id).SequenceEqual([2,3,1]),"saved cards sort by real rating");
-        ResetCatalogFilters();topAll!.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Settle();Check(Page(2).IsEnabled&&catalogHasNext,"returning from saved cards restores catalog pagination");
+        SavedButton.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Settle();
+        Check(section=="Сохранённое"&&catalogDisplay.Select(item=>item.Id).ToHashSet().SetEquals([1,2,3])&&catalogDisplay.All(item=>item.CardRating!="—"),"sidebar Saved displays persisted films with their actual available scores");
+        ShowCatalogSection("Фильмы");await Settle();Check(Page(2).IsEnabled&&catalogHasNext,"returning from saved cards restores catalog pagination");
         var bitmap=new RenderTargetBitmap((int)ActualWidth,(int)ActualHeight,96,96,PixelFormats.Pbgra32);bitmap.Render(this);var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(bitmap));using(var file=File.Create(Path.Combine(output,"catalog.png")))png.Save(file);
         MinWidth=1600;Width=1600;Height=950;await Task.Delay(150);UpdateLayout();
         CheckCatalogFilterLine(Check,"1600-wide");

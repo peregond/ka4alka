@@ -111,24 +111,27 @@ public partial class MainWindow
         SidebarColumn.Width=new GridLength(narrow?64:194);
         SidePanel.Margin=narrow?new Thickness(0,0,12,0):new Thickness(0,0,16,0);
         SidePanel.Padding=new Thickness(narrow?8:10);
-        Brand.Margin=narrow?new Thickness(0,6,0,18):new Thickness(6,8,0,24);
+        Brand.Margin=narrow?new Thickness(0,6,0,shortView?10:18):new Thickness(6,8,0,shortView?12:24);
         Brand.HorizontalAlignment=narrow?HorizontalAlignment.Center:HorizontalAlignment.Stretch;
         Brand.Visibility=veryShort?Visibility.Collapsed:Visibility.Visible;
         BrandLogo.Width=narrow?30:34;BrandLogo.Height=narrow?30:34;BrandLogo.Margin=new Thickness(0,0,narrow?0:10,0);
         BrandText.Visibility=narrow?Visibility.Collapsed:Visibility.Visible;
-        LibraryLabel.Visibility=narrow?Visibility.Collapsed:Visibility.Visible;
-        foreach(var nav in Navigation.Children.OfType<Button>()){var name=nav.Tag?.ToString()??"";nav.Content=IconLabel(narrow?"":name,name=="Фильмы"?"IconMovies":"IconSeries");nav.HorizontalContentAlignment=narrow?HorizontalAlignment.Center:HorizontalAlignment.Left;nav.Padding=new Thickness(narrow?10:12,veryShort?5:10,narrow?10:12,veryShort?5:10);}
-        DownloadsButton.Content=IconLabel(narrow?"":"Загрузки","IconDownload");SettingsButton.Content=IconLabel(narrow?"":"Настройки","IconSettings");
-        DownloadsButton.HorizontalContentAlignment=SettingsButton.HorizontalContentAlignment=narrow?HorizontalAlignment.Center:HorizontalAlignment.Left;
-        DownloadsButton.Padding=SettingsButton.Padding=new Thickness(narrow?10:12,veryShort?5:10,narrow?10:12,veryShort?5:10);
-        foreach(var nav in Navigation.Children.OfType<Button>().Concat(new[]{DownloadsButton,SettingsButton}))nav.MinHeight=veryShort?28:42;
-        if(SidebarFooter.Children[0] is Border divider)divider.Margin=new Thickness(10,veryShort?4:16,10,veryShort?4:14);
+        LibraryLabel.Visibility=narrow||shortView?Visibility.Collapsed:Visibility.Visible;
+        foreach(var nav in Navigation.Children.OfType<Button>()){var name=nav.Tag?.ToString()??"";nav.Content=IconLabel(narrow?"":name,name=="Фильмы"?"IconMovies":"IconSeries");}
+        SavedButton.Content=IconLabel(narrow?"":"Сохранённое","IconHeart");DownloadsButton.Content=IconLabel(narrow?"":"Загрузки","IconDownload");SettingsButton.Content=IconLabel(narrow?"":"Настройки","IconSettings");
+        foreach(var nav in Navigation.Children.OfType<Button>().Concat(new[]{SavedButton,DownloadsButton,SettingsButton}))
+        {
+            nav.HorizontalContentAlignment=narrow?HorizontalAlignment.Center:HorizontalAlignment.Left;
+            nav.Padding=new Thickness(narrow?6:12,veryShort?4:shortView?7:10,narrow?6:12,veryShort?4:shortView?7:10);
+            nav.MinHeight=veryShort?26:shortView?36:42;nav.Margin=new(0,0,0,veryShort?2:4);
+        }
+        SidebarDivider.Margin=new Thickness(narrow?4:10,veryShort?3:shortView?8:16,narrow?4:10,veryShort?3:shortView?8:14);
         AddTorrentButton.Content=IconLabel(tiny?"":narrow?"Добавить":"Добавить торрент","IconPlus");
         HeaderArea.Margin=new Thickness(0,2,0,veryShort?6:shortView?12:22);
         SearchBar.Margin=new Thickness(0,0,tiny?10:18,0);SearchBar.Height=shortView?40:44;
         Search.Padding=new Thickness(narrowSearch?10:42,8,narrowSearch?30:40,8);
         SearchMagnifier.Visibility=narrowSearch?Visibility.Collapsed:Visibility.Visible;
-        SearchPlaceholder.Text=narrowSearch?"Поиск":"Найти фильм или сериал";SearchPlaceholder.Margin=new Thickness(narrowSearch?10:42,0,0,0);
+        SearchPlaceholder.Text=narrowSearch?"Поиск":"Найти фильм, сериал или человека";SearchPlaceholder.Margin=new Thickness(narrowSearch?10:42,0,0,0);
         SearchSubmitButton.Content=narrowSearch?IconLabel("","IconSearch"):"Поиск";
         SearchSubmitButton.Padding=new Thickness(narrowSearch?8:10,6,narrowSearch?8:10,6);
         foreach(var subtitle in PageHeader.Children.OfType<TextBlock>().Where(x=>Equals(x.Tag,"CatalogSubtitle")))subtitle.Visibility=shortView?Visibility.Collapsed:Visibility.Visible;
@@ -137,7 +140,7 @@ public partial class MainWindow
     }
     void UpdateFilterRail()
     {
-        var visible=inlineCatalogFilterScroll!=null&&catalogToolbar!=null&&current==null&&section is "Фильмы" or "Сериалы";
+        var visible=inlineCatalogFilterScroll!=null&&catalogToolbar!=null&&current==null&&activePerson==null&&section is "Фильмы" or "Сериалы" or "Сохранённое";
         FiltersPanel.Visibility=visible?Visibility.Visible:Visibility.Collapsed;
         CenterRegion.Margin=new(0);
         if(!visible||inlineCatalogFilters==null)return;

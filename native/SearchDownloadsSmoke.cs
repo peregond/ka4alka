@@ -333,9 +333,12 @@ public partial class MainWindow
         finally{peopleSearchProvider=null;downloads.Items.Clear();prefs.Light=originalLight;prefs.DownloadSort=originalSort;downloadSort=originalSort;ApplyTheme();MinWidth=originalMinWidth;Width=1280;Height=800;}
         check(SidebarUpdateButton.Visibility==Visibility.Collapsed,"sidebar update prompt stays hidden until a package is ready");
         preparedUpdateJob="fixture";RefreshSidebarUpdate();UpdateLayout();
-        check(SidebarUpdateButton.Visibility==Visibility.Visible&&SidebarUpdateButton.IsEnabled&&SidebarUpdateButton.TransformToAncestor(SidebarFooter).Transform(new Point()).Y<DownloadsButton.TransformToAncestor(SidebarFooter).Transform(new Point()).Y,"ready update appears above Downloads in the sidebar");
+        check(SidebarUpdateButton.Visibility==Visibility.Visible&&SidebarUpdateButton.IsEnabled&&SidebarUpdateButton.TransformToAncestor(SidebarFooter).Transform(new Point()).Y>=SettingsButton.TransformToAncestor(SidebarFooter).Transform(new Point(0,SettingsButton.ActualHeight)).Y,"ready update occupies its own row below Settings in the sidebar");
+        CheckSidebarFooter(check,"ready-update-desktop");
         check(!SystemParameters.ClientAreaAnimation||SidebarUpdateButton.HasAnimatedProperties,"ready update softly animates when system animations are enabled");
-        Width=680;await Task.Delay(100);UpdateLayout();check(SidebarUpdateButton.Visibility==Visibility.Visible&&SidebarUpdateButton.ActualWidth>0,"sidebar update remains available in narrow layout");
-        preparedUpdateJob=null;RefreshSidebarUpdate();Width=1280;
+        Width=680;await Task.Delay(100);UpdateLayout();check(SidebarUpdateButton.Visibility==Visibility.Visible&&SidebarUpdateButton.ActualWidth>0,"sidebar update remains available in narrow layout");CheckSidebarFooter(check,"ready-update-narrow");
+        var footerMinimumHeight=MinHeight;MinHeight=300;Height=300;await Task.Delay(100);UpdateLayout();CheckSidebarFooter(check,"ready-update-minimum-height");
+        preparedUpdateJob=null;RefreshSidebarUpdate();Width=1280;Height=800;MinHeight=footerMinimumHeight;
+        await SavedSmoke(check);
     }
 }

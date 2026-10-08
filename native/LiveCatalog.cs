@@ -7,18 +7,28 @@ using HtmlAgilityPack;
 namespace Kachalka;
 public sealed class LiveCatalog(SourceClient client)
 {
-    record DetailSnapshot(string Kinopoisk,string Imdb,string Description,string? OriginalTitle=null,string Genre="",string Country="",string[]? GenreKeys=null,string[]? CountryKeys=null,CinemaPerson[]? People=null,CinemaCollection[]? Collections=null);
+    record DetailSnapshot(string Kinopoisk,string Imdb,string Description,string? OriginalTitle=null,string Genre="",string Country="",string[]? GenreKeys=null,string[]? CountryKeys=null,CinemaPerson[]? People=null,CinemaCollection[]? Collections=null,bool CountryKeysComplete=true);
     public const string Base="https://w6.zona.plus";
     static HtmlDocument Html(byte[] b){var h=new HtmlDocument();h.LoadHtml(Encoding.UTF8.GetString(b));return h;}
     static string Text(HtmlNode? n)=>HtmlEntity.DeEntitize(n?.InnerText??"").Trim();
     static string Class(string value)=>"contains(concat(' ',normalize-space(@class),' '),' "+value+" ')";
-    public static CatalogPage ParsePage(byte[] bytes,string section,int page)
+    public static CatalogPage ParsePage(byte[] bytes,string section,int page,CatalogSelection? selection=null)
     {
         var html=Html(bytes);
         CatalogChoice[] Choices(string prefix)=> (html.DocumentNode.SelectNodes("//option[starts-with(@value,'"+prefix+"-')]")??new HtmlNodeCollection(null))
             .Select(n=>new CatalogChoice(n.GetAttributeValue("value","")[(prefix.Length+1)..],Text(n))).DistinctBy(x=>x.Key).ToArray();
         var hasNext=(html.DocumentNode.SelectNodes("//a[@href] | //link[@href and @rel='next']")??new HtmlNodeCollection(null)).Any(n=>Regex.IsMatch(HtmlEntity.DeEntitize(n.GetAttributeValue("href","")),@"[?&]page="+(page+1)+@"(?:&|$)"));
-        return new(Parse(bytes,section).DistinctBy(x=>x.Id).ToArray(),hasNext&&page<CatalogPaging.Limit,Choices("genre"),Choices("country"));
+        var rows=Parse(bytes,section).DistinctBy(x=>x.Id).ToArray();
+        // A confirmed selected country filter proves membership, but does not
+        // prove the absence of another coproducing country.
+        if(selection?.Region=="native")
+        {
+            var home=CatalogRegions.HomeCountry(selection.HomeCountry);
+            var selected=html.DocumentNode.SelectSingleNode("//option[@selected and @value='country-"+home+"']");
+            if(selected!=null&&(selection.Country.Length==0||selection.Country==home))
+                rows=rows.Select(item=>item.CountryKeys.Length>0?item:item with{CountryKeys=[home],Country=Text(selected),CountryKeysComplete=false}).ToArray();
+        }
+        return new(rows,hasNext&&page<CatalogPaging.Limit,Choices("genre"),Choices("country"));
     }
     public async Task<CatalogPage> BrowsePage(string section,int page,CatalogSelection selection,CancellationToken ct,bool forceRefresh=false)
     {
@@ -29,14 +39,14 @@ public sealed class LiveCatalog(SourceClient client)
             var url=Base+path+(filter.Length>0?"/filter/"+filter:"")+"?page="+sourcePage;
             var cache=System.IO.Path.Combine(Preferences.DataDir,"catalog",Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(url)))+".html");
             if(!forceRefresh&&System.IO.File.Exists(cache)&&DateTime.UtcNow-System.IO.File.GetLastWriteTimeUtc(cache)<TimeSpan.FromMinutes(15))
-                return ParsePage(await CacheFiles.ReadAllBytesAsync(cache,ct),section,sourcePage);
+                return ParsePage(await CacheFiles.ReadAllBytesAsync(cache,ct),section,sourcePage,selection);
             try
             {
-                var bytes=await client.Read(new Uri(url),4*1024*1024,ct);var parsed=ParsePage(bytes,section,sourcePage);
+                var bytes=await client.Read(new Uri(url),4*1024*1024,ct);var parsed=ParsePage(bytes,section,sourcePage,selection);
                 if(parsed.Items.Length==0&&parsed.Genres.Length==0)throw new System.IO.InvalidDataException("Источник вернул страницу без каталога.");
                 System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(cache)!);await CacheFiles.WriteAllBytesAsync(cache,bytes,ct);return parsed;
             }
-            catch(Exception) when(!ct.IsCancellationRequested&&System.IO.File.Exists(cache)){return ParsePage(await CacheFiles.ReadAllBytesAsync(cache,ct),section,sourcePage);}
+            catch(Exception) when(!ct.IsCancellationRequested&&System.IO.File.Exists(cache)){return ParsePage(await CacheFiles.ReadAllBytesAsync(cache,ct),section,sourcePage,selection);}
         }
         var window=CatalogPaging.SourceWindow(page);
         var first=await SourcePage(window.Page);
@@ -76,7 +86,7 @@ public sealed class LiveCatalog(SourceClient client)
                 var snapshot=JsonSerializer.Deserialize<DetailSnapshot>(await CacheFiles.ReadAllTextAsync(cache,ct));
                 if(snapshot!=null)
                 {
-                    var restored=item with{Kinopoisk=ValidScore(snapshot.Kinopoisk),Imdb=ValidScore(snapshot.Imdb),Description=snapshot.Description,OriginalTitle=snapshot.OriginalTitle,Genre=snapshot.Genre,Country=snapshot.Country,GenreKeys=snapshot.GenreKeys??[],CountryKeys=snapshot.CountryKeys??[],People=snapshot.People??[],Collections=snapshot.Collections??[]};
+                    var restored=item with{Kinopoisk=ValidScore(snapshot.Kinopoisk),Imdb=ValidScore(snapshot.Imdb),Description=snapshot.Description,OriginalTitle=snapshot.OriginalTitle,Genre=snapshot.Genre,Country=snapshot.Country,GenreKeys=snapshot.GenreKeys??[],CountryKeys=snapshot.CountryKeys??[],CountryKeysComplete=snapshot.CountryKeysComplete,People=snapshot.People??[],Collections=snapshot.Collections??[]};
                     if(MediaMetadata.Useful(restored))saved=MediaMetadata.Merge(item,restored);
                 }
             }
@@ -109,7 +119,7 @@ public sealed class LiveCatalog(SourceClient client)
             if(!MediaMetadata.Useful(result))throw new InvalidDataException("Источник вернул страницу без сведений о фильме.");
             var prior=saved??item;
             result=MediaMetadata.Merge(prior,result) with{People=ZonaMovieMetadata.MergePeople(prior.People,result.People)};
-            try{System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(cache)!);await CacheFiles.WriteAllTextAsync(cache,JsonSerializer.Serialize(new DetailSnapshot(result.Kinopoisk,result.Imdb,result.Description??"",result.OriginalTitle,result.Genre,result.Country,result.GenreKeys,result.CountryKeys,result.People,result.Collections)),ct);}catch(System.IO.IOException){}
+            try{System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(cache)!);await CacheFiles.WriteAllTextAsync(cache,JsonSerializer.Serialize(new DetailSnapshot(result.Kinopoisk,result.Imdb,result.Description??"",result.OriginalTitle,result.Genre,result.Country,result.GenreKeys,result.CountryKeys,result.People,result.Collections,result.CountryKeysComplete)),ct);}catch(System.IO.IOException){}
             return result;
             MediaItem ParseHtml(byte[] body)
             {
@@ -120,7 +130,7 @@ public sealed class LiveCatalog(SourceClient client)
                 var genres=(h.DocumentNode.SelectNodes("//*[@itemprop='genre']")??new HtmlNodeCollection(null)).Select(InlineText).Where(x=>x.Length>0).Distinct().ToArray();
                 HtmlNode[] Links(string prefix)=>(h.DocumentNode.SelectNodes("//a[contains(@href,'/filter/"+prefix+"-')]")??new HtmlNodeCollection(null)).ToArray();
                 string[] Keys(string prefix)=>Links(prefix).Select(n=>n.GetAttributeValue("href","").Split("/filter/"+prefix+"-")[1]).Distinct().ToArray();
-                return item with{Kinopoisk=Score("entity-rating-kp"),Imdb=Score("entity-rating-imdb"),Description=Text(h.DocumentNode.SelectSingleNode("//*[@itemprop='description' and not(self::meta)]")),OriginalTitle=original.Length==0?null:original,Genre=string.Join(", ",genres),Country=string.Join(", ",Links("country").Select(InlineText).Where(x=>x.Length>0).Distinct()),GenreKeys=Keys("genre"),CountryKeys=Keys("country"),People=CinemaMetadata.People(body),Collections=CinemaMetadata.Collections(body)};
+                return item with{Kinopoisk=Score("entity-rating-kp"),Imdb=Score("entity-rating-imdb"),Description=Text(h.DocumentNode.SelectSingleNode("//*[@itemprop='description' and not(self::meta)]")),OriginalTitle=original.Length==0?null:original,Genre=string.Join(", ",genres),Country=string.Join(", ",Links("country").Select(InlineText).Where(x=>x.Length>0).Distinct()),GenreKeys=Keys("genre"),CountryKeys=Keys("country"),CountryKeysComplete=true,People=CinemaMetadata.People(body),Collections=CinemaMetadata.Collections(body)};
             }
         }
         catch(Exception) when(!ct.IsCancellationRequested&&saved!=null)

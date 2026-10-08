@@ -19,6 +19,7 @@ public record MediaItem(int Id, string Title, string Section, string Genre, int 
     public string? ImdbId {get;init;}
     public string[] GenreKeys {get;init;}=[];
     public string[] CountryKeys {get;init;}=[];
+    public bool CountryKeysComplete {get;init;}=true;
     public string Country {get;init;}="";
     [JsonIgnore] public bool IsLive => PageUrl!=null;
     [JsonIgnore] public bool Cinema => Section is "Фильмы" or "Сериалы";
@@ -89,6 +90,7 @@ public class Preferences
     public string Folder { get;set; }=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),"Downloads","Ka4alka");
     public bool FolderConfigured {get;set;}
     public bool Light {get;set;}=false;
+    public string HomeCountry {get;set;}="rossiia";
     public int MaxDownloadKbps {get;set;}
     public int MaxUploadKbps {get;set;}
     public string DownloadSort {get;set;}="newest";
@@ -110,6 +112,7 @@ public class Preferences
             var prefs=JsonSerializer.Deserialize<Preferences>(File.ReadAllText(Path.Combine(DataDir,"settings.json")))??new();
             if(!prefs.QualityFilterConfigured){prefs.HidePoorQuality=true;prefs.QualityFilterConfigured=true;}
             prefs.CatalogQualityHeight=ReleaseQuality.CatalogHeight(prefs.CatalogQualityHeight);
+            prefs.HomeCountry=CatalogRegions.HomeCountry(prefs.HomeCountry);
             return prefs;
         }
         catch{return new(){QualityFilterConfigured=true};}

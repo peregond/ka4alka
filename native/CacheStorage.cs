@@ -12,7 +12,7 @@ public record CacheUsage(long Bytes,int Files,int Removed=0,long FreedBytes=0,in
 public sealed class CacheStorage
 {
     public const long DefaultLimit=1024L*1024*1024;
-    static readonly string[] Folders=["covers","portraits","catalog","details","people","release-index"];
+    static readonly string[] Folders=["covers","portraits","catalog","details","people","release-index","regions"];
     static readonly string[] RootFiles=["catalog-index.json","catalog-shared.json"];
     readonly string root,statePath;
     readonly long limit;

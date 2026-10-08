@@ -83,6 +83,8 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null)
         {
             OnlineId=onlineId,PageUrl=url,ImageUrl=Https(String(row,"poster")),
             OriginalTitle=String(row,"originalTitle"),ImdbId=String(row,"imdbId"),Description=String(row,"description"),
+            Country=String(row,"country")??"",CountryKeys=CatalogRegions.CountryKeys(MetadataArray<string>(row,"countryKeys")),
+            CountryKeysComplete=!row.TryGetProperty("countryKeysComplete",out var completeCountries)||completeCountries.ValueKind!=JsonValueKind.False,
             People=MetadataArray<CinemaPerson>(row,"people").Where(x=>!string.IsNullOrWhiteSpace(x.Name)&&!string.IsNullOrWhiteSpace(x.Role)&&(x.PageUrl==""||CinemaMetadata.CatalogUrl(x.PageUrl,"/persons/","/person/","/people/")!=null)).ToArray(),
             Awards=MetadataArray<CinemaAward>(row,"awards").Where(x=>!string.IsNullOrWhiteSpace(x.Name)&&!string.IsNullOrWhiteSpace(x.Category)&&x.Year>0).ToArray(),
             Collections=MetadataArray<CinemaCollection>(row,"collections").Where(x=>!string.IsNullOrWhiteSpace(x.Name)&&CinemaMetadata.CatalogUrl(x.PageUrl,"/collections/","/franchise/")!=null).ToArray()
@@ -121,6 +123,8 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null)
             ImageUrl=fresh.ImageUrl??item.ImageUrl,OriginalTitle=fresh.OriginalTitle??item.OriginalTitle,
             ImdbId=fresh.ImdbId??item.ImdbId,
             Description=fresh.Description??item.Description,
+            Country=fresh.Country.Length>0?fresh.Country:item.Country,CountryKeys=fresh.CountryKeys.Length>0?fresh.CountryKeys:item.CountryKeys,
+            CountryKeysComplete=fresh.CountryKeys.Length>0?fresh.CountryKeysComplete:item.CountryKeysComplete,
             People=fresh.People.Length>0?fresh.People:item.People,Awards=fresh.Awards.Length>0?fresh.Awards:item.Awards,Collections=fresh.Collections.Length>0?fresh.Collections:item.Collections,
             Kinopoisk=fresh.Kinopoisk=="—"?item.Kinopoisk:fresh.Kinopoisk,
             Imdb=fresh.Imdb=="—"?item.Imdb:fresh.Imdb

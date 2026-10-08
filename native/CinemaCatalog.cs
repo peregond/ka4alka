@@ -12,59 +12,93 @@ public partial class MainWindow
     StackPanel? catalogRailPreview;
     Grid? discoveryHero;
     ContentControl? discoveryShelf;
-    int discoveryShelfColumns;
-    MediaItem[] discoveryShelfItems=[];
+    readonly Dictionary<DiscoveryShelfKind,DiscoveryShelfView> discoveryShelves=[];
     readonly HashSet<string> featuredRequests=[];
     readonly HashSet<string> featuredFallback=[];
-    bool DiscoveryCatalog=>!SearchActive&&!favoritesOnly&&livePage==1&&CatalogSelection.IsDefault;
+    CancellationTokenSource? featuredRequest;
+    string? featuredCategory;
+    int featuredGeneration;
+    bool DiscoveryCatalog=>section is ("Фильмы" or "Сериалы")&&!SearchActive&&!favoritesOnly&&activePerson==null&&current==null&&livePage==1&&CatalogSelection.IsDefault&&catalogRegion.Length==0;
 
     void AddDiscovery(StackPanel content,MediaItem[] cards)
     {
-        if(cards.Length==0||!DiscoveryCatalog)return;
-        var featureKey=section+"||1";
-        var popular=catalogPages.TryGetValue(featureKey,out var page)&&page.Items.Length>0&&!featuredFallback.Contains(section);
-        var picks=(popular?page!.Items.AsEnumerable():cards.OrderByDescending(CatalogScore)).Where(x=>!NoDownloads(x)).ToArray();
-        picks=picks.Where(CatalogQualityMatches).ToArray();
-        if(picks.Length==0)picks=cards;
-        discoveryHero=new Grid{Margin=new(0,0,8,20)};
-        discoveryHero.ColumnDefinitions.Add(new(){Width=new GridLength(1.8,GridUnitType.Star)});
-        discoveryHero.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});
-        discoveryHero.Children.Add(FeatureBanner(picks[0],true));
-        if(picks.Length>1){var second=FeatureBanner(picks[1],false);Grid.SetColumn(second,1);second.Margin=new(12,0,0,0);discoveryHero.Children.Add(second);}
-        content.Children.Add(discoveryHero);
-        AddShelfHeading(content,popular?"Популярное":"Рекомендуем",()=>ChangeCatalogFilter(()=>catalogCollection="popular"));
-        discoveryShelfItems=picks.Take(8).ToArray();
-        discoveryShelf=new ContentControl{ContentTemplate=(DataTemplate)FindResource("MediaRow"),Margin=new(0,0,0,8)};
-        discoveryShelfColumns=0;
-        content.Children.Add(discoveryShelf);
-        AddShelfHeading(content,section=="Фильмы"?"Новые фильмы":"Новые сериалы",()=>{ResetCatalogFilters();GoCatalogPage(2);});
+        discoveryShelves.Clear();
+        if(!DiscoveryCatalog)return;
+        var popular=DiscoveryPopularItems(section);
+        var banners=popular.Length>0?popular:cards;
+        if(banners.Length>0)
+        {
+            discoveryHero=new Grid{Margin=new(0,0,8,20)};
+            discoveryHero.ColumnDefinitions.Add(new(){Width=new GridLength(1.8,GridUnitType.Star)});
+            discoveryHero.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});
+            discoveryHero.Children.Add(FeatureBanner(banners[0],true));
+            if(banners.Length>1){var second=FeatureBanner(banners[1],false);Grid.SetColumn(second,1);second.Margin=new(12,0,0,0);discoveryHero.Children.Add(second);}
+            content.Children.Add(discoveryHero);
+        }
+        var regions=DiscoveryRegionalItems(section,prefs.HomeCountry,cards);
+        var order=section=="Фильмы"?new[]{DiscoveryShelfKind.Popular,DiscoveryShelfKind.New,DiscoveryShelfKind.Foreign,DiscoveryShelfKind.Native}:new[]{DiscoveryShelfKind.Popular,DiscoveryShelfKind.Foreign,DiscoveryShelfKind.New,DiscoveryShelfKind.Native};
+        foreach(var kind in order)
+        {
+            var view=AddDiscoveryShelf(content,kind);discoveryShelves[kind]=view;
+            switch(kind)
+            {
+                case DiscoveryShelfKind.Popular:view.Set(popular,featuredRequests.Contains(section)&&!featuredFallback.Contains(section));discoveryShelf=view.Row;break;
+                case DiscoveryShelfKind.New:view.Set(cards,false);break;
+                case DiscoveryShelfKind.Foreign:view.Set(regions.Foreign,regions.Loading);break;
+                case DiscoveryShelfKind.Native:view.Set(regions.Native,regions.Loading);break;
+            }
+        }
+        var all=Text(section=="Фильмы"?"Все фильмы":"Все сериалы",24);all.Name="CatalogAllHeading";all.FontWeight=FontWeights.SemiBold;all.Margin=new(0,8,8,12);content.Children.Add(all);
         UpdateDiscoveryLayout();
-        if(!popular&&!featuredRequests.Contains(section)){featuredRequests.Add(section);_ = LoadFeatured(section);}
+        StartRegionalDiscovery(section,cards);
+        if(!catalogPages.ContainsKey(section+"||1")&&!featuredRequests.Contains(section)&&!featuredFallback.Contains(section)){featuredRequests.Add(section);_=LoadFeatured(section);}
     }
+
     static double CatalogScore(MediaItem item)
     {
         var kp=CatalogPaging.Rating(item);
         return kp>=0?kp:double.TryParse(item.Imdb.Replace(',','.'),System.Globalization.NumberStyles.Float,System.Globalization.CultureInfo.InvariantCulture,out var imdb)?imdb:-1;
     }
+    MediaItem[] DiscoveryPopularItems(string category)=>catalogPages.TryGetValue(category+"||1",out var page)&&!featuredFallback.Contains(category)?page.Items.Where(item=>!NoDownloads(item)&&CatalogQualityMatches(item)).DistinctBy(item=>item.Id).Take(40).ToArray():[];
+    void SyncDiscoveryContext()
+    {
+        SyncRegionalDiscoveryContext();
+        if(!DiscoveryCatalog||featuredCategory!=null&&featuredCategory!=section)
+        {
+            featuredGeneration++;featuredRequest?.Cancel();featuredRequest?.Dispose();featuredRequest=null;
+            if(featuredCategory!=null)featuredRequests.Remove(featuredCategory);
+            featuredCategory=null;
+        }
+        discoveryShelves.Clear();
+    }
+    void ResetDiscoveryData()
+    {
+        ResetRegionalDiscovery();
+        featuredGeneration++;featuredRequest?.Cancel();featuredRequest?.Dispose();featuredRequest=null;featuredCategory=null;
+        featuredRequests.Clear();featuredFallback.Clear();discoveryRegions.Clear();discoveryShelves.Clear();
+    }
     async Task LoadFeatured(string category)
     {
+        featuredRequest?.Cancel();featuredRequest?.Dispose();var request=featuredRequest=new CancellationTokenSource(TimeSpan.FromSeconds(12));featuredCategory=category;var generation=++featuredGeneration;
+        if(discoveryShelves.TryGetValue(DiscoveryShelfKind.Popular,out var pending))pending.Set(DiscoveryPopularItems(category),true);
         try
         {
-            using var timeout=new CancellationTokenSource(TimeSpan.FromSeconds(12));
-            var page=await new LiveCatalog(sourceClient).BrowsePage(category,1,new(Collection:"popular"),timeout.Token);
-            if(closed)return;
+            var page=await new LiveCatalog(sourceClient).BrowsePage(category,1,new(Collection:"popular"),request.Token);
+            if(request.IsCancellationRequested||generation!=featuredGeneration||closed)return;
             if(page.Items.Length>0){catalogPages[category+"||1"]=page;featuredFallback.Remove(category);}
             else featuredFallback.Add(category);
         }
-        catch{if(!closed)featuredFallback.Add(category);}
-        if(!closed&&section==category&&current==null&&DiscoveryCatalog&&catalogPages.ContainsKey(category+"||1")&&
-           !VisualElements<Button>(RootGrid).Any(x=>x.ContextMenu?.IsOpen==true))RenderCatalogKeepingPosition();
-    }
-    void AddShelfHeading(Panel target,string label,Action all)
-    {
-        var row=new DockPanel{Margin=new(0,0,8,10)};
-        var more=ActionButton("Все","IconChevron",all);more.FontSize=11;more.Padding=new(5);more.Margin=new(0);more.MinHeight=26;more.SetResourceReference(Control.ForegroundProperty,"Accent");DockPanel.SetDock(more,Dock.Right);row.Children.Add(more);
-        var heading=Text(label,22);heading.FontWeight=FontWeights.SemiBold;heading.Margin=new(0);row.Children.Add(heading);target.Children.Add(row);
+        catch(OperationCanceledException)when(request.IsCancellationRequested&&generation!=featuredGeneration){return;}
+        catch{if(generation==featuredGeneration&&!closed)featuredFallback.Add(category);}
+        finally
+        {
+            if(generation==featuredGeneration)
+            {
+                featuredRequest=null;featuredCategory=null;featuredRequests.Remove(category);
+                if(!closed&&DiscoveryCatalog&&section==category&&discoveryShelves.TryGetValue(DiscoveryShelfKind.Popular,out var shelf))shelf.Set(DiscoveryPopularItems(category),false);
+            }
+            request.Dispose();
+        }
     }
     Button FeatureBanner(MediaItem item,bool primary)
     {
@@ -106,11 +140,7 @@ public partial class MainWindow
             discoveryHero.ColumnDefinitions[1].Width=wide?new GridLength(1,GridUnitType.Star):new GridLength(0);
             if(discoveryHero.Children.Count>1)discoveryHero.Children[1].Visibility=wide?Visibility.Visible:Visibility.Collapsed;
         }
-        if(discoveryShelf!=null&&discoveryShelfColumns!=catalogColumns)
-        {
-            discoveryShelfColumns=catalogColumns;
-            discoveryShelf.Content=new CatalogRow(discoveryShelfItems.Take(catalogColumns).ToArray(),Math.Max(1,catalogColumns));
-        }
+        foreach(var shelf in discoveryShelves.Values)shelf.Resize(Math.Max(1,catalogColumns));
     }
     void AddRailPreview(MediaItem[] cards)
     {

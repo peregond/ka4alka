@@ -72,7 +72,7 @@ public static class ZonaMovieMetadata
                 Kinopoisk=Score(Field(movie,"rating_kinopoisk")),Imdb=Score(Field(movie,"rating_imdb")),
                 People=people.DistinctBy(x=>(Normalize(x.Name),x.Role,x.SourcePersonId)).Take(80).OrderBy(x=>x.Role switch{"Актёры"=>0,"Режиссёры"=>1,_=>2}).ToArray(),
                 Genre=string.Join(", ",genres.Select(x=>x.Name)),Country=string.Join(", ",countries.Select(x=>x.Name)),
-                GenreKeys=genres.Select(x=>x.Key).Where(x=>x.Length>0).Distinct().ToArray(),CountryKeys=countries.Select(x=>x.Key).Where(x=>x.Length>0).Distinct().ToArray(),Collections=[]
+                GenreKeys=genres.Select(x=>x.Key).Where(x=>x.Length>0).Distinct().ToArray(),CountryKeys=countries.Select(x=>x.Key).Where(x=>x.Length>0).Distinct().ToArray(),CountryKeysComplete=true,Collections=[]
             };
         }
     }

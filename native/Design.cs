@@ -27,7 +27,7 @@ public partial class MainWindow
     void ClearSearch(object sender,RoutedEventArgs e)
     {
         Search.Clear();
-        if(current!=null||section=="Загрузки"){searchDelay.Stop();submittedQuery="";searchCategory="";liveRequest?.Cancel();liveLoading=false;liveKey="";Render();}
+        if(current!=null||section is "Загрузки" or "Сохранённое"){searchDelay.Stop();submittedQuery="";searchCategory="";liveRequest?.Cancel();liveLoading=false;liveKey="";Render();}
         else SubmitSearch(sender,e);
         Search.Focus();
     }

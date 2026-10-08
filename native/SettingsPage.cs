@@ -85,6 +85,20 @@ public partial class MainWindow
             var check=Text(selected?"✓":"",12);check.Margin=new(6,0,0,0);check.SetResourceReference(TextBlock.ForegroundProperty,"Accent");Grid.SetColumn(check,1);themeLabel.Children.Add(check);themeContent.Children.Add(themeLabel);theme.Content=themeContent;
             AutomationProperties.SetName(theme,light?"Светлая тема":"Тёмная тема");themes.Children.Add(theme);
         }
+        var catalogue=Card("Каталог","Выбери страну для отечественных подборок фильмов и сериалов.","IconMovies");
+        var countryLabel=Text("Отечественное кино",12,true);countryLabel.Margin=new(0,0,0,7);catalogue.Children.Add(countryLabel);
+        var homeCountries=CatalogChoices.Countries.OrderBy(choice=>choice.Label).ToArray();
+        var homeCountry=new ComboBox{Name="SettingsHomeCountry",ItemsSource=homeCountries,SelectedItem=homeCountries.First(choice=>choice.Key==CatalogRegions.HomeCountry(prefs.HomeCountry)),MaxWidth=320,HorizontalAlignment=HorizontalAlignment.Left,MinWidth=220};
+        AutomationProperties.SetName(homeCountry,"Страна отечественных подборок");catalogue.Children.Add(homeCountry);
+        var countryHint=Text("Учитываем страну производства. Фильмы совместного производства с выбранной страной тоже входят в отечественные подборки.",12,true);countryHint.Margin=new(0,8,0,0);catalogue.Children.Add(countryHint);
+        var countryNotice=Notice(catalogue);
+        homeCountry.SelectionChanged+=(_,_)=>
+        {
+            if(homeCountry.SelectedItem is not CatalogChoice choice)return;
+            var previous=prefs.HomeCountry;prefs.HomeCountry=choice.Key;
+            try{prefs.Save();ResetDiscoveryData();catalogPages.Clear();liveKey="";Feedback(countryNotice,"Страна подборок сохранена.");}
+            catch(Exception error){prefs.HomeCountry=previous;Feedback(countryNotice,"Не удалось сохранить страну: "+error.Message,true);}
+        };
         var files=Card("Загрузки","Папка для новых файлов и поведение при запуске.","IconDownload");
         var folderLabel=Text("Сохранять файлы в",12,true);folderLabel.Margin=new(0,0,0,7);files.Children.Add(folderLabel);
         var folder=Text(prefs.Folder,13);folder.Name="SettingsFolder";folder.Margin=new(0);folder.ToolTip=prefs.Folder;

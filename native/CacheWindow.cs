@@ -19,7 +19,7 @@ public partial class MainWindow
     }
     async Task<CacheUsage> ClearCacheAsync()
     {
-        ResetCatalogQualityChecks();
+        ResetCatalogQualityChecks();ResetDiscoveryData();
         liveRequest?.Cancel();personRequest?.Cancel();CancelDetailMetadata(restart:true);foreach(var view in releaseViews.Values)view.Request?.Cancel();
         var result=await Task.Run(()=>CacheFiles.Current.MaintainAsync(clear:true));
         coverCache.Clear();featurePosters.Clear();cardMetadata.Clear();priorityMetadata.Clear();requestedDetails.Clear();

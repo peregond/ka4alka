@@ -10,17 +10,16 @@ public partial class MainWindow
     Border? releaseLoadingIndicator;
     int releaseLoadingItemId;
 
-    void RenderReleaseLoading(StackPanel target,MediaItem item)
+    void RenderReleaseLoading(WrapPanel target,MediaItem item)
     {
         releaseLoadingItemId=item.Id;
         var content=new StackPanel();
-        var label=Text("Ищем раздачи…",13);label.FontWeight=FontWeights.SemiBold;label.Margin=new(0,0,0,7);
+        var label=Text("Ищем раздачи…",11);label.Margin=new(0,0,0,4);
         label.SetResourceReference(TextBlock.ForegroundProperty,"Accent");content.Children.Add(label);
-        var progress=new ProgressBar{IsIndeterminate=true,Height=5,BorderThickness=new(0)};
+        var progress=new ProgressBar{IsIndeterminate=true,Height=3,BorderThickness=new(0)};
         progress.SetResourceReference(Control.ForegroundProperty,"Accent");progress.SetResourceReference(Control.BackgroundProperty,"Edge");
         AutomationProperties.SetName(progress,"Поиск раздач: прогресс");content.Children.Add(progress);
-        releaseLoadingIndicator=new Border{Child=content,Padding=new(12,10,12,10),CornerRadius=new(10),Margin=new(0,0,0,12),Visibility=Visibility.Collapsed};
-        releaseLoadingIndicator.SetResourceReference(Border.BackgroundProperty,"AccentSoft");
+        releaseLoadingIndicator=new Border{Child=content,Width=108,Margin=new(10,5,0,5),VerticalAlignment=VerticalAlignment.Center,Visibility=Visibility.Collapsed};
         AutomationProperties.SetName(releaseLoadingIndicator,"Поиск раздач");target.Children.Add(releaseLoadingIndicator);
         RefreshReleaseLoadingIndicator();
     }
@@ -29,6 +28,7 @@ public partial class MainWindow
         if(releaseLoadingIndicator==null)return;
         var checking=current?.IsLive==true&&current.Id==releaseLoadingItemId&&releaseViews.TryGetValue(current.Id,out var view)&&view.Checking;
         releaseLoadingIndicator.Visibility=checking?Visibility.Visible:Visibility.Collapsed;
+        RefreshReleaseSourceStatus();
     }
 
     async Task FetchDetails(MediaItem item)

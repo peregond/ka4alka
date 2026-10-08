@@ -13,6 +13,10 @@ public partial class MainWindow
         SidebarUpdateButton.Visibility=available?Visibility.Visible:Visibility.Collapsed;
         SidebarUpdateButton.IsEnabled=available&&!checkingUpdate;
         SidebarUpdateButton.Content=IconLabel(compactWidth?"":"Обновить","IconRefresh");
+        SidebarUpdateButton.HorizontalContentAlignment=compactWidth?HorizontalAlignment.Center:HorizontalAlignment.Left;
+        SidebarUpdateButton.Padding=new(compactWidth?6:12,veryCompactHeight?4:7,compactWidth?6:12,veryCompactHeight?4:7);
+        SidebarUpdateButton.MinHeight=veryCompactHeight?26:compactHeight?32:38;
+        SidebarUpdateButton.Margin=new(0,veryCompactHeight?4:8,0,0);
         var version=updateOffer?.Manifest.Version;
         SidebarUpdateButton.ToolTip=available?$"Установить версию {version} и перезапустить":"Обновить приложение";
         AutomationProperties.SetName(SidebarUpdateButton,"Обновить приложение");

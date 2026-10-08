@@ -19,10 +19,10 @@ public partial class MainWindow
         var person=new CinemaPerson("Участник UI-проверки","Актёры","");
         var original=new MediaItem(-70001,"Первый проверочный фильм","Фильмы","Драма",2020,"8.2","7.8","#526B69")
         {
-            PageUrl=LiveCatalog.Base+"/movies/cinema-smoke-first",Description="Описание фильма",
+            PageUrl=LiveCatalog.Base+"/movies/cinema-smoke-first",Description="Описание фильма",OriginalTitle="First verification film: a story to remember",
             People=[new("Проверочный режиссёр","Режиссёры",""),person,..Enumerable.Range(2,12).Select(x=>new CinemaPerson("Участник "+x,"Актёры",""))]
         };
-        var next=original with{Id=-70002,Title="Второй проверочный фильм",PageUrl=LiveCatalog.Base+"/movies/cinema-smoke-second",Year=2022,Kinopoisk="9.1"};
+        var next=original with{Id=-70002,Title="Второй проверочный фильм",OriginalTitle="Second verification film",PageUrl=LiveCatalog.Base+"/movies/cinema-smoke-second",Year=2022,Kinopoisk="9.1"};
         var biography="Биография участника для проверки интерфейса. "+new string('а',400);
         var folder=Path.Combine(Preferences.DataDir,"people");Directory.CreateDirectory(folder);
         var key=Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(person.Name+"|"+person.Role)));
@@ -79,9 +79,37 @@ public partial class MainWindow
         if(crew.Columns!=3)throw new Exception("Wide participant card does not arrange three portraits per row.");
         var title=FindVisual<TextBlock>(Body,x=>x.Name=="DetailTitle")!;var favorite=FindVisual<Button>(Body,x=>x.Name=="DetailFavorite")!;
         if(favorite.TransformToAncestor(Body).Transform(new Point()).Y<title.TransformToAncestor(Body).Transform(new Point()).Y+title.ActualHeight)throw new Exception("Save action must follow the movie title.");
+        void CheckIdentityOrder()
+        {
+            var identity=FindVisual<StackPanel>(Body,x=>x.Name=="DetailIdentity")??throw new Exception("Movie identity is missing.");
+            var heading=FindVisual<TextBlock>(identity,x=>x.Name=="DetailTitle")!;
+            var originalTitle=FindVisual<TextBlock>(identity,x=>x.Name=="DetailOriginalTitle")??throw new Exception("Original movie title is missing.");
+            var save=FindVisual<Button>(identity,x=>x.Name=="DetailFavorite")!;
+            if(identity.Children.IndexOf(originalTitle)!=identity.Children.IndexOf(heading)+1||identity.Children.IndexOf(save)!=identity.Children.IndexOf(originalTitle)+1)throw new Exception("Movie identity must be title, original title, then Save.");
+            if(originalTitle.TransformToAncestor(identity).Transform(new Point()).Y<heading.TransformToAncestor(identity).Transform(new Point()).Y+heading.ActualHeight-.5||save.TransformToAncestor(identity).Transform(new Point()).Y<originalTitle.TransformToAncestor(identity).Transform(new Point()).Y+originalTitle.ActualHeight-.5)throw new Exception("Movie title, original title and Save overlap.");
+        }
+        void CheckCrewTiles()
+        {
+            var frame=FindVisual<Border>(Body,x=>x.Name=="CinemaParticipants")!;
+            foreach(var button in VisualElements<Button>(frame).Where(x=>x.Name=="CinemaPersonTile"))
+            {
+                if(button.BorderThickness!=new Thickness(0)||button.Background is not SolidColorBrush{Color.A:0})throw new Exception("Crew actions must not draw separate permanent cards.");
+                var portrait=FindVisual<Border>(button,x=>x.Name=="CinemaPersonPortrait")??throw new Exception("Crew photograph frame is missing.");
+                if(portrait.BorderThickness!=new Thickness(0)||portrait.Clip is not RectangleGeometry{RadiusX:>0,RadiusY:>0})throw new Exception("Crew photographs must keep rounded clipping without an extra outline.");
+                var bounds=button.TransformToAncestor(frame).TransformBounds(new Rect(new Point(),button.RenderSize));
+                if(bounds.Left<-.5||bounds.Right>frame.ActualWidth+.5)throw new Exception("Crew action overflows its participant card.");
+                if(button.Tag is not CinemaPerson person||AutomationProperties.GetName(button)!="Открыть карточку: "+person.Name+", "+person.Role)throw new Exception("Crew action lost its participant navigation.");
+            }
+        }
+        CheckIdentityOrder();CheckCrewTiles();
         var filmCard=FindVisual<Border>(Body,x=>x.Name=="CinemaFilm")!;var hero=detailHero!;
                 var ratings=FindVisual<WrapPanel>(filmCard,x=>x.Name=="DetailRatings")!;var year=FindVisual<TextBlock>(filmCard,x=>x.Name=="DetailYear")!;
         if(Grid.GetRow(ratings)!=0||Grid.GetColumn(ratings)!=1)throw new Exception("Wide ratings should share the type/year row.");
+        if(ratings.Children.OfType<Border>().Any(x=>x.BorderThickness!=new Thickness(0)))throw new Exception("Ratings must share the metadata row without separate outlined boxes.");
+        if(detailSynopsis!.ActualWidth<detailHero!.ActualWidth-1||detailDescription!.Parent!=detailHero)throw new Exception("The synopsis must use the movie card's full content width.");
+        var wasSaved=IsSaved(original);favorite.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
+        if(IsSaved(original)==wasSaved||!ReferenceEquals(participants,FindVisual<Border>(Body,x=>x.Name=="CinemaParticipants"))||AutomationProperties.GetName(favorite)!=(IsSaved(original)?"Сохранено":"Сохранить"))throw new Exception("Save must update its state without restarting participant photographs.");
+        favorite.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));if(IsSaved(original)!=wasSaved)throw new Exception("Save did not restore its previous state.");
         if(filmCard.ActualHeight-hero.ActualHeight>44)throw new Exception("Movie card leaves excess blank space below its content.");
         if(Grid.GetColumn(participants)!=1)throw new Exception($"Wide layout did not place participants next to the movie: window={ActualWidth}, cards={cards.ActualWidth}.");
         void CheckAlignedCrew()
@@ -99,8 +127,12 @@ public partial class MainWindow
         if(crewScroll.VerticalOffset<=0)throw new Exception("Participant scrolling did not reach later rows.");
         var heading=FindVisual<TextBlock>(participants,x=>x.Name=="CinemaPeopleHeading")!;
         if(heading.TransformToAncestor(participants).Transform(new Point()).Y<0)throw new Exception("Participant heading must remain visible while its list scrolls.");
-        current=original with{Description=string.Join(" ",Enumerable.Repeat("Развёрнутое описание для проверки высоты карточки фильма.",30))};descriptionExpanded=true;Render();await Task.Delay(150);UpdateLayout();
+        current=original with{Description=string.Join(" ",Enumerable.Repeat("Развёрнутое описание для проверки высоты карточки фильма.",30))};descriptionExpanded=false;Render();await Task.Delay(150);UpdateLayout();
         cards=FindVisual<Grid>(Body,x=>x.Name=="CinemaCards")!;filmCard=FindVisual<Border>(Body,x=>x.Name=="CinemaFilm")!;participants=FindVisual<Border>(Body,x=>x.Name=="CinemaParticipants")!;
+        var collapsedHeight=filmCard.ActualHeight;var expand=FindVisual<Button>(Body,x=>x.Name=="DescriptionToggle")!;
+        if(!expand.IsVisible)throw new Exception("A long synopsis must offer an expansion action.");
+        expand.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Task.Delay(150);UpdateLayout();
+        if(!descriptionExpanded||!double.IsPositiveInfinity(detailSynopsis!.MaxHeight)||filmCard.ActualHeight<=collapsedHeight||!ReferenceEquals(participants,FindVisual<Border>(Body,x=>x.Name=="CinemaParticipants")))throw new Exception("Synopsis expansion must reveal the text without recreating participant photographs.");
         CheckAlignedCrew();Shot("film-wide-expanded");
         current=original;descriptionExpanded=false;Render();await Task.Delay(100);UpdateLayout();
         cards=FindVisual<Grid>(Body,x=>x.Name=="CinemaCards")!;filmCard=FindVisual<Border>(Body,x=>x.Name=="CinemaFilm")!;participants=FindVisual<Border>(Body,x=>x.Name=="CinemaParticipants")!;
@@ -108,13 +140,15 @@ public partial class MainWindow
         MinWidth=760;Width=760;await Task.Delay(150);UpdateLayout();Shot("film-narrow");
         if(Grid.GetRow(participants)!=1||Grid.GetColumn(participants)!=0)throw new Exception("Narrow layout did not stack participants.");
         if(!double.IsNaN(participants.Height))throw new Exception("Stacked participant card kept its wide-layout height binding.");
+        CheckIdentityOrder();CheckCrewTiles();
         crewScroll=FindVisual<ScrollViewer>(participants,x=>x.Name=="CinemaPeopleScroll")!;
         if(crewScroll.ActualHeight>Body.ActualHeight*.7+1&&crewScroll.ActualHeight>220)throw new Exception("Stacked participant list does not fit the available viewport.");
         MinWidth=620;Width=620;await Task.Delay(150);UpdateLayout();Shot("film-minimum");
-        foreach(var element in VisualElements<FrameworkElement>(Body).Where(x=>x.IsVisible&&(x.Name is "DetailTitle" or "DetailRatings" or "DetailFavorite" or "DetailSynopsis")))
+        foreach(var element in VisualElements<FrameworkElement>(Body).Where(x=>x.IsVisible&&(x.Name is "DetailTitle" or "DetailOriginalTitle" or "DetailTraits" or "DetailRatings" or "DetailFavorite" or "DetailSynopsis")))
         {
             var bounds=element.TransformToAncestor(Body).TransformBounds(new Rect(new Point(),element.RenderSize));if(bounds.Right>Body.ActualWidth+1||bounds.Left<-.5)throw new Exception("Minimum-width detail element overflows: "+element.Name);
         }
-        await File.WriteAllTextAsync(Path.Combine(output,"checks.json"),JsonSerializer.Serialize(new{PersonCard=true,Biography=true,Filmography=true,WideAndNarrow=true,Navigation=true}));Close();
+        CheckIdentityOrder();CheckCrewTiles();
+        await File.WriteAllTextAsync(Path.Combine(output,"checks.json"),JsonSerializer.Serialize(new{PersonCard=true,Biography=true,Filmography=true,WideAndNarrow=true,Navigation=true,TitleOrder=true,QuietCrewTiles=true,InlineSave=true,FullWidthSynopsis=true}));Close();
     }
 }

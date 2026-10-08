@@ -14,7 +14,7 @@ public partial class MainWindow
     bool favoritesOnly;
     int? catalogYear;
     string catalogOrder="Сначала новые";
-    Button? topAll,topSaved;
+    Button? topAll;
     StackPanel? inlineCatalogFilters;
     ScrollViewer? inlineCatalogFilterScroll;
     Button? catalogFilterBack,catalogFilterForward;
@@ -83,7 +83,7 @@ public partial class MainWindow
         try{var data=await task;if(!closed)item.SetScores(data.Kinopoisk,data.Imdb,data.Genre);}
         catch{if(cardMetadata.TryGetValue(item.Id,out var latest)&&ReferenceEquals(task,latest))cardMetadata.Remove(item.Id); /* A missing rating stays unavailable. */ }
     }
-    string catalogGenre="",catalogCountry="",catalogCollection="all";
+    string catalogGenre="",catalogCountry="",catalogCollection="all",catalogRegion="";
     int catalogRating;
     bool catalogHasNext=true,catalogRefreshRequested;
     int? catalogLastPage;
@@ -93,11 +93,11 @@ public partial class MainWindow
     bool ExpireCatalogPages()
     {
         var boundary=SharedCatalog.BoundaryUtc(DateTime.UtcNow);if(boundary==catalogMemoryBoundary)return false;
-        catalogMemoryBoundary=boundary;catalogPages.Clear();featuredRequests.Clear();featuredFallback.Clear();cardMetadata.Clear();catalogLastPage=null;if(!SearchActive)liveKey="";return true;
+        catalogMemoryBoundary=boundary;catalogPages.Clear();ResetDiscoveryData();cardMetadata.Clear();catalogLastPage=null;if(!SearchActive)liveKey="";return true;
     }
-    string CurrentCatalogKey=>(SearchActive?"Поиск|"+submittedQuery:section+"|"+livePage+"|"+CatalogSelection.Filter+"|"+CatalogSelection.Collection)+"|quality:"+prefs.CatalogQualityHeight;
-    CatalogSelection CatalogSelection=>new(catalogGenre,catalogCountry,catalogYear,catalogRating,catalogOrder switch{"По рейтингу"=>"rating","По популярности"=>"popular",_=>"date"},catalogCollection);
-    void ResetCatalogFilters(){catalogYear=null;catalogGenre="";catalogCountry="";catalogRating=0;catalogOrder="Сначала новые";catalogCollection="all";catalogLastPage=null;}
+    string CurrentCatalogKey=>(SearchActive?"Поиск|"+submittedQuery:section+"|"+livePage+"|"+CatalogSelection.Filter+"|"+CatalogSelection.Collection+"|region:"+catalogRegion+"|home:"+CatalogRegions.HomeCountry(prefs.HomeCountry))+"|quality:"+prefs.CatalogQualityHeight;
+    CatalogSelection CatalogSelection=>new(catalogGenre,catalogCountry,catalogYear,catalogRating,catalogOrder switch{"По рейтингу"=>"rating","По популярности"=>"popular",_=>"date"},catalogCollection,catalogRegion,prefs.HomeCountry);
+    void ResetCatalogFilters(){catalogYear=null;catalogGenre="";catalogCountry="";catalogRating=0;catalogOrder="Сначала новые";catalogCollection="all";catalogRegion="";catalogLastPage=null;}
     void ChangeCatalogFilter(Action change)
     {
         if(!SearchActive&&Search.Text.Length>0){Search.Text="";searchDelay.Stop();}
@@ -118,7 +118,7 @@ public partial class MainWindow
         if(!favoritesOnly&&liveKey!=key){liveKey=key;_ = FetchCatalog(key,section,submittedQuery,livePage);}
         var headingRow=new DockPanel{Margin=new(5,0,8,5)};
         var count=Text(liveLoading?"Загружаем…":$"Страница {livePage}",11,true);count.VerticalAlignment=VerticalAlignment.Center;count.Margin=new(14,0,0,0);DockPanel.SetDock(count,Dock.Right);headingRow.Children.Add(count);
-        var title=favoritesOnly?"Сохранённое":SearchActive?"Результаты поиска":catalogCollection=="popular"?"Популярное":catalogCollection=="rated"?"Кино с высоким рейтингом":section=="Фильмы"?"Все фильмы":"Все сериалы";
+        var title=favoritesOnly?"Сохранённое":SearchActive?"Результаты поиска":catalogRegion=="native"?section=="Фильмы"?"Отечественные фильмы":"Отечественные сериалы":catalogRegion=="foreign"?section=="Фильмы"?"Иностранные фильмы":"Иностранные сериалы":catalogCollection=="popular"?"Популярное":catalogCollection=="rated"?"Кино с высоким рейтингом":section=="Фильмы"?"Все фильмы":"Все сериалы";
         var heading=Text(title,compactHeight?22:28);heading.FontWeight=FontWeights.SemiBold;heading.Margin=new(0);headingRow.Children.Add(heading);if(!DiscoveryCatalog)PageHeader.Children.Add(headingRow);
         var subtitle=Text(liveError.Length>0?liveError:favoritesOnly?"Кино, к которому хочется вернуться.":SearchActive?$"Результаты для «{submittedQuery}».":catalogCollection!="all"?"Подборка Zona · обновляется из общего каталога.":"Выбирай историю на сегодня.",13,true);subtitle.Tag="CatalogSubtitle";subtitle.Margin=new(5,3,0,12);subtitle.Visibility=compactHeight?Visibility.Collapsed:Visibility.Visible;if(!DiscoveryCatalog)PageHeader.Children.Add(subtitle);
         var toolbar=new DockPanel();catalogToolbar=toolbar;
@@ -126,7 +126,6 @@ public partial class MainWindow
         if(SearchActive)SearchTabs(tabs);
         else {
         topAll=Button("Все",()=>{favoritesOnly=false;catalogLastPage=null;livePage=1;Render();});topAll.Style=(Style)FindResource("PillButton");topAll.SetResourceReference(Control.BackgroundProperty,favoritesOnly?"Panel":"Selected");tabs.Children.Add(topAll);
-        topSaved=ActionButton("Сохранённое",favoritesOnly?"IconHeartFilled":"IconHeart",()=>{liveRequest?.Cancel();liveLoading=false;liveError="";liveKey="";favoritesOnly=true;catalogCollection="all";if(catalogOrder=="По популярности")catalogOrder="Сначала новые";catalogLastPage=null;livePage=1;Render();},"PillButton");topSaved.SetResourceReference(Control.BackgroundProperty,favoritesOnly?"Selected":"Panel");topSaved.ToolTip="Сохранённое";catalogFilterCaptions[topSaved]=new("Сохранённое","Сохран.",favoritesOnly?"IconHeartFilled":"IconHeart");tabs.Children.Add(topSaved);
         }
         if(!PeopleOnlySearch)
         {
@@ -135,7 +134,7 @@ public partial class MainWindow
         }
         if(!favoritesOnly)
         {
-            var refresh=ActionButton("","IconRefresh",()=>{onlineIndex.RetryNow();ResetCatalogQualityChecks();catalogPages.Clear();featuredRequests.Clear();featuredFallback.Clear();catalogRefreshRequested=true;liveKey="";Render();});catalogRefreshButton=refresh;refresh.ToolTip="Обновить каталог";System.Windows.Automation.AutomationProperties.SetName(refresh,"Обновить каталог");refresh.Padding=new(9,7,9,7);refresh.Margin=new(0);tabs.Children.Add(refresh);
+            var refresh=ActionButton("","IconRefresh",()=>{onlineIndex.RetryNow();ResetCatalogQualityChecks();catalogPages.Clear();ResetDiscoveryData();catalogRefreshRequested=true;liveKey="";Render();});catalogRefreshButton=refresh;refresh.ToolTip="Обновить каталог";System.Windows.Automation.AutomationProperties.SetName(refresh,"Обновить каталог");refresh.Padding=new(9,7,9,7);refresh.Margin=new(0);tabs.Children.Add(refresh);
         }
         inlineCatalogFilters=tabs;
         inlineCatalogFilterScroll=new ScrollViewer{Content=tabs,VerticalScrollBarVisibility=ScrollBarVisibility.Disabled,HorizontalScrollBarVisibility=ScrollBarVisibility.Hidden,CanContentScroll=false};
@@ -190,7 +189,7 @@ public partial class MainWindow
         foreach(var number in CatalogPaging.Numbers(livePage,catalogLastPage))PageButton(number.ToString(),number,true);
         PageButton("Далее",livePage+1,catalogHasNext&&livePage<CatalogPaging.Limit);
         footer.Children.Add(numbers);
-        if(liveError.Length>0&&!favoritesOnly){var retry=Button("Повторить загрузку",()=>{onlineIndex.RetryNow();catalogPages.Clear();featuredRequests.Clear();featuredFallback.Clear();catalogRefreshRequested=true;liveKey="";Render();});retry.Style=(Style)FindResource("QuietButton");footer.Children.Add(retry);}
+        if(liveError.Length>0&&!favoritesOnly){var retry=Button("Повторить загрузку",()=>{onlineIndex.RetryNow();catalogPages.Clear();ResetDiscoveryData();catalogRefreshRequested=true;liveKey="";Render();});retry.Style=(Style)FindResource("QuietButton");footer.Children.Add(retry);}
         content.Children.Add(footer);
         Body.Children.Add(new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=content,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});
         UpdateFilterRail();
@@ -222,9 +221,13 @@ public partial class MainWindow
             }
             AttachMenuToggle(button,menu);target.Children.Add(button);
         }
-        if(!favoritesOnly&&!SearchActive)Choice("Подборка",[new("all","Весь каталог"),new("popular","Популярное · Zona"),new("rated","Высокий рейтинг · Zona")],catalogCollection,v=>catalogCollection=v);
+        if(!favoritesOnly&&!SearchActive)Choice("Подборка",[new("all","Весь каталог"),new("popular","Популярное · Zona"),new("rated","Высокий рейтинг · Zona"),new("foreign","Иностранные"),new("native","Отечественные")],catalogRegion.Length>0?catalogRegion:catalogCollection,v=>
+        {
+            catalogRegion=v is "foreign" or "native"?v:"";catalogCollection=catalogRegion.Length>0?"all":v;
+            if(catalogRegion.Length>0)catalogCountry="";
+        });
         Choice("Жанр",new[]{new CatalogChoice("","Любой жанр")}.Concat(catalogGenres),catalogGenre,v=>catalogGenre=v);
-        Choice("Страна",new[]{new CatalogChoice("","Любая страна")}.Concat(catalogCountries),catalogCountry,v=>catalogCountry=v);
+        Choice("Страна",new[]{new CatalogChoice("","Любая страна")}.Concat(catalogCountries),catalogCountry,v=>{catalogCountry=v;catalogRegion="";});
         Choice("Рейтинг от",new[]{new CatalogChoice("0","Любой рейтинг")}.Concat(Enumerable.Range(1,9).Reverse().Select(x=>new CatalogChoice(x.ToString(),x+" и выше"))),catalogRating.ToString(),v=>catalogRating=int.Parse(v));
         Choice("Год выхода",new[]{new CatalogChoice("","Любой год")}.Concat(Enumerable.Range(2010,DateTime.UtcNow.Year-2009).Reverse().Select(x=>new CatalogChoice(x.ToString(),x.ToString()))),catalogYear?.ToString()??"",v=>catalogYear=int.TryParse(v,out var y)?y:null);
         var effectiveOrder=catalogCollection=="popular"?"По популярности":catalogCollection=="rated"?"По рейтингу":catalogOrder;
@@ -242,7 +245,7 @@ public partial class MainWindow
         var request=liveRequest;var selection=CatalogSelection;var forceRefresh=catalogRefreshRequested;catalogRefreshRequested=false;
         bool IsCurrent()=>ReferenceEquals(liveRequest,request)&&!token.IsCancellationRequested&&liveKey==key&&submittedQuery==query;
         liveItems=[];catalogHasNext=false;
-        var cacheKey=category+"|"+selection.Filter+"|"+page;
+        var cacheKey=category+"|"+selection.Filter+"|"+page+(selection.Region.Length>0?"|region:"+selection.Region+"|home:"+CatalogRegions.HomeCountry(selection.HomeCountry):"");
         await Task.Yield();
         try
         {
@@ -256,7 +259,9 @@ public partial class MainWindow
                     try
                     {
                         var shared=selection.IsDefault?await sharedCatalog.PageAsync(category,page,token,forceRefresh):null;
-                        result=shared??await new LiveCatalog(sourceClient).BrowsePage(category,page,selection,token,forceRefresh);
+                        result=shared??(selection.Region.Length>0
+                            ?await new RegionalCatalog(sourceClient).BrowsePage(category,page,selection.Region,selection.HomeCountry,token,selection,forceRefresh)
+                            :await new LiveCatalog(sourceClient).BrowsePage(category,page,selection,token,forceRefresh));
                     }
                     catch(Exception) when(!token.IsCancellationRequested&&selection.IsDefault)
                     {
@@ -303,31 +308,40 @@ public partial class MainWindow
         }
         ApplyKnownQuality(item);
         if(descriptionItemId!=item.Id){descriptionItemId=item.Id;descriptionExpanded=false;}
-        var back=ActionButton(returnPerson?.Person.Name??section,"IconBack",CinemaBack);back.Style=(Style)FindResource("QuietButton");back.HorizontalAlignment=HorizontalAlignment.Left;back.Margin=new(0,0,0,10);PageHeader.Children.Add(back);
+        var back=ActionButton(returnPerson?.Person.Name??SavedBackLabel()??section,"IconBack",CinemaBack);back.Style=(Style)FindResource("QuietButton");back.HorizontalAlignment=HorizontalAlignment.Left;back.Margin=new(0,0,0,10);PageHeader.Children.Add(back);
         var panel=new StackPanel{Margin=new(0,0,10,0)};Body.Children.Add(new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=panel,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});
-        detailHero=new Grid();detailHero.ColumnDefinitions.Add(new(){Width=new GridLength(174)});detailHero.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});detailHero.RowDefinitions.Add(new(){Height=GridLength.Auto});detailHero.RowDefinitions.Add(new(){Height=GridLength.Auto});detailHero.RowDefinitions.Add(new(){Height=GridLength.Auto});
+        detailHero=new Grid{Name="DetailHero"};detailHero.ColumnDefinitions.Add(new(){Width=new GridLength(174)});detailHero.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});detailHero.RowDefinitions.Add(new(){Height=GridLength.Auto});detailHero.RowDefinitions.Add(new(){Height=GridLength.Auto});detailHero.RowDefinitions.Add(new(){Height=GridLength.Auto});
         detailPoster=new Border{Width=150,Height=225,CornerRadius=new(12),ClipToBounds=true,Background=item.Cover,HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Top,Margin=new(0,0,24,0)};
         detailPoster.SizeChanged+=(sender,_)=>ClipPoster((Border)sender);
         var posterGrid=new Grid();posterGrid.Children.Add(new TextBlock{Text="Постер\nнедоступен",Foreground=Brushes.White,Opacity=.75,TextAlignment=TextAlignment.Center,VerticalAlignment=VerticalAlignment.Center,FontSize=11});
         var image=new Image{DataContext=item,Stretch=Stretch.UniformToFill};image.Loaded+=SourceCover;posterGrid.Children.Add(image);detailPoster.Child=posterGrid;detailHero.Children.Add(detailPoster);
-        detailInfo=new StackPanel{VerticalAlignment=VerticalAlignment.Top};detailInfo.SizeChanged+=(sender,_)=>{if(ReferenceEquals(sender,detailInfo))UpdateDetailLayout();};Grid.SetColumn(detailInfo,1);detailHero.Children.Add(detailInfo);
+        detailInfo=new StackPanel{Name="DetailIdentity",VerticalAlignment=VerticalAlignment.Top};detailInfo.SizeChanged+=(sender,_)=>{if(ReferenceEquals(sender,detailInfo))UpdateDetailLayout();};Grid.SetColumn(detailInfo,1);detailHero.Children.Add(detailInfo);
         detailMetaRow=new Grid{Name="DetailMetaRow",Margin=new(0,0,0,12)};detailMetaRow.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});detailMetaRow.ColumnDefinitions.Add(new(){Width=GridLength.Auto});detailMetaRow.RowDefinitions.Add(new(){Height=GridLength.Auto});detailMetaRow.RowDefinitions.Add(new(){Height=GridLength.Auto});detailInfo.Children.Add(detailMetaRow);
         var meta=Text(item.Section+(item.Year>0?"  ·  "+item.Year:""),12,true);meta.Name="DetailYear";meta.Margin=new(0,0,12,0);meta.VerticalAlignment=VerticalAlignment.Center;detailMetaRow.Children.Add(meta);
         detailRatings=new WrapPanel{Name="DetailRatings",HorizontalAlignment=HorizontalAlignment.Right};Grid.SetColumn(detailRatings,1);detailMetaRow.Children.Add(detailRatings);
         Border Rating(string name,string value)
         {
             var row=new StackPanel{Orientation=Orientation.Horizontal};row.Children.Add(Text(name+"  ",10,true));var score=Text(value,12);score.FontWeight=FontWeights.SemiBold;row.Children.Add(score);foreach(var label in row.Children.OfType<TextBlock>()){label.Margin=new(0);label.VerticalAlignment=VerticalAlignment.Center;}
-            var badge=new Border{Child=row,Padding=new(8,5,8,5),BorderThickness=new(1),CornerRadius=new(8),Margin=new(6,0,0,0)};badge.SetResourceReference(Border.BackgroundProperty,"PanelAlt");badge.SetResourceReference(Border.BorderBrushProperty,"EdgeSoft");return badge;
+            return new Border{Child=row,Padding=new(0,3,0,3),BorderThickness=new(0),Background=Brushes.Transparent,Margin=new(12,0,0,0),ToolTip=name+" · "+value};
         }
         detailRatings.Children.Add(Rating("Кинопоиск",item.Kinopoisk));detailRatings.Children.Add(Rating("IMDb",item.Imdb));
-        detailTitle=Text(item.Title,28);detailTitle.Name="DetailTitle";detailTitle.FontWeight=FontWeights.SemiBold;detailTitle.Margin=new(0,0,0,12);detailInfo.Children.Add(detailTitle);
-        var favorite=ActionButton(prefs.Favorites.Contains(item.Id)?"Сохранено":"Сохранить",prefs.Favorites.Contains(item.Id)?"IconHeartFilled":"IconHeart",()=>{if(prefs.Favorites.Add(item.Id)){prefs.LiveFavorites.RemoveAll(x=>x.Id==item.Id);prefs.LiveFavorites.Add(item);}else{prefs.Favorites.Remove(item.Id);prefs.LiveFavorites.RemoveAll(x=>x.Id==item.Id);}prefs.Save();Render();},"PillButton");favorite.Name="DetailFavorite";favorite.HorizontalAlignment=HorizontalAlignment.Left;favorite.Margin=new(0,0,0,14);detailInfo.Children.Add(favorite);
+        var hasOriginal=!string.IsNullOrWhiteSpace(item.OriginalTitle)&&!item.OriginalTitle.Equals(item.Title,StringComparison.OrdinalIgnoreCase);
+        detailTitle=Text(item.Title,28);detailTitle.Name="DetailTitle";detailTitle.FontWeight=FontWeights.SemiBold;detailTitle.Margin=new(0,0,0,hasOriginal?5:14);detailInfo.Children.Add(detailTitle);
+        if(hasOriginal){var original=Text(item.OriginalTitle!,13,true);original.Name="DetailOriginalTitle";original.Margin=new(0,0,0,14);detailInfo.Children.Add(original);}
+        Button favorite=null!;favorite=ActionButton(IsSaved(item)?"Сохранено":"Сохранить",IsSaved(item)?"IconHeartFilled":"IconHeart",()=>
+        {
+            ToggleSaved(item);var saved=IsSaved(item);favorite.Content=IconLabel(saved?"Сохранено":"Сохранить",saved?"IconHeartFilled":"IconHeart");
+            System.Windows.Automation.AutomationProperties.SetName(favorite,saved?"Сохранено":"Сохранить");
+        },"QuietButton");favorite.Name="DetailFavorite";favorite.HorizontalAlignment=HorizontalAlignment.Left;favorite.Margin=new(0,0,0,14);favorite.Padding=new(12,7,12,7);favorite.BorderThickness=new(0);favorite.SetResourceReference(Control.BackgroundProperty,"Selected");detailInfo.Children.Add(favorite);
         if(item.OnlyPoorQuality)detailInfo.Children.Add(PoorQualityBadge(item.PosterQuality));
-        if(!string.IsNullOrWhiteSpace(item.OriginalTitle)&&!item.OriginalTitle.Equals(item.Title,StringComparison.OrdinalIgnoreCase)){var original=Text(item.OriginalTitle,12,true);original.Margin=new(0,0,0,8);detailInfo.Children.Add(original);}
-        var traits=string.Join("  ·  ",new[]{item.Genre,item.Country}.Where(x=>!string.IsNullOrWhiteSpace(x)));if(traits.Length>0){var genre=Text(traits,12,true);genre.Margin=new(0,0,0,12);detailInfo.Children.Add(genre);}
-        detailDescription=new StackPanel{Margin=new(0,0,0,0)};detailInfo.Children.Add(detailDescription);
+        var traits=string.Join("  ·  ",new[]{item.Genre,item.Country}.Where(x=>!string.IsNullOrWhiteSpace(x)));if(traits.Length>0){var genre=Text(traits,12,true);genre.Name="DetailTraits";genre.Margin=new(0);detailInfo.Children.Add(genre);}
+        detailDescription=new StackPanel{Name="DetailDescription",Margin=new(0,16,0,0)};Grid.SetColumn(detailDescription,0);Grid.SetRow(detailDescription,1);Grid.SetColumnSpan(detailDescription,2);detailHero.Children.Add(detailDescription);
         detailSynopsis=Text(DetailDescriptionText(item),13,true);detailSynopsis.Name="DetailSynopsis";detailSynopsis.LineHeight=20;detailSynopsis.MaxHeight=descriptionExpanded?double.PositiveInfinity:80;detailSynopsis.TextTrimming=TextTrimming.CharacterEllipsis;detailSynopsis.Margin=new(0);detailDescription.Children.Add(detailSynopsis);
-        descriptionToggle=Button(descriptionExpanded?"Свернуть описание":"Читать дальше",()=>{descriptionExpanded=!descriptionExpanded;Render();});descriptionToggle.Name="DescriptionToggle";descriptionToggle.Style=(Style)FindResource("QuietButton");descriptionToggle.HorizontalAlignment=HorizontalAlignment.Left;descriptionToggle.Padding=new(0,5,0,5);descriptionToggle.Margin=new(0);descriptionToggle.MinHeight=26;descriptionToggle.Visibility=Visibility.Collapsed;detailDescription.Children.Add(descriptionToggle);
+        descriptionToggle=Button(descriptionExpanded?"Свернуть описание":"Читать дальше",()=>
+        {
+            if(descriptionItemId!=item.Id||detailSynopsis==null)return;
+            descriptionExpanded=!descriptionExpanded;detailSynopsis.MaxHeight=descriptionExpanded?double.PositiveInfinity:80;UpdateDescriptionToggle();
+        });descriptionToggle.Name="DescriptionToggle";descriptionToggle.Style=(Style)FindResource("QuietButton");descriptionToggle.HorizontalAlignment=HorizontalAlignment.Left;descriptionToggle.Padding=new(0,5,0,5);descriptionToggle.Margin=new(0);descriptionToggle.MinHeight=26;descriptionToggle.Visibility=Visibility.Collapsed;detailDescription.Children.Add(descriptionToggle);
         if(DetailMetadataNeedsRetry(item.Id)&&!MediaMetadata.HasDescription(item)){var retry=ActionButton("Повторить загрузку карточки","IconRefresh",()=>RetryDetailMetadata(item));retry.Name="DetailMetadataRetry";retry.HorizontalAlignment=HorizontalAlignment.Left;retry.Margin=new(0,8,0,0);detailDescription.Children.Add(retry);}
         detailSynopsis.SizeChanged+=(sender,_)=>{if(ReferenceEquals(sender,detailSynopsis))UpdateDescriptionToggle();};
         var heroFrame=new Border{Child=detailHero,Background=(Brush)FindResource("Panel"),BorderBrush=(Brush)FindResource("Edge"),BorderThickness=new(1),CornerRadius=new(22),Padding=new(20),Margin=new(0,0,0,24)};heroFrame.Name="CinemaFilm";heroFrame.VerticalAlignment=VerticalAlignment.Top;
@@ -337,7 +351,8 @@ public partial class MainWindow
         bool? aligned=null;
         void ArrangeCards()
         {
-            var alongside=cards.ActualWidth>=1050;
+            // Keep the breakpoint stable when a longer synopsis adds a page scrollbar.
+            var alongside=Body.ActualWidth>=1080;
             cards.ColumnDefinitions[0].Width=new GridLength(1,GridUnitType.Star);cards.ColumnDefinitions[1].Width=alongside?new GridLength(1,GridUnitType.Star):new GridLength(0);
             heroFrame.Margin=alongside?new(0,0,10,0):new(0);
             Grid.SetColumn(participants,alongside?1:0);Grid.SetRow(participants,alongside?0:1);participants.Margin=alongside?new(10,0,0,0):new(0,20,0,0);
@@ -359,15 +374,13 @@ public partial class MainWindow
         }
         cards.SizeChanged+=(_,_)=>ArrangeCards();ArrangeCards();
         var releasesTitle=Text("Раздачи",23);releasesTitle.FontWeight=FontWeights.SemiBold;releasesTitle.Margin=new(0,0,0,13);panel.Children.Add(releasesTitle);
-        RenderReleaseLoading(panel,item);
-        RenderSourceStatus(panel,item);
+        RenderReleaseToolbar(panel,item);
         if(!liveReleases.TryGetValue(item.Id,out var releases)||releases.Count==0)
         {
             var checking=releaseViews.TryGetValue(item.Id,out var scan)&&scan.Checking;
             if(checking)return;
-            var empty=new StackPanel{Margin=new(22)};var noReleases=Text("Подходящих раздач пока нет",17);noReleases.FontWeight=FontWeights.SemiBold;empty.Children.Add(noReleases);empty.Children.Add(Text("Можно повторить поиск позже или выбрать другую историю.",13,true));
-            var retry=ActionButton("Повторить поиск","IconRefresh",()=>RetryReleases(item));retry.HorizontalAlignment=HorizontalAlignment.Left;retry.Margin=new(0,6,0,0);empty.Children.Add(retry);
-            panel.Children.Add(new Border{Child=empty,Background=(Brush)FindResource("Panel"),BorderBrush=(Brush)FindResource("EdgeSoft"),BorderThickness=new(1),CornerRadius=new(12)});return;
+            var empty=new StackPanel{Margin=new(2,16,2,20)};var noReleases=Text("Подходящих раздач пока нет",17);noReleases.FontWeight=FontWeights.SemiBold;empty.Children.Add(noReleases);empty.Children.Add(Text("Можно обновить поиск раздач или вернуться позже.",13,true));
+            panel.Children.Add(empty);return;
         }
         RenderReleasePicker(panel,releases);
     }
@@ -380,26 +393,18 @@ public partial class MainWindow
         detailHero.ColumnDefinitions[0].Width=new GridLength(posterWidth+(narrow?18:24));detailPoster.Margin=new(0,0,tiny?0:narrow?18:24,0);
         Grid.SetColumn(detailInfo,tiny?0:1);Grid.SetRow(detailInfo,tiny?1:0);Grid.SetColumnSpan(detailInfo,tiny?2:1);detailInfo.Margin=tiny?new(0,16,0,0):new(0);
         Grid.SetColumnSpan(detailPoster,tiny?2:1);detailPoster.HorizontalAlignment=tiny?HorizontalAlignment.Center:HorizontalAlignment.Left;
-        if(narrow&&detailDescription.Parent==detailInfo)
-        {
-            detailInfo.Children.Remove(detailDescription);Grid.SetColumn(detailDescription,0);Grid.SetRow(detailDescription,1);Grid.SetColumnSpan(detailDescription,2);detailHero.Children.Add(detailDescription);
-        }
-        else if(!narrow&&detailDescription.Parent==detailHero)
-        {
-            detailHero.Children.Remove(detailDescription);detailInfo.Children.Add(detailDescription);
-        }
-        if(detailDescription.Parent==detailHero)Grid.SetRow(detailDescription,tiny?2:1);
-        detailDescription.Margin=narrow?new(0,16,0,0):new(0);detailTitle.FontSize=narrow?22:28;
+        Grid.SetRow(detailDescription,tiny?2:1);detailTitle.FontSize=narrow?22:28;
         if(detailMetaRow!=null&&detailRatings!=null)
         {
             var stack=detailInfo.ActualWidth>0&&detailInfo.ActualWidth<300;
             Grid.SetColumn(detailRatings,stack?0:1);Grid.SetRow(detailRatings,stack?1:0);Grid.SetColumnSpan(detailRatings,stack?2:1);
-            detailRatings.HorizontalAlignment=stack?HorizontalAlignment.Left:HorizontalAlignment.Right;detailRatings.Margin=stack?new(-6,8,0,0):new(0);
+            detailRatings.HorizontalAlignment=stack?HorizontalAlignment.Left:HorizontalAlignment.Right;detailRatings.Margin=stack?new(-12,8,0,0):new(0);
         }
     }
     void UpdateDescriptionToggle()
     {
         if(detailSynopsis==null||descriptionToggle==null||detailSynopsis.ActualWidth<=0)return;
+        descriptionToggle.Content=descriptionExpanded?"Свернуть описание":"Читать дальше";
         var formatted=new FormattedText(detailSynopsis.Text,System.Globalization.CultureInfo.CurrentCulture,detailSynopsis.FlowDirection,new Typeface(detailSynopsis.FontFamily,detailSynopsis.FontStyle,detailSynopsis.FontWeight,detailSynopsis.FontStretch),detailSynopsis.FontSize,detailSynopsis.Foreground,VisualTreeHelper.GetDpi(detailSynopsis).PixelsPerDip){MaxTextWidth=detailSynopsis.ActualWidth,LineHeight=20};
         descriptionToggle.Visibility=descriptionExpanded||formatted.Height>80.5?Visibility.Visible:Visibility.Collapsed;
     }

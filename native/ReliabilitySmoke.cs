@@ -21,6 +21,7 @@ public partial class MainWindow
         var cases=new List<object>();
         var fixtures=Enumerable.Range(1,8).Select(id=>new DownloadItem{Name="Fixture.S01E0"+id+".mkv",MediaTitle="Проверка масштабирования "+id,Paused=true,Progress=25,Stats="25% · на паузе"}).ToArray();
         foreach(var item in fixtures)downloads.Items.Add(item);
+        var previousUpdateJob=preparedUpdateJob;preparedUpdateJob="dpi-ready-update-fixture";RefreshSidebarUpdate();
         try
         {
             foreach(var pixels in new[]{(Width:1920d,Height:1040d),(Width:1366d,Height:728d)})
@@ -29,15 +30,13 @@ public partial class MainWindow
                 var fit=WindowSizing.FitPixels(pixels.Width,pixels.Height,scale,scale);
                 MinWidth=fit.MinWidth;MinHeight=fit.MinHeight;MaxWidth=fit.MaxWidth;MaxHeight=fit.MaxHeight;Width=fit.Width;Height=fit.Height;
                 await Task.Delay(60);
-                foreach(var page in new[]{"Фильмы","Загрузки","Настройки"})
+                foreach(var page in new[]{"Фильмы","Сохранённое","Загрузки","Настройки"})
                 {
                     section=page;current=null;Render();UpdateLayout();
                     if(page=="Фильмы")CheckCatalogFilterLine((ok,message)=>{if(!ok)throw new Exception(message);},"DPI-"+pixels.Width+"-"+scale);
                     if(ActualWidth>fit.MaxWidth+1||ActualHeight>fit.MaxHeight+1)throw new Exception("Window overflows scaled work area");
                     if(Body.ActualWidth<90||Body.ActualHeight<20)throw new Exception($"{page}: no usable content at {scale*100}%: body {Body.ActualWidth} x {Body.ActualHeight}, header {PageHeader.ActualHeight}, window {ActualWidth} x {ActualHeight}");
-                    var lastNavigationBottom=Navigation.TransformToAncestor(SidePanel).Transform(new Point(0,Navigation.ActualHeight)).Y;
-                    var footerTop=SidebarFooter.TransformToAncestor(SidePanel).Transform(new Point()).Y;
-                    if(lastNavigationBottom>footerTop+.5)throw new Exception($"Sidebar navigation overlaps footer at {scale*100}%");
+                    CheckSidebarFooter((ok,message)=>{if(!ok)throw new Exception(message);},page+"-DPI-"+pixels.Width+"-"+scale);
                     foreach(var action in VisualElements<Button>(Body).Where(b=>b.IsVisible&&b.ActualWidth>0&&AutomationProperties.GetName(b) is "Продолжить" or "Удалить файлы" or "Подробнее"))
                     {
                         var box=action.TransformToAncestor(Body).TransformBounds(new Rect(new Point(),action.RenderSize));
@@ -50,7 +49,7 @@ public partial class MainWindow
             }
             File.WriteAllText(Path.Combine(output,"dpi-viewports.json"),JsonSerializer.Serialize(cases,new JsonSerializerOptions{WriteIndented=true}));
         }
-        finally{foreach(var item in fixtures)downloads.Items.Remove(item);}
+        finally{preparedUpdateJob=previousUpdateJob;RefreshSidebarUpdate();foreach(var item in fixtures)downloads.Items.Remove(item);}
         Close();
     }
     public async Task CloseSmokeTest(string output)

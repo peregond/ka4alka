@@ -27,20 +27,19 @@ public partial class MainWindow
         }
         if(item.People.Length>0)
         {
-            var row=new UniformGrid{Name="CinemaPeopleGrid",Columns=3,Margin=new(0,0,-8,0)};people.Children.Add(row);
+            var row=new UniformGrid{Name="CinemaPeopleGrid",Columns=3,Margin=new(0,0,-12,0)};people.Children.Add(row);
             row.SizeChanged+=(_,_)=>{var columns=row.ActualWidth>=366?3:row.ActualWidth>=236?2:1;if(row.Columns!=columns)row.Columns=columns;};
             foreach(var person in item.People)
             {
-                var button=Button(person.Name,()=>OpenPerson(person,item));button.Style=(Style)FindResource("PillButton");
-                var tile=new StackPanel();tile.Children.Add(PersonPortrait(person,96,116,item));var name=Text(person.Name,12);name.TextAlignment=TextAlignment.Center;name.MinHeight=28;name.MaxHeight=32;name.TextTrimming=TextTrimming.CharacterEllipsis;name.Margin=new(0);tile.Children.Add(name);
+                var button=Button(person.Name,()=>OpenPerson(person,item));button.Name="CinemaPersonTile";button.Tag=person;button.Style=(Style)FindResource("PosterButton");
+                var tile=new StackPanel();var portrait=PersonPortrait(person,96,120,item);portrait.Name="CinemaPersonPortrait";portrait.BorderThickness=new(0);portrait.HorizontalAlignment=HorizontalAlignment.Center;tile.Children.Add(portrait);var name=Text(person.Name,12);name.TextAlignment=TextAlignment.Center;name.MinHeight=28;name.MaxHeight=32;name.TextTrimming=TextTrimming.CharacterEllipsis;name.Margin=new(0);tile.Children.Add(name);
                 var role=Text(person.Role switch{"Актёры"=>"В ролях","Режиссёры"=>"Режиссёр","Операторы"=>"Оператор",_=>person.Role},10,true);role.TextAlignment=TextAlignment.Center;role.TextWrapping=TextWrapping.NoWrap;role.TextTrimming=TextTrimming.CharacterEllipsis;role.Margin=new(0,3,0,0);tile.Children.Add(role);button.Content=tile;
-                button.Padding=new(6);button.Margin=new(0,0,8,8);button.HorizontalContentAlignment=HorizontalAlignment.Stretch;button.VerticalContentAlignment=VerticalAlignment.Top;button.ToolTip=person.Name+" · "+person.Role;
-                button.SetResourceReference(Control.BackgroundProperty,"PanelAlt");button.SetResourceReference(Control.BorderBrushProperty,"EdgeSoft");
+                button.Padding=new(4);button.Margin=new(0,0,12,12);button.BorderThickness=new(0);button.MinHeight=0;button.HorizontalContentAlignment=HorizontalAlignment.Stretch;button.VerticalContentAlignment=VerticalAlignment.Top;button.ToolTip=person.Name+" · "+person.Role;
                 AutomationProperties.SetName(button,"Открыть карточку: "+person.Name+", "+person.Role);row.Children.Add(button);
             }
         }
         var participantContent=new Grid();participantContent.RowDefinitions.Add(new(){Height=GridLength.Auto});participantContent.RowDefinitions.Add(new(){Height=new GridLength(1,GridUnitType.Star)});
-        var heading=Text("Актёры и съёмочная группа",18);heading.Name="CinemaPeopleHeading";heading.Margin=new(0,0,0,12);participantContent.Children.Add(heading);
+        var heading=Text("Актёры и съёмочная группа",18);heading.Name="CinemaPeopleHeading";heading.FontWeight=FontWeights.SemiBold;heading.Margin=new(0,0,0,16);participantContent.Children.Add(heading);
         var participantScroll=new ScrollViewer{Name="CinemaPeopleScroll",Style=(Style)FindResource("PageScroll"),Content=people,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};Grid.SetRow(participantScroll,1);participantContent.Children.Add(participantScroll);
         BindingOperations.SetBinding(participantScroll,FrameworkElement.MaxHeightProperty,new Binding(nameof(ActualHeight)){Source=Body,Converter=crewViewportHeight,Mode=BindingMode.OneWay});
         var participants=new Border{Name="CinemaParticipants",Child=participantContent,CornerRadius=new(22),Padding=new(20),BorderThickness=new(1),VerticalAlignment=VerticalAlignment.Top};
@@ -94,6 +93,7 @@ public partial class MainWindow
     void CinemaBack()
     {
         if(returnPerson is {} previous){returnPerson=null;OpenPerson(previous.Person,previous.Origin);return;}
+        if(ReturnToSaved())return;
         current=null;Render();
     }
     void OpenCollection(CinemaCollection collection)

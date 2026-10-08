@@ -15,6 +15,23 @@ public partial class MainWindow
     }
     readonly Dictionary<int,ReleasePickerState> releasePickerStates=[];
 
+    ReleasePickerState ReleaseSelection(int filmId)
+    {
+        if(releasePickerStates.TryGetValue(filmId,out var state))return state;
+        if(releasePickerStates.Count>=40)releasePickerStates.Remove(releasePickerStates.Keys.First());
+        return releasePickerStates[filmId]=new();
+    }
+
+    void RenderReleaseToolbar(StackPanel panel,MediaItem item)
+    {
+        var state=ReleaseSelection(item.Id);
+        var toolbar=new WrapPanel{Name="ReleaseToolbar",Margin=new(0,0,0,8),VerticalAlignment=VerticalAlignment.Center};
+        AutomationProperties.SetName(toolbar,"Фильтры и источники раздач");panel.Children.Add(toolbar);
+        toolbar.Children.Add(QualityControls(()=>{state.VisibleCount=60;RefreshDetail(item.Id);}));
+        RenderSourceStatus(toolbar,panel,item);
+        RenderReleaseLoading(toolbar,item);
+    }
+
     static int QualityRank(SourceEntry entry)=>entry.Quality switch{"4K"=>3,"Full HD"=>2,"HD Ready"=>1,_=>0};
     static int SeedRank(SourceEntry entry)=>entry.Seeds switch{>0=>entry.Seeds.Value,null=>0,_=>-1};
     static bool RussianSource(SourceEntry entry)=>entry.Source is "RuTor" or "RuTracker" or "NNM-Club" or "MegaPeer" or "BigFanGroup";
@@ -27,12 +44,7 @@ public partial class MainWindow
     void RenderReleasePicker(StackPanel panel,IReadOnlyList<SourceEntry> releases)
     {
         var filmId=current?.Id??0;
-        if(!releasePickerStates.TryGetValue(filmId,out var state))
-        {
-            if(releasePickerStates.Count>=40)releasePickerStates.Remove(releasePickerStates.Keys.First());
-            state=new();releasePickerStates[filmId]=state;
-        }
-        panel.Children.Add(QualityControls(()=>{state.VisibleCount=60;RefreshDetail(filmId);}));
+        var state=ReleaseSelection(filmId);
         var controls=new WrapPanel{Margin=new(0,4,0,0)};panel.Children.Add(controls);
         var more=new WrapPanel{Visibility=state.More?Visibility.Visible:Visibility.Collapsed,Margin=new(0,0,0,2)};panel.Children.Add(more);
         var filters=new Dictionary<string,ComboBox>();

@@ -19,9 +19,12 @@ public static class MediaMetadata
         Kinopoisk=Score(fresh.Kinopoisk)?fresh.Kinopoisk:prior.Kinopoisk,
         Imdb=Score(fresh.Imdb)?fresh.Imdb:prior.Imdb,
         Genre=string.IsNullOrWhiteSpace(fresh.Genre)?prior.Genre:fresh.Genre,Country=string.IsNullOrWhiteSpace(fresh.Country)?prior.Country:fresh.Country,
-        GenreKeys=fresh.GenreKeys.Length>0?fresh.GenreKeys:prior.GenreKeys,CountryKeys=fresh.CountryKeys.Length>0?fresh.CountryKeys:prior.CountryKeys,
+        GenreKeys=fresh.GenreKeys.Length>0?fresh.GenreKeys:prior.GenreKeys,
+        CountryKeys=UseFreshCountries(prior,fresh)?fresh.CountryKeys:prior.CountryKeys,
+        CountryKeysComplete=UseFreshCountries(prior,fresh)?fresh.CountryKeysComplete:prior.CountryKeysComplete,
         People=fresh.People.Length>0?ZonaMovieMetadata.MergePeople(prior.People,fresh.People):prior.People,Awards=fresh.Awards.Length>0?fresh.Awards:prior.Awards,Collections=fresh.Collections.Length>0?fresh.Collections:prior.Collections
     };
+    static bool UseFreshCountries(MediaItem prior,MediaItem fresh)=>fresh.CountryKeys.Length>0&&(fresh.CountryKeysComplete||prior.CountryKeys.Length==0||!prior.CountryKeysComplete);
     static bool Score(string value)=>double.TryParse(value.Replace(',','.'),System.Globalization.NumberStyles.Float,System.Globalization.CultureInfo.InvariantCulture,out var score)&&score is >0 and <=10;
 
     public static async Task<MediaMetadataResult> Load(MediaItem item,Func<CancellationToken,Task<MediaItem>> indexed,Func<CancellationToken,Task<MediaItem>> direct,Action<MediaItem>? updated=null,CancellationToken ct=default,TimeSpan? timeout=null)
