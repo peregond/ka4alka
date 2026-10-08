@@ -8,9 +8,9 @@ public static class ZonaMovieMetadataTests
 {
     const string Photo="https://img4.zonapic.com/images/actor/972/972478.jpg";
     static void Check(bool value,string name){if(!value)throw new Exception(name);Console.WriteLine("PASS: "+name);}
-    static byte[] Json(MediaItem item,string? description="Описание фильма из собственного источника каталога.",string? score="6.5",string? photo=Photo,string actorId="972478",string? name=null,int? year=null,bool credits=true)
+    static byte[] Json(MediaItem item,string? description="Описание фильма из собственного источника каталога.",string? score="6.5",string? photo=Photo,string actorId="972478",string? name=null,int? year=null,bool credits=true,string countryIds="25 1 11")
     {
-        var detail=new Dictionary<string,object?>{{"id","7178187"},{"name_rus",name??item.Title},{"name_original",item.OriginalTitle??"Runner"},{"year",year??item.Year},{"serial",item.Section=="Сериалы"},{"description",description},{"rating_kinopoisk",score},{"rating_imdb",6.7},{"rating",9.9},{"genreId","3 6 16"},{"country_id","25 1 11"}};
+        var detail=new Dictionary<string,object?>{{"id","7178187"},{"name_rus",name??item.Title},{"name_original",item.OriginalTitle??"Runner"},{"year",year??item.Year},{"serial",item.Section=="Сериалы"},{"description",description},{"rating_kinopoisk",score},{"rating_imdb",6.7},{"rating",9.9},{"genreId","3 6 16"},{"country_id",countryIds}};
         return JsonSerializer.SerializeToUtf8Bytes(new Dictionary<string,object?>
         {
             [item.Section=="Сериалы"?"serial":"movie"]=detail,
@@ -38,6 +38,9 @@ public static class ZonaMovieMetadataTests
         Check(parsed.Kinopoisk=="6.5"&&parsed.Imdb=="6.7"&&parsed.OriginalTitle=="Runner"&&parsed.Description!.StartsWith("Описание фильма",StringComparison.Ordinal),"Zona JSON supplies the identified film's own description, original title and separate Kinopoisk/IMDb scores");
         Check(parsed.People is [var actor,var director]&&actor is {Name:"Алан Ричсон",Role:"Актёры",PhotoUrl:Photo,OriginalName:"Alan Ritchson",SourcePersonId:"972478",PageUrl:""}&&director is {Role:"Режиссёры",OriginalName:"Scott Waugh",SourcePersonId:"3640",PhotoUrl:null},"Zona JSON preserves actor photo, official English name and source ID while leaving a director without a source photo unset");
         Check(parsed.Genre=="криминал, комедия, боевик"&&parsed.GenreKeys.SequenceEqual(new[]{"kriminal","komedia","boevik"})&&parsed.Country=="Великобритания, США, Австралия"&&!parsed.CountryKeys.Contains("kanada"),"Zona genres and countries include only rows selected by the identified film's exact source IDs");
+        var partialCountries=ZonaMovieMetadata.Parse(Json(film,countryIds:"1 99"),film)!;
+        Check(parsed.CountryKeysComplete&&!partialCountries.CountryKeysComplete&&partialCountries.CountryKeys.SequenceEqual(["ssha"])&&!CatalogRegions.IsForeign(partialCountries,"rossiia"),"an unmatched selected country ID keeps the country list partial instead of falsely classifying a coproduction as foreign");
+        Check(!ZonaMovieMetadata.Parse(Json(film,countryIds:"1 invalid"),film)!.CountryKeysComplete,"an invalid selected country identifier cannot become proof of a complete production-country list");
         Check(ZonaMovieMetadata.Parse(Json(film,score:"-10"),film)?.Kinopoisk=="—"&&ZonaMovieMetadata.Parse(Json(film,score:"11"),film)?.Kinopoisk=="—"&&ZonaMovieMetadata.Parse(Json(film,score:null),film)?.Kinopoisk=="—","missing or invalid source scores stay unknown without borrowing the unrelated aggregate rating");
         Check(ZonaMovieMetadata.Parse(Json(film,name:"Другой фильм"),film with{OriginalTitle=null})==null&&ZonaMovieMetadata.Parse(Json(film,year:2025),film)==null,"Zona JSON rejects another title or another release year before using any cast or ratings");
         Check(ZonaMovieMetadata.Parse(Json(film,name:"Другое название"),film)?.People.Length==2,"an exact verified original title and year can identify a film with another localized title");

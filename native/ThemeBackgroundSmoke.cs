@@ -20,12 +20,12 @@ public partial class MainWindow
         for(var change=0;change<64;change++)
             if(!ReferenceEquals(ThemeBackground.Grain(change%2==0).ImageSource,tile))throw new Exception("Switching theme regenerated the grain bitmap.");
         var layer=FindVisual<Border>(this,element=>element.Name=="BackgroundGrainLayer")??throw new Exception("The backdrop grain layer is missing.");
-        if(Content is not Grid root||!ReferenceEquals(layer.Parent,root)||layer.IsHitTestVisible||layer.Focusable||layer.Child!=null||layer.Effect!=null||
+        if(Content is not Grid root||!ReferenceEquals(layer.Parent,root)||!layer.IsVisible||layer.Opacity!=1||layer.IsHitTestVisible||layer.Focusable||layer.Child!=null||layer.Effect!=null||
            !ReferenceEquals(layer.Background,grain)||Math.Abs(layer.ActualWidth-root.ActualWidth)>.5||Math.Abs(layer.ActualHeight-root.ActualHeight)>.5||
            root.Children.IndexOf(layer)>=root.Children.IndexOf(RootGrid)||VisualElements<Border>(this).Count(element=>ReferenceEquals(element.Background,grain))!=1)
             throw new Exception("Grain must fill only the root backdrop, behind panels, text and posters, without receiving input.");
         var glow=root.Children.OfType<Border>().SingleOrDefault(element=>ReferenceEquals(element.Background,ambient));
-        if(glow==null||root.Children.IndexOf(glow)>=root.Children.IndexOf(layer)||glow.IsHitTestVisible)
+        if(glow==null||!glow.IsVisible||glow.Opacity!=1||root.Children.IndexOf(glow)>=root.Children.IndexOf(layer)||glow.IsHitTestVisible)
             throw new Exception("The root gradient and grain layers are out of order.");
 
         const int width=800,height=500;

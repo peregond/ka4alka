@@ -51,7 +51,8 @@ public sealed class RegionalCatalog(SourceClient client)
                 if(root.TryGetProperty("CountryKeys",out var keys)&&keys.ValueKind==JsonValueKind.Array)
                 {
                     var countries=CatalogRegions.CountryKeys(keys.EnumerateArray().Where(x=>x.ValueKind==JsonValueKind.String).Select(x=>x.GetString()!));
-                    if(countries.Length>0)return item with{CountryKeys=countries,Country=root.TryGetProperty("Country",out var country)&&country.ValueKind==JsonValueKind.String?country.GetString()??"":"",CountryKeysComplete=true};
+                    var complete=!root.TryGetProperty("CountryKeysComplete",out var completeness)||completeness.ValueKind!=JsonValueKind.False;
+                    if(countries.Length>0)return item with{CountryKeys=countries,Country=root.TryGetProperty("Country",out var country)&&country.ValueKind==JsonValueKind.String?country.GetString()??"":"",CountryKeysComplete=complete};
                 }
             }
         }
@@ -62,7 +63,7 @@ public sealed class RegionalCatalog(SourceClient client)
     {
         if(!forceRefresh)
         {
-            var saved=await Cached(item,ct);if(saved!=null)return saved;
+            var saved=await Cached(item,ct);if(saved is {CountryKeysComplete:true})return saved;
         }
         if(item.CountryKeysComplete&&CatalogRegions.CountryKeys(item.CountryKeys).Length>0&&!forceRefresh)return item;
         var url=CinemaMetadata.CatalogUrl(item.PageUrl,item.Section=="Сериалы"?"/tvseries/":"/movies/");

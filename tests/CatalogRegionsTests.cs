@@ -79,6 +79,17 @@ static class CatalogRegionsTests
             var page=await new RegionalCatalog(client).BrowsePage("Фильмы",1,"foreign","rossiia",CancellationToken.None,selection:new(Genre:"komediia"));
             Check(page.Items.Single().CountryKeys.SequenceEqual(["ssha","kanada"])&&detailCacheHandler.DetailCalls==0,"existing detail snapshots supply verified countries offline without repeating metadata requests");
         }
+        var partialCached=Film("partial-cache-"+suffix);
+        var partialPath=Path.Combine(Preferences.DataDir,"details",Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(partialCached.PageUrl!)))+".json");
+        await File.WriteAllTextAsync(partialPath,JsonSerializer.Serialize(new{Country="США",CountryKeys=new[]{"ssha"},CountryKeysComplete=false}));
+        var restoredPartial=(await RegionalCatalog.WithCachedCountries([partialCached],CancellationToken.None)).Single();
+        Check(!restoredPartial.CountryKeysComplete&&CatalogRegions.IsNative(restoredPartial,"ssha")&&!CatalogRegions.IsForeign(restoredPartial,"rossiia"),"a cached native-feed country stamp preserves its partial provenance and never becomes foreign proof");
+        var partialHandler=new Handler((request,_)=>Task.FromResult(request.RequestUri!.AbsolutePath.Contains("/filter/")?Reply(Html([partialCached]),"text/html"):Reply(Json(partialCached,"1 2"))));
+        using(var client=new SourceClient(partialHandler))
+        {
+            var page=await new RegionalCatalog(client).BrowsePage("Фильмы",1,"foreign","rossiia",CancellationToken.None,selection:new(Genre:"uzhasy"));
+            Check(page.Items.Length==0&&partialHandler.DetailCalls==1,"a partial detail cache still requests complete countries and excludes a confirmed home-country coproduction");
+        }
         var online=JsonSerializer.SerializeToElement(new{id="movies:country-index",section="movies",title="Страна",year=2024,pageUrl="https://w6.zona.plus/movies/country-index",country="США",countryKeys=new[]{"ssha","../rossiia"},countryKeysComplete=false});
         using(var client=new SourceClient(new Handler((_,_)=>Task.FromResult(Reply(JsonSerializer.Serialize(new{items=new[]{online},hasMore=false}))))))
         {

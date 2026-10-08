@@ -53,6 +53,7 @@ if(args.Contains("--portraits-only")){await CinemaPortraitTests.Run();return;}
 if(args.Contains("--person-profile-only")){await PersonProfileLoadingTests.Run();return;}
 if(args.Contains("--professional-people-only")){await ProfessionalCinemaPeopleTests.Run();return;}
 if(args.Contains("--zona-metadata-only")){await ZonaMovieMetadataTests.Run();return;}
+if(args.Contains("--catalog-regions-only")){await CatalogRegionsTests.Run();return;}
 await CacheStorageTests.Run(root);
 if(args.Contains("--cache-only"))return;
 DownloadTests.Run();
@@ -63,6 +64,7 @@ AdditionalSourceTests.Run();
 await DownloadOrderingTests.Run();
 await CatalogBatchTests.Run();
 CatalogPagingTests.Run();
+await CatalogRegionsTests.Run();
 await SharedCatalogTests.Run();
 await UnifiedSearchTests.Run();
 if(args.Contains("--catalog-only"))return;

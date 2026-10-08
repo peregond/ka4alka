@@ -5,21 +5,21 @@ on:
       version:
         description: Version matching native/Kachalka.csproj
         required: true
-        default: '0.35.0'
+        default: '0.36.0'
   push:
-    branches: [release/0.35.0]
+    branches: [release/0.36.0]
     paths: [.github/workflows/release.yml, 'native/**', 'update-core/**', 'updater/**', 'update-tests/**', 'tests/**', 'installer/**', build-release.ps1, package-release.ps1]
 permissions:
   contents: write
 concurrency:
-  group: kachalka-release-0.35.0
+  group: kachalka-release-0.36.0
   cancel-in-progress: false
 jobs:
   release:
     runs-on: windows-latest
     timeout-minutes: 25
     env:
-      RELEASE_VERSION: ${{ inputs.version || '0.35.0' }}
+      RELEASE_VERSION: ${{ inputs.version || '0.36.0' }}
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
     steps:
       - uses: actions/checkout@v4
@@ -64,12 +64,12 @@ jobs:
         run: |
           $env:KACHALKA_DATA=Join-Path $env:RUNNER_TEMP 'kachalka-cinema-smoke'
           $output=Join-Path $pwd 'test-output/cinema-ui'
-          $process=Start-Process dist/Kachalka-0.35/Kachalka.exe -ArgumentList @('--cinema-smoke-test',$output) -PassThru
+          $process=Start-Process dist/Kachalka-0.36/Kachalka.exe -ArgumentList @('--cinema-smoke-test',$output) -PassThru
           if(-not $process.WaitForExit(60000)){$process.Kill();throw 'Person card UI smoke timed out'}
           if($process.ExitCode -ne 0 -or (Test-Path "$output/error.txt") -or -not (Test-Path "$output/checks.json")){throw 'Person card UI smoke failed'}
-      - name: Verify upgrade from previously published 0.34.0
+      - name: Verify upgrade from previously published 0.35.0
         shell: pwsh
-        run: ./tests/WindowsPublishedUpgrade.ps1 -FromVersion 0.34.0 -ReleaseDirectory ('dist/release-'+$env:RELEASE_VERSION)
+        run: ./tests/WindowsPublishedUpgrade.ps1 -FromVersion 0.35.0 -ReleaseDirectory ('dist/release-'+$env:RELEASE_VERSION)
       - name: Upload verified files to draft GitHub Release
         shell: pwsh
         env:
@@ -150,3 +150,20 @@ jobs:
             test-output/published-upgrade/checks.txt
             test-output/published-upgrade/data/updates/*/result.txt
             test-output/windows-update/data/updates/*/result.txt
+      - name: Publish verified 0.36 release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag='v'+$env:RELEASE_VERSION
+          $release=gh release view $tag --json isDraft,assets | ConvertFrom-Json
+          if($LASTEXITCODE -ne 0 -or -not $release.isDraft){throw 'Verified draft release missing'}
+          foreach($asset in $release.assets){
+            if($asset.name.StartsWith('preview-')){
+              gh release delete-asset $tag $asset.name --yes
+              if($LASTEXITCODE -ne 0){throw 'Cannot remove temporary preview asset'}
+            }
+          }
+          gh release edit $tag --draft=false --latest
+          if($LASTEXITCODE -ne 0){throw 'Cannot publish verified release'}
+          ('Published verified release https://github.com/'+$env:GITHUB_REPOSITORY+'/releases/tag/'+$tag) >> $env:GITHUB_STEP_SUMMARY

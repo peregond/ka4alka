@@ -187,7 +187,7 @@ public partial class MainWindow
             // Reproduce metadata arriving after the row was already measured.
             foreach(var item in liveItems.Take(8))item.SetScores(item.Kinopoisk,item.Imdb,"\nбоевик\r\n, \n криминал, \n драма\n");
             await Settle();CheckSeriesLayout();CheckDiscoveryShelves((ok,message)=>{if(!ok)throw new Exception(message);},"dark-series-shelves");Shot("series-catalog-dark");
-            prefs.Light=true;ApplyTheme();Render();await Settle();CheckSeriesLayout();CheckDiscoveryShelves((ok,message)=>{if(!ok)throw new Exception(message);},"light-series-shelves");
+            prefs.Light=true;ApplyTheme();Render();await Settle();CheckSeriesLayout();CheckDiscoveryShelves((ok,message)=>{if(!ok)throw new Exception(message);},"light-series-shelves");Shot("series-catalog-light");
             section="Фильмы";liveItems=movies;liveKey=CurrentCatalogKey;prefs.Light=false;ApplyTheme();Render();await Settle();
             var preview=liveItems.FirstOrDefault(x=>x.ImageUrl!=null)?.ImageUrl;
             var movie=new MediaItem(-987654320,"За пределами тишины: невероятное путешествие через время, которое начинается с одного случайного письма","Фильмы","Приключения · Драма",2026,"8,7","8,5","#526B69")
