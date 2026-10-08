@@ -22,7 +22,7 @@ public partial class MainWindow
         ResetCatalogQualityChecks();
         liveRequest?.Cancel();personRequest?.Cancel();CancelDetailMetadata(restart:true);foreach(var view in releaseViews.Values)view.Request?.Cancel();
         var result=await Task.Run(()=>CacheFiles.Current.MaintainAsync(clear:true));
-        coverCache.Clear();featurePosters.Clear();cardMetadata.Clear();priorityMetadata.Clear();requestedDetails.Clear();
+        coverCache.Clear();portraitCache.Clear();featurePosters.Clear();cardMetadata.Clear();priorityMetadata.Clear();requestedDetails.Clear();
         catalogPages.Clear();liveReleases.Clear();cachedReleaseViews.Clear();releaseViews.Clear();liveItems=[];liveKey="";catalogLastPage=null;liveLoading=false;
         await catalogIndex.ClearMemoryAsync();await sharedCatalog.ClearMemoryAsync();return result;
     }

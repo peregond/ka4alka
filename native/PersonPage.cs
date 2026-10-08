@@ -26,7 +26,7 @@ public partial class MainWindow
         var name=Text(person.Name,30);name.Name="PersonName";name.FontWeight=FontWeights.SemiBold;name.Margin=new(0,0,0,16);identity.Children.Add(name);
         var biographyPanel=new StackPanel{Name="PersonBiographyPanel"};identity.Children.Add(biographyPanel);
         var biography=Text("Загружаем биографию…",14,true);biography.Name="PersonBiography";biography.LineHeight=21;biography.MaxHeight=126;biography.Margin=new(0);biographyPanel.Children.Add(biography);
-        bool expanded=false;
+        bool expanded=false;string? measuredBiography=null;double measuredWidth=0,measuredDpi=0;bool biographyOverflows=false;
         Button expand=null!;expand=Button("Подробнее",()=>{expanded=!expanded;UpdateBiography();});expand.Name="PersonBiographyToggle";expand.Style=(Style)FindResource("QuietButton");expand.FontSize=12;expand.HorizontalAlignment=HorizontalAlignment.Left;expand.Padding=new(0,5,5,5);expand.Margin=new(0,5,0,0);expand.Visibility=Visibility.Collapsed;biographyPanel.Children.Add(expand);
         string? sourceUrl=null;
         var source=Button("Источник биографии",()=>{if(sourceUrl!=null)System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(sourceUrl){UseShellExecute=true});});source.Name="PersonBiographySource";source.Style=(Style)FindResource("QuietButton");source.FontSize=11;source.HorizontalAlignment=HorizontalAlignment.Left;source.Padding=new(0,4,5,4);source.Margin=new(0,6,0,0);source.Visibility=Visibility.Collapsed;biographyPanel.Children.Add(source);
@@ -36,8 +36,16 @@ public partial class MainWindow
             biography.MaxHeight=expanded?double.PositiveInfinity:126;
             expand.Content=expanded?"Свернуть":"Подробнее";
             if(biography.ActualWidth<=0)return;
-            var formatted=new FormattedText(biography.Text,CultureInfo.CurrentCulture,FlowDirection.LeftToRight,new Typeface(biography.FontFamily,biography.FontStyle,biography.FontWeight,biography.FontStretch),biography.FontSize,Brushes.Black,VisualTreeHelper.GetDpi(biography).PixelsPerDip){MaxTextWidth=Math.Max(1,biography.ActualWidth),LineHeight=21};
-            expand.Visibility=formatted.Height>127?Visibility.Visible:Visibility.Collapsed;
+            var width=Math.Max(1,biography.ActualWidth);var dpi=VisualTreeHelper.GetDpi(biography).PixelsPerDip;
+            if(measuredBiography!=biography.Text||Math.Abs(measuredWidth-width)>.5||measuredDpi!=dpi)
+            {
+                // Only seven lines are needed to decide whether six visible
+                // lines overflow. Avoid shaping the entire biography again on
+                // every filmography progress tick or unrelated layout pass.
+                var formatted=new FormattedText(biography.Text,CultureInfo.CurrentCulture,FlowDirection.LeftToRight,new Typeface(biography.FontFamily,biography.FontStyle,biography.FontWeight,biography.FontStretch),biography.FontSize,Brushes.Black,dpi){MaxTextWidth=width,LineHeight=21,MaxLineCount=7};
+                biographyOverflows=formatted.Height>127;measuredBiography=biography.Text;measuredWidth=width;measuredDpi=dpi;
+            }
+            expand.Visibility=biographyOverflows?Visibility.Visible:Visibility.Collapsed;
         }
         void HeroLayout()
         {
@@ -69,7 +77,7 @@ public partial class MainWindow
         bool IsCurrent()=>!closed&&!request.IsCancellationRequested&&ReferenceEquals(personRequest,request)&&activePerson==person;
         void Apply(PersonProfile profile,int attempt,bool complete=false)
         {
-            if(!Dispatcher.CheckAccess()){Dispatcher.BeginInvoke(new Action(()=>Apply(profile,attempt,complete)),DispatcherPriority.DataBind);return;}
+            if(!Dispatcher.CheckAccess()){Dispatcher.BeginInvoke(new Action(()=>Apply(profile,attempt,complete)),DispatcherPriority.Background);return;}
             // A provider's queued progress can arrive after its final result or
             // after a retry started. Check again on the UI thread before editing.
             if(!IsCurrent()||attempt!=refreshAttempt||!complete&&attempt==settledAttempt)return;
@@ -77,7 +85,8 @@ public partial class MainWindow
             var hasBiography=!string.IsNullOrWhiteSpace(profile.Description);
             if(hasBiography||complete)
             {
-                biography.Text=hasBiography?profile.Description:"Биография пока недоступна.";biography.SetResourceReference(TextBlock.ForegroundProperty,hasBiography?"Text":"Muted");UpdateBiography();
+                var description=hasBiography?profile.Description:"Биография пока недоступна.";
+                if(biography.Text!=description){biography.Text=description;biography.SetResourceReference(TextBlock.ForegroundProperty,hasBiography?"Text":"Muted");UpdateBiography();}
             }
             var uri=PersonBiographyUrl(profile.SourceUrl);sourceUrl=uri?.AbsoluteUri;source.Visibility=uri==null?Visibility.Collapsed:Visibility.Visible;source.ToolTip=uri?.Host;
             var films=profile.Filmography.Where(film=>film.Cinema).DistinctBy(film=>film.Id).OrderByDescending(film=>film.Year).ThenBy(film=>film.Title).ToArray();
@@ -95,7 +104,10 @@ public partial class MainWindow
             retry.Visibility=Visibility.Collapsed;status.Text="Загружаем фильмографию…";
             try
             {
-                var profile=await new LiveCatalog(sourceClient).Person(person,request.Token,origin,liveItems.Concat(prefs.LiveFavorites),updated=>Apply(updated,attempt));Apply(profile,attempt,true);
+                // Snapshot UI-owned lists first. Providers read disk caches and
+                // parse substantial HTML/JSON even when no network await yields.
+                var known=liveItems.Concat(prefs.LiveFavorites).ToArray();
+                var profile=await LoadPersonInBackground(sourceClient,person,request.Token,origin,known,updated=>Apply(updated,attempt));Apply(profile,attempt,true);
             }
             catch(OperationCanceledException)when(request.IsCancellationRequested){}
             catch
@@ -107,6 +119,9 @@ public partial class MainWindow
         all.Frame.Visibility=top.Frame.Visibility=awards.Frame.Visibility=Visibility.Collapsed;
         _=Refresh();
     }
+
+    static Task<PersonProfile> LoadPersonInBackground(SourceClient client,CinemaPerson person,CancellationToken ct,MediaItem? origin,MediaItem[] known,Action<PersonProfile>? progress=null)
+        =>Task.Run(()=>new LiveCatalog(client).Person(person,ct,origin,known,progress),ct);
 
     static Uri? PersonBiographyUrl(string? value)
     {

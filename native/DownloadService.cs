@@ -4,11 +4,12 @@ using System.Text.Json;
 using MonoTorrent;
 using MonoTorrent.Client;
 namespace Kachalka;
-public sealed class DownloadService
+public sealed partial class DownloadService
 {
     ClientEngine? engine;
     readonly Dictionary<string,TorrentManager> managers=[];
     readonly Dictionary<string,(PayloadMeter Down,PayloadMeter Up)> meters=[];
+    readonly Dictionary<TorrentManager,Task> stoppingTasks=[];
     readonly HashSet<string> pendingResume=[];
     readonly Dictionary<string,(string State,DateTime Utc)> diagnosticStates=[];
     readonly SemaphoreSlim gate=new(1,1);
@@ -19,8 +20,9 @@ public sealed class DownloadService
     readonly IReadOnlyList<string> publicTrackers;
     public int DownloadLimitKbps {get;private set;}
     public int UploadLimitKbps {get;private set;}
-    public DownloadService(EngineSettings? settings=null,int? downloadLimitKbps=null,int? uploadLimitKbps=null,IReadOnlyList<string>? publicTrackers=null)
+    public DownloadService(EngineSettings? settings=null,int? downloadLimitKbps=null,int? uploadLimitKbps=null,IReadOnlyList<string>? publicTrackers=null,DownloadSpace? downloadSpace=null)
     {
+        space=downloadSpace??new();
         customSettings=settings;
         this.publicTrackers=publicTrackers??MagnetDiscovery.PublicTrackers;
         DownloadLimitKbps=Math.Clamp(downloadLimitKbps??settings?.MaximumDownloadRate/1024??0,0,int.MaxValue/1024);
@@ -30,9 +32,11 @@ public sealed class DownloadService
         if(DownloadOrdering.AssignMissingAddedUtc(restored,File.GetLastWriteTimeUtc(queuePath)))SaveQueue(restored);
         foreach(var item in restored)
         {
-            if(!item.Paused)pendingResume.Add(item.Id);
+            if(!item.Paused&&!item.LowSpacePaused)pendingResume.Add(item.Id);
+            if(item.Completed)completionNotified.Add(item.Id);
             item.Paused=true;item.Busy=false;item.Status="На паузе";item.Stats=$"{item.Progress:F1}% · на паузе";item.Hint="";
             item.DownloadRate=0;item.UploadRate=0;item.TotalBytes=KnownTotal(item.Files);Items.Add(item);
+            ApplyReliabilityStatus(item);
         }
     }
     ClientEngine Engine
@@ -62,7 +66,7 @@ public sealed class DownloadService
     public async Task<int> SetGroupAsync(bool completed,bool paused)
     {
         Update();int changed=0;
-        foreach(var item in Items.ToArray().Where(x=>x.Completed==completed))if(!item.Busy&&item.Paused!=paused){await SetPausedAsync(item,paused);changed++;}
+        foreach(var item in Items.ToArray().Where(x=>x.Completed==completed))if(!item.Busy&&item.Paused!=paused){await SetPausedAsync(item,paused);if(item.Paused==paused)changed++;}
         return changed;
     }
     public void Save()=>SaveQueue(Items);
@@ -80,7 +84,7 @@ public sealed class DownloadService
             pendingResume.Remove(id);
             var item=Items.FirstOrDefault(x=>x.Id==id);
             if(item==null||!item.Paused)continue;
-            try{await Toggle(item);restored++;}
+            try{await Toggle(item);if(!item.Paused)restored++;}
             catch(Exception error){item.Status="Не удалось продолжить: "+error.Message;item.Refresh();Save();}
         }
         return restored;
@@ -106,12 +110,22 @@ public sealed class DownloadService
         }
         catch{await Engine.RemoveAsync(manager);throw;}
         manager.ConnectionAttemptFailed+=(_,failure)=>DiagnosticLog.Write("peer-connection-failed",new{item.Id,item.ReleaseSource,item.InfoHash,Reason=failure.Reason.ToString()});
-        managers[item.Id]=manager;meters[item.Id]=(new(),new());return manager;
+        managers[item.Id]=manager;meters[item.Id]=(new(),new());
+        if(!manager.HasMetadata)WatchMetadata(item,manager);
+        return manager;
     }
-    public async Task Add(string source,string folder,MediaItem? media=null,string? imageUrl=null,SourceEntry? release=null)
+    public async Task<DownloadItem> Add(string source,string folder,MediaItem? media=null,string? imageUrl=null,SourceEntry? release=null)
     {
+        var requestedAfterClose=closeRequested;
         await gate.WaitAsync();
         try {
+            if(closeRequested)
+            {
+                // Explicit reuse after Close is supported by the core, but an
+                // older queued click must never reopen an engine during exit.
+                if(!requestedAfterClose)throw new OperationCanceledException(lifetime.Token);
+                lifetime.Dispose();lifetime=new();closeRequested=false;
+            }
             source=source.Trim();
             string name="Получение метаданных…";
             string identity;
@@ -124,7 +138,7 @@ public sealed class DownloadService
                 if(!File.Exists(cached))File.Copy(source,cached);source=cached;
             }
             if(Items.Any(x=>x.Source==source||identity.Length>0&&string.Equals(ExistingHash(x),identity,StringComparison.OrdinalIgnoreCase)))throw new InvalidOperationException("Эта раздача уже в очереди.");
-            Directory.CreateDirectory(folder);
+            await Task.Run(()=>Directory.CreateDirectory(folder),CancellationToken.None).WaitAsync(lifetime.Token);
             var item=new DownloadItem
             {
                 Source=source,Folder=folder,Name=name,InfoHash=identity,AddedUtc=DateTime.UtcNow,
@@ -136,13 +150,17 @@ public sealed class DownloadService
             try
             {
                 manager=await Manager(item);
-                await manager.StartAsync();item.Paused=false;item.LastStartedUtc=DateTime.UtcNow;meters[item.Id].Down.Sample(item.LastStartedUtc,item.LastStartedUtc,manager.Monitor.DataBytesReceived);meters[item.Id].Up.Sample(item.LastStartedUtc,item.LastStartedUtc,manager.Monitor.DataBytesSent);item.Status="Поиск участников…";item.Refresh();
-                Items.Add(item);Save();
+                SnapshotFiles(item,manager);Items.Add(item);
+                if(await EnsureSpaceAsync(item,manager,lifetime.Token))
+                {
+                    await manager.StartAsync();item.Paused=false;item.LastStartedUtc=DateTime.UtcNow;meters[item.Id].Down.Sample(item.LastStartedUtc,item.LastStartedUtc,manager.Monitor.DataBytesReceived);meters[item.Id].Up.Sample(item.LastStartedUtc,item.LastStartedUtc,manager.Monitor.DataBytesSent);item.Status="Поиск участников…";ApplyReliabilityStatus(item);item.Refresh();
+                }
+                Save();await ReleaseIdleEngine();return item;
             }
             catch
             {
                 Items.Remove(item);
-                if(manager!=null){try{await manager.StopAsync(TimeSpan.FromSeconds(2));await Engine.RemoveAsync(manager);}catch{}managers.Remove(item.Id);meters.Remove(item.Id);}
+                if(manager!=null){try{await manager.StopAsync(TimeSpan.FromSeconds(2));await Engine.RemoveAsync(manager);}catch{}managers.Remove(item.Id);meters.Remove(item.Id);CancelMetadataWatch(item.Id);}
                 await ReleaseIdleEngine();
                 throw;
             }
@@ -157,8 +175,13 @@ public sealed class DownloadService
         {
             if(!Items.Contains(item)||item.Paused==paused)return;
             var manager=await Manager(item);
-            if(!paused){await manager.StartAsync();item.Paused=false;item.LastStartedUtc=DateTime.UtcNow;}
-            else{await StopManager(manager);item.Paused=true;}
+            if(!paused)
+            {
+                SnapshotFiles(item,manager);
+                if(!await EnsureSpaceAsync(item,manager,lifetime.Token)){Update();Save();await ReleaseIdleEngine();return;}
+                lifetime.Token.ThrowIfCancellationRequested();await manager.StartAsync();item.Paused=false;item.LowSpacePaused=false;item.SpacePauseMessage="";item.SpaceCheckFailed=false;item.LastStartedUtc=DateTime.UtcNow;
+            }
+            else{await StopManager(manager);item.Paused=true;item.LowSpacePaused=false;item.SpacePauseMessage="";item.SpaceCheckFailed=false;}
             Update();Save();await ReleaseIdleEngine();
         }
         catch(Exception error){item.DownloadRate=0;item.UploadRate=0;item.Status="Ошибка: "+error.Message;item.Refresh();Save();throw;}
@@ -170,6 +193,7 @@ public sealed class DownloadService
         try
         {
             pendingResume.Remove(item.Id);
+            CancelMetadataWatch(item.Id);
             if(managers.TryGetValue(item.Id,out var manager)){await StopManager(manager);item.Paused=true;SnapshotFiles(item,manager);item.DownloadRate=0;item.UploadRate=0;item.Remaining="";item.PeersText="";item.Indeterminate=false;item.Status="На паузе";await Engine.RemoveAsync(manager);managers.Remove(item.Id);meters.Remove(item.Id);}
             if(deleteFiles)
             {
@@ -182,7 +206,7 @@ public sealed class DownloadService
                 foreach(var path in paths)File.Delete(path);
                 foreach(var path in paths)DownloadFiles.RemoveEmptyParents(item.Folder,path);
             }
-            Items.Remove(item);diagnosticStates.Remove(item.Id);Save();await ReleaseIdleEngine();
+            Items.Remove(item);diagnosticStates.Remove(item.Id);spaceChecks.Remove(item.Id);lastSpaceChecks.Remove(item.Id);completionNotified.Remove(item.Id);errorNotified.Remove(item.Id);Save();await ReleaseIdleEngine();
         }
         catch{Save();await ReleaseIdleEngine();throw;}
         finally{item.Busy=false;item.Refresh();gate.Release();}
@@ -195,6 +219,8 @@ public sealed class DownloadService
             var meter=meters[item.Id];var rate=meter.Down.Sample(now,item.LastStartedUtc,m.Monitor.DataBytesReceived);
             var upload=meter.Up.Sample(now,item.LastStartedUtc,m.Monitor.DataBytesSent);
             DownloadPresentation.Apply(item,new(m.State,item.Paused,m.Progress,m.Torrent?.Size,rate,upload,m.OpenConnections,m.Peers.Seeds,item.LastStartedUtc,meter.Down.LastPayloadUtc,m.Error?.Exception?.Message,TrackerHealth.From(m)),now);
+            ApplyReliabilityStatus(item);
+            ObserveNotices(item,m);
             var health=TrackerHealth.From(m);
             var fingerprint=$"{m.State}|{m.HasMetadata}|{m.OpenConnections}|{health.Responded}|{health.Failed}";
             if(!diagnosticStates.TryGetValue(item.Id,out var prior)||prior.State!=fingerprint||now-prior.Utc>TimeSpan.FromSeconds(60))
@@ -220,15 +246,30 @@ public sealed class DownloadService
         }
         return total;
     }
-    static async Task StopManager(TorrentManager manager)
+    Task StopManager(TorrentManager manager)
     {
-        for(int attempt=0;attempt<4;attempt++){await manager.StopAsync(TimeSpan.FromSeconds(2));await Task.Delay(50);if(manager.State==TorrentState.Stopped)return;}
-        throw new InvalidOperationException("Раздача ещё завершает операцию. Повтори остановку через несколько секунд.");
+        if(stoppingTasks.TryGetValue(manager,out var stopping)&&!stopping.IsCompleted)return stopping;
+        if(manager.State==TorrentState.Stopped)return Task.CompletedTask;
+        return stoppingTasks[manager]=manager.StopAsync(TimeSpan.FromSeconds(2));
     }
     public async Task Close()
     {
-        await gate.WaitAsync();try{Update();Save();if(engine!=null){try{await engine.StopAllAsync(TimeSpan.FromSeconds(2));Update();Save();}finally{engine.Dispose();engine=null;managers.Clear();meters.Clear();}}}finally{gate.Release();}
+        var clock=System.Diagnostics.Stopwatch.StartNew();closeRequested=true;lifetime.Cancel();CancelAllMetadataWatches();Update();Save();
+        if(!await gate.WaitAsync(TimeSpan.FromSeconds(2)))return;
+        try
+        {
+            if(engine==null)return;
+            try
+            {
+                var remaining=TimeSpan.FromSeconds(2)-clock.Elapsed;
+                if(remaining>TimeSpan.Zero)await Task.WhenAll(managers.Values.Select(StopManager)).WaitAsync(remaining);
+                Update();Save();
+            }
+            catch(TimeoutException){DiagnosticLog.Write("torrent-close-deadline",new{Count=Items.Count});}
+            finally{engine.Dispose();engine=null;managers.Clear();meters.Clear();stoppingTasks.Clear();}
+        }
+        finally{gate.Release();}
     }
-    async Task ReleaseIdleEngine(){if(engine!=null&&Items.All(x=>x.Paused)){await engine.StopAllAsync(TimeSpan.FromSeconds(2));engine.Dispose();engine=null;managers.Clear();meters.Clear();}}
+    async Task ReleaseIdleEngine(){if(engine!=null&&Items.All(x=>x.Paused)){CancelAllMetadataWatches();await Task.WhenAll(managers.Values.Select(StopManager));engine.Dispose();engine=null;managers.Clear();meters.Clear();stoppingTasks.Clear();}}
     public static string FormatBytes(long bytes){string[] units=["Б","КБ","МБ","ГБ"];double value=bytes;int i=0;while(value>=1024&&i<3){i++;value/=1024;}return $"{value:F1} {units[i]}";}
 }

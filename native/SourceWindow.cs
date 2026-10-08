@@ -57,14 +57,17 @@ public partial class MainWindow
     }
     async void SourceDownload(object sender,RoutedEventArgs e)
     {
+        if(closing||closed)return;
         var button=(Button)sender;var item=(SourceEntry)button.Tag;var media=current?.Cinema==true?current:null;
         if(media!=null)media=DownloadMetadata.EnrichMedia(media,prefs.LiveFavorites.Concat(liveItems).Concat(catalogIndex.Recent(media.Section,200)).Append(media));
         button.IsEnabled=false;
         try{if(!EnsureDownloadFolder()){Status.Text="Папка для загрузок не выбрана. Её можно выбрать в настройках.";return;}
-            Status.Text="Проверяем раздачу…";using var timeout=new CancellationTokenSource(TimeSpan.FromSeconds(30));var source=await sourceClient.TorrentFile(item,timeout.Token);
+            Status.Text="Проверяем раздачу…";using var timeout=CancellationTokenSource.CreateLinkedTokenSource(reliabilityCancellation.Token);timeout.CancelAfter(TimeSpan.FromSeconds(30));var source=await sourceClient.TorrentFile(item,timeout.Token);
+            if(closing||closed)return;
             if(media!=null&&cardMetadata.TryGetValue(media.Id,out var metadata)&&metadata.IsCompletedSuccessfully)media=DownloadMetadata.EnrichMedia(media,[metadata.Result]);
-            await downloads.Add(source,prefs.Folder,media,item.ImageUrl,item);section="Загрузки";current=null;Render();Status.Text=item.Seeds==0?"Раздача добавлена, но источник показывает: отдают 0. Ждём участников.":"Раздача добавлена. Ищем участников.";
-        }catch(Exception error){var message=error is HttpRequestException?"Не удалось получить раздачу из источника.":error.Message;Status.Text=message;MessageBox.Show(this,message,"Не удалось начать загрузку",MessageBoxButton.OK,MessageBoxImage.Warning);}finally{button.IsEnabled=true;}
+            var added=await downloads.Add(source,prefs.Folder,media,item.ImageUrl,item);if(closing||closed)return;section="Загрузки";current=null;Render();Status.Text=added.LowSpacePaused?added.SpacePauseMessage:item.Seeds==0?"Раздача добавлена, но источник показывает: отдают 0. Ждём участников.":"Раздача добавлена. Ищем участников.";
+        }catch(Exception)when(closing||closed){}
+        catch(Exception error){var message=error is HttpRequestException?"Не удалось получить раздачу из источника.":error.Message;Status.Text=message;MessageBox.Show(this,message,"Не удалось начать загрузку",MessageBoxButton.OK,MessageBoxImage.Warning);}finally{if(!closing&&!closed)button.IsEnabled=true;}
     }
     void SourcePage(object sender,RoutedEventArgs e){var item=(SourceEntry)((Button)sender).Tag;if(string.IsNullOrEmpty(item.PageUrl))return;System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(SourceClient.WebUri(item.PageUrl).AbsoluteUri){UseShellExecute=true});}
     async void SourceCover(object sender,RoutedEventArgs e)

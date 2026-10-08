@@ -74,6 +74,11 @@ await PersonProfileLoadingTests.Run();
 await ProfessionalCinemaPeopleTests.Run();
 await UXReliabilityTests.Run(root);
 await WindowsIntegrationTests.Run();
+await WindowsNotificationTests.Run();
+DownloadDiagnosticsTests.Run();
+DownloadSpaceTests.Run(root);
+await DownloadReliabilityTests.Run(root);
+await CoverCachePerformanceTests.Run(root);
 await MagnetDiscoveryTests.Run(root);
 await SourceTests.Run(args.Contains("--live-sources")||args.Contains("--all-live-sources"),args.Contains("--all-live-sources"));
 void Check(bool condition,string message){if(!condition)throw new Exception(message);Console.WriteLine("PASS: "+message);}

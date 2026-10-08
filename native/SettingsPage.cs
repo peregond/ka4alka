@@ -117,6 +117,33 @@ public partial class MainWindow
             catch(Exception error){prefs.AutoResumeDownloads=previous;resume.IsChecked=previous;Feedback(resumeNotice,"Не удалось сохранить настройки: "+error.Message,true);}
         }
         resume.Click+=(_,_)=>SaveResume();
+        Divider(files);
+        var recovery=new CheckBox{Name="SettingsAutoRecover",Style=(Style)FindResource("SettingsSwitch"),Content=Text("Восстанавливать подключения после обрыва сети"),IsChecked=prefs.AutoRecoverDownloads,Margin=new(0,0,0,8)};
+        AutomationProperties.SetName(recovery,"Восстанавливать загрузки после обрыва сети");files.Children.Add(recovery);
+        files.Children.Add(Text("Активные загрузки продолжатся при возвращении сети и после сна. Задачи на ручной паузе останутся на паузе.",12,true));
+        var recoveryNotice=Notice(files);
+        recovery.Click+=(_,_)=>
+        {
+            var previous=prefs.AutoRecoverDownloads;prefs.AutoRecoverDownloads=recovery.IsChecked==true;
+            try{prefs.Save();Feedback(recoveryNotice,"Настройка сохранена.");if(prefs.AutoRecoverDownloads)RequestDownloadRecovery(true);}
+            catch(Exception error){prefs.AutoRecoverDownloads=previous;recovery.IsChecked=previous;Feedback(recoveryNotice,"Не удалось сохранить настройки: "+error.Message,true);}
+        };
+        Divider(files);
+        files.Children.Add(Text("Свободное место",13));
+        files.Children.Add(Text("Перед началом и во время скачивания проверяем место для оставшихся файлов и других активных загрузок на том же диске. Оставляем запас 256 МБ. Если места не хватает, загрузка встанет на паузу: освободи место и нажми «Продолжить».",12,true));
+        var notifications=Card("Уведомления","Windows сообщит о завершении загрузки, ошибке или нехватке места.","IconInfo");
+        var notify=new CheckBox{Name="SettingsNotifyDownloads",Style=(Style)FindResource("SettingsSwitch"),Content=Text("Уведомления о загрузках"),IsChecked=prefs.NotifyDownloads,Margin=new(0,0,0,8)};
+        AutomationProperties.SetName(notify,"Уведомления Windows о загрузках");notifications.Children.Add(notify);
+        notifications.Children.Add(Text("Повторяющиеся ошибки не создают поток уведомлений. Нажатие на уведомление откроет очередь. Windows может скрывать уведомления в режиме «Не беспокоить».",12,true));
+        var notificationNotice=Notice(notifications);
+        notify.Click+=(_,_)=>
+        {
+            var previous=prefs.NotifyDownloads;prefs.NotifyDownloads=notify.IsChecked==true;
+            try{prefs.Save();if(!prefs.NotifyDownloads)downloadNotifications?.Dismiss();Feedback(notificationNotice,"Настройка сохранена.");}
+            catch(Exception error){prefs.NotifyDownloads=previous;notify.IsChecked=previous;Feedback(notificationNotice,"Не удалось сохранить настройки: "+error.Message,true);}
+        };
+        var testNotification=ActionButton("Проверить уведомление","IconInfo",()=>Feedback(notificationNotice,ShowTestDownloadNotification()?"Уведомление передано Windows. Если оно скрыто, проверь настройки уведомлений и режим «Не беспокоить».":prefs.NotifyDownloads?"Windows не приняла уведомление. Попробуй ещё раз.":"Включи уведомления о загрузках для проверки.",!prefs.NotifyDownloads));
+        AutomationProperties.SetName(testNotification,"Проверить уведомление Windows");notifications.Children.Add(testNotification);
         var system=Card("Windows","Автозапуск и подключения участников раздачи.","IconSettings");
         var startupNotice=Notice(system);
         var startup=new CheckBox{Name="SettingsStartup",Content=Text("Открывать Качалку при входе в Windows"),IsChecked=WindowsIntegration.StartupEnabled,Style=(Style)FindResource("SettingsSwitch"),Margin=new(0,0,0,12)};

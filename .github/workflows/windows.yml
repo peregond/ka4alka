@@ -1,7 +1,7 @@
 name: Windows release validation
 on:
   push:
-    branches: [release/0.30.0, codex/cinema-cards-0.30, codex/film-detail-polish-0.31, codex/catalog-filters-0.33, codex/person-cards-0.34]
+    branches: [release/0.30.0, codex/cinema-cards-0.30, codex/film-detail-polish-0.31, codex/catalog-filters-0.33, codex/person-cards-0.34, codex/download-reliability-0.35.0]
   pull_request:
   workflow_dispatch:
 permissions:
@@ -74,6 +74,8 @@ jobs:
           path: |
             test-output/transfer-*/portrait-source/*
             test-output/cache-reliability/*
+            test-output/download-reliability/*
+            test-output/person-performance/*
             test-output/cinema-ui/*
             test-output/windows-update/checks.txt
             test-output/dpi-reliability/*
