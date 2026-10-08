@@ -24,7 +24,7 @@ class Markup(HTMLParser):
             self.scripts.append(attrs['src'])
         elif tag == 'img':
             self.images.append({k: attrs.get(k) for k in ['src', 'alt', 'class']})
-        elif tag == 'a' and re.search(r'/person/|/name/|/persons|/search|/actor', attrs.get('href', '')):
+        elif tag == 'a' and re.search(r'/person/|/name/|/persons|/search|/actor|page|offset|start=', attrs.get('href', '')):
             self.links.append(attrs.get('href'))
         elif tag == 'meta' and attrs.get('property') in ['og:title', 'og:image', 'og:description']:
             self.metadata.append(attrs)
@@ -62,6 +62,7 @@ def probe(url):
                         'images': parser.images[:12], 'personLinks': list(dict.fromkeys(parser.links))[:15],
                         'profileLinks': all_profiles[:20], 'profileCount': len(all_profiles),
                         'scottMatches': [link for link in all_profiles if 'waugh-scott-' in link.lower()],
+                        'pagination': list(dict.fromkeys(link for link in parser.links if re.search(r'page|offset|start=|/p/|[?&]p=', link)))[:16],
                         'metadata': parser.metadata, 'headings': parser.headings[:8],
                         'structure': [text[max(0, match.start()-180):match.end()+220] for match in
                                       list(re.finditer(r'person_films|biography|itemprop|Waugh|Режисс[её]р|Акт[её]р|Гонка|Жажда скорости', text))[:8]]}
@@ -75,7 +76,7 @@ def probe(url):
 
 urls = [
             'https://kino-teatr.ua/ru/main/persons/order_by/fio.asc.phtml?lastname=' + urllib.parse.quote(name)
-            for name in ['Во', 'Во Скотт', 'Скотт Во', 'Холланд Том', 'Кэмерон Джеймс', 'Фергюсон Ребекка']]
+            for name in ['Во', 'Скотт', 'Waugh']]
 with ThreadPoolExecutor(max_workers=4) as pool:
     results = list(pool.map(probe, urls))
 pathlib.Path('test-output/person-profile-source/responses.json').write_text(json.dumps(results, ensure_ascii=False), encoding='utf-8')
