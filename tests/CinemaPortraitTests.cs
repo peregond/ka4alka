@@ -33,6 +33,15 @@ public static class CinemaPortraitTests
         var disambiguation=Encoding.UTF8.GetBytes("""{"query":{"pages":{"1":{"title":"Холланд, Том","extract":"Актёр","pageprops":{"disambiguation":""},"thumbnail":{"source":"https://upload.wikimedia.org/wikipedia/commons/wrong.jpg"}}}}}""");
         Check(CinemaPeople.ParseIdentities(disambiguation,tom).Length==0,"disambiguation pages never supply a photograph");
         Check(CinemaPeople.ParseIdentities(Page("Холланд, Том (актёр)","https://upload.wikimedia.org.evil.test/person.jpg"),tom).Single().PhotoUrl==null,"portrait thumbnails require the trusted Wikimedia image host");
+        var ivan=new CinemaPerson("Иван Янковский","Актёры","");
+        var redirect=Encoding.UTF8.GetBytes("""{"query":{"redirects":[{"from":"Иван Янковский","to":"Янковский, Иван Филиппович"}],"pages":{"1":{"title":"Янковский, Иван Филиппович","extract":"Российский актёр","thumbnail":{"source":"https://upload.wikimedia.org/wikipedia/commons/person.jpg"}}}}}""");
+        Check(CinemaPeople.ParseIdentities(redirect,ivan).Single().ResolvedName==ivan.Name,"an explicit Wikipedia alias safely resolves a canonical name containing a patronymic");
+        Check(CinemaPeople.ParseIdentities(redirect,ivan with{Name="Олег Янковский"}).Length==0,"another namesake's redirect cannot identify the requested actor");
+        var aliasHandler=new Handler((_,_)=>Task.FromResult(Reply(redirect)));
+        using(var client=new SourceClient(aliasHandler))
+            Check((await new CinemaPeople(client).ResolvePortrait(ivan,CancellationToken.None)).Status==PortraitStatus.Available,"trusted redirect evidence supplies the actor portrait");
+        using(var client=new SourceClient(new Handler((_,_)=>throw new HttpRequestException("fixture unavailable"))))
+            Check((await new CinemaPeople(client).ResolvePortrait(ivan,CancellationToken.None)) is {Status:PortraitStatus.Available,FromCache:true},"canonical patronymic identity retains its accepted alias in the offline cache");
 
         var person=new CinemaPerson("Проверочный актёр "+Guid.NewGuid().ToString("N"),"Актёры","");
         var people=Path.Combine(Preferences.DataDir,"people");Directory.CreateDirectory(people);
@@ -75,14 +84,19 @@ public static class CinemaPortraitTests
         }
 
         var fallbackPerson=person with{Name="Фото резерв "+Guid.NewGuid().ToString("N")};
-        var fallback=new Handler((uri,_)=>Task.FromResult(Reply(uri.Host switch
+        var exactSitelink=false;
+        var fallback=new Handler((uri,_)=>
         {
-            "ru.wikipedia.org"=>Page(fallbackPerson.Name,null,item:"Q123"),
-            "www.wikidata.org"=>Encoding.UTF8.GetBytes("""{"entities":{"Q123":{"claims":{"P18":[{"rank":"normal","mainsnak":{"datavalue":{"value":"Person portrait.jpg"}}}]}}}}"""),
-            "commons.wikimedia.org"=>Encoding.UTF8.GetBytes("""{"query":{"pages":{"2":{"imageinfo":[{"thumburl":"https://upload.wikimedia.org/wikipedia/commons/person.jpg"}]}}}}"""),
-            _=>throw new Exception("Unexpected portrait identity host.")
-        })));
+            if(uri.Host=="www.wikidata.org")exactSitelink=uri.Query.Contains("sites=ruwiki",StringComparison.Ordinal)&&Uri.UnescapeDataString(uri.Query).Contains("titles="+fallbackPerson.Name,StringComparison.Ordinal);
+            return Task.FromResult(Reply(uri.Host switch
+            {
+                "ru.wikipedia.org"=>Page(fallbackPerson.Name,null),
+                "www.wikidata.org"=>Encoding.UTF8.GetBytes("""{"entities":{"Q123":{"claims":{"P18":[{"rank":"normal","mainsnak":{"datavalue":{"value":"Person portrait.jpg"}}}]}}}}"""),
+                "commons.wikimedia.org"=>Encoding.UTF8.GetBytes("""{"query":{"pages":{"2":{"imageinfo":[{"url":"https://upload.wikimedia.org/wikipedia/commons/person.jpg"}]}}}}"""),
+                _=>throw new Exception("Unexpected portrait identity host.")
+            }));
+        });
         using(var client=new SourceClient(fallback))
-            Check((await new CinemaPeople(client).ResolvePortrait(fallbackPerson,CancellationToken.None)).Url==Photo&&fallback.Calls==3,"missing article thumbnails can use the same verified Wikidata person's Wikimedia portrait");
+            Check((await new CinemaPeople(client).ResolvePortrait(fallbackPerson,CancellationToken.None)).Url==Photo&&fallback.Calls==3&&exactSitelink,"missing article thumbnails and pageprops use the exact canonical Wikidata sitelink and original Wikimedia portrait");
     }
 }

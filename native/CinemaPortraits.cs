@@ -12,7 +12,7 @@ public record PortraitResult(string? Url,PortraitStatus Status,string? SourceUrl
 
 public sealed partial class CinemaPeople
 {
-    public record Identity(string Title,string Description,string SourceUrl,string? PhotoUrl,string? WikidataId);
+    public record Identity(string Title,string Description,string SourceUrl,string? PhotoUrl,string? WikidataId,string? ResolvedName=null);
     sealed record IdentityCache(Identity Profile,bool PortraitChecked,int? OriginId=null);
     sealed record IdentityResult(Identity? Profile,bool Unavailable=false,bool FromCache=false,bool PortraitChecked=false);
     static readonly SemaphoreSlim identitySlots=new(3);
@@ -50,27 +50,44 @@ public sealed partial class CinemaPeople
         using var document=JsonDocument.Parse(bytes);var root=document.RootElement;
         if(root.TryGetProperty("error",out _))throw new InvalidDataException("Википедия временно не вернула сведения об участнике.");
         if(!root.TryGetProperty("query",out var query)||!query.TryGetProperty("pages",out var pages))throw new InvalidDataException("Источник не вернул страницы участников.");
+        var redirectedTitles=new HashSet<string>(StringComparer.Ordinal);
+        var redirects=query.TryGetProperty("redirects",out var redirectValues)&&redirectValues.ValueKind==JsonValueKind.Array
+            ?redirectValues.EnumerateArray().Select(x=>(From:x.GetProperty("from").GetString()??"",To:x.GetProperty("to").GetString()??"")).ToArray():[];
+        foreach(var redirect in redirects.Where(x=>NameKey(x.From)==NameKey(person.Name)))redirectedTitles.Add(redirect.To);
+        // Explicit aliases can contain a patronymic only in the canonical title.
+        // Follow the API's redirect chain, rather than relaxing exact name checks.
+        for(var step=0;step<8;step++)
+        {
+            var added=false;
+            foreach(var redirect in redirects.Where(x=>redirectedTitles.Contains(x.From)))added|=redirectedTitles.Add(redirect.To);
+            if(!added)break;
+        }
         var result=new List<Identity>();
         foreach(var page in pages.EnumerateObject().Select(x=>x.Value))
         {
             if(page.TryGetProperty("missing",out _)||page.TryGetProperty("invalid",out _))continue;
-            if(page.TryGetProperty("pageprops",out var properties)&&properties.TryGetProperty("disambiguation",out _))continue;
+            if(page.TryGetProperty("pageprops",out var properties)&&properties.ValueKind==JsonValueKind.Object&&properties.TryGetProperty("disambiguation",out _))continue;
             var title=page.TryGetProperty("title",out var titleValue)?titleValue.GetString()??"":"";
             var description=page.TryGetProperty("extract",out var extract)?extract.GetString()??"":"";
-            if(NameKey(title)!=NameKey(person.Name)||!Profession(description,person.Role))continue;
+            if(NameKey(title)!=NameKey(person.Name)&&!redirectedTitles.Contains(title)||!Profession(description,person.Role))continue;
             var photo=page.TryGetProperty("thumbnail",out var thumbnail)&&thumbnail.ValueKind==JsonValueKind.Object&&thumbnail.TryGetProperty("source",out var source)?PhotoUrl(source.GetString()):null;
-            var item=page.TryGetProperty("pageprops",out properties)&&properties.TryGetProperty("wikibase_item",out var wikibase)?wikibase.GetString():null;
+            var item=page.TryGetProperty("pageprops",out properties)&&properties.ValueKind==JsonValueKind.Object&&properties.TryGetProperty("wikibase_item",out var wikibase)?wikibase.GetString():null;
             if(item==null||!Regex.IsMatch(item,@"^Q[1-9]\d*$"))item=null;
-            result.Add(new(title,description,"https://ru.wikipedia.org/wiki/"+Uri.EscapeDataString(title.Replace(' ','_')),photo,item));
+            result.Add(new(title,description,"https://ru.wikipedia.org/wiki/"+Uri.EscapeDataString(title.Replace(' ','_')),photo,item,person.Name));
         }
         return result.DistinctBy(x=>x.SourceUrl).ToArray();
     }
-    async Task<string?> WikidataPortrait(string item,CancellationToken ct)
+    async Task<string?> WikidataPortrait(Identity identity,CancellationToken ct)
     {
-        var url="https://www.wikidata.org/w/api.php?action=wbgetentities&format=json&props=claims&ids="+item;
+        // Some Wikipedia installations omit wikibase_item from pageprops. A
+        // canonical ru-Wikipedia sitelink identifies the same entity exactly.
+        var url="https://www.wikidata.org/w/api.php?action=wbgetentities&format=json&props=claims&"+
+            (identity.WikidataId is {} item?"ids="+item:"sites=ruwiki&titles="+Uri.EscapeDataString(identity.Title));
         using var document=JsonDocument.Parse(await client.Read(new Uri(url),1024*1024,ct));
         if(document.RootElement.TryGetProperty("error",out _))throw new InvalidDataException("Wikidata временно не вернула фотографию.");
-        var entity=document.RootElement.GetProperty("entities").GetProperty(item);
+        var entities=document.RootElement.GetProperty("entities");
+        var entity=identity.WikidataId is {} id?entities.GetProperty(id):entities.EnumerateObject().Where(x=>Regex.IsMatch(x.Name,@"^Q[1-9]\d*$")&&!x.Value.TryGetProperty("missing",out _)).Select(x=>x.Value).SingleOrDefault();
+        if(entity.ValueKind!=JsonValueKind.Object)return null;
         if(!entity.TryGetProperty("claims",out var claims)||!claims.TryGetProperty("P18",out var images))return null;
         var image=images.EnumerateArray().Where(x=>!x.TryGetProperty("rank",out var rank)||rank.GetString()!="deprecated")
             .OrderByDescending(x=>x.TryGetProperty("rank",out var rank)&&rank.GetString()=="preferred")
@@ -84,7 +101,12 @@ public sealed partial class CinemaPeople
         {
             if(!page.TryGetProperty("imageinfo",out var information))continue;
             foreach(var info in information.EnumerateArray())
+            {
                 if(info.TryGetProperty("thumburl",out var thumbnail)&&PhotoUrl(thumbnail.GetString()) is {} photo)return photo;
+                // Commons need not resize a small original. The caller applies
+                // the same size limit and target-size decode to these bytes.
+                if(info.TryGetProperty("url",out var original)&&PhotoUrl(original.GetString()) is {} smallPhoto)return smallPhoto;
+            }
         }
         return null;
     }
@@ -95,7 +117,8 @@ public sealed partial class CinemaPeople
         {
             savedAt=File.GetLastWriteTimeUtc(path);
             if(File.Exists(path))saved=JsonSerializer.Deserialize<IdentityCache>(await CacheFiles.ReadAllTextAsync(path));
-            if(saved?.Profile is {} profile&&(NameKey(profile.Title)!=NameKey(person.Name)||!Profession(profile.Description,person.Role)||saved.OriginId!=null&&saved.OriginId!=origin?.Id))saved=null;
+            if(saved?.Profile is {} profile&&(NameKey(profile.ResolvedName??profile.Title)!=NameKey(person.Name)||!Profession(profile.Description,person.Role)||
+                profile.SourceUrl!="https://ru.wikipedia.org/wiki/"+Uri.EscapeDataString(profile.Title.Replace(' ','_'))||saved.OriginId!=null&&saved.OriginId!=origin?.Id))saved=null;
         }
         catch(Exception error)when(error is IOException or UnauthorizedAccessException or JsonException){}
         if(saved!=null&&DateTime.UtcNow-savedAt<TimeSpan.FromDays(7)&&saved.PortraitChecked)
@@ -111,7 +134,7 @@ public sealed partial class CinemaPeople
             if(identity==null||DateTime.UtcNow-savedAt>=TimeSpan.FromDays(7))
             {
                 var titles=IdentityTitles(person);if(titles.Length==0)return new(null);
-                var url="https://ru.wikipedia.org/w/api.php?action=query&format=json&redirects=1&prop=extracts%7Cpageprops%7Cpageimages&exintro=1&explaintext=1&piprop=thumbnail&pithumbsize=400&titles="+Uri.EscapeDataString(string.Join('|',titles));
+                var url="https://ru.wikipedia.org/w/api.php?action=query&format=json&redirects=1&prop=extracts%7Cpageprops%7Cpageimages&ppprop=wikibase_item%7Cdisambiguation&exintro=1&explaintext=1&piprop=thumbnail&pithumbsize=400&titles="+Uri.EscapeDataString(string.Join('|',titles));
                 var candidates=ParseIdentities(await client.Read(new Uri(url),2*1024*1024,ct),person);
                 if(candidates.Length==1){identity=candidates[0];resolvedOrigin=null;}
                 else
@@ -138,7 +161,7 @@ public sealed partial class CinemaPeople
             {
                 try
                 {
-                    var photo=identity.WikidataId==null?null:await WikidataPortrait(identity.WikidataId,ct);
+                    var photo=await WikidataPortrait(identity,ct);
                     identity=identity with{PhotoUrl=photo};checkedPortrait=true;
                 }
                 catch(Exception error)when(error is not OutOfMemoryException){portraitUnavailable=true;}

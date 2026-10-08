@@ -23,6 +23,7 @@ jobs:
       - name: Verify live participant photographs
         run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --probe-portraits
       - name: Validate installer and signed update on Windows
+        if: ${{ !cancelled() }}
         shell: pwsh
         run: |
           try { ./tests/WindowsUpdateSmoke.ps1 }
