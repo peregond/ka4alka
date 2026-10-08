@@ -90,40 +90,67 @@ public sealed class LiveCatalog(SourceClient client)
         {
             using var sourceDeadline=CancellationTokenSource.CreateLinkedTokenSource(ct);
             sourceDeadline.CancelAfter(TimeSpan.FromSeconds(12));
-            var bytes=await client.Read(SourceClient.WebUri(item.PageUrl!),4*1024*1024,sourceDeadline.Token);
-            var h=Html(bytes);
-            string Score(string name)=>ValidScore(Text(h.DocumentNode.SelectSingleNode("//*["+Class(name)+"]")));
-            var original=HtmlEntity.DeEntitize(h.DocumentNode.SelectSingleNode("//meta[@itemprop='alternativeHeadline']")?.GetAttributeValue("content","")??"").Trim();
-            string InlineText(HtmlNode node)=>Regex.Replace(Text(node),@"\s+"," ").Trim();
-            var genres=(h.DocumentNode.SelectNodes("//*[@itemprop='genre']")??new HtmlNodeCollection(null)).Select(InlineText).Where(x=>x.Length>0).Distinct().ToArray();
-            HtmlNode[] Links(string prefix)=>(h.DocumentNode.SelectNodes("//a[contains(@href,'/filter/"+prefix+"-')]")??new HtmlNodeCollection(null)).ToArray();
-            string[] Keys(string prefix)=>Links(prefix).Select(n=>n.GetAttributeValue("href","").Split("/filter/"+prefix+"-")[1]).Distinct().ToArray();
-            var result=item with{Kinopoisk=Score("entity-rating-kp"),Imdb=Score("entity-rating-imdb"),Description=Text(h.DocumentNode.SelectSingleNode("//*[@itemprop='description' and not(self::meta)]")),OriginalTitle=original.Length==0?null:original,Genre=string.Join(", ",genres),Country=string.Join(", ",Links("country").Select(InlineText).Where(x=>x.Length>0).Distinct()),GenreKeys=Keys("genre"),CountryKeys=Keys("country"),People=CinemaMetadata.People(bytes),Collections=CinemaMetadata.Collections(bytes)};
+            var uri=SourceClient.WebUri(item.PageUrl!);
+            byte[] bytes;
+            try{bytes=await client.ReadCinemaDetail(uri,4*1024*1024,sourceDeadline.Token);}
+            catch(Exception error)when((error is System.Net.Http.HttpRequestException or InvalidDataException)&&!ct.IsCancellationRequested&&!sourceDeadline.IsCancellationRequested)
+            {bytes=await client.Read(uri,4*1024*1024,sourceDeadline.Token);}
+            var result=ZonaMovieMetadata.Parse(bytes,item);
+            if(result==null)result=ParseHtml(bytes);
+            else if(!MediaMetadata.HasFullDetails(result))
+            {
+                try
+                {
+                    var html=ParseHtml(await client.Read(uri,4*1024*1024,sourceDeadline.Token));
+                    var primary=result;result=MediaMetadata.Merge(html,primary) with{People=ZonaMovieMetadata.MergePeople(html.People,primary.People)};
+                }
+                catch(Exception)when(!ct.IsCancellationRequested&&MediaMetadata.Useful(result)){}
+            }
             if(!MediaMetadata.Useful(result))throw new InvalidDataException("Источник вернул страницу без сведений о фильме.");
-            result=MediaMetadata.Merge(saved??item,result);
+            var prior=saved??item;
+            result=MediaMetadata.Merge(prior,result) with{People=ZonaMovieMetadata.MergePeople(prior.People,result.People)};
             try{System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(cache)!);await CacheFiles.WriteAllTextAsync(cache,JsonSerializer.Serialize(new DetailSnapshot(result.Kinopoisk,result.Imdb,result.Description??"",result.OriginalTitle,result.Genre,result.Country,result.GenreKeys,result.CountryKeys,result.People,result.Collections)),ct);}catch(System.IO.IOException){}
             return result;
+            MediaItem ParseHtml(byte[] body)
+            {
+                var h=Html(body);
+                string Score(string name)=>ValidScore(Text(h.DocumentNode.SelectSingleNode("//*["+Class(name)+"]")));
+                var original=HtmlEntity.DeEntitize(h.DocumentNode.SelectSingleNode("//meta[@itemprop='alternativeHeadline']")?.GetAttributeValue("content","")??"").Trim();
+                string InlineText(HtmlNode node)=>Regex.Replace(Text(node),@"\s+"," ").Trim();
+                var genres=(h.DocumentNode.SelectNodes("//*[@itemprop='genre']")??new HtmlNodeCollection(null)).Select(InlineText).Where(x=>x.Length>0).Distinct().ToArray();
+                HtmlNode[] Links(string prefix)=>(h.DocumentNode.SelectNodes("//a[contains(@href,'/filter/"+prefix+"-')]")??new HtmlNodeCollection(null)).ToArray();
+                string[] Keys(string prefix)=>Links(prefix).Select(n=>n.GetAttributeValue("href","").Split("/filter/"+prefix+"-")[1]).Distinct().ToArray();
+                return item with{Kinopoisk=Score("entity-rating-kp"),Imdb=Score("entity-rating-imdb"),Description=Text(h.DocumentNode.SelectSingleNode("//*[@itemprop='description' and not(self::meta)]")),OriginalTitle=original.Length==0?null:original,Genre=string.Join(", ",genres),Country=string.Join(", ",Links("country").Select(InlineText).Where(x=>x.Length>0).Distinct()),GenreKeys=Keys("genre"),CountryKeys=Keys("country"),People=CinemaMetadata.People(body),Collections=CinemaMetadata.Collections(body)};
+            }
         }
         catch(Exception) when(!ct.IsCancellationRequested&&saved!=null)
         {
             return saved;
         }
     }
-    public async Task<PersonProfile> Person(CinemaPerson person,CancellationToken ct,MediaItem? origin=null,IEnumerable<MediaItem>? known=null)
+    public async Task<PersonProfile> Person(CinemaPerson person,CancellationToken ct,MediaItem? origin=null,IEnumerable<MediaItem>? known=null,Action<PersonProfile>? progress=null)
     {
-        if(person.PageUrl.Length==0)return await new CinemaPeople(client).Load(person,origin,known??[],ct);
+        if(person.PageUrl.Length==0)return await new CinemaPeople(client).Load(person,origin,known??[],ct,progress);
         var url=CinemaMetadata.CatalogUrl(person.PageUrl,"/persons/","/person/","/people/")??throw new ArgumentException("Неверная карточка человека.");
         var key=Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(url)));
         var cache=System.IO.Path.Combine(Preferences.DataDir,"people",key+".html");
+        PersonProfile? saved=null;
+        try
+        {
+            if(new FileInfo(cache).Length<=4*1024*1024)
+            {saved=CinemaMetadata.Person(await CacheFiles.ReadAllBytesAsync(cache,ct),person) with{SourceUrl=url};if(!ct.IsCancellationRequested)progress?.Invoke(saved);}
+        }
+        catch(Exception error)when(error is IOException or UnauthorizedAccessException or ArgumentException){}
         try
         {
             var bytes=await client.Read(new Uri(url),4*1024*1024,ct);
-            var result=CinemaMetadata.Person(bytes,person);
+            var result=CinemaMetadata.Person(bytes,person) with{SourceUrl=url};
             if(result.Description.Length==0&&result.Filmography.Length==0)throw new System.IO.InvalidDataException("Источник не вернул сведения о человеке.");
+            ct.ThrowIfCancellationRequested();progress?.Invoke(result);
             try{System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(cache)!);await CacheFiles.WriteAllBytesAsync(cache,bytes,ct);}catch(System.IO.IOException){}
             return result;
         }
-        catch(Exception) when(!ct.IsCancellationRequested&&System.IO.File.Exists(cache)){return CinemaMetadata.Person(await CacheFiles.ReadAllBytesAsync(cache,ct),person);}
+        catch(Exception) when(!ct.IsCancellationRequested&&saved!=null){return saved;}
     }
     public async Task<IReadOnlyList<SourceEntry>> Releases(string title,CancellationToken ct)
     {

@@ -22,25 +22,98 @@ public partial class MainWindow
         check(ExpireCatalogPages()&&catalogPages.Count==0&&liveKey==""&&!ExpireCatalogPages(),"crossing the daily refresh boundary expires in-memory catalog pages once");
         var films=Enumerable.Range(1,45).Select(id=>new MediaItem(1300+id,"Поисковая искра · фильм "+id,"Фильмы","драма",2024,"8.0","8.0","#526B69")).ToArray();
         var series=Enumerable.Range(1,5).Select(id=>new MediaItem(2300+id,"Поисковая искра · сериал "+id,"Сериалы","драма",2024,"8.0","8.0","#526B69")).ToArray();
+        var namesakeOne=new CinemaPerson("Поисковая Искра Тёзка","Актёры","","https://kino-teatr.ua/ru/person/search-smoke-910001.phtml");
+        var namesakeTwo=namesakeOne with{ProfileUrl="https://kino-teatr.ua/ru/person/search-smoke-910002.phtml"};
+        var searchedPeople=new[]{new CinemaPerson("Поисковая Искра","Актёры",""),new CinemaPerson("Поисковая Искра Режиссёр","Режиссёры",""),new CinemaPerson("Поисковая Искра Оператор","Операторы",""),namesakeOne,namesakeTwo};
+        var namesakeTerm=PersonSearchTerm(namesakeOne.Name);
+        var namesakeMerge=MergePeopleSearch(namesakeTerm,[namesakeOne,namesakeTwo,namesakeOne],[namesakeOne with{ProfileUrl=null}]);
+        check(namesakeMerge.Length==2&&namesakeMerge.Select(person=>person.ProfileUrl).ToHashSet().SetEquals([namesakeOne.ProfileUrl,namesakeTwo.ProfileUrl]),"people search preserves distinct confirmed namesakes and omits duplicate or unidentified candidates");
+        check(MergePeopleSearch(namesakeTerm,[namesakeOne],[namesakeOne with{Name=namesakeOne.Name+" · вариант имени"}]).Length==1,"a confirmed identity does not duplicate when a known name alias differs");
+        var knownNamesake=namesakeOne with{PageUrl=LiveCatalog.Base+"/persons/person-search-linked"};
+        check(MergePeopleSearch(namesakeTerm,[namesakeOne,knownNamesake],[knownNamesake with{ProfileUrl=null}]) is [var linkedSearchIdentity]&&linkedSearchIdentity.ProfileUrl==namesakeOne.ProfileUrl,"an explicitly linked catalog identity does not duplicate its professional profile");
+        check(MergePeopleSearch(namesakeTerm,[namesakeOne],[knownNamesake with{ProfileUrl=null}]).Length==2,"matching names do not merge distinct unlinked source identities by guesswork");
+        var idNamesakeOne=namesakeOne with{ProfileUrl=null,SourcePersonId="990001"};var idNamesakeTwo=idNamesakeOne with{SourcePersonId="990002"};
+        check(MergePeopleSearch(namesakeTerm,[idNamesakeOne,idNamesakeTwo],[idNamesakeOne with{SourcePersonId=null}]).Length==2,"ID-only catalog credits preserve different confirmed same-name people");
+        check(MergePeopleSearch(namesakeTerm,[namesakeOne with{SourcePersonId=idNamesakeOne.SourcePersonId}],[idNamesakeOne]).Length==1,"matching explicit catalog IDs link a raw credit to its known professional identity");
+        check(MergePeopleSearch(namesakeTerm,[namesakeOne],[idNamesakeOne]).Length==2,"a professional profile without a catalog ID does not absorb unrelated ID-only credits");
+        for(var index=0;index<2;index++)
+        {
+            films[index]=films[index] with{PageUrl=LiveCatalog.Base+"/movies/person-search-fixture-"+index,Description="Описание поискового фильма.",People=[searchedPeople[0]]};
+            requestedDetails.Add(films[index].Id);liveReleases[films[index].Id]=[];
+        }
+        var peopleFolder=Path.Combine(Preferences.DataDir,"people");Directory.CreateDirectory(peopleFolder);
+        var searchedBiography="Биография участника для проверки поиска и возврата к результатам.";
+        string SearchFixtureKey(string value)=>Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(value)));
+        await File.WriteAllTextAsync(Path.Combine(peopleFolder,SearchFixtureKey(searchedPeople[0].Name+"|"+searchedPeople[0].Role)+".json"),System.Text.Json.JsonSerializer.Serialize(new PersonProfile(searchedPeople[0],searchedBiography,films.Take(2).ToArray())));
+        var searchedPortraitUrl="https://upload.wikimedia.org/wikipedia/commons/person-search-smoke.png";
+        foreach(var person in searchedPeople)await File.WriteAllTextAsync(Path.Combine(peopleFolder,SearchFixtureKey(person.Name)+".portrait.json"),System.Text.Json.JsonSerializer.Serialize(searchedPortraitUrl));
+        var searchPortraitFolder=Path.Combine(Preferences.DataDir,"portraits");Directory.CreateDirectory(searchPortraitFolder);
+        var searchPortrait=new RenderTargetBitmap(20,30,96,96,PixelFormats.Pbgra32);var searchDrawing=new DrawingVisual();using(var context=searchDrawing.RenderOpen())context.DrawRectangle(Brushes.Teal,null,new Rect(0,0,20,30));searchPortrait.Render(searchDrawing);
+        var searchPortraitEncoder=new PngBitmapEncoder();searchPortraitEncoder.Frames.Add(BitmapFrame.Create(searchPortrait));using(var file=File.Create(Path.Combine(searchPortraitFolder,SearchFixtureKey(searchedPortraitUrl)+".img")))searchPortraitEncoder.Save(file);
+        var namesakePortraitUrl="https://kino-teatr.ua/public/main/persons/person-search-smoke.jpg";
+        using(var file=File.Create(Path.Combine(searchPortraitFolder,SearchFixtureKey(namesakePortraitUrl)+".img")))searchPortraitEncoder.Save(file);
+        string NamesakeBiography(CinemaPerson person)=>"Проверочная биография отдельного профиля: "+person.ProfileUrl;
+        foreach(var namesake in new[]{namesakeOne,namesakeTwo})
+        {
+            await File.WriteAllTextAsync(ProfessionalCinemaPeople.CachePath(namesake,null),System.Text.Json.JsonSerializer.Serialize(new ProfessionalPerson(namesake,"Биография проверочного участника с отдельной идентичностью.",namesakePortraitUrl,namesake.ProfileUrl!,"Kino-Teatr.ua",[],[namesake.Name])));
+            await File.WriteAllTextAsync(CinemaPeople.ProfileCachePath(namesake),System.Text.Json.JsonSerializer.Serialize(new PersonProfile(namesake,NamesakeBiography(namesake),films.Take(2).Select(film=>film with{People=[namesake]}).ToArray(),namesake.ProfileUrl)));
+        }
         foreach(var item in films.Concat(series))cardMetadata[item.Id]=Task.FromResult(item);
-        var release=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);int calls=0;
+        var release=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);int calls=0,peopleCalls=0;
         searchProvider=async(kind,query,token)=>{calls++;await release.Task.WaitAsync(token);return kind=="Фильмы"?films:series;};
-        Search.Text="Поисковая искра";check(!SearchActive,"typing does not submit a query before Search or Enter");
+        peopleSearchProvider=async(query,token)=>{peopleCalls++;await release.Task.WaitAsync(token);return searchedPeople;};
+        Search.Text="Поисковая искра";check(!SearchActive&&peopleCalls==0,"typing does not submit a film or people query before Search or Enter");
         SubmitSearch(Search,new RoutedEventArgs());UpdateLayout();
         check(SearchActive&&searchCategory==""&&LoadingIndicator.Visibility==Visibility.Visible,"submitted query defaults to both types with visible animated loading indicator");
-        await Task.Delay(100);check(calls==2,"search dispatches film and series requests together");release.SetResult();
-        var end=DateTime.UtcNow.AddSeconds(15);while(liveLoading&&DateTime.UtcNow<end)await Task.Delay(30);UpdateLayout();
+        await Task.Delay(100);check(calls==2&&peopleCalls==1,"search dispatches film, series and people requests together");release.SetResult();
+        var end=DateTime.UtcNow.AddSeconds(15);while((liveLoading||PeopleSearchLoading)&&DateTime.UtcNow<end)await Task.Delay(30);UpdateLayout();
         check(!liveLoading&&LoadingIndicator.Visibility==Visibility.Collapsed&&liveItems.Count==50&&catalogDisplay.Any(x=>x.Section=="Сериалы")&&catalogDisplay.Any(x=>x.Section=="Фильмы"),"combined results include both types and hide completed loading indicator");
         Button Filter(string type)=>FindVisual<Button>(FilterControls,b=>AutomationProperties.GetName(b)=="Результаты: "+type)??throw new Exception("Missing search type "+type);
         CheckCatalogFilterLine(check,"unified-search");
-        check(new[]{"Все","Фильмы","Сериалы"}.All(type=>Filter(type) is {IsVisible:true,ActualWidth:>0,ActualHeight:>0}),"unified search type tabs remain visible in the single filter line below search");
+        check(new[]{"Все","Фильмы","Сериалы","Люди"}.All(type=>Filter(type) is {IsVisible:true,ActualWidth:>0,ActualHeight:>0}),"all four search type tabs remain visible in the single filter line below search");
+        check(VisualElements<Button>(Body).Count(button=>button.Tag is CinemaPerson)==5,"combined results include matching actors, directors, cinematographers and separate namesakes");
         Filter("Сериалы").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));UpdateLayout();
         check(catalogDisplay.Count==5&&catalogDisplay.All(x=>x.Section=="Сериалы")&&calls==2,"series tab filters existing results without another network request");
         Filter("Фильмы").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));UpdateLayout();check(catalogDisplay.Count==40&&catalogHasNext,"film results keep paged navigation");
+        Filter("Люди").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));UpdateLayout();
+        check(PeopleOnlySearch&&VisualElements<Button>(Body).Count(button=>button.Tag is CinemaPerson)==5&&!VisualElements<Button>(Body).Any(button=>button.Tag is MediaItem)&&calls==2&&peopleCalls==1,"people tab filters cached unified results without another film or people request");
+        foreach(var namesake in new[]{namesakeOne,namesakeTwo})
+        {
+            var namesakeButton=FindVisual<Button>(Body,button=>button.Tag is CinemaPerson person&&person.ProfileUrl==namesake.ProfileUrl)??throw new Exception("A confirmed namesake disappeared from people search.");
+            namesakeButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));UpdateLayout();
+            check(activePerson?.ProfileUrl==namesake.ProfileUrl&&personOrigin==null,"namesake selection opens its own confirmed identity: "+namesake.ProfileUrl);
+            end=DateTime.UtcNow.AddSeconds(2);while(FindVisual<TextBlock>(Body,text=>text.Text==NamesakeBiography(namesake))==null&&DateTime.UtcNow<end)await Task.Delay(25);UpdateLayout();
+            check(FindVisual<TextBlock>(Body,text=>text.Text==NamesakeBiography(namesake))!=null,"namesake selection loads its own cached biography instead of the same-name profile: "+namesake.ProfileUrl);
+            FindVisual<Button>(PageHeader,button=>AutomationProperties.GetName(button)=="К результатам поиска")!.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));UpdateLayout();
+        }
+        FindVisual<Button>(Body,button=>button.Tag is CinemaPerson person&&person==searchedPeople[0])!.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));UpdateLayout();
+        check(activePerson==searchedPeople[0]&&current==null&&personOrigin==null,"search opens a person page without inventing an origin film");
+        end=DateTime.UtcNow.AddSeconds(15);while(FindVisual<Button>(Body,button=>AutomationProperties.GetName(button)=="Открыть "+films[0].Title)==null&&DateTime.UtcNow<end)await Task.Delay(50);UpdateLayout();
+        check(FindVisual<TextBlock>(Body,text=>text.Text==searchedBiography)!=null,"search person page loads its cached verified biography");
+        var personFilm=FindVisual<Button>(Body,button=>AutomationProperties.GetName(button)=="Открыть "+films[0].Title)??throw new Exception("Search person filmography action is missing.");
+        personFilm.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));UpdateLayout();
+        check(current?.Id==films[0].Id&&activePerson==null&&returnPerson?.Person==searchedPeople[0]&&returnPerson?.Origin==null,"a search person's filmography opens a film while retaining its person return destination");
+        CinemaBack();UpdateLayout();check(activePerson==searchedPeople[0]&&personOrigin==null,"film back restores the person opened from search");
+        var personSearchBack=FindVisual<Button>(PageHeader,button=>AutomationProperties.GetName(button)=="К результатам поиска")??throw new Exception("Search person back action is missing.");
+        personSearchBack.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));UpdateLayout();
+        check(activePerson==null&&current==null&&Search.Text=="Поисковая искра"&&PeopleOnlySearch&&livePage==1&&calls==2&&peopleCalls==1,"person back restores the same search query, people tab and page without repeating requests");
+        Filter("Все").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));UpdateLayout();
+        FindVisual<Button>(Body,button=>AutomationProperties.GetName(button)=="Страница 2")!.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));UpdateLayout();
+        FindVisual<Button>(Body,button=>button.Tag is CinemaPerson person&&person==searchedPeople[0])!.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));UpdateLayout();
+        FindVisual<Button>(PageHeader,button=>AutomationProperties.GetName(button)=="К результатам поиска")!.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));UpdateLayout();
+        check(SearchActive&&searchCategory==""&&livePage==2&&catalogDisplay.Count==10&&calls==2&&peopleCalls==1,"opening a person from combined search restores its second film page without fetching results again");
+        Filter("Фильмы").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));UpdateLayout();
         ShowDownloads(this,new RoutedEventArgs());ShowCatalogSection("Фильмы");UpdateLayout();
         check(SearchActive&&Search.Text=="Поисковая искра"&&searchCategory=="Фильмы"&&calls==2,"returning from downloads restores submitted query and selected search type");
         ShowCatalogSection("Фильмы");await Task.Delay(150);UpdateLayout();
         check(!SearchActive&&Search.Text==""&&CatalogSelection.IsDefault,"repeated active catalog navigation clears query and filters");
+        var blockedPeopleStart=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);var blockedPeopleEnd=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);CancellationToken blockedPeopleToken=default;
+        peopleSearchProvider=async(query,token)=>{blockedPeopleToken=token;blockedPeopleStart.SetResult();try{await Task.Delay(Timeout.Infinite,token);return Array.Empty<CinemaPerson>();}finally{blockedPeopleEnd.TrySetResult();}};
+        Search.Text="Проверка отмены поиска";SubmitSearch(Search,new RoutedEventArgs());await blockedPeopleStart.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        ShowDownloads(this,new RoutedEventArgs());await blockedPeopleEnd.Task.WaitAsync(TimeSpan.FromSeconds(2));UpdateLayout();
+        check(blockedPeopleToken.IsCancellationRequested&&!PeopleSearchLoading&&section=="Загрузки","leaving search cancels an unfinished people request instead of leaving an endless loader");
+        peopleSearchProvider=(query,token)=>Task.FromResult<IReadOnlyList<CinemaPerson>>(searchedPeople);
+        ShowCatalogSection("Фильмы");ShowCatalogSection("Фильмы");UpdateLayout();
         var contexts=new List<string>();
         searchProvider=(kind,query,token)=>{contexts.Add(kind);return Task.FromResult<IReadOnlyList<MediaItem>>(kind=="Фильмы"?films:series);};
         async Task WaitSearch()
@@ -256,7 +329,7 @@ public partial class MainWindow
             searchProvider=null;submittedQuery="";searchCategory="";Search.Text="";section="Загрузки";Render();await SettleDownloads();
             check(!downloads.EngineCreated,"download design and menu fixtures do not start a torrent engine");
         }
-        finally{downloads.Items.Clear();prefs.Light=originalLight;prefs.DownloadSort=originalSort;downloadSort=originalSort;ApplyTheme();MinWidth=originalMinWidth;Width=1280;Height=800;}
+        finally{peopleSearchProvider=null;downloads.Items.Clear();prefs.Light=originalLight;prefs.DownloadSort=originalSort;downloadSort=originalSort;ApplyTheme();MinWidth=originalMinWidth;Width=1280;Height=800;}
         check(SidebarUpdateButton.Visibility==Visibility.Collapsed,"sidebar update prompt stays hidden until a package is ready");
         preparedUpdateJob="fixture";RefreshSidebarUpdate();UpdateLayout();
         check(SidebarUpdateButton.Visibility==Visibility.Visible&&SidebarUpdateButton.IsEnabled&&SidebarUpdateButton.TransformToAncestor(SidebarFooter).Transform(new Point()).Y<DownloadsButton.TransformToAncestor(SidebarFooter).Transform(new Point()).Y,"ready update appears above Downloads in the sidebar");

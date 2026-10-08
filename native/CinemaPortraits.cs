@@ -17,6 +17,7 @@ public sealed partial class CinemaPeople
 {
     public record Identity(string Title,string Description,string SourceUrl,string? PhotoUrl,string? WikidataId,string? ResolvedName=null);
     sealed record IdentityCache(Identity Profile,bool PortraitChecked,int? OriginId=null);
+    sealed record MissingIdentity(string Name,string Role,int? OriginId,DateTime ConfirmedUtc);
     sealed record IdentityResult(Identity? Profile,bool Unavailable=false,bool FromCache=false,bool PortraitChecked=false);
     static readonly SemaphoreSlim identitySlots=new(3);
     static readonly SemaphoreSlim wikiPacing=new(1);
@@ -136,19 +137,33 @@ public sealed partial class CinemaPeople
         }
         return null;
     }
-    async Task<IdentityResult> FetchIdentity(CinemaPerson person,MediaItem? origin,string path)
+    async Task<IdentityResult> FetchIdentity(CinemaPerson person,MediaItem? origin,string path,bool forceRefresh)
     {
+        var missingPath=Path.Combine(Preferences.DataDir,"people",IdentityKey(person,origin)+".wiki-missing.json");
         IdentityCache? saved=null;DateTime savedAt=default;
         try
         {
             savedAt=File.GetLastWriteTimeUtc(path);
             if(File.Exists(path))saved=JsonSerializer.Deserialize<IdentityCache>(await CacheFiles.ReadAllTextAsync(path));
-            if(saved?.Profile is {} profile&&(NameKey(profile.ResolvedName??profile.Title)!=NameKey(person.Name)||!Profession(profile.Description,person.Role)||
-                profile.SourceUrl!="https://ru.wikipedia.org/wiki/"+Uri.EscapeDataString(profile.Title.Replace(' ','_'))||saved.OriginId!=null&&saved.OriginId!=origin?.Id))saved=null;
+            if(saved?.Profile is not {} profile||string.IsNullOrWhiteSpace(profile.Title)||string.IsNullOrWhiteSpace(profile.Description)||
+                NameKey(profile.ResolvedName??profile.Title)!=NameKey(person.Name)||!Profession(profile.Description,person.Role)||
+                profile.SourceUrl!="https://ru.wikipedia.org/wiki/"+Uri.EscapeDataString(profile.Title.Replace(' ','_'))||
+                profile.PhotoUrl!=null&&PhotoUrl(profile.PhotoUrl)==null||saved.OriginId!=null&&saved.OriginId!=origin?.Id)saved=null;
         }
         catch(Exception error)when(error is IOException or UnauthorizedAccessException or JsonException){}
-        if(saved!=null&&DateTime.UtcNow-savedAt<TimeSpan.FromDays(7)&&saved.PortraitChecked)
+        var freshness=saved?.Profile.PhotoUrl!=null?TimeSpan.FromDays(7):TimeSpan.FromHours(1);
+        if(!forceRefresh&&saved!=null&&DateTime.UtcNow-savedAt<freshness&&saved.PortraitChecked)
             return new(saved.Profile,FromCache:true,PortraitChecked:true);
+        if(!forceRefresh&&saved==null)
+        {
+            try
+            {
+                if(File.Exists(missingPath)&&JsonSerializer.Deserialize<MissingIdentity>(await CacheFiles.ReadAllTextAsync(missingPath)) is {} missing&&
+                    missing.Name==person.Name&&missing.Role==person.Role&&missing.OriginId==origin?.Id&&
+                    DateTime.UtcNow-missing.ConfirmedUtc is var age&&age>=TimeSpan.Zero&&age<TimeSpan.FromHours(1))return new(null,FromCache:true);
+            }
+            catch(Exception error)when(error is IOException or UnauthorizedAccessException or JsonException){}
+        }
         if(!await identitySlots.WaitAsync(TimeSpan.FromSeconds(30)))
             return new(saved?.Profile,Unavailable:true,FromCache:saved!=null,PortraitChecked:saved?.PortraitChecked??false);
         try
@@ -157,7 +172,8 @@ public sealed partial class CinemaPeople
             // bounded request and can consume its successful result afterwards.
             using var deadline=new CancellationTokenSource(TimeSpan.FromSeconds(18));var ct=deadline.Token;
             Identity? identity=saved?.Profile;int? resolvedOrigin=saved?.OriginId;
-            if(identity==null||DateTime.UtcNow-savedAt>=TimeSpan.FromDays(7))
+            if(forceRefresh||identity==null||DateTime.UtcNow-savedAt>=TimeSpan.FromDays(7)||
+                saved is {PortraitChecked:true,Profile.PhotoUrl:null}&&DateTime.UtcNow-savedAt>=TimeSpan.FromHours(1))
             {
                 var titles=IdentityTitles(person);if(titles.Length==0)return new(null);
                 var url="https://ru.wikipedia.org/w/api.php?action=query&format=json&redirects=1&prop=extracts%7Cpageprops%7Cpageimages&ppprop=wikibase_item%7Cdisambiguation&exintro=1&explaintext=1&piprop=thumbnail&pithumbsize=400&titles="+Uri.EscapeDataString(string.Join('|',titles));
@@ -179,7 +195,12 @@ public sealed partial class CinemaPeople
                         if(matches.Count==1){identity=matches[0];resolvedOrigin=origin.Id;}
                     }
                 }
-                if(identity==null)return new(null);
+                if(identity==null)
+                {
+                    try{await CacheFiles.WriteAllTextAsync(missingPath,JsonSerializer.Serialize(new MissingIdentity(person.Name,person.Role,origin?.Id,DateTime.UtcNow)));}
+                    catch(Exception error)when(error is IOException or UnauthorizedAccessException){}
+                    return new(null);
+                }
             }
             bool checkedPortrait=identity.PhotoUrl!=null;
             bool portraitUnavailable=false;
@@ -204,18 +225,41 @@ public sealed partial class CinemaPeople
         }
         finally{identitySlots.Release();}
     }
-    async Task<IdentityResult> ResolveIdentity(CinemaPerson person,MediaItem? origin,CancellationToken ct)
+    async Task<IdentityResult> ResolveIdentity(CinemaPerson person,MediaItem? origin,CancellationToken ct,bool forceRefresh=false)
     {
-        ct.ThrowIfCancellationRequested();var key=Path.GetFullPath(Preferences.DataDir)+"|"+IdentityKey(person,origin);
+        ct.ThrowIfCancellationRequested();var key=Path.GetFullPath(Preferences.DataDir)+"|"+IdentityKey(person,origin)+(forceRefresh?"|refresh":"");
         // Unambiguous identities are reusable across films. Only a namesake
         // chosen by matching film/year carries an origin constraint in the cache.
         var path=Path.Combine(Preferences.DataDir,"people",IdentityKey(person,null)+".identity.json");
-        var pending=identityRequests.GetOrAdd(key,_=>new Lazy<Task<IdentityResult>>(()=>FetchIdentity(person,origin,path),LazyThreadSafetyMode.ExecutionAndPublication));
+        var pending=identityRequests.GetOrAdd(key,_=>new Lazy<Task<IdentityResult>>(()=>FetchIdentity(person,origin,path,forceRefresh),LazyThreadSafetyMode.ExecutionAndPublication));
         var task=pending.Value;
         _=task.ContinueWith(_=>identityRequests.TryRemove(new KeyValuePair<string,Lazy<Task<IdentityResult>>>(key,pending)),CancellationToken.None,TaskContinuationOptions.ExecuteSynchronously,TaskScheduler.Default);
         return await task.WaitAsync(ct);
     }
-    public async Task<PortraitResult> ResolvePortrait(CinemaPerson person,CancellationToken ct,MediaItem? origin=null)
+    public async Task<PortraitResult> ResolvePortrait(CinemaPerson person,CancellationToken ct,MediaItem? origin=null,bool forceRefresh=false)
+    {
+        ct.ThrowIfCancellationRequested();
+        // A catalog photograph is already tied to this film's validated credit.
+        // A copied person record without that film context still needs a profile lookup.
+        if(ZonaPhotoUrl(person.PhotoUrl) is {} directPhoto&&
+           Uri.TryCreate(origin?.PageUrl,UriKind.Absolute,out var sourcePage)&&sourcePage.Scheme=="https"&&
+           CinemaMetadata.CatalogUrl(origin!.PageUrl,"/movies/","/tvseries/") is {} source&&
+           !string.IsNullOrWhiteSpace(person.Name)&&(person.Role is "Актёры" or "Режиссёры" or "Операторы")&&
+           origin.People.Any(credit=>credit.Name==person.Name&&credit.Role==person.Role&&ZonaPhotoUrl(credit.PhotoUrl)==directPhoto&&
+               (string.IsNullOrWhiteSpace(person.SourcePersonId)||string.IsNullOrWhiteSpace(credit.SourcePersonId)||person.SourcePersonId==credit.SourcePersonId)))
+            return new(directPhoto,PortraitStatus.Available,source);
+        bool professionalUnavailable=false;
+        try
+        {
+            var profile=await new ProfessionalCinemaPeople(client).Load(person,origin,ct,forceRefresh);
+            if(PhotoUrl(profile?.PhotoUrl) is {} photo)return new(photo,PortraitStatus.Available,profile!.SourceUrl,profile.FromCache);
+        }
+        catch(OperationCanceledException)when(ct.IsCancellationRequested){throw;}
+        catch(Exception error)when(error is not OutOfMemoryException){professionalUnavailable=true;}
+        var fallback=await ResolveWikiPortrait(person,ct,origin,forceRefresh);
+        return professionalUnavailable&&fallback.Status!=PortraitStatus.Available?fallback with{Status=PortraitStatus.Unavailable}:fallback;
+    }
+    public async Task<PortraitResult> ResolveWikiPortrait(CinemaPerson person,CancellationToken ct,MediaItem? origin=null,bool forceRefresh=false)
     {
         ct.ThrowIfCancellationRequested();string? legacy=null;DateTime legacyAt=default;
         var path=Path.Combine(Preferences.DataDir,"people",Hash(person.Name)+".portrait.json");
@@ -224,11 +268,11 @@ public sealed partial class CinemaPeople
             if(File.Exists(path))
             {
                 legacyAt=File.GetLastWriteTimeUtc(path);legacy=PhotoUrl(JsonSerializer.Deserialize<string>(await CacheFiles.ReadAllTextAsync(path,ct)));
-                if(legacy!=null&&DateTime.UtcNow-legacyAt<TimeSpan.FromDays(7))return new(legacy,PortraitStatus.Available,FromCache:true);
+                if(!forceRefresh&&legacy!=null&&DateTime.UtcNow-legacyAt<TimeSpan.FromDays(7))return new(legacy,PortraitStatus.Available,FromCache:true);
             }
         }
         catch(Exception error)when(error is IOException or UnauthorizedAccessException or JsonException){}
-        var resolved=await ResolveIdentity(person,origin,ct);
+        var resolved=await ResolveIdentity(person,origin,ct,forceRefresh);
         if(PhotoUrl(resolved.Profile?.PhotoUrl) is {} photo)return new(photo,PortraitStatus.Available,resolved.Profile?.SourceUrl,resolved.FromCache);
         if(resolved.Unavailable&&legacy!=null)return new(legacy,PortraitStatus.Available,resolved.Profile?.SourceUrl,true);
         return new(null,resolved.Unavailable?PortraitStatus.Unavailable:PortraitStatus.Missing,resolved.Profile?.SourceUrl,resolved.FromCache);

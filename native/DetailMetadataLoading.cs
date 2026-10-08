@@ -46,7 +46,7 @@ public partial class MainWindow
             liveItems=liveItems.Select(x=>x.Id==fresh.Id?fresh:x).ToArray();
             if(current?.Id==item.Id){current=MediaMetadata.Merge(current,fresh);ApplyKnownQuality(current);}
             if(personOrigin?.Id==fresh.Id)personOrigin=MediaMetadata.Merge(personOrigin,fresh);
-            if(returnPerson is {} previous&&previous.Origin.Id==fresh.Id)returnPerson=(previous.Person,MediaMetadata.Merge(previous.Origin,fresh));
+            if(returnPerson is {} previous&&previous.Origin?.Id==fresh.Id)returnPerson=(previous.Person,MediaMetadata.Merge(previous.Origin!,fresh));
             RefreshDetail(item.Id);
         }
         async Task<MediaItem> Load()

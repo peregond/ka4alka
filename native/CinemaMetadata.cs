@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 using HtmlAgilityPack;
 namespace Kachalka;
 
-public record CinemaPerson(string Name,string Role,string PageUrl);
+public record CinemaPerson(string Name,string Role,string PageUrl,string? ProfileUrl=null,string? PhotoUrl=null,string? OriginalName=null,string? SourcePersonId=null);
 public record CinemaAward(string Name,int Year,string Category,bool Winner,string? PersonUrl=null)
 {
     public string Label=>$"{Name} · {Year} · {Category} · {(Winner?"Победитель":"Номинация")}";

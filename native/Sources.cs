@@ -26,6 +26,19 @@ public sealed partial class SourceClient : IDisposable
     public async Task<byte[]> Read(Uri uri,int max,CancellationToken ct)
     {
         using var response=await http.GetAsync(uri,HttpCompletionOption.ResponseHeadersRead,ct);response.EnsureSuccessStatusCode();
+        return await ReadBody(response,max,ct);
+    }
+    public async Task<byte[]> ReadCinemaDetail(Uri uri,int max,CancellationToken ct)
+    {
+        if(CinemaMetadata.CatalogUrl(uri.AbsoluteUri,"/movies/","/tvseries/")==null)return await Read(uri,max,ct);
+        using var request=new HttpRequestMessage(HttpMethod.Get,uri);
+        request.Headers.TryAddWithoutValidation("Accept","application/json, text/javascript, */*; q=0.01");
+        request.Headers.Add("X-Requested-With","XMLHttpRequest");
+        using var response=await http.SendAsync(request,HttpCompletionOption.ResponseHeadersRead,ct);response.EnsureSuccessStatusCode();
+        return await ReadBody(response,max,ct);
+    }
+    static async Task<byte[]> ReadBody(HttpResponseMessage response,int max,CancellationToken ct)
+    {
         if(response.Content.Headers.ContentLength>max)throw new InvalidDataException("Ответ источника превышает допустимый размер.");
         await using var input=await response.Content.ReadAsStreamAsync(ct);using var output=new MemoryStream();var buffer=new byte[16384];int count;
         while((count=await input.ReadAsync(buffer,ct))!=0){if(output.Length+count>max)throw new InvalidDataException("Ответ источника превышает допустимый размер.");output.Write(buffer,0,count);}return output.ToArray();

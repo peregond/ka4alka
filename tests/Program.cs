@@ -50,6 +50,9 @@ if(args.Contains("--diagnose-cinema-source")){await CinemaSourceTests.Diagnostic
 if(args.Contains("--probe-portraits")){await PortraitSourceProbe.Run(root);return;}
 if(args.Contains("--metadata-only")){await MediaMetadataTests.Run();return;}
 if(args.Contains("--portraits-only")){await CinemaPortraitTests.Run();return;}
+if(args.Contains("--person-profile-only")){await PersonProfileLoadingTests.Run();return;}
+if(args.Contains("--professional-people-only")){await ProfessionalCinemaPeopleTests.Run();return;}
+if(args.Contains("--zona-metadata-only")){await ZonaMovieMetadataTests.Run();return;}
 await CacheStorageTests.Run(root);
 if(args.Contains("--cache-only"))return;
 DownloadTests.Run();
@@ -65,7 +68,10 @@ await UnifiedSearchTests.Run();
 if(args.Contains("--catalog-only"))return;
 await ReleaseSearchTests.Run();
 await MediaMetadataTests.Run();
+await ZonaMovieMetadataTests.Run();
 await CinemaPortraitTests.Run();
+await PersonProfileLoadingTests.Run();
+await ProfessionalCinemaPeopleTests.Run();
 await UXReliabilityTests.Run(root);
 await WindowsIntegrationTests.Run();
 await MagnetDiscoveryTests.Run(root);

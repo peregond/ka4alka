@@ -18,4 +18,9 @@ public static class BundledCatalog
         return new(rows.Skip(offset).Take(CatalogPaging.Size).ToArray(),offset+CatalogPaging.Size<rows.Length,[],[]);
     }
     public static IReadOnlyList<MediaItem> Search(string section,string query)=>snapshot.Value.Where(x=>x.Section==section&&x.Title.Contains(query,StringComparison.CurrentCultureIgnoreCase)).Take(80).ToArray();
+    public static IReadOnlyList<MediaItem> FindWork(string section,string title,int year,string? originalTitle=null)
+    {
+        var work=new CinemaPeople.Work(title,year,originalTitle);
+        return snapshot.Value.Where(x=>x.Section==section&&CinemaPeople.MatchesWork(x,work)).Take(10).ToArray();
+    }
 }

@@ -5,7 +5,7 @@ using System.Text.RegularExpressions;
 using System.Windows.Media.Imaging;
 using Kachalka;
 
-// This probe uses real Wikipedia biographies and Wikimedia image bytes. The
+// This probe uses real catalog portraits, professional profiles and fallback image sources. The
 // regular suite separately checks lookup, cancellation and caching with mocks.
 public static class PortraitSourceProbe
 {
@@ -19,10 +19,18 @@ public static class PortraitSourceProbe
             (Person:new CinemaPerson("Джеймс Кэмерон","Режиссёры",""),Film:"Аватар",Year:2009,Original:"Avatar"),
             (Person:new CinemaPerson("Том Холланд","Актёры",""),Film:"Человек-паук: Нет пути домой",Year:2021,Original:"Spider-Man: No Way Home"),
             (Person:new CinemaPerson("Ребекка Фергюсон","Актёры",""),Film:"Укрытие",Year:2023,Original:"Silo"),
-            (Person:new CinemaPerson("Сергей Безруков","Актёры",""),Film:"Высоцкий. Спасибо, что живой",Year:2011,Original:"")
+            (Person:new CinemaPerson("Сергей Безруков","Актёры",""),Film:"Высоцкий. Спасибо, что живой",Year:2011,Original:""),
+            (Person:new CinemaPerson("Скотт Во","Режиссёры",""),Film:"Курьер",Year:2026,Original:"Runner")
         };
         var evidence=new List<object>();
         var failures=new List<Exception>();
+        try{evidence.Add(await ProbeZonaActor(client,people,deadline.Token));}
+        catch(Exception error)
+        {
+            Console.WriteLine("PORTRAIT FAILURE Zona Runner actor: "+error.Message);
+            failures.Add(new InvalidOperationException("Zona Runner actor: "+error.Message,error));
+            evidence.Add(new{Source="Zona Runner actor",Error=error.ToString()});
+        }
         var caseIndex=0;
         foreach(var example in cases)
         {
@@ -37,9 +45,11 @@ public static class PortraitSourceProbe
             Console.WriteLine($"PORTRAIT person={example.Person.Name}; status={portrait.Status}; source={portrait.SourceUrl}; cached={portrait.FromCache}");
             if(portrait.Status!=PortraitStatus.Available||CinemaPeople.PhotoUrl(portrait.Url)==null||string.IsNullOrWhiteSpace(portrait.SourceUrl)||portrait.FromCache)
                 throw new InvalidOperationException("A fresh, confirmed photograph was not resolved for "+example.Person.Name+".");
+            if(example.Person.Name=="Скотт Во"&&(new Uri(portrait.SourceUrl!).Host!="kino-teatr.ua"||new Uri(portrait.Url!).Host!="kino-teatr.ua"))
+                throw new InvalidOperationException("Scott Waugh must resolve from the confirmed professional profile and photograph.");
             using var download=CancellationTokenSource.CreateLinkedTokenSource(deadline.Token);download.CancelAfter(TimeSpan.FromSeconds(15));
             var image=await client.Read(new Uri(portrait.Url!),2*1024*1024,download.Token);
-            if(image.Length<512||!IsImage(image))throw new InvalidDataException("Wikimedia did not return image bytes for "+example.Person.Name+".");
+            if(image.Length<512||!IsImage(image))throw new InvalidDataException("The portrait source did not return image bytes for "+example.Person.Name+".");
             var dimensions=await DecodePortrait(image,deadline.Token);
             var cached=await people.ResolvePortrait(example.Person,deadline.Token,origin);
             if(cached.Status!=PortraitStatus.Available||!cached.FromCache||cached.Url!=portrait.Url)
@@ -60,12 +70,42 @@ public static class PortraitSourceProbe
         if(failures.Count>0)throw new AggregateException("Live portrait verification failed.",failures);
     }
 
+    static async Task<object> ProbeZonaActor(SourceClient client,CinemaPeople people,CancellationToken ct)
+    {
+        var seed=LiveCatalog.Parse(Encoding.UTF8.GetBytes("<li class='results-item-wrap'><a itemprop='url' href='/movies/kurer-2026'><span itemprop='name'>Курьер</span></a><span class='results-item-year'>2026</span></li>"),"Фильмы").Single();
+        var film=await new LiveCatalog(client).Detail(seed,ct);
+        var actor=film.People.FirstOrDefault(person=>person.Role=="Актёры"&&CinemaPeople.ZonaPhotoUrl(person.PhotoUrl)!=null)
+            ??throw new InvalidOperationException("Live Runner detail did not retain any source-supplied actor portrait.");
+        var portrait=await people.ResolvePortrait(actor,ct,film);
+        if(portrait.Status!=PortraitStatus.Available||portrait.Url!=actor.PhotoUrl||CinemaPeople.ZonaPhotoUrl(portrait.Url)==null||portrait.SourceUrl!=film.PageUrl)
+            throw new InvalidOperationException("The confirmed actor portrait did not resolve directly from its movie credit.");
+        var cache=Path.Combine(Preferences.DataDir,"portraits",Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(portrait.Url!)))+".img");
+        using var download=CancellationTokenSource.CreateLinkedTokenSource(ct);download.CancelAfter(TimeSpan.FromSeconds(15));
+        byte[] ImageBytes(byte[] bytes)=>bytes.Length>=512&&IsImage(bytes)?bytes:throw new InvalidDataException("Zona did not return photograph bytes.");
+        var first=await CoverCache.Load(cache,2*1024*1024,token=>client.Read(new Uri(portrait.Url!),2*1024*1024,token),ImageBytes,download.Token);
+        var dimensions=await DecodePortrait(first.Image,ct);
+        var cached=await CoverCache.Load(cache,2*1024*1024,_=>throw new HttpRequestException("A cached portrait must not download again."),ImageBytes,ct);
+        var cachedDimensions=await DecodePortrait(cached.Image,ct);
+        if(!first.Downloaded||cached.Downloaded||!first.Image.AsSpan().SequenceEqual(cached.Image)||dimensions!=cachedDimensions)
+            throw new InvalidOperationException("The live catalog portrait did not reuse its decoded image cache.");
+        Console.WriteLine($"PASS: Zona {actor.Name}: direct movie-credit portrait downloads ({first.Image.Length} bytes), decodes {dimensions.Width}×{dimensions.Height} and remains cached without another request");
+        return new{Person=actor.Name,actor.Role,actor.SourcePersonId,portrait.SourceUrl,portrait.Url,Source="Zona movie credit",Bytes=first.Image.Length,
+            dimensions.Width,dimensions.Height,ImageFromCache=!cached.Downloaded,Sha256=Convert.ToHexString(SHA256.HashData(first.Image))};
+    }
+
     static async Task Diagnose(SourceClient client,CinemaPerson person,string? sourceUrl,CancellationToken ct)
     {
         try
         {
             using var timeout=CancellationTokenSource.CreateLinkedTokenSource(ct);timeout.CancelAfter(TimeSpan.FromSeconds(20));
-            var title=sourceUrl!=null&&Uri.TryCreate(sourceUrl,UriKind.Absolute,out var page)?Uri.UnescapeDataString(page.AbsolutePath["/wiki/".Length..]).Replace('_',' '):person.Name;
+            if(ProfessionalCinemaPeople.ProfileUrl(sourceUrl) is {} profileUrl)
+            {
+                var profileBytes=await client.Read(new Uri(profileUrl),2*1024*1024,timeout.Token);
+                var profile=ProfessionalCinemaPeople.Parse(profileBytes,person,profileUrl);
+                Console.WriteLine($"PORTRAIT DIAGNOSTIC professional profile={profileUrl}; bytes={profileBytes.Length}; accepted={profile!=null}; photo={profile?.PhotoUrl}");
+                return;
+            }
+            var title=sourceUrl!=null&&Uri.TryCreate(sourceUrl,UriKind.Absolute,out var page)&&page.Host=="ru.wikipedia.org"&&page.AbsolutePath.StartsWith("/wiki/",StringComparison.Ordinal)?Uri.UnescapeDataString(page.AbsolutePath["/wiki/".Length..]).Replace('_',' '):person.Name;
             var api="https://ru.wikipedia.org/w/api.php?action=query&format=json&redirects=1&prop=extracts%7Cpageprops%7Cpageimages&exintro=1&explaintext=1&ppprop=wikibase_item&piprop=thumbnail&pithumbsize=400&titles="+Uri.EscapeDataString(title);
             var bytes=await client.Read(new Uri(api),1024*1024,timeout.Token);var json=Encoding.UTF8.GetString(bytes);
             Console.WriteLine("PORTRAIT DIAGNOSTIC Wikipedia "+title+": "+json[..Math.Min(json.Length,4096)]);

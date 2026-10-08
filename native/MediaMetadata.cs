@@ -20,7 +20,7 @@ public static class MediaMetadata
         Imdb=Score(fresh.Imdb)?fresh.Imdb:prior.Imdb,
         Genre=string.IsNullOrWhiteSpace(fresh.Genre)?prior.Genre:fresh.Genre,Country=string.IsNullOrWhiteSpace(fresh.Country)?prior.Country:fresh.Country,
         GenreKeys=fresh.GenreKeys.Length>0?fresh.GenreKeys:prior.GenreKeys,CountryKeys=fresh.CountryKeys.Length>0?fresh.CountryKeys:prior.CountryKeys,
-        People=fresh.People.Length>0?fresh.People:prior.People,Awards=fresh.Awards.Length>0?fresh.Awards:prior.Awards,Collections=fresh.Collections.Length>0?fresh.Collections:prior.Collections
+        People=fresh.People.Length>0?ZonaMovieMetadata.MergePeople(prior.People,fresh.People):prior.People,Awards=fresh.Awards.Length>0?fresh.Awards:prior.Awards,Collections=fresh.Collections.Length>0?fresh.Collections:prior.Collections
     };
     static bool Score(string value)=>double.TryParse(value.Replace(',','.'),System.Globalization.NumberStyles.Float,System.Globalization.CultureInfo.InvariantCulture,out var score)&&score is >0 and <=10;
 
