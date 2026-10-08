@@ -56,10 +56,12 @@ def probe(url):
             parser.feed(text)
             slug = re.sub(r'[^A-Za-z0-9]+', '-', url).strip('-')
             (output / (slug + '.html')).write_text(text, encoding='utf-8')
+            all_profiles = list(dict.fromkeys(link for link in parser.links if '/person/' in link))
             evidence = {'url': url, 'finalUrl': response.url, 'status': response.status, 'bytes': len(data),
                         'forms': parser.forms, 'inputs': parser.inputs, 'scripts': parser.scripts,
                         'images': parser.images[:12], 'personLinks': list(dict.fromkeys(parser.links))[:15],
-                        'profileLinks': list(dict.fromkeys(link for link in parser.links if '/person/' in link))[:20],
+                        'profileLinks': all_profiles[:20], 'profileCount': len(all_profiles),
+                        'scottMatches': [link for link in all_profiles if 'waugh-scott-' in link.lower()],
                         'metadata': parser.metadata, 'headings': parser.headings[:8],
                         'structure': [text[max(0, match.start()-180):match.end()+220] for match in
                                       list(re.finditer(r'person_films|biography|itemprop|Waugh|Режисс[её]р|Акт[её]р|Гонка|Жажда скорости', text))[:8]]}
@@ -71,10 +73,9 @@ def probe(url):
         return evidence
 
 
-urls = ['https://kino-teatr.ua/person/Waugh-Scott-6293.phtml',
-        'https://kino-teatr.ua/person_films/waugh-scott-6293.phtml'] + [
+urls = [
             'https://kino-teatr.ua/ru/main/persons/order_by/fio.asc.phtml?lastname=' + urllib.parse.quote(name)
-            for name in ['Во', 'Холланд', 'Кэмерон', 'Фергюсон']]
+            for name in ['Во', 'Во Скотт', 'Скотт Во', 'Холланд Том', 'Кэмерон Джеймс', 'Фергюсон Ребекка']]
 with ThreadPoolExecutor(max_workers=4) as pool:
     results = list(pool.map(probe, urls))
 pathlib.Path('test-output/person-profile-source/responses.json').write_text(json.dumps(results, ensure_ascii=False), encoding='utf-8')
