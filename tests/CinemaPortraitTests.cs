@@ -76,8 +76,11 @@ public static class CinemaPortraitTests
         var directOrigin=new MediaItem(-34,"Курьер","Фильмы","",2026,"—","—","#526B69"){
             PageUrl="https://w6.zona.plus/movies/kurer-2026",People=[directPerson]
         };
-        await CacheFiles.WriteAllTextAsync(ProfessionalCinemaPeople.CachePath(directPerson,directOrigin),
-            await CacheFiles.ReadAllTextAsync(ProfessionalCinemaPeople.CachePath(professionalPerson,null)));
+        var directFallback=JsonSerializer.Deserialize<ProfessionalPerson>(
+            await CacheFiles.ReadAllTextAsync(ProfessionalCinemaPeople.CachePath(professionalPerson,null)))!
+            with{Person=directPerson with{ProfileUrl=professionalProfile}};
+        foreach(var fallbackOrigin in new MediaItem?[]{null,directOrigin})
+            await CacheFiles.WriteAllTextAsync(ProfessionalCinemaPeople.CachePath(directPerson,fallbackOrigin),JsonSerializer.Serialize(directFallback));
         var directHandler=new Handler((_,_)=>throw new Exception("A film-scoped Zona portrait must not perform a name lookup."));
         using(var client=new SourceClient(directHandler))
         {
