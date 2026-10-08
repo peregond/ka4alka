@@ -13,6 +13,7 @@ public partial class MainWindow
     {
         Directory.CreateDirectory(output);
         var checks=new List<object>();
+        var captureOffsets=new Dictionary<FrameworkElement,Vector>();
         var poster=BitmapSource.Create(2,2,96,96,PixelFormats.Bgra32,null,
             new byte[]{90,150,220,255,90,150,220,255,90,150,220,255,90,150,220,255},8);
         poster.Freeze();
@@ -24,6 +25,7 @@ public partial class MainWindow
             FrameworkElement root=element;
             while(VisualTreeHelper.GetParent(root) is FrameworkElement ancestor)root=ancestor;
             var detached=parent?.Child==element;
+            var container=new ContainerVisual();var contained=false;
             try
             {
                 // A nested Grid's visual offset remains part of a direct or brush
@@ -31,13 +33,18 @@ public partial class MainWindow
                 // at the origin, retaining its production clip and children.
                 if(detached)
                 {
-                    parent!.Child=null;element.Measure(size);element.Arrange(new Rect(size));element.UpdateLayout();
-                    if(VisualTreeHelper.GetOffset(element).Length>0.001)throw new Exception("Banner artwork fixture could not be arranged at the origin.");
+                    parent!.Child=null;element.InvalidateMeasure();element.InvalidateArrange();element.Measure(size);element.Arrange(new Rect(size));element.UpdateLayout();
                 }
-                bitmap.Render(element);return bitmap;
+                var offset=VisualTreeHelper.GetOffset(element);captureOffsets[element]=offset;
+                // FrameworkElement can retain an arrangement offset after it is
+                // detached. Cancel the observed offset in the capture container;
+                // the artwork's own clip and rendering remain unchanged.
+                container.Offset=-offset;container.Children.Add(element);contained=true;
+                bitmap.Render(container);return bitmap;
             }
             finally
             {
+                if(contained)container.Children.Remove(element);
                 if(detached){parent!.Child=element;root.UpdateLayout();}
             }
         }
@@ -64,7 +71,7 @@ public partial class MainWindow
                 int[][] Rows(byte[] data)=>Enumerable.Range(0,Math.Min(4,actual.PixelHeight)).Select(y=>Enumerable.Range(0,width).Select(x=>(int)data[y*stride+x*4+3]).ToArray()).ToArray();
                 File.WriteAllText(Path.Combine(output,stage+"-failure.json"),JsonSerializer.Serialize(new
                 {
-                    Message=message,Scale=scale,ElementType=element.GetType().Name,ElementSize=element.RenderSize.ToString(),RestoredOffset=VisualTreeHelper.GetOffset(element).ToString(),
+                    Message=message,Scale=scale,ElementType=element.GetType().Name,ElementSize=element.RenderSize.ToString(),CapturedOffset=captureOffsets[element].ToString(),RestoredOffset=VisualTreeHelper.GetOffset(element).ToString(),
                     Clip=element.Clip?.ToString(),ClipBounds=element.Clip?.Bounds.ToString(),ActualAlphaRows=Rows(pixels),ExpectedAlphaRows=Rows(target)
                 },new JsonSerializerOptions{WriteIndented=true}));
                 throw new Exception(message);
