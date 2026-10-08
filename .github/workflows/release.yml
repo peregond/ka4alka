@@ -26,7 +26,7 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-      - name: Verify live participant photographs
+      - name: Verify direct Zona and fallback participant photographs
         run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --probe-portraits
       - name: Diagnose current cinema source paths
         run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --diagnose-cinema-source
@@ -59,7 +59,7 @@ jobs:
             [System.IO.File]::WriteAllText($key,$env:RELEASE_SIGNING_KEY)
             ./build-release.ps1 -Version $env:RELEASE_VERSION -SigningKeyPath $key -MakeNsis 'C:/Program Files (x86)/NSIS/makensis.exe'
           } finally { Remove-Item $key -ErrorAction SilentlyContinue }
-      - name: Verify person card and film navigation at three window sizes
+      - name: Verify equal film cards, person galleries and navigation at three window sizes
         shell: pwsh
         run: |
           $env:KACHALKA_DATA=Join-Path $env:RUNNER_TEMP 'kachalka-cinema-smoke'
