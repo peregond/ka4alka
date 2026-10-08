@@ -28,6 +28,8 @@ jobs:
           dotnet-version: '10.0.x'
       - name: Verify live participant photographs
         run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --probe-portraits
+      - name: Diagnose current cinema source paths
+        run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --diagnose-cinema-source
       - name: Verify live cinema navigation
         run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --verify-cinema-source
       - name: Verify metadata and actual release for affected new films
@@ -125,6 +127,7 @@ jobs:
             test-output/cache-reliability/*
             test-output/cinema-ui/*
             test-output/cinema-source/*
+            test-output/cinema-source-diagnostics/*
             test-output/windows-update/checks.txt
             test-output/dpi-reliability/*
             test-output/close-reliability/*.json
