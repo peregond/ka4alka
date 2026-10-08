@@ -33,6 +33,12 @@ public static class CinemaPortraitTests
         var disambiguation=Encoding.UTF8.GetBytes("""{"query":{"pages":{"1":{"title":"Холланд, Том","extract":"Актёр","pageprops":{"disambiguation":""},"thumbnail":{"source":"https://upload.wikimedia.org/wikipedia/commons/wrong.jpg"}}}}}""");
         Check(CinemaPeople.ParseIdentities(disambiguation,tom).Length==0,"disambiguation pages never supply a photograph");
         Check(CinemaPeople.ParseIdentities(Page("Холланд, Том (актёр)","https://upload.wikimedia.org.evil.test/person.jpg"),tom).Single().PhotoUrl==null,"portrait thumbnails require the trusted Wikimedia image host");
+        const string cdnPhoto="https://thumb.wikimedia.org/wikipedia/commons/thumb/person.jpg/500px-person.jpg?utm_source=api";
+        Check(CinemaPeople.ParseIdentities(Page("Холланд, Том (актёр)",cdnPhoto),tom).Single().PhotoUrl==cdnPhoto&&
+              CinemaPeople.PhotoUrl("https://thumb.wikimedia.org.evil.test/person.jpg")==null&&
+              CinemaPeople.PhotoUrl("http://thumb.wikimedia.org/person.jpg")==null&&
+              CinemaPeople.PhotoUrl("https://user@thumb.wikimedia.org/person.jpg")==null,
+              "modern Wikimedia thumbnail CDN is accepted while lookalike, HTTP and credential URLs are rejected");
         var ivan=new CinemaPerson("Иван Янковский","Актёры","");
         var redirect=Encoding.UTF8.GetBytes("""{"query":{"redirects":[{"from":"Иван Янковский","to":"Янковский, Иван Филиппович"}],"pages":{"1":{"title":"Янковский, Иван Филиппович","extract":"Российский актёр","thumbnail":{"source":"https://upload.wikimedia.org/wikipedia/commons/person.jpg"}}}}}""");
         Check(CinemaPeople.ParseIdentities(redirect,ivan).Single().ResolvedName==ivan.Name,"an explicit Wikipedia alias safely resolves a canonical name containing a patronymic");
@@ -68,6 +74,11 @@ public static class CinemaPortraitTests
             Check((await new CinemaPeople(client).ResolvePortrait(retryPerson,CancellationToken.None)).Status==PortraitStatus.Unavailable,"a transient portrait error is distinct from a confirmed absent image");
         using(var client=new SourceClient(retry))
             Check((await new CinemaPeople(client).ResolvePortrait(retryPerson,CancellationToken.None)).Status==PortraitStatus.Available&&retry.Calls==1,"transient portrait errors are not persisted as missing images");
+        var ratePerson=person with{Name="Лимит актёр "+Guid.NewGuid().ToString("N")};
+        var rateCalls=0;
+        var limited=new Handler((_,_)=>Task.FromResult(Interlocked.Increment(ref rateCalls)==1?new HttpResponseMessage(HttpStatusCode.TooManyRequests):Reply(Page(ratePerson.Name))));
+        using(var client=new SourceClient(limited))
+            Check((await new CinemaPeople(client).ResolvePortrait(ratePerson,CancellationToken.None)).Status==PortraitStatus.Available&&limited.Calls==2,"temporary Wikipedia rate limits receive one delayed retry without producing an empty portrait cache");
 
         var sharedPerson=person with{Name="Общий актёр "+Guid.NewGuid().ToString("N")};
         var started=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);

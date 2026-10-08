@@ -1,5 +1,8 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.IO;
+using System.Net.Http;
+using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -16,9 +19,32 @@ public sealed partial class CinemaPeople
     sealed record IdentityCache(Identity Profile,bool PortraitChecked,int? OriginId=null);
     sealed record IdentityResult(Identity? Profile,bool Unavailable=false,bool FromCache=false,bool PortraitChecked=false);
     static readonly SemaphoreSlim identitySlots=new(3);
+    static readonly SemaphoreSlim wikiPacing=new(1);
+    static long nextWikiRequest;
     static readonly ConcurrentDictionary<string,Lazy<Task<IdentityResult>>> identityRequests=new();
     static string Hash(string value)=>Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
     static string IdentityKey(CinemaPerson person,MediaItem? origin)=>Hash(Normalize(person.Name)+"|"+person.Role+"|"+person.PageUrl+"|"+origin?.Id);
+    async Task<byte[]> WikiRead(Uri uri,int maxBytes,CancellationToken ct)
+    {
+        for(var attempt=0;;attempt++)
+        {
+            await wikiPacing.WaitAsync(ct);
+            try
+            {
+                var delay=TimeSpan.FromSeconds(Math.Max(0,nextWikiRequest-Stopwatch.GetTimestamp())/(double)Stopwatch.Frequency);
+                if(delay>TimeSpan.Zero)await Task.Delay(delay,ct);
+                nextWikiRequest=Stopwatch.GetTimestamp()+(long)(Stopwatch.Frequency*.75);
+            }
+            finally{wikiPacing.Release();}
+            try{return await client.Read(uri,maxBytes,ct);}
+            catch(HttpRequestException error)when(error.StatusCode==HttpStatusCode.TooManyRequests&&attempt==0)
+            {
+                // One bounded retry shares the same caller/deadline budget.
+                // Do not persist a temporary rate limit as an absent portrait.
+                await Task.Delay(TimeSpan.FromSeconds(2),ct);
+            }
+        }
+    }
 
     // Wiki's canonical Russian titles usually put the surname first. Only exact
     // name variants are queried; a first search hit is never used as identity.
@@ -83,7 +109,7 @@ public sealed partial class CinemaPeople
         // canonical ru-Wikipedia sitelink identifies the same entity exactly.
         var url="https://www.wikidata.org/w/api.php?action=wbgetentities&format=json&props=claims&"+
             (identity.WikidataId is {} item?"ids="+item:"sites=ruwiki&titles="+Uri.EscapeDataString(identity.Title));
-        using var document=JsonDocument.Parse(await client.Read(new Uri(url),1024*1024,ct));
+        using var document=JsonDocument.Parse(await WikiRead(new Uri(url),1024*1024,ct));
         if(document.RootElement.TryGetProperty("error",out _))throw new InvalidDataException("Wikidata временно не вернула фотографию.");
         var entities=document.RootElement.GetProperty("entities");
         var entity=identity.WikidataId is {} id?entities.GetProperty(id):entities.EnumerateObject().Where(x=>Regex.IsMatch(x.Name,@"^Q[1-9]\d*$")&&!x.Value.TryGetProperty("missing",out _)).Select(x=>x.Value).SingleOrDefault();
@@ -95,7 +121,7 @@ public sealed partial class CinemaPeople
             .FirstOrDefault(x=>!string.IsNullOrWhiteSpace(x));
         if(image==null)return null;
         var commons="https://commons.wikimedia.org/w/api.php?action=query&format=json&prop=imageinfo&iiprop=url&iiurlwidth=400&titles="+Uri.EscapeDataString("File:"+image);
-        using var media=JsonDocument.Parse(await client.Read(new Uri(commons),1024*1024,ct));
+        using var media=JsonDocument.Parse(await WikiRead(new Uri(commons),1024*1024,ct));
         if(media.RootElement.TryGetProperty("error",out _))throw new InvalidDataException("Wikimedia временно не вернула фотографию.");
         foreach(var page in media.RootElement.GetProperty("query").GetProperty("pages").EnumerateObject().Select(x=>x.Value))
         {
@@ -135,7 +161,7 @@ public sealed partial class CinemaPeople
             {
                 var titles=IdentityTitles(person);if(titles.Length==0)return new(null);
                 var url="https://ru.wikipedia.org/w/api.php?action=query&format=json&redirects=1&prop=extracts%7Cpageprops%7Cpageimages&ppprop=wikibase_item%7Cdisambiguation&exintro=1&explaintext=1&piprop=thumbnail&pithumbsize=400&titles="+Uri.EscapeDataString(string.Join('|',titles));
-                var candidates=ParseIdentities(await client.Read(new Uri(url),2*1024*1024,ct),person);
+                var candidates=ParseIdentities(await WikiRead(new Uri(url),2*1024*1024,ct),person);
                 if(candidates.Length==1){identity=candidates[0];resolvedOrigin=null;}
                 else
                 {
@@ -146,7 +172,7 @@ public sealed partial class CinemaPeople
                         foreach(var candidate in candidates)
                         {
                             var parse="https://ru.wikipedia.org/w/api.php?action=parse&format=json&prop=text&redirects=1&page="+Uri.EscapeDataString(candidate.Title);
-                            using var article=JsonDocument.Parse(await client.Read(new Uri(parse),4*1024*1024,ct));
+                            using var article=JsonDocument.Parse(await WikiRead(new Uri(parse),4*1024*1024,ct));
                             var works=Works(article.RootElement.GetProperty("parse").GetProperty("text").GetProperty("*").GetString()??"");
                             if(works.Any(work=>work.Year==origin.Year&&Normalize(work.Title)==Normalize(origin.Title)))matches.Add(candidate);
                         }

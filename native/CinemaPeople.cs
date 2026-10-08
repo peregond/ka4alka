@@ -37,7 +37,7 @@ public sealed partial class CinemaPeople(SourceClient client)
         }
         return works.DistinctBy(x=>(x.Title,x.Year)).ToArray();
     }
-    public static string? PhotoUrl(string? value)=>Uri.TryCreate(value,UriKind.Absolute,out var uri)&&uri.Scheme=="https"&&uri.Host=="upload.wikimedia.org"&&uri.IsDefaultPort&&uri.UserInfo.Length==0?uri.AbsoluteUri:null;
+    public static string? PhotoUrl(string? value)=>Uri.TryCreate(value,UriKind.Absolute,out var uri)&&uri.Scheme=="https"&&uri.Host is ("upload.wikimedia.org" or "thumb.wikimedia.org")&&uri.IsDefaultPort&&uri.UserInfo.Length==0?uri.AbsoluteUri:null;
     public async Task<string?> Portrait(CinemaPerson person,CancellationToken ct)=>
         (await ResolvePortrait(person,ct)).Url;
     public async Task<PersonProfile> Load(CinemaPerson person,MediaItem? origin,IEnumerable<MediaItem> known,CancellationToken ct)
@@ -59,7 +59,7 @@ public sealed partial class CinemaPeople(SourceClient client)
             var identity=resolved.Profile??throw new InvalidDataException("Нет однозначной биографии участника.");
             var title=identity.Title;biography=identity.Description;source=identity.SourceUrl;
             var parse="https://ru.wikipedia.org/w/api.php?action=parse&format=json&prop=text&redirects=1&page="+Uri.EscapeDataString(title);
-            using var article=JsonDocument.Parse(await client.Read(new Uri(parse),4*1024*1024,token));
+            using var article=JsonDocument.Parse(await WikiRead(new Uri(parse),4*1024*1024,token));
             var candidates=Works(article.RootElement.GetProperty("parse").GetProperty("text").GetProperty("*").GetString()??"").OrderByDescending(x=>x.Year).Take(16).ToArray();
             var catalog=new LiveCatalog(client);using var slots=new SemaphoreSlim(3);
             await Task.WhenAll(candidates.Select(async work=>

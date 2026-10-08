@@ -23,11 +23,13 @@ public static class PortraitSourceProbe
         };
         var evidence=new List<object>();
         var failures=new List<Exception>();
+        var caseIndex=0;
         foreach(var example in cases)
         {
             PortraitResult? portrait=null;
             try
             {
+            if(caseIndex++>0)await Task.Delay(TimeSpan.FromMilliseconds(1250),deadline.Token);
             var origin=new MediaItem(-example.Year,example.Film,example.Original=="Silo"?"Сериалы":"Фильмы","",example.Year,"—","—","#526B69"){
                 OriginalTitle=example.Original,People=[example.Person]
             };

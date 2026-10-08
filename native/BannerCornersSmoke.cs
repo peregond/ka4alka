@@ -19,7 +19,13 @@ public partial class MainWindow
         BitmapSource Raster(FrameworkElement element,double scale)
         {
             var bitmap=new RenderTargetBitmap((int)Math.Ceiling(element.ActualWidth*scale),(int)Math.Ceiling(element.ActualHeight*scale),96*scale,96*scale,PixelFormats.Pbgra32);
-            bitmap.Render(element);return bitmap;
+            // A nested artwork grid has the border's inset as a visual offset.
+            // Paint its local bounds at the origin so the contour comparison
+            // measures the artwork rather than that parent layout offset.
+            var bounds=new Rect(0,0,element.ActualWidth,element.ActualHeight);
+            var brush=new VisualBrush(element){AutoLayoutContent=false,ViewboxUnits=BrushMappingMode.Absolute,Viewbox=bounds,ViewportUnits=BrushMappingMode.Absolute,Viewport=bounds,Stretch=Stretch.Fill};
+            var drawing=new DrawingVisual();using(var context=drawing.RenderOpen())context.DrawRectangle(brush,null,bounds);
+            bitmap.Render(drawing);return bitmap;
         }
         void Save(BitmapSource bitmap,string name)
         {
