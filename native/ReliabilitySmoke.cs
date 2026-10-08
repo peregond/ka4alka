@@ -15,9 +15,11 @@ public partial class MainWindow
     public async Task DpiSmokeTest(string output)
     {
         Directory.CreateDirectory(output);
-        liveRequest?.Cancel();liveLoading=false;current=null;favoritesOnly=true;
+        liveRequest?.Cancel();ResetDiscoveryData();liveLoading=false;current=null;favoritesOnly=false;ResetCatalogFilters();livePage=1;
         prefs.LiveFavorites=Enumerable.Range(1,8).Select(id=>new MediaItem(-50000-id,"Проверка интерфейса "+id,"Фильмы","драма",2026,"8.0","7.5","#526B69"){PageUrl="https://w6.zona.plus/movies/dpi-fixture-"+id}).ToList();
         foreach(var item in prefs.LiveFavorites){cardMetadata[item.Id]=Task.FromResult(item);requestedDetails.Add(item.Id);}
+        catalogPages["Фильмы|sort-date|1"]=new(prefs.LiveFavorites.ToArray(),false,CatalogChoices.Genres,CatalogChoices.Countries);
+        PrepareDiscoverySmokeRegions("Фильмы",prefs.LiveFavorites);
         var cases=new List<object>();
         var fixtures=Enumerable.Range(1,8).Select(id=>new DownloadItem{Name="Fixture.S01E0"+id+".mkv",MediaTitle="Проверка масштабирования "+id,Paused=true,Progress=25,Stats="25% · на паузе"}).ToArray();
         foreach(var item in fixtures)downloads.Items.Add(item);

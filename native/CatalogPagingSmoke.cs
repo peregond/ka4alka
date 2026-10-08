@@ -133,7 +133,10 @@ public partial class MainWindow
         check(filterBounds.Top>=searchBounds.Bottom-.5,"catalog filter line sits below the search input ("+stage+")");
         var buttons=VisualElements<Button>(inlineCatalogFilters!).Where(x=>x.IsVisible).ToArray();
         var centers=buttons.Select(x=>x.TransformToAncestor(inlineCatalogFilters!).Transform(new Point(0,x.ActualHeight/2)).Y).ToArray();
-        check(buttons.Length>=8&&buttons.All(x=>x.ActualWidth>0&&x.ActualHeight>0)&&centers.Max()-centers.Min()<=2,"catalog buttons share one row with no wrapping ("+stage+")");
+        foreach(var name in new[]{"Жанр","Страна","Рейтинг от","Год выхода","Порядок","Качество каталога"})
+            check(buttons.Count(x=>AutomationProperties.GetName(x)==name)==1,"catalog filter remains available: "+name+" ("+stage+")");
+        check(buttons.Any(x=>AutomationProperties.GetName(x)=="Подборка")==(!favoritesOnly&&!SearchActive),"collection filter matches the active catalog context ("+stage+")");
+        check(buttons.All(x=>x.ActualWidth>0&&x.ActualHeight>0)&&centers.Max()-centers.Min()<=2,"catalog buttons share one row with no wrapping ("+stage+")");
         check(inlineCatalogFilterScroll is {VerticalScrollBarVisibility:ScrollBarVisibility.Disabled,ScrollableHeight:0},"filter overflow does not create vertical scrolling ("+stage+")");
         check(buttons.Count(x=>AutomationProperties.GetName(x)=="Качество каталога")==1&&!buttons.Any(x=>AutomationProperties.GetName(x) is "Минимальное качество" or "Скрыть плохое качество"),"catalog has one quality dropdown instead of separate quality buttons ("+stage+")");
     }

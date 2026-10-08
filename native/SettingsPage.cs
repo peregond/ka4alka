@@ -12,15 +12,32 @@ public partial class MainWindow
 {
     string settingsReturnSection="Фильмы";
     MediaItem? settingsReturnItem;
+    sealed record SettingsPersonNavigation(CinemaPerson? Person,MediaItem? Origin,string? Section,
+        (CinemaPerson Person,MediaItem? Origin)? ReturnPerson,PersonSearchReturn? Search,SavedReturn? Saved);
+    SettingsPersonNavigation? settingsPersonNavigation;
     void Settings(object sender,RoutedEventArgs e)
     {
         searchDelay.Stop();
-        if(section!="Настройки"){settingsReturnSection=section;settingsReturnItem=current;}
+        if(section!="Настройки")
+        {
+            settingsReturnSection=section;settingsReturnItem=current;
+            settingsPersonNavigation=new(activePerson,personOrigin,personSection,returnPerson,personSearchReturn,savedReturn);
+        }
         section="Настройки";current=null;Render();
+    }
+    void ReturnFromSettings()
+    {
+        section=settingsReturnSection;current=settingsReturnItem;
+        if(settingsPersonNavigation is {} previous)
+        {
+            activePerson=previous.Person;personOrigin=previous.Origin;personSection=previous.Section;
+            returnPerson=previous.ReturnPerson;personSearchReturn=previous.Search;savedReturn=previous.Saved;
+        }
+        settingsPersonNavigation=null;Render();
     }
     void RenderSettings()
     {
-        var back=ActionButton("Вернуться","IconBack",()=>{section=settingsReturnSection;current=settingsReturnItem;Render();});
+        var back=ActionButton("Вернуться","IconBack",ReturnFromSettings);
         back.Content=IconLabel("","IconBack");back.ToolTip="Вернуться";back.Style=(Style)FindResource("QuietButton");back.Width=36;back.Height=36;back.MinHeight=36;back.Padding=new(9);back.Margin=new(0,0,10,0);
         var header=new Grid{Margin=new(0,0,0,compactHeight?8:12)};
         header.ColumnDefinitions.Add(new(){Width=GridLength.Auto});header.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});

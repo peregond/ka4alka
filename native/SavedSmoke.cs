@@ -64,9 +64,16 @@ public partial class MainWindow
             Click(FindVisual<Button>(Body,button=>button.Tag is MediaItem item&&item.Id==selected.Id)!);await Settle();
             Click(FindVisual<Button>(Body,button=>button.Tag is CinemaPerson actor&&actor==person)!);await Settle();
             check(activePerson==person&&personOrigin?.Id==selected.Id&&savedReturn!=null,"a person opened from a saved film retains the Saved navigation destination");
+            Click(SettingsButton);await Settle();
+            check(section=="Настройки"&&activePerson==null&&current==null,"settings opens from the saved film's person page");
+            Click(FindVisual<Button>(PageHeader,button=>AutomationProperties.GetName(button)=="Вернуться")!);await Settle();
+            check(activePerson==person&&personOrigin?.Id==selected.Id&&current?.Id==selected.Id&&savedReturn is{Category:"Фильмы",Page:2},"settings back restores the same person, origin film and Saved ancestor");
             var deadline=DateTime.UtcNow.AddSeconds(3);while(FindVisual<Button>(Body,button=>button.Tag is MediaItem film&&film.Id==films[0].Id)==null&&DateTime.UtcNow<deadline)await Task.Delay(30);UpdateLayout();
             Click(FindVisual<Button>(Body,button=>button.Tag is MediaItem film&&film.Id==films[0].Id)??throw new Exception("Saved person filmography fixture is missing."));await Settle();
             check(returnPerson?.Person==person&&savedReturn!=null,"person filmography opens another film without losing its Saved ancestor");
+            Click(SettingsButton);await Settle();
+            Click(FindVisual<Button>(PageHeader,button=>AutomationProperties.GetName(button)=="Вернуться")!);await Settle();
+            check(current?.Id==films[0].Id&&activePerson==null&&returnPerson?.Person==person&&returnPerson?.Origin?.Id==selected.Id&&savedReturn is{Category:"Фильмы",Page:2},"settings back preserves the filmography film's person return destination and Saved ancestor");
             CinemaBack();await Settle();check(activePerson==person&&personOrigin?.Id==selected.Id,"back from filmography restores the saved film's person page first");
             Click(FindVisual<Button>(PageHeader,button=>AutomationProperties.GetName(button)=="Назад к фильму")!);await Settle();
             check(current?.Id==selected.Id&&activePerson==null,"person back restores its saved origin film");
