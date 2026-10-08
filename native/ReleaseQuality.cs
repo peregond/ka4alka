@@ -25,7 +25,7 @@ public static class ReleaseQuality
            Uri.TryCreate(entry.PageUrl,UriKind.Absolute,out var archive)&&archive.Scheme=="https"&&archive.Host=="archive.org"&&archive.IsDefaultPort&&string.IsNullOrEmpty(archive.UserInfo)&&
            archive.AbsolutePath.StartsWith("/details/",StringComparison.Ordinal)&&Uri.UnescapeDataString(archive.AbsolutePath["/details/".Length..].TrimEnd('/')) is {Length:>0} identifier&&!identifier.Contains('/'))return true;
         if(!Uri.TryCreate(entry.TorrentUrl,UriKind.Absolute,out var url))return false;
-        if(url.Scheme=="magnet")return Regex.IsMatch(url.Query,@"(?i)(?:[?&])xt=urn(?:%3a|:)(?:btih|btmh)(?:%3a|:)(?:[a-f0-9]{40}|[a-z2-7]{32}|1220[a-f0-9]{64})(?:&|$)");
+        if(url.Scheme=="magnet")return Regex.IsMatch(url.Query,@"(?i)(?:[?&])xt=urn(?:%3a|:)(?:btih(?:%3a|:)(?:[a-f0-9]{40}|[a-z2-7]{32})|btmh(?:%3a|:)1220[a-f0-9]{64})(?:&|$)");
         return url.Scheme is "http" or "https"&&!string.IsNullOrEmpty(url.Host)&&string.IsNullOrEmpty(url.UserInfo);
     }
     public static bool Matches(SourceEntry entry,int height)=>CatalogHeight(height)!=0&&Downloadable(entry)&&!IsScreen(entry)&&Height(entry)==height;

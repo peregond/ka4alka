@@ -29,6 +29,9 @@ static class ReleaseQualityTests
             Check(!ReleaseQuality.HasResolution([Row("Film 2160p") with{TorrentUrl=unavailable}],2160),"unavailable torrent URL cannot satisfy 4K: "+(unavailable??"null"));
         Check(!ReleaseQuality.HasResolution([Row("Film WEBRip")],720)&&!ReleaseQuality.HasResolution([Row("Film 1440p")],1080),"unknown and other resolutions cannot be advertised as the selected resolution");
         Check(ReleaseQuality.Downloadable(Row("Film 4K") with{TorrentUrl="https://downloads.example/film.torrent"})&&!ReleaseQuality.Downloadable(Row("Film 4K") with{TorrentUrl="https://user:password@downloads.example/film.torrent"}),"quality evidence accepts downloadable web links without URL credentials");
+        var v1=new string('a',40);var v1Base32=new string('A',32);var v2="1220"+new string('a',64);
+        Check(new[]{"btih:"+v1,"btih:"+v1Base32,"btmh:"+v2,"btih%3A"+v1}.All(hash=>ReleaseQuality.Downloadable(Row("Film 4K") with{TorrentUrl="magnet:?xt=urn:"+hash}))&&
+              new[]{"btmh:"+v1,"btmh:"+v1Base32,"btih:"+v2}.All(hash=>!ReleaseQuality.Downloadable(Row("Film 4K") with{TorrentUrl="magnet:?xt=urn:"+hash})),"magnet quality evidence accepts matching v1 and v2 hash formats and rejects swapped prefixes");
         var archive=Row("Archive film 1080p") with{Source="Internet Archive",TorrentUrl=null,PageUrl="https://archive.org/details/quality-film"};
         Check(ReleaseQuality.HasResolution([archive],1080)&&!ReleaseQuality.HasResolution([archive with{PageUrl="https://archive.org.attacker.example/details/quality-film"}],1080)&&!ReleaseQuality.HasResolution([archive with{PageUrl="https://archive.org/details/"}],1080),"resolvable Internet Archive entries retain quality evidence only for a valid archive item URL");
         var copied=item with{Title="Копия"};copied.SetReleaseQuality([Row("Film 1080p")]);

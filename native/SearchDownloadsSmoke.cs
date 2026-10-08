@@ -31,7 +31,9 @@ public partial class MainWindow
         await Task.Delay(100);check(calls==2,"search dispatches film and series requests together");release.SetResult();
         var end=DateTime.UtcNow.AddSeconds(15);while(liveLoading&&DateTime.UtcNow<end)await Task.Delay(30);UpdateLayout();
         check(!liveLoading&&LoadingIndicator.Visibility==Visibility.Collapsed&&liveItems.Count==50&&catalogDisplay.Any(x=>x.Section=="Сериалы")&&catalogDisplay.Any(x=>x.Section=="Фильмы"),"combined results include both types and hide completed loading indicator");
-        Button Filter(string type)=>FindVisual<Button>(PageHeader,b=>AutomationProperties.GetName(b)=="Результаты: "+type)??throw new Exception("Missing search type "+type);
+        Button Filter(string type)=>FindVisual<Button>(FilterControls,b=>AutomationProperties.GetName(b)=="Результаты: "+type)??throw new Exception("Missing search type "+type);
+        CheckCatalogFilterLine(check,"unified-search");
+        check(new[]{"Все","Фильмы","Сериалы"}.All(type=>Filter(type) is {IsVisible:true,ActualWidth:>0,ActualHeight:>0}),"unified search type tabs remain visible in the single filter line below search");
         Filter("Сериалы").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));UpdateLayout();
         check(catalogDisplay.Count==5&&catalogDisplay.All(x=>x.Section=="Сериалы")&&calls==2,"series tab filters existing results without another network request");
         Filter("Фильмы").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));UpdateLayout();check(catalogDisplay.Count==40&&catalogHasNext,"film results keep paged navigation");
