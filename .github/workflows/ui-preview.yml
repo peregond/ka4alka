@@ -49,6 +49,15 @@ jobs:
           if($app.ExitCode -ne 0 -or -not(Test-Path (Join-Path $output 'checks.json'))){throw 'Download reliability UI evidence missing'}
           Get-Content (Join-Path $output 'checks.json')
           Get-Content (Join-Path $output 'download-diagnostics-checks.json')
+      - name: Verify UI input during actor photo and biography loading
+        shell: pwsh
+        run: |
+          $output=Join-Path $PWD 'test-output/ui-preview/person-performance'
+          $app=Start-Process (Join-Path $PWD 'dist/ui-preview/Kachalka.exe') -ArgumentList @('--person-performance-smoke-test',('"'+$output+'"')) -PassThru
+          if(-not $app.WaitForExit(45000)){$app.Kill($true);throw 'Person performance UI timed out'}
+          if(Test-Path (Join-Path $output 'error.txt')){throw (Get-Content (Join-Path $output 'error.txt') -Raw)}
+          if($app.ExitCode -ne 0 -or -not(Test-Path (Join-Path $output 'checks.json'))){throw 'Person performance UI evidence missing'}
+          Get-Content (Join-Path $output 'checks.json')
       - name: Save rendered previews in a temporary draft
         if: always()
         shell: pwsh

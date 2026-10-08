@@ -116,9 +116,16 @@ public sealed partial class DownloadService
     }
     public async Task<DownloadItem> Add(string source,string folder,MediaItem? media=null,string? imageUrl=null,SourceEntry? release=null)
     {
+        var requestedAfterClose=closeRequested;
         await gate.WaitAsync();
         try {
-            if(closeRequested){lifetime.Dispose();lifetime=new();closeRequested=false;}
+            if(closeRequested)
+            {
+                // Explicit reuse after Close is supported by the core, but an
+                // older queued click must never reopen an engine during exit.
+                if(!requestedAfterClose)throw new OperationCanceledException(lifetime.Token);
+                lifetime.Dispose();lifetime=new();closeRequested=false;
+            }
             source=source.Trim();
             string name="Получение метаданных…";
             string identity;
