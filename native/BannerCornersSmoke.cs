@@ -25,7 +25,7 @@ public partial class MainWindow
             FrameworkElement root=element;
             while(VisualTreeHelper.GetParent(root) is FrameworkElement ancestor)root=ancestor;
             var detached=parent?.Child==element;
-            var container=new ContainerVisual();var contained=false;
+            var scene=new ContainerVisual();var container=new ContainerVisual();scene.Children.Add(container);var contained=false;
             try
             {
                 // A nested Grid's visual offset remains part of a direct or brush
@@ -40,7 +40,7 @@ public partial class MainWindow
                 // detached. Cancel the observed offset in the capture container;
                 // the artwork's own clip and rendering remain unchanged.
                 container.Offset=-offset;container.Children.Add(element);contained=true;
-                bitmap.Render(container);return bitmap;
+                bitmap.Render(scene);return bitmap;
             }
             finally
             {
