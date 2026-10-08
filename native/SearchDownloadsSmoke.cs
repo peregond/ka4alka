@@ -49,9 +49,10 @@ public partial class MainWindow
         foreach(var person in searchedPeople)await File.WriteAllTextAsync(Path.Combine(peopleFolder,SearchFixtureKey(person.Name)+".portrait.json"),System.Text.Json.JsonSerializer.Serialize(searchedPortraitUrl));
         var searchPortraitFolder=Path.Combine(Preferences.DataDir,"portraits");Directory.CreateDirectory(searchPortraitFolder);
         var searchPortrait=new RenderTargetBitmap(20,30,96,96,PixelFormats.Pbgra32);var searchDrawing=new DrawingVisual();using(var context=searchDrawing.RenderOpen())context.DrawRectangle(Brushes.Teal,null,new Rect(0,0,20,30));searchPortrait.Render(searchDrawing);
-        var searchPortraitEncoder=new PngBitmapEncoder();searchPortraitEncoder.Frames.Add(BitmapFrame.Create(searchPortrait));using(var file=File.Create(Path.Combine(searchPortraitFolder,SearchFixtureKey(searchedPortraitUrl)+".img")))searchPortraitEncoder.Save(file);
+        var searchPortraitEncoder=new PngBitmapEncoder();searchPortraitEncoder.Frames.Add(BitmapFrame.Create(searchPortrait));using var searchPortraitBytes=new MemoryStream();searchPortraitEncoder.Save(searchPortraitBytes);
+        var searchPortraitData=searchPortraitBytes.ToArray();await File.WriteAllBytesAsync(Path.Combine(searchPortraitFolder,SearchFixtureKey(searchedPortraitUrl)+".img"),searchPortraitData);
         var namesakePortraitUrl="https://kino-teatr.ua/public/main/persons/person-search-smoke.jpg";
-        using(var file=File.Create(Path.Combine(searchPortraitFolder,SearchFixtureKey(namesakePortraitUrl)+".img")))searchPortraitEncoder.Save(file);
+        await File.WriteAllBytesAsync(Path.Combine(searchPortraitFolder,SearchFixtureKey(namesakePortraitUrl)+".img"),searchPortraitData);
         string NamesakeBiography(CinemaPerson person)=>"Проверочная биография отдельного профиля: "+person.ProfileUrl;
         foreach(var namesake in new[]{namesakeOne,namesakeTwo})
         {
