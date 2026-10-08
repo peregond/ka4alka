@@ -1,4 +1,4 @@
-"""Read-only evidence about metadata exposed by two actual public Zona films.
+"""Read-only evidence about metadata exposed by actual public Zona titles.
 
 This diagnostic does not infer a private upstream provider from a rating label
 or a CDN filename. It saves selected public facts, never headers or raw HTML.
@@ -20,6 +20,7 @@ OUTPUT = pathlib.Path('test-output/zona-metadata-source')
 FILMS = [
     ('Курьер / Runner (2026)', 'https://w6.zona.plus/movies/kurer-2026'),
     ('До последнего грамма / The Weight (2026)', 'https://w6.zona.plus/movies/do-poslednego-gramma'),
+    ('Укрытие / Silo (2023)', 'https://w6.zona.plus/tvseries/ukrytie-2023'),
 ]
 VOID = {'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr'}
 
@@ -163,6 +164,27 @@ def evidence(label, requested, final, text, status, redirects):
             'interpretation': 'Public labels and mirrored image filenames alone do not prove the private upstream provider.'}
 
 
+def catalog_list(value):
+    result = {'type': type(value).__name__}
+    if isinstance(value, list):
+        entries = value[:5]
+    elif isinstance(value, dict):
+        result['fields'] = sorted(value)[:12]
+        entries = list(value.values())[:5]
+    else:
+        return result
+    result['items'] = []
+    for entry in entries:
+        if isinstance(entry, dict):
+            selected = {'fields': sorted(entry)[:12]}
+            selected.update({key: clean(str(entry[key]), 100) for key in ['id', 'i', 'name', 'name_rus', 'name_eng', 'text']
+                             if key in entry and isinstance(entry[key], (str, int, float))})
+            result['items'].append(selected)
+        elif isinstance(entry, (str, int, float)):
+            result['items'].append(clean(str(entry), 100))
+    return result
+
+
 def json_evidence(label, requested, final, data, status, redirects):
     """Whitelist public metadata fields from the historical keyless JSON route."""
     result = {'film': label, 'requestedUrl': requested, 'finalUrl': public_url(final, requested),
@@ -171,11 +193,12 @@ def json_evidence(label, requested, final, data, status, redirects):
         result['error'] = 'JSON is not a metadata object'
         return result
     result['rootFields'] = sorted(data)[:40]
+    result['catalogLists'] = {key: catalog_list(data[key]) for key in ['genres', 'countries'] if key in data}
     movie = data.get('movie', data.get('serial'))
     if isinstance(movie, dict):
         result['movieFields'] = sorted(movie)[:50]
         result['movie'] = {key: clean(str(movie[key]), 180) for key in
-                           ['id', 'name_rus', 'name_original', 'name_eng', 'year', 'rating', 'rating_kinopoisk', 'rating_imdb', 'kinopoisk_id', 'imdb_id']
+                           ['id', 'name_id', 'name_rus', 'name_original', 'name_eng', 'year', 'rating', 'rating_kinopoisk', 'rating_imdb', 'kinopoisk_id', 'imdb_id', 'serial', 'country_id', 'genreId']
                            if key in movie and isinstance(movie[key], (str, int, float))}
         result['descriptionCharacters'] = len(str(movie.get('description', '')))
         result['images'] = [{key: uri} for key in ['image', 'cover']
@@ -196,7 +219,7 @@ def json_evidence(label, requested, final, data, status, redirects):
                 for key in ['name', 'name_rus', 'name_original', 'name_eng']:
                     if isinstance(person.get(key), str):
                         facts[key] = clean(person[key], 150)
-                for key in ['id', 'kinopoisk_id', 'imdb_id']:
+                for key in ['id', 'i', 'kinopoisk_id', 'imdb_id']:
                     if isinstance(person.get(key), (str, int)) and re.fullmatch(r'(?:nm)?\d{1,12}', str(person[key])):
                         facts[key] = str(person[key])
                 for key in ['cover', 'image', 'url', 'page', 'link']:
@@ -205,6 +228,8 @@ def json_evidence(label, requested, final, data, status, redirects):
                 for key in ['description', 'biography']:
                     if isinstance(person.get(key), str):
                         facts[key + 'Characters'] = len(person[key])
+                if isinstance(person.get('r'), (str, int, float)):
+                    facts['sourceField_r'] = clean(str(person['r']), 100)
                 selected[role].append(facts)
         result['people'] = selected
     result['interpretation'] = 'Public Zona JSON metadata does not itself disclose the upstream provider or a documented external API.'
