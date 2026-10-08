@@ -68,6 +68,24 @@ public sealed class LiveCatalog(SourceClient client)
         var key=Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(item.PageUrl!)));
         var cache=System.IO.Path.Combine(Preferences.DataDir,"details",key+".json");
         static string ValidScore(string value)=>Regex.IsMatch(value,@"^\d{1,2}([.,]\d)?$")&&double.TryParse(value.Replace(',','.'),NumberStyles.Float,CultureInfo.InvariantCulture,out var score)&&score is >0 and <=10?value:"—";
+        MediaItem? saved=null;
+        try
+        {
+            if(new FileInfo(cache).Length<=4*1024*1024)
+            {
+                var snapshot=JsonSerializer.Deserialize<DetailSnapshot>(await CacheFiles.ReadAllTextAsync(cache,ct));
+                if(snapshot!=null)
+                {
+                    var restored=item with{Kinopoisk=ValidScore(snapshot.Kinopoisk),Imdb=ValidScore(snapshot.Imdb),Description=snapshot.Description,OriginalTitle=snapshot.OriginalTitle,Genre=snapshot.Genre,Country=snapshot.Country,GenreKeys=snapshot.GenreKeys??[],CountryKeys=snapshot.CountryKeys??[],People=snapshot.People??[],Collections=snapshot.Collections??[]};
+                    if(MediaMetadata.Useful(restored))saved=MediaMetadata.Merge(item,restored);
+                }
+            }
+        }
+        catch(Exception error) when(error is IOException or UnauthorizedAccessException or JsonException or ArgumentException){}
+        // Complete recent pages can be opened immediately, including offline.
+        // Partial older snapshots are retained as fallback while missing fields
+        // are retried against the source.
+        if(saved!=null&&MediaMetadata.HasFullDetails(saved)&&DateTime.UtcNow-File.GetLastWriteTimeUtc(cache)<TimeSpan.FromHours(6))return saved;
         try
         {
             var bytes=await client.Read(SourceClient.WebUri(item.PageUrl!),4*1024*1024,ct);
@@ -79,13 +97,14 @@ public sealed class LiveCatalog(SourceClient client)
             HtmlNode[] Links(string prefix)=>(h.DocumentNode.SelectNodes("//a[contains(@href,'/filter/"+prefix+"-')]")??new HtmlNodeCollection(null)).ToArray();
             string[] Keys(string prefix)=>Links(prefix).Select(n=>n.GetAttributeValue("href","").Split("/filter/"+prefix+"-")[1]).Distinct().ToArray();
             var result=item with{Kinopoisk=Score("entity-rating-kp"),Imdb=Score("entity-rating-imdb"),Description=Text(h.DocumentNode.SelectSingleNode("//*[@itemprop='description' and not(self::meta)]")),OriginalTitle=original.Length==0?null:original,Genre=string.Join(", ",genres),Country=string.Join(", ",Links("country").Select(InlineText).Where(x=>x.Length>0).Distinct()),GenreKeys=Keys("genre"),CountryKeys=Keys("country"),People=CinemaMetadata.People(bytes),Collections=CinemaMetadata.Collections(bytes)};
+            if(!MediaMetadata.Useful(result))throw new InvalidDataException("Источник вернул страницу без сведений о фильме.");
+            result=MediaMetadata.Merge(saved??item,result);
             try{System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(cache)!);await CacheFiles.WriteAllTextAsync(cache,JsonSerializer.Serialize(new DetailSnapshot(result.Kinopoisk,result.Imdb,result.Description??"",result.OriginalTitle,result.Genre,result.Country,result.GenreKeys,result.CountryKeys,result.People,result.Collections)),ct);}catch(System.IO.IOException){}
             return result;
         }
-        catch(Exception) when(!ct.IsCancellationRequested&&System.IO.File.Exists(cache))
+        catch(Exception) when(!ct.IsCancellationRequested&&saved!=null)
         {
-            var saved=JsonSerializer.Deserialize<DetailSnapshot>(await CacheFiles.ReadAllTextAsync(cache,ct))!;
-            return item with{Kinopoisk=ValidScore(saved.Kinopoisk)=="—"?item.Kinopoisk:saved.Kinopoisk,Imdb=ValidScore(saved.Imdb)=="—"?item.Imdb:saved.Imdb,Description=saved.Description,OriginalTitle=saved.OriginalTitle??item.OriginalTitle,Genre=saved.Genre,Country=saved.Country,GenreKeys=saved.GenreKeys??[],CountryKeys=saved.CountryKeys??[],People=saved.People??item.People,Collections=saved.Collections??item.Collections};
+            return saved;
         }
     }
     public async Task<PersonProfile> Person(CinemaPerson person,CancellationToken ct,MediaItem? origin=null,IEnumerable<MediaItem>? known=null)

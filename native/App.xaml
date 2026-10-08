@@ -85,6 +85,25 @@
     </ControlTemplate>
    </Setter.Value></Setter>
   </Style>
+  <Style x:Key="FeatureBannerButton" TargetType="Button" BasedOn="{StaticResource PosterButton}">
+   <Setter Property="Template"><Setter.Value>
+    <ControlTemplate TargetType="Button">
+     <Grid>
+      <Border x:Name="Frame" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="16" Padding="{TemplateBinding Padding}">
+       <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}" TextElement.Foreground="{TemplateBinding Foreground}"/>
+      </Border>
+      <Border x:Name="HoverRing" CornerRadius="16" BorderBrush="{DynamicResource Edge}" BorderThickness="1" Visibility="Collapsed" IsHitTestVisible="False"/>
+      <Border x:Name="FocusRing" CornerRadius="16" BorderBrush="{DynamicResource Accent}" BorderThickness="2" Visibility="Collapsed" IsHitTestVisible="False"/>
+     </Grid>
+     <ControlTemplate.Triggers>
+      <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Frame" Property="Background" Value="{DynamicResource Hover}"/><Setter TargetName="HoverRing" Property="Visibility" Value="Visible"/></Trigger>
+      <Trigger Property="IsPressed" Value="True"><Setter TargetName="Frame" Property="Background" Value="{DynamicResource Selected}"/></Trigger>
+      <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="FocusRing" Property="Visibility" Value="Visible"/></Trigger>
+      <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Frame" Property="Opacity" Value="0.42"/></Trigger>
+     </ControlTemplate.Triggers>
+    </ControlTemplate>
+   </Setter.Value></Setter>
+  </Style>
   <Style x:Key="PillButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
    <Setter Property="Background" Value="Transparent"/><Setter Property="BorderBrush" Value="{DynamicResource EdgeSoft}"/><Setter Property="MinHeight" Value="34"/><Setter Property="Padding" Value="12,7"/><Setter Property="Margin" Value="0,0,6,6"/>
    <Setter Property="Template"><Setter.Value>

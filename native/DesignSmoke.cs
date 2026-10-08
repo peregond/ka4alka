@@ -163,6 +163,7 @@ public partial class MainWindow
             if(!VisualElements<Border>(Body).Any(x=>x.Name=="PosterQualityBadge"&&x.IsVisible))throw new Exception("Known quality badge is missing.");
             if(ActualWidth<1700||ActualHeight<900||FiltersPanel.Visibility!=Visibility.Visible||inlineCatalogFilterScroll?.Parent!=FilterControls||discoveryHero is not {ActualHeight:>180}||discoveryHero.Children.Count!=2||discoveryShelf is not {ActualWidth:>500})throw new Exception($"Cinematic desktop catalog is missing its banners, curated row or right filters ({ActualWidth}x{ActualHeight}, rail={FiltersPanel.Visibility}, hero={discoveryHero?.ActualHeight}, shelf={discoveryShelf?.ActualWidth}).");
             if(VisualElements<UIElement>(Body).Any(x=>x.Effect!=null))throw new Exception("Cinematic catalog adds an expensive blur or shadow effect.");
+            var bannerCornerChecks=CheckBannerCorners(output);
             var featurePosterWidths=VisualElements<Image>(discoveryHero!).Select(x=>(x.Source as BitmapSource)?.PixelWidth??0).ToArray();
             var movies=liveItems;
             section="Сериалы";liveItems=catalogPages["Сериалы|sort-date|1"].Items;liveKey=CurrentCatalogKey;
@@ -226,10 +227,10 @@ public partial class MainWindow
             current=shortMovie;Render();await Settle();
             var descriptionButton=FindVisual<Button>(Body,x=>x.Name=="DescriptionToggle")??throw new Exception("Short description: expansion control is missing.");
             if(!descriptionButton.IsVisible||descriptionButton.ActualWidth<=0)throw new Exception("Short description: clipped text cannot be expanded at 510 px.");
-            if(detailSynopsis==null||detailSynopsis.MaxHeight>60.1)throw new Exception("Short description: fixture did not start in its collapsed state.");
+            if(detailSynopsis==null||detailSynopsis.MaxHeight>80.1)throw new Exception("Short description: fixture did not start in its collapsed state.");
             descriptionButton.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Settle();
             var expandedSynopsis=detailSynopsis??throw new Exception("Short description: synopsis disappeared after expansion.");
-            if(!double.IsPositiveInfinity(expandedSynopsis.MaxHeight)||expandedSynopsis.ActualHeight<=60||expandedSynopsis.Text!=shortDescription)
+            if(!double.IsPositiveInfinity(expandedSynopsis.MaxHeight)||expandedSynopsis.ActualHeight<=80||expandedSynopsis.Text!=shortDescription)
                 throw new Exception("Short description: expansion did not reveal the complete text beyond 60 px.");
             var shortDescriptionExpandedHeight=Math.Round(expandedSynopsis.ActualHeight);
             FindVisual<ScrollViewer>(Body,_=>true)?.ScrollToTop();await Settle();Shot("short-description-expanded");

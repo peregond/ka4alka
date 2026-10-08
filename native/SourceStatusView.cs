@@ -20,7 +20,8 @@ public partial class MainWindow
     void RetryReleases(MediaItem item)
     {
         if(releaseViews.TryGetValue(item.Id,out var view)&&view.Checking)return;
-        onlineIndex.RetryNow();requestedDetails.Remove(item.Id);RefreshDetail(item.Id);
+        onlineIndex.RetryNow();if(DetailMetadataNeedsRetry(item.Id))_ = FetchDetailMetadata(item,true);
+        requestedDetails.Remove(item.Id);RefreshDetail(item.Id);
     }
     void RefreshDetail(int id)
     {

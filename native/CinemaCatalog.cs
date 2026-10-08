@@ -69,9 +69,15 @@ public partial class MainWindow
     }
     Button FeatureBanner(MediaItem item,bool primary)
     {
-        var frame=new Border{CornerRadius=new(16),BorderThickness=new(1),ClipToBounds=true};
-        frame.SetResourceReference(Border.BorderBrushProperty,"Edge");frame.SizeChanged+=(_,_)=>ClipPoster(frame);
-        var grid=new Grid();frame.Child=grid;
+        var frame=new Border{Name="FeatureFrame",CornerRadius=new(16),BorderThickness=new(1)};
+        frame.SetResourceReference(Border.BackgroundProperty,"PanelAlt");frame.SetResourceReference(Border.BorderBrushProperty,"Edge");
+        var grid=new Grid{Name="FeatureArtwork"};frame.Child=grid;
+        // Clip the artwork to the inside of the border, keeping its rounded stroke intact.
+        grid.SizeChanged+=(_,e)=>
+        {
+            if(e.NewSize.Width<=0||e.NewSize.Height<=0)return;
+            var clip=new RectangleGeometry(new Rect(e.NewSize),15,15);clip.Freeze();grid.Clip=clip;
+        };
         var image=new Image{DataContext=item,Width=0,Height=0,Opacity=0,Tag="FeaturePoster"};image.Loaded+=SourceCover;image.DataContextChanged+=SourceCoverChanged;image.Loaded+=async(_,_)=>await ImproveFeaturePoster(image,item);grid.Children.Add(image);
         var picture=new ImageBrush{Stretch=Stretch.UniformToFill,AlignmentX=AlignmentX.Center,AlignmentY=AlignmentY.Top};
         BindingOperations.SetBinding(picture,ImageBrush.ImageSourceProperty,new Binding("Source"){Source=image});
@@ -88,7 +94,7 @@ public partial class MainWindow
         foreach(var label in VisualElements<TextBlock>(actionLabel))label.Foreground=Brushes.White;
         foreach(var glyph in VisualElements<System.Windows.Shapes.Path>(actionLabel))glyph.Stroke=Brushes.White;
         action.Child=actionLabel;content.Children.Add(action);
-        var button=new Button{Content=frame,Tag=item,Style=(Style)FindResource("PosterButton"),Padding=new(0),Margin=new(0),HorizontalContentAlignment=HorizontalAlignment.Stretch,VerticalContentAlignment=VerticalAlignment.Stretch,ToolTip="Открыть «"+item.Title+"»"};
+        var button=new Button{Content=frame,Tag=item,Style=(Style)FindResource("FeatureBannerButton"),Padding=new(0),Margin=new(0),HorizontalContentAlignment=HorizontalAlignment.Stretch,VerticalContentAlignment=VerticalAlignment.Stretch,ToolTip="Открыть «"+item.Title+"»"};
         System.Windows.Automation.AutomationProperties.SetName(button,"Открыть "+item.Title);
         button.Click+=OpenCard;return button;
     }

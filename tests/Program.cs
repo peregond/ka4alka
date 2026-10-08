@@ -46,6 +46,7 @@ if(args.Contains("--probe-public"))
  return;
 }
 if(args.Contains("--verify-cinema-source")){await CinemaSourceTests.Run();return;}
+if(args.Contains("--metadata-only")){await MediaMetadataTests.Run();return;}
 await CacheStorageTests.Run(root);
 if(args.Contains("--cache-only"))return;
 DownloadTests.Run();
@@ -60,6 +61,7 @@ await SharedCatalogTests.Run();
 await UnifiedSearchTests.Run();
 if(args.Contains("--catalog-only"))return;
 await ReleaseSearchTests.Run();
+await MediaMetadataTests.Run();
 await UXReliabilityTests.Run(root);
 await WindowsIntegrationTests.Run();
 await MagnetDiscoveryTests.Run(root);

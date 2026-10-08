@@ -33,6 +33,9 @@ public partial class MainWindow
 
     async Task FetchDetails(MediaItem item)
     {
+        // Movie information has its own request and lifetime; source retries or
+        // cancellation must not discard a completed description and credits.
+        var detailTask=FetchDetailMetadata(item);
         if(!releaseViews.TryGetValue(item.Id,out var view))releaseViews[item.Id]=view=new();
         view.Request?.Cancel();view.Request?.Dispose();var request=view.Request=new CancellationTokenSource();var token=request.Token;
         var prior=view.Sources.GroupBy(x=>x.Name).ToDictionary(x=>x.Key,x=>x.Last().LastSuccessUtc);
@@ -59,24 +62,7 @@ public partial class MainWindow
         }
         IndexRows(saved,SourceState.Saved);checks["Онлайн-индекс"]=Remember(new("Онлайн-индекс",SourceState.Searching));view.Sources=checks.Values.ToArray();
         await Task.Yield();if(!IsCurrent())return;
-        async Task<MediaItem> Resolve()
-        {
-            try
-            {
-                var detail=await Metadata(item,true);
-                if(IsCurrent())
-                {
-                    item.SetScores(detail.Kinopoisk,detail.Imdb);detail.SetScores(detail.Kinopoisk,detail.Imdb);
-                    liveItems=liveItems.Select(x=>x.Id==detail.Id?detail:x).ToArray();if(current?.Id==item.Id)current=detail;
-                    if(prefs.LiveFavorites.Any(x=>x.Id==detail.Id)){prefs.LiveFavorites=prefs.LiveFavorites.Select(x=>x.Id==detail.Id?detail:x).ToList();prefs.Save();}
-                    try{await catalogIndex.AddAsync([detail],token);}catch(IOException){}catch(UnauthorizedAccessException){}
-                    RefreshDetail(item.Id);
-                }
-                return detail;
-            }
-            catch{return item;}
-        }
-        var detailTask=Resolve();var entered=false;
+        var entered=false;
         try
         {
             await releaseSlots.WaitAsync(token);entered=true;
