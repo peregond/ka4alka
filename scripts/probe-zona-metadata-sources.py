@@ -163,11 +163,65 @@ def evidence(label, requested, final, text, status, redirects):
             'interpretation': 'Public labels and mirrored image filenames alone do not prove the private upstream provider.'}
 
 
+def json_evidence(label, requested, final, data, status, redirects):
+    """Whitelist public metadata fields from the historical keyless JSON route."""
+    result = {'film': label, 'requestedUrl': requested, 'finalUrl': public_url(final, requested),
+              'status': status, 'redirects': redirects, 'returnedFormat': 'JSON'}
+    if not isinstance(data, dict):
+        result['error'] = 'JSON is not a metadata object'
+        return result
+    result['rootFields'] = sorted(data)[:40]
+    movie = data.get('movie', data.get('serial'))
+    if isinstance(movie, dict):
+        result['movieFields'] = sorted(movie)[:50]
+        result['movie'] = {key: clean(str(movie[key]), 180) for key in
+                           ['id', 'name_rus', 'name_original', 'name_eng', 'year', 'rating', 'rating_kinopoisk', 'rating_imdb', 'kinopoisk_id', 'imdb_id']
+                           if key in movie and isinstance(movie[key], (str, int, float))}
+        result['descriptionCharacters'] = len(str(movie.get('description', '')))
+        result['images'] = [{key: uri} for key in ['image', 'cover']
+                            if isinstance(movie.get(key), str) and (uri := public_url(movie[key], final))]
+    persons = data.get('persons')
+    if isinstance(persons, dict):
+        result['personRoles'] = sorted(persons)[:20]
+        selected = {}
+        for role in ['actors', 'actor', 'director', 'directors', 'cinematographer', 'cinematographers', 'operator', 'operators', 'scenarist']:
+            people = persons.get(role)
+            if not isinstance(people, list):
+                continue
+            selected[role] = []
+            for person in people[:5]:
+                if not isinstance(person, dict):
+                    continue
+                facts = {'fields': sorted(person)[:25]}
+                for key in ['name', 'name_rus', 'name_original', 'name_eng']:
+                    if isinstance(person.get(key), str):
+                        facts[key] = clean(person[key], 150)
+                for key in ['id', 'kinopoisk_id', 'imdb_id']:
+                    if isinstance(person.get(key), (str, int)) and re.fullmatch(r'(?:nm)?\d{1,12}', str(person[key])):
+                        facts[key] = str(person[key])
+                for key in ['cover', 'image', 'url', 'page', 'link']:
+                    if isinstance(person.get(key), str) and (uri := public_url(person[key], final)):
+                        facts[key] = uri
+                for key in ['description', 'biography']:
+                    if isinstance(person.get(key), str):
+                        facts[key + 'Characters'] = len(person[key])
+                selected[role].append(facts)
+        result['people'] = selected
+    result['interpretation'] = 'Public Zona JSON metadata does not itself disclose the upstream provider or a documented external API.'
+    return result
+
+
 def probe(film):
-    label, url = film
+    label, url, mode = film
     redirects = Redirects()
     try:
-        request = urllib.request.Request(url, headers={'User-Agent': 'Kachalka/0.34'})
+        headers = {'User-Agent': 'Kachalka/0.34'}
+        if mode == 'JSON/XMLHttpRequest':
+            # Public open-source Kodi client uses these ordinary content-
+            # negotiation headers on the same detail URL; no key or login.
+            headers.update({'Accept': 'application/json, text/javascript, */*; q=0.01',
+                            'X-Requested-With': 'XMLHttpRequest'})
+        request = urllib.request.Request(url, headers=headers)
         deadline = time.monotonic() + 25
         with urllib.request.build_opener(redirects).open(request, timeout=12) as response:
             chunks, size = [], 0
@@ -183,10 +237,16 @@ def probe(film):
                 chunks.append(chunk)
             raw = b''.join(chunks)
             text = raw.decode(response.headers.get_content_charset() or 'utf-8', errors='replace')
-            return evidence(label, url, response.url, text, response.status, redirects.hops)
+            if text.lstrip().startswith(('{', '[')):
+                result = json_evidence(label, url, response.url, json.loads(text), response.status, redirects.hops)
+            else:
+                result = evidence(label, url, response.url, text, response.status, redirects.hops)
+                result['returnedFormat'] = 'HTML'
+            result.update(requestedRepresentation=mode, responseContentType=clean(response.headers.get('Content-Type', ''), 100))
+            return result
     except Exception as error:
         result = {'film': label, 'requestedUrl': url, 'redirects': redirects.hops,
-                  'errorType': type(error).__name__, 'error': clean(str(error), 300)}
+                  'requestedRepresentation': mode, 'errorType': type(error).__name__, 'error': clean(str(error), 300)}
         if isinstance(error, urllib.error.HTTPError):
             result.update(status=error.code, finalUrl=public_url(error.url, url))
         return result
@@ -195,7 +255,7 @@ def probe(film):
 if __name__ == '__main__':
     OUTPUT.mkdir(parents=True, exist_ok=True)
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
-        results = list(pool.map(probe, FILMS))
+        results = list(pool.map(probe, [(label, url, mode) for label, url in FILMS for mode in ['HTML', 'JSON/XMLHttpRequest']]))
     for result in results:
         print(json.dumps(result, ensure_ascii=False), flush=True)
     (OUTPUT / 'evidence.json').write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding='utf-8')
