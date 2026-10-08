@@ -96,6 +96,8 @@ public class Preferences
     public string DownloadSort {get;set;}="newest";
     public bool Economy {get;set;}=true;
     public bool AutoResumeDownloads {get;set;}=true;
+    public bool AutoRecoverDownloads {get;set;}=true;
+    public bool NotifyDownloads {get;set;}=true;
     public bool CheckForUpdates {get;set;}=true;
     public bool AutoUpdate {get;set;}=true;
     public bool HidePoorQuality {get;set;}=true;
@@ -164,6 +166,9 @@ public class DownloadItem : INotifyPropertyChanged
     public DateTime LastStartedUtc {get;set;}
     public bool Busy {get;set;}
     public bool Paused {get;set;}=true;
+    public bool LowSpacePaused {get;set;}
+    public string SpacePauseMessage {get;set;}="";
+    public bool SpaceCheckFailed {get;set;}
     [JsonIgnore] public bool Completed=>Progress>=100;
     public string Action => Paused?"Продолжить":"Пауза";
     public event PropertyChangedEventHandler? PropertyChanged;

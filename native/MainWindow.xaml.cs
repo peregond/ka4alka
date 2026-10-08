@@ -37,8 +37,9 @@ public partial class MainWindow:Window
         EnableAdaptiveLayout();
         EnableShortcuts();
         try{downloads=new(null,prefs.MaxDownloadKbps,prefs.MaxUploadKbps);}catch(Exception e){downloads=newEmpty(prefs.MaxDownloadKbps,prefs.MaxUploadKbps);Status.Text="Не удалось прочитать очередь: "+e.Message;}
+        InitializeDownloadReliability();
         foreach(var name in new[]{"Фильмы","Сериалы"}) { var n=name;var b=ActionButton(n,n=="Фильмы"?"IconMovies":"IconSeries",()=>ShowCatalogSection(n),"NavButton");b.Tag=n;b.ToolTip=n;b.HorizontalContentAlignment=HorizontalAlignment.Left;b.Margin=new(0,0,0,5);Navigation.Children.Add(b); }
-        refresh.Tick+=(_,_)=>{downloads.Update();RefreshDownloadView();SyncTimer();};
+        refresh.Tick+=(_,_)=>RefreshDownloadsReliably();
         ContentRendered+=async(_,_)=>{if(!prefs.AutoResumeDownloads||downloads.PendingResumeCount==0)return;Status.Text="Продолжаем загрузки…";var resumed=await downloads.ResumePendingAsync();Status.Text=resumed>0?$"Продолжено загрузок: {resumed}":"Не удалось продолжить загрузки. Проверь очередь.";if(!closed){SyncTimer();if(section=="Загрузки")Render();}};
         StateChanged+=(_,_)=>SyncTimer();searchDelay.Tick+=(_,_)=>{searchDelay.Stop();if(section is "Фильмы" or "Сериалы"){current=null;Render();}};
         Closing+=OnClosing;ready=true;ApplyTheme();ApplyCompactLayout();Render();
@@ -131,7 +132,7 @@ public partial class MainWindow:Window
         var p=new StackPanel{Margin=new Thickness(24)};dialog.Content=new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=p,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};var title=Text("Добавить загрузку",23);title.FontWeight=FontWeights.SemiBold;p.Children.Add(title);p.Children.Add(Text("Вставь magnet-ссылку или выбери файл .torrent.",13,true));var input=new TextBox{Margin=new(0,8,0,18)};p.Children.Add(input);dialog.ContentRendered+=(_,_)=>input.Focus();
         p.Children.Add(Text("Папка загрузки: "+prefs.Folder+". Изменить её можно в настройках.",12,true));
         var error=Text("",12);var actions=new WrapPanel();
-        async Task Add(string source){try{await downloads.Add(source.Trim(),prefs.Folder);dialog.Close();section="Загрузки";current=null;Render();Status.Text="Раздача добавлена. Ищем участников.";}catch(Exception ex){error.Text=ex.Message;}}
+        async Task Add(string source){if(closing||closed)return;try{var added=await downloads.Add(source.Trim(),prefs.Folder);if(closing||closed)return;dialog.Close();section="Загрузки";current=null;Render();Status.Text=added.LowSpacePaused?added.SpacePauseMessage:"Раздача добавлена. Ищем участников.";}catch(Exception)when(closing||closed){}catch(Exception ex){error.Text=ex.Message;}}
         var start=AsyncButton("Начать загрузку",()=>Add(input.Text));start.Style=(Style)FindResource("PrimaryButton");start.IsDefault=true;actions.Children.Add(start);actions.Children.Add(AsyncButton("Выбрать .torrent",async()=>{var f=new OpenFileDialog{Filter="BitTorrent (*.torrent)|*.torrent"};if(f.ShowDialog(dialog)==true)await Add(f.FileName);}));p.Children.Add(actions);p.Children.Add(error);p.Children.Add(Text("После скачивания клиент продолжает раздачу. Нажми «Пауза», чтобы остановить её.",12,true));dialog.ShowDialog();
     }
     async void ToggleDownload(object sender,RoutedEventArgs e){try{await downloads.Toggle((DownloadItem)((Button)sender).Tag);}catch(Exception ex){Status.Text=ex.Message;}finally{SyncTimer();}}
@@ -156,7 +157,7 @@ public partial class MainWindow:Window
     {
         if(closed)return;e.Cancel=true;if(closing)return;closing=true;
         DiagnosticLog.Write("closing",new{QueueCount=downloads.Items.Count});Status.Text="Сохраняем загрузки и закрываем приложение…";
-        IsEnabled=false;personRequest?.Cancel();updateCancellation.Cancel();catalogRefreshTimer.Stop();refresh.Stop();searchDelay.Stop();liveRequest?.Cancel();sourceRequest?.Cancel();archiveRequest?.Cancel();broadcastRequest?.Cancel();
+        IsEnabled=false;StopDownloadReliability();personRequest?.Cancel();updateCancellation.Cancel();catalogRefreshTimer.Stop();refresh.Stop();searchDelay.Stop();liveRequest?.Cancel();sourceRequest?.Cancel();archiveRequest?.Cancel();broadcastRequest?.Cancel();
         ResetDiscoveryData();CancelDetailMetadata();CancelCatalogQualityCheck();CancelPeopleSearch();foreach(var view in releaseViews.Values)view.Request?.Cancel();
         bool saved=false;
         try{prefs.Save();await downloads.Close();saved=true;DiagnosticLog.Write("closed",new{QueueSaved=true});}

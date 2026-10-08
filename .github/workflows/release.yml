@@ -5,21 +5,21 @@ on:
       version:
         description: Version matching native/Kachalka.csproj
         required: true
-        default: '0.34.0'
+        default: '0.35.0'
   push:
-    branches: [release/0.34.0]
+    branches: [release/0.35.0]
     paths: [.github/workflows/release.yml, 'native/**', 'update-core/**', 'updater/**', 'update-tests/**', 'tests/**', 'installer/**', build-release.ps1, package-release.ps1]
 permissions:
   contents: write
 concurrency:
-  group: kachalka-release-0.34.0
+  group: kachalka-release-0.35.0
   cancel-in-progress: false
 jobs:
   release:
     runs-on: windows-latest
     timeout-minutes: 25
     env:
-      RELEASE_VERSION: ${{ inputs.version || '0.34.0' }}
+      RELEASE_VERSION: ${{ inputs.version || '0.35.0' }}
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
     steps:
       - uses: actions/checkout@v4
@@ -64,12 +64,12 @@ jobs:
         run: |
           $env:KACHALKA_DATA=Join-Path $env:RUNNER_TEMP 'kachalka-cinema-smoke'
           $output=Join-Path $pwd 'test-output/cinema-ui'
-          $process=Start-Process dist/Kachalka-0.34/Kachalka.exe -ArgumentList @('--cinema-smoke-test',$output) -PassThru
+          $process=Start-Process dist/Kachalka-0.35/Kachalka.exe -ArgumentList @('--cinema-smoke-test',$output) -PassThru
           if(-not $process.WaitForExit(60000)){$process.Kill();throw 'Person card UI smoke timed out'}
           if($process.ExitCode -ne 0 -or (Test-Path "$output/error.txt") -or -not (Test-Path "$output/checks.json")){throw 'Person card UI smoke failed'}
-      - name: Verify upgrade from previously published 0.33.0
+      - name: Verify upgrade from previously published 0.34.0
         shell: pwsh
-        run: ./tests/WindowsPublishedUpgrade.ps1 -FromVersion 0.33.0 -ReleaseDirectory ('dist/release-'+$env:RELEASE_VERSION)
+        run: ./tests/WindowsPublishedUpgrade.ps1 -FromVersion 0.34.0 -ReleaseDirectory ('dist/release-'+$env:RELEASE_VERSION)
       - name: Upload verified files to draft GitHub Release
         shell: pwsh
         env:
@@ -114,6 +114,13 @@ jobs:
             Copy-Item $source $target
             $previews+=$target
           }
+          foreach($name in @('diagnostics-wide-dark','diagnostics-wide-light','diagnostics-narrow-dark','diagnostics-narrow-light','notification-settings-dark','notification-settings-light')){
+            $source=Join-Path 'test-output/download-reliability' ($name+'.png')
+            if(-not(Test-Path $source)){throw ('Missing download reliability preview: '+$name)}
+            $target=Join-Path $env:RUNNER_TEMP ('preview-'+$name+'.png')
+            Copy-Item $source $target
+            $previews+=$target
+          }
           # Review-only assets; removed before the public release is published.
           gh release upload ('v'+$env:RELEASE_VERSION) @previews --clobber
           if($LASTEXITCODE -ne 0){throw 'Cannot attach rendered review previews'}
@@ -125,6 +132,8 @@ jobs:
           path: |
             test-output/transfer-*/portrait-source/*
             test-output/cache-reliability/*
+            test-output/download-reliability/*
+            test-output/person-performance/*
             test-output/cinema-ui/*
             test-output/cinema-source/*
             test-output/cinema-source-diagnostics/*
@@ -141,27 +150,3 @@ jobs:
             test-output/published-upgrade/checks.txt
             test-output/published-upgrade/data/updates/*/result.txt
             test-output/windows-update/data/updates/*/result.txt
-      - name: Publish authorized release and verify anonymous download
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          $version=$env:RELEASE_VERSION
-          $tag='v'+$version
-          $latest=gh release view --json tagName | ConvertFrom-Json
-          if($LASTEXITCODE -eq 0 -and $latest.tagName -match '^v(\d+\.\d+\.\d+)$' -and [Version]$Matches[1] -ge [Version]$version){throw 'A release at or above this version is already latest; do not downgrade'}
-          $release=gh release view $tag --json assets,isDraft | ConvertFrom-Json
-          if($LASTEXITCODE -ne 0 -or -not $release.isDraft){throw 'Expected verified draft release'}
-          foreach($asset in $release.assets | Where-Object {$_.name.StartsWith('preview-')}){
-            gh release delete-asset $tag $asset.name --yes
-            if($LASTEXITCODE -ne 0){throw 'Cannot remove temporary review image'}
-          }
-          gh release edit $tag --draft=false --latest
-          if($LASTEXITCODE -ne 0){throw 'Cannot publish release'}
-          $public=Join-Path $env:RUNNER_TEMP 'anonymous-release'
-          New-Item -ItemType Directory -Force $public | Out-Null
-          foreach($name in @('latest.json','latest.sig','Kachalka-win-x64.zip','SHA256SUMS.txt')){
-            Invoke-WebRequest "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$tag/$name" -OutFile (Join-Path $public $name) -TimeoutSec 180
-            if((Get-FileHash (Join-Path $public $name)).Hash -ne (Get-FileHash (Join-Path ('dist/release-'+$version) $name)).Hash){throw ('Anonymous download differs: '+$name)}
-          }
-          "Published https://github.com/$env:GITHUB_REPOSITORY/releases/tag/$tag with verified anonymous downloads." >> $env:GITHUB_STEP_SUMMARY

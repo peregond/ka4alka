@@ -1,7 +1,7 @@
 name: Native UI preview
 on:
   push:
-    branches: [codex/ui-actions-0.29.2]
+    branches: [codex/download-reliability-0.35.0]
     paths: ['native/**', 'tests/**', '.github/workflows/ui-preview.yml']
   workflow_dispatch:
 permissions:
@@ -39,6 +39,25 @@ jobs:
             throw ('Native UI preview evidence missing; exit code '+$app.ExitCode)
           }
           Get-Content (Join-Path $output 'design.json')
+      - name: Render and validate download diagnostics and notification settings
+        shell: pwsh
+        run: |
+          $output=Join-Path $PWD 'test-output/ui-preview/render'
+          $app=Start-Process (Join-Path $PWD 'dist/ui-preview/Kachalka.exe') -ArgumentList @('--download-reliability-smoke-test',('"'+$output+'"')) -PassThru
+          if(-not $app.WaitForExit(45000)){$app.Kill($true);throw 'Download reliability UI timed out'}
+          if(Test-Path (Join-Path $output 'error.txt')){throw (Get-Content (Join-Path $output 'error.txt') -Raw)}
+          if($app.ExitCode -ne 0 -or -not(Test-Path (Join-Path $output 'checks.json'))){throw 'Download reliability UI evidence missing'}
+          Get-Content (Join-Path $output 'checks.json')
+          Get-Content (Join-Path $output 'download-diagnostics-checks.json')
+      - name: Verify UI input during actor photo and biography loading
+        shell: pwsh
+        run: |
+          $output=Join-Path $PWD 'test-output/ui-preview/person-performance'
+          $app=Start-Process (Join-Path $PWD 'dist/ui-preview/Kachalka.exe') -ArgumentList @('--person-performance-smoke-test',('"'+$output+'"')) -PassThru
+          if(-not $app.WaitForExit(45000)){$app.Kill($true);throw 'Person performance UI timed out'}
+          if(Test-Path (Join-Path $output 'error.txt')){throw (Get-Content (Join-Path $output 'error.txt') -Raw)}
+          if($app.ExitCode -ne 0 -or -not(Test-Path (Join-Path $output 'checks.json'))){throw 'Person performance UI evidence missing'}
+          Get-Content (Join-Path $output 'checks.json')
       - name: Save rendered previews in a temporary draft
         if: always()
         shell: pwsh
