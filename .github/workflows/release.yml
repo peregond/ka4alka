@@ -39,7 +39,7 @@ jobs:
         run: ./tests/PublishedSiteProbe.ps1
       - name: Install NSIS
         run: ./scripts/install-nsis.ps1
-      - name: Validate Windows installation and update
+      - name: Validate redesigned catalog, saved navigation, themes and Windows update
         shell: pwsh
         run: |
           try { ./tests/WindowsUpdateSmoke.ps1 }
