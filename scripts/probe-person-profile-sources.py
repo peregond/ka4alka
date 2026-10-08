@@ -2,6 +2,7 @@ import json
 import pathlib
 import re
 import urllib.request
+import urllib.parse
 from concurrent.futures import ThreadPoolExecutor
 from html.parser import HTMLParser
 
@@ -10,6 +11,8 @@ class Markup(HTMLParser):
     def __init__(self):
         super().__init__()
         self.forms, self.inputs, self.scripts, self.images, self.links = [], [], [], [], []
+        self.metadata, self.headings = [], []
+        self.active_heading = None
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
@@ -23,6 +26,19 @@ class Markup(HTMLParser):
             self.images.append({k: attrs.get(k) for k in ['src', 'alt', 'class']})
         elif tag == 'a' and re.search(r'/person/|/name/|/persons|/search|/actor', attrs.get('href', '')):
             self.links.append(attrs.get('href'))
+        elif tag == 'meta' and attrs.get('property') in ['og:title', 'og:image', 'og:description']:
+            self.metadata.append(attrs)
+        if tag in ['h1', 'h2', 'h3']:
+            self.active_heading = {'tag': tag, 'attrs': attrs, 'text': ''}
+            self.headings.append(self.active_heading)
+
+    def handle_endtag(self, tag):
+        if tag in ['h1', 'h2', 'h3']:
+            self.active_heading = None
+
+    def handle_data(self, data):
+        if self.active_heading is not None:
+            self.active_heading['text'] += data.strip()[:160]
 
 
 def probe(url):
@@ -42,7 +58,11 @@ def probe(url):
             (output / (slug + '.html')).write_text(text, encoding='utf-8')
             evidence = {'url': url, 'finalUrl': response.url, 'status': response.status, 'bytes': len(data),
                         'forms': parser.forms, 'inputs': parser.inputs, 'scripts': parser.scripts,
-                        'images': parser.images[:12], 'personLinks': list(dict.fromkeys(parser.links))[:15]}
+                        'images': parser.images[:12], 'personLinks': list(dict.fromkeys(parser.links))[:15],
+                        'profileLinks': list(dict.fromkeys(link for link in parser.links if '/person/' in link))[:20],
+                        'metadata': parser.metadata, 'headings': parser.headings[:8],
+                        'structure': [text[max(0, match.start()-180):match.end()+220] for match in
+                                      list(re.finditer(r'person_films|biography|itemprop|Waugh|Режисс[её]р|Акт[её]р|Гонка|Жажда скорости', text))[:8]]}
             print(json.dumps(evidence, ensure_ascii=False))
             return evidence
     except Exception as error:
@@ -51,8 +71,10 @@ def probe(url):
         return evidence
 
 
-urls = ['https://kino-teatr.ua/persons.phtml', 'https://kino-teatr.ua/person/Waugh-Scott-6293.phtml',
-        'https://www.kinoafisha.info/person/8386748/', 'https://api.tvmaze.com/search/people?q=Scott%20Waugh']
+urls = ['https://kino-teatr.ua/person/Waugh-Scott-6293.phtml',
+        'https://kino-teatr.ua/person_films/waugh-scott-6293.phtml'] + [
+            'https://kino-teatr.ua/ru/main/persons/order_by/fio.asc.phtml?lastname=' + urllib.parse.quote(name)
+            for name in ['Во', 'Холланд', 'Кэмерон', 'Фергюсон']]
 with ThreadPoolExecutor(max_workers=4) as pool:
     results = list(pool.map(probe, urls))
 pathlib.Path('test-output/person-profile-source/responses.json').write_text(json.dumps(results, ensure_ascii=False), encoding='utf-8')
