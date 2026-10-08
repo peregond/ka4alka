@@ -1,0 +1,21 @@
+name: Inspect free participant profile sources
+on:
+  push:
+    branches: [codex/person-cards-0.34]
+    paths: [scripts/probe-person-profile-sources.py, .github/workflows/person-profile-source.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  profiles:
+    runs-on: windows-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read public profile markup
+        run: python -X utf8 scripts/probe-person-profile-sources.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: person-profile-source
+          path: test-output/person-profile-source/*
