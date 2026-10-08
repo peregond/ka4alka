@@ -1,6 +1,5 @@
 using System.Collections.ObjectModel;
 using System.Windows;
-using System.Windows.Automation;
 using System.Windows.Controls;
 namespace Kachalka;
 
@@ -41,15 +40,6 @@ public partial class MainWindow
         var frame=PersonPanel(content,name+"Card");frame.Margin=new(0,0,0,20);
         var view=new PersonGalleryView(frame,rows);grid.Tag=view;
         grid.SizeChanged+=(_,_)=>view.Resize(grid.ActualWidth);
-        grid.ItemContainerGenerator.StatusChanged+=(_,_)=>
-        {
-            if(grid.ItemContainerGenerator.Status!=System.Windows.Controls.Primitives.GeneratorStatus.ContainersGenerated)return;
-            Dispatcher.BeginInvoke(new Action(()=>
-            {
-                foreach(var button in VisualElements<Button>(grid).Where(button=>button.Tag is MediaItem))
-                    AutomationProperties.SetName(button,"Открыть "+((MediaItem)button.Tag).Title);
-            }),System.Windows.Threading.DispatcherPriority.Loaded);
-        };
         grid.Loaded+=(_,_)=>view.Resize(grid.ActualWidth);
         return view;
     }

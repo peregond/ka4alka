@@ -28,6 +28,7 @@ public partial class MainWindow
             if(bounds.Left<-.5||bounds.Right>Body.ActualWidth+1)throw new Exception("Person page overflows horizontally: "+element.Name);
         }
         if(FindVisual<Border>(Body,element=>element.Name=="PersonAwardFilmsCard") is {IsVisible:true})throw new Exception("A person with no confirmed awards shows an empty awards section.");
+        if(narrow)AssertPersonFilmGrid();
     }
 
     void AssertPersonFilmGrid(int minimumCount=2)
@@ -39,7 +40,8 @@ public partial class MainWindow
         foreach(var button in VisualElements<Button>(gallery).Where(button=>button.Tag is MediaItem))
         {
             var film=(MediaItem)button.Tag;
-            if(AutomationProperties.GetName(button)!="Открыть "+film.Title)throw new Exception("Filmography tile lost its named navigation action.");
+            var expected="Открыть "+film.Title;var actual=AutomationProperties.GetName(button);
+            if(actual!=expected)throw new Exception($"Filmography tile lost its named navigation action: expected='{expected}', actual='{actual}', dataContext={button.DataContext?.GetType().Name??"null"}, loaded={button.IsLoaded}.");
             var poster=FindVisual<Border>(button,element=>element.Name=="CardPoster")??throw new Exception("Filmography must use catalog poster cards.");
             if(poster.ActualWidth<1||Math.Abs(poster.ActualHeight-poster.ActualWidth*1.5)>1.5)throw new Exception("Filmography poster does not keep the catalog aspect ratio.");
             if(poster.Clip is not RectangleGeometry{RadiusX:>0,RadiusY:>0})throw new Exception("Filmography poster artwork is not clipped to rounded corners.");

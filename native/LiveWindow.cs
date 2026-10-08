@@ -392,7 +392,7 @@ public partial class MainWindow
         detailDescription.Margin=narrow?new(0,16,0,0):new(0);detailTitle.FontSize=narrow?22:28;
         if(detailMetaRow!=null&&detailRatings!=null)
         {
-            var stack=detailInfo.ActualWidth>0&&detailInfo.ActualWidth<360;
+            var stack=detailInfo.ActualWidth>0&&detailInfo.ActualWidth<300;
             Grid.SetColumn(detailRatings,stack?0:1);Grid.SetRow(detailRatings,stack?1:0);Grid.SetColumnSpan(detailRatings,stack?2:1);
             detailRatings.HorizontalAlignment=stack?HorizontalAlignment.Left:HorizontalAlignment.Right;detailRatings.Margin=stack?new(-6,8,0,0):new(0);
         }
