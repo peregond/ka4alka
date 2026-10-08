@@ -5,12 +5,14 @@ using System.Windows.Automation;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
+using System.Windows.Threading;
 using System.IO;
 using FilePath=System.IO.Path;
 namespace Kachalka;
 
 public partial class MainWindow
 {
+    readonly Dictionary<string,BitmapImage> portraitCache=[];
     Border PersonPortrait(CinemaPerson person,double width,double height,MediaItem? origin=null)
     {
         var grid=new Grid();var fallback=new StackPanel{HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center,IsHitTestVisible=false};
@@ -24,6 +26,7 @@ public partial class MainWindow
         frame.SetResourceReference(Border.BackgroundProperty,"PanelAlt");frame.SetResourceReference(Border.BorderBrushProperty,"EdgeSoft");frame.SizeChanged+=(_,_)=>ClipPoster(frame);
         CancellationTokenSource? request=null;bool attempted=false;string? portraitPath=null;
         Button? portraitOwner=null;bool cancelledByUnload=false;
+        DispatcherOperation? visibleCheck=null;DateTime nextCacheTouch=DateTime.MinValue;
         var scrollers=new List<ScrollViewer>();
         bool InViewport()
         {
@@ -55,7 +58,8 @@ public partial class MainWindow
                 {
                     try
                     {
-                        var portrait=await new CinemaPeople(sourceClient).ResolvePortrait(person,pending.Token,origin,forceRefresh:force&&attempt==0);
+                        var refresh=force&&attempt==0;
+                        var portrait=await Task.Run(()=>new CinemaPeople(sourceClient).ResolvePortrait(person,pending.Token,origin,forceRefresh:refresh),pending.Token);
                         var url=portrait.Url;
                         if(url==null)
                         {
@@ -65,12 +69,19 @@ public partial class MainWindow
                         else
                         {
                             var key=Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(url)));portraitPath=FilePath.Combine(Preferences.DataDir,"portraits",key+".img");
+                            var pixels=(int)Math.Ceiling(width*2);var memoryKey=key+":"+pixels;
+                            if(!force&&portraitCache.TryGetValue(memoryKey,out var cached))
+                            {
+                                if(image.IsLoaded&&!pending.IsCancellationRequested){image.Source=cached;fallback.Visibility=Visibility.Collapsed;frame.ToolTip=person.Name;}
+                                return;
+                            }
                             await coverSlots.WaitAsync(pending.Token);
                             try
                             {
                                 using var download=CancellationTokenSource.CreateLinkedTokenSource(pending.Token);download.CancelAfter(TimeSpan.FromSeconds(12));
                                 var (bitmap,_)=await CoverCache.Load(portraitPath,2*1024*1024,
-                                    ct=>sourceClient.Read(new Uri(url),2*1024*1024,ct),bytes=>{using var stream=new MemoryStream(bytes);var result=new BitmapImage();result.BeginInit();result.CacheOption=BitmapCacheOption.OnLoad;result.DecodePixelWidth=(int)Math.Ceiling(width*2);result.StreamSource=stream;result.EndInit();result.Freeze();return result;},download.Token);
+                                    ct=>sourceClient.Read(new Uri(url),2*1024*1024,ct),bytes=>{using var stream=new MemoryStream(bytes);var result=new BitmapImage();result.BeginInit();result.CacheOption=BitmapCacheOption.OnLoad;result.DecodePixelWidth=pixels;result.StreamSource=stream;result.EndInit();result.Freeze();return result;},download.Token);
+                                if(portraitCache.Count>=48)portraitCache.Remove(portraitCache.Keys.First());portraitCache[memoryKey]=bitmap;
                                 if(image.IsLoaded&&!pending.IsCancellationRequested){image.Source=bitmap;fallback.Visibility=Visibility.Collapsed;frame.ToolTip=person.Name;}
                                 return;
                             }
@@ -96,14 +107,24 @@ public partial class MainWindow
                     if(cancelledByUnload&&pending.IsCancellationRequested)
                     {
                         attempted=false;
-                        if(image.IsLoaded)_=Dispatcher.BeginInvoke(new Action(VisiblePhoto));
+                        if(image.IsLoaded)SchedulePhoto();
                     }
                 }
             }
         }
-        void VisiblePhoto(){if(portraitPath!=null&&InViewport())CacheFiles.Touch(portraitPath);_ = LoadPhoto();}
-        void Scrolled(object sender,ScrollChangedEventArgs args)=>VisiblePhoto();
-        void ViewportResized(object sender,SizeChangedEventArgs args)=>VisiblePhoto();
+        void VisiblePhoto()
+        {
+            visibleCheck=null;
+            if(portraitPath!=null&&InViewport()&&DateTime.UtcNow>=nextCacheTouch)
+            {
+                nextCacheTouch=DateTime.UtcNow.AddMinutes(10);var path=portraitPath;
+                _=Task.Run(()=>CacheFiles.Touch(path));
+            }
+            _ = LoadPhoto();
+        }
+        void SchedulePhoto(){if(visibleCheck==null)visibleCheck=Dispatcher.BeginInvoke(DispatcherPriority.Background,new Action(VisiblePhoto));}
+        void Scrolled(object sender,ScrollChangedEventArgs args)=>SchedulePhoto();
+        void ViewportResized(object sender,SizeChangedEventArgs args)=>SchedulePhoto();
         image.Loaded+=(_,_)=>
         {
             for(DependencyObject? parent=VisualTreeHelper.GetParent(image);parent!=null;parent=VisualTreeHelper.GetParent(parent))
@@ -111,10 +132,10 @@ public partial class MainWindow
                 if(portraitOwner==null&&parent is Button button)portraitOwner=button;
                 if(parent is ScrollViewer scroll){scrollers.Add(scroll);scroll.ScrollChanged+=Scrolled;scroll.SizeChanged+=ViewportResized;}
             }
-            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded,new Action(VisiblePhoto));
+            SchedulePhoto();
         };
-        image.SizeChanged+=(_,_)=>VisiblePhoto();
-        image.Unloaded+=(_,_)=>{cancelledByUnload=true;request?.Cancel();attempted=false;foreach(var scroll in scrollers){scroll.ScrollChanged-=Scrolled;scroll.SizeChanged-=ViewportResized;}scrollers.Clear();};
+        image.SizeChanged+=(_,_)=>SchedulePhoto();
+        image.Unloaded+=(_,_)=>{visibleCheck?.Abort();visibleCheck=null;cancelledByUnload=true;request?.Cancel();attempted=false;foreach(var scroll in scrollers){scroll.ScrollChanged-=Scrolled;scroll.SizeChanged-=ViewportResized;}scrollers.Clear();};
         return frame;
     }
 }

@@ -12,7 +12,8 @@ public partial class MainWindow
         int columns=1;
         public void Update(MediaItem[] items)
         {
-            films=items;Reflow();
+            var unchanged=films.Length==items.Length&&films.Zip(items).All(pair=>SameFilm(pair.First,pair.Second));
+            films=items;if(!unchanged)Reflow();
         }
         public void Resize(double width)
         {
