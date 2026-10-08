@@ -24,8 +24,7 @@ public partial class MainWindow
         var featureKey=section+"||1";
         var popular=catalogPages.TryGetValue(featureKey,out var page)&&page.Items.Length>0&&!featuredFallback.Contains(section);
         var picks=(popular?page!.Items.AsEnumerable():cards.OrderByDescending(CatalogScore)).Where(x=>!NoDownloads(x)).ToArray();
-        foreach(var item in picks)ApplyKnownQuality(item);
-        if(prefs.HidePoorQuality)picks=picks.Where(x=>!x.OnlyPoorQuality).ToArray();
+        picks=picks.Where(CatalogQualityMatches).ToArray();
         if(picks.Length==0)picks=cards;
         discoveryHero=new Grid{Margin=new(0,0,8,20)};
         discoveryHero.ColumnDefinitions.Add(new(){Width=new GridLength(1.8,GridUnitType.Star)});

@@ -74,14 +74,15 @@ public sealed class CatalogIndex
         catch(IOException){return null;}catch(JsonException){return null;}catch(UnauthorizedAccessException){return null;}
     }
 
-    public async Task CacheReleasesAsync(MediaItem item,IReadOnlyList<SourceEntry> releases,IReadOnlyList<SourceCheck>? sources=null)
+    public async Task CacheReleasesAsync(MediaItem item,IReadOnlyList<SourceEntry> releases,IReadOnlyList<SourceCheck>? sources=null,CancellationToken ct=default)
     {
         if(!Valid(item)||releases.Count==0&&!ReleaseAvailability.ConfirmedEmpty(releases,sources))return;
-        await writer.WaitAsync();
+        await writer.WaitAsync(ct);
         try
         {
+            ct.ThrowIfCancellationRequested();
             var file=ReleasePath(item);Directory.CreateDirectory(Path.GetDirectoryName(file)!);
-            await CacheFiles.WriteAllTextAsync(file,JsonSerializer.Serialize(new ReleaseCache(DateTime.UtcNow,releases.Take(300).ToArray(),sources?.ToArray()),new JsonSerializerOptions{IgnoreReadOnlyProperties=true}));
+            await CacheFiles.WriteAllTextAsync(file,JsonSerializer.Serialize(new ReleaseCache(DateTime.UtcNow,releases.Take(300).ToArray(),sources?.ToArray()),new JsonSerializerOptions{IgnoreReadOnlyProperties=true}),ct);
             Revision++;
         }
         finally{writer.Release();}

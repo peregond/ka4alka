@@ -39,7 +39,7 @@ public partial class MainWindow
             MinWidth=1000;MinHeight=720;Width=1000;Height=720;Left=0;Top=0;
             section="Фильмы";current=null;Search.Clear();submittedQuery="";searchCategory="";favoritesOnly=false;ResetCatalogFilters();liveKey=CurrentCatalogKey;Render();await Task.Delay(200);UpdateLayout();
             foreach(var popupAnimation in new[]{PopupAnimation.None,PopupAnimation.Fade})
-            foreach(var label in new[]{"Подборка","Жанр","Страна","Рейтинг от","Год выхода","Порядок","Минимальное качество"})
+            foreach(var label in new[]{"Подборка","Жанр","Страна","Рейтинг от","Год выхода","Порядок","Качество каталога"})
             {
                 var owner=FindVisual<Button>(RootGrid,b=>AutomationProperties.GetName(b)==label)??throw new Exception("Missing menu "+label);
                 owner.BringIntoView();await Task.Delay(80);UpdateLayout();

@@ -161,7 +161,8 @@ public partial class MainWindow
                 if(badge.HorizontalAlignment!=HorizontalAlignment.Left||badge.VerticalAlignment!=VerticalAlignment.Top||badge.Parent is not Grid poster||poster.Children.OfType<Image>().Count()!=1)throw new Exception("Quality badge is not on the poster's top-left corner.");
             }
             if(!VisualElements<Border>(Body).Any(x=>x.Name=="PosterQualityBadge"&&x.IsVisible))throw new Exception("Known quality badge is missing.");
-            if(ActualWidth<1700||ActualHeight<900||FiltersPanel.Visibility!=Visibility.Visible||inlineCatalogFilterScroll?.Parent!=FilterControls||discoveryHero is not {ActualHeight:>180}||discoveryHero.Children.Count!=2||discoveryShelf is not {ActualWidth:>500})throw new Exception($"Cinematic desktop catalog is missing its banners, curated row or right filters ({ActualWidth}x{ActualHeight}, rail={FiltersPanel.Visibility}, hero={discoveryHero?.ActualHeight}, shelf={discoveryShelf?.ActualWidth}).");
+            CheckCatalogFilterLine((ok,message)=>{if(!ok)throw new Exception(message);},"cinematic-desktop");
+            if(ActualWidth<1700||ActualHeight<900||discoveryHero is not {ActualHeight:>180}||discoveryHero.Children.Count!=2||discoveryShelf is not {ActualWidth:>500})throw new Exception($"Cinematic desktop catalog is missing its banners or curated row ({ActualWidth}x{ActualHeight}, hero={discoveryHero?.ActualHeight}, shelf={discoveryShelf?.ActualWidth}).");
             if(VisualElements<UIElement>(Body).Any(x=>x.Effect!=null))throw new Exception("Cinematic catalog adds an expensive blur or shadow effect.");
             var bannerCornerChecks=CheckBannerCorners(output);
             var featurePosterWidths=VisualElements<Image>(discoveryHero!).Select(x=>(x.Source as BitmapSource)?.PixelWidth??0).ToArray();

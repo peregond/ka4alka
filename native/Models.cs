@@ -40,13 +40,17 @@ public record MediaItem(int Id, string Title, string Section, string Genre, int 
     [JsonIgnore] public string Scores => liveScores ?? (Cinema ? $"КП {Kinopoisk}   IMDb {Imdb}" : Section);
     public event PropertyChangedEventHandler? PropertyChanged;
     [JsonIgnore] public bool OnlyPoorQuality {get;private set;}
+    HashSet<int> releaseResolutions=[];
+    [JsonIgnore] public IReadOnlySet<int> ReleaseResolutions=>releaseResolutions;
+    public bool HasReleaseResolution(int height)=>releaseResolutions.Contains(ReleaseQuality.CatalogHeight(height));
     public void SetReleaseQuality(IEnumerable<SourceEntry> entries,int minimum=720)
     {
         var rows=entries.ToArray();
         var value=ReleaseQuality.OnlyPoor(rows,minimum);
-        var height=rows.Where(x=>(x.TorrentUrl!=null||x.Source=="Internet Archive")&&!ReleaseQuality.Poor(x,720)).Select(x=>ReleaseQuality.Height(x)??0).DefaultIfEmpty(0).Max();
+        var available=rows.Where(ReleaseQuality.Downloadable).ToArray();
+        releaseResolutions=available.Where(x=>!ReleaseQuality.IsScreen(x)).Select(x=>ReleaseQuality.CatalogHeight(ReleaseQuality.Height(x)??0)).Where(x=>x!=0).ToHashSet();
+        var height=available.Where(x=>!ReleaseQuality.Poor(x,720)).Select(x=>ReleaseQuality.Height(x)??0).DefaultIfEmpty(0).Max();
         var quality=height>=2160?"4K":height>=1080?"Full HD":height>=720?"HD Ready":"";
-        var available=rows.Where(x=>x.TorrentUrl!=null||x.Source=="Internet Archive").ToArray();
         var label=quality.Length>0?quality:available.Length>0&&available.All(ReleaseQuality.IsScreen)?"Экранка":value?"SD":"";
         if(label!=posterQuality){posterQuality=label;PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(PosterQuality)));PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(HasPosterQuality)));}
         if(value!=OnlyPoorQuality){OnlyPoorQuality=value;PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(OnlyPoorQuality)));}
@@ -95,6 +99,7 @@ public class Preferences
     public bool HidePoorQuality {get;set;}=true;
     public bool QualityFilterConfigured {get;set;}
     public int MinimumReleaseHeight {get;set;}=720;
+    public int CatalogQualityHeight {get;set;}
     public HashSet<int> Favorites {get;set;}=[];
     public List<MediaItem> LiveFavorites {get;set;}=[];
     public static string DataDir=>Environment.GetEnvironmentVariable("KACHALKA_DATA") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"Kachalka");
@@ -104,6 +109,7 @@ public class Preferences
         {
             var prefs=JsonSerializer.Deserialize<Preferences>(File.ReadAllText(Path.Combine(DataDir,"settings.json")))??new();
             if(!prefs.QualityFilterConfigured){prefs.HidePoorQuality=true;prefs.QualityFilterConfigured=true;}
+            prefs.CatalogQualityHeight=ReleaseQuality.CatalogHeight(prefs.CatalogQualityHeight);
             return prefs;
         }
         catch{return new(){QualityFilterConfigured=true};}

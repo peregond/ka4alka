@@ -46,7 +46,8 @@ public partial class MainWindow
         Width=1280;Height=800;Render();await Settle();
         Check(liveItems.Count==40&&catalogDisplay.Count==40,"one catalog page displays 40 cards");
         CheckCards("desktop",6);
-        Check(FiltersPanel.Visibility==Visibility.Collapsed&&inlineCatalogFilters!.Children.Contains(topSaved!),"filters share the top pill toolbar with All and Saved");
+        CheckCatalogFilterLine(Check,"desktop");
+        Check(inlineCatalogFilters!.Children.Contains(topSaved!),"catalog filters share one line with All and Saved below search");
         Check(!VisualElements<TextBlock>(PageHeader).Any(x=>x.Text=="Настроить подборку"),"no redundant selection heading");
         var genreMenuButton=FindVisual<Button>(RootGrid,x=>AutomationProperties.GetName(x)=="Жанр")!;
         genreMenuButton.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Task.Delay(100);
@@ -80,14 +81,26 @@ public partial class MainWindow
         Choose("Порядок","По рейтингу");await Settle();Check(catalogDisplay.Select(x=>x.Id).SequenceEqual([2,3,1]),"saved cards sort by real rating");
         ResetCatalogFilters();topAll!.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Settle();Check(Page(2).IsEnabled&&catalogHasNext,"returning from saved cards restores catalog pagination");
         var bitmap=new RenderTargetBitmap((int)ActualWidth,(int)ActualHeight,96,96,PixelFormats.Pbgra32);bitmap.Render(this);var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(bitmap));using(var file=File.Create(Path.Combine(output,"catalog.png")))png.Save(file);
+        MinWidth=1600;Width=1600;Height=950;await Task.Delay(150);UpdateLayout();
+        CheckCatalogFilterLine(Check,"1600-wide");
+        Check(inlineCatalogFilterScroll is {ScrollableWidth:0},"1600-pixel window fits the default filters in one visible line");
         MinWidth=1760;Width=1760;Height=950;await Task.Delay(150);UpdateLayout();
-        Check(FiltersPanel.Visibility==Visibility.Visible&&inlineCatalogFilterScroll?.Parent==FilterControls&&discoveryHero is {ActualHeight:>180},"wide catalog shows cinematic banners and moves the existing filter controls into the right panel");
+        CheckCatalogFilterLine(Check,"wide");
+        Check(discoveryHero is {ActualHeight:>180},"wide catalog retains cinematic banners below the single filter line");
         var wideGenre=FindVisual<Button>(RootGrid,b=>AutomationProperties.GetName(b)=="Жанр")!;
         wideGenre.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Task.Delay(80);UpdateLayout();
-        Check(wideGenre.ContextMenu is {IsOpen:true,ActualHeight:>0},"right panel genre dropdown remains interactive after responsive relocation");wideGenre.ContextMenu!.IsOpen=false;
-        MinWidth=360;Width=680;Height=500;await Task.Delay(150);UpdateLayout();Check(FiltersPanel.Visibility==Visibility.Collapsed&&inlineCatalogFilters?.Visibility==Visibility.Visible,"top filters remain available in narrow windows");
-        Height=360;await Task.Delay(150);UpdateLayout();Check(inlineCatalogFilterScroll is {} filterScroll&&Body.ActualHeight>25&&(filterScroll.ScrollableHeight>0||inlineCatalogFilters!.ActualHeight<=filterScroll.ViewportHeight+1),$"short window keeps all filter choices reachable and retains space for cards (window={ActualHeight}, filters={inlineCatalogFilterScroll?.ActualHeight}, scroll={inlineCatalogFilterScroll?.ScrollableHeight}, cards={Body.ActualHeight})");
-        Width=510;await Task.Delay(150);UpdateLayout();Check(inlineCatalogFilterScroll is {ScrollableHeight:>0}&&Body.ActualHeight>25,"overflowing filter choices scroll in a narrow short window without hiding the catalog");
+        Check(wideGenre.ContextMenu is {IsOpen:true,ActualHeight:>0},"single-line genre dropdown remains interactive after resizing");wideGenre.ContextMenu!.IsOpen=false;
+        MinWidth=360;Width=680;Height=500;await Task.Delay(150);UpdateLayout();CheckCatalogFilterLine(Check,"narrow");
+        Height=360;await Task.Delay(150);UpdateLayout();CheckCatalogFilterLine(Check,"short");
+        Check(Body.ActualHeight>25,"short window preserves space for catalog cards below filters");
+        Width=510;await Task.Delay(150);UpdateLayout();CheckCatalogFilterLine(Check,"narrow-short");
+        Check(inlineCatalogFilterScroll is {ScrollableWidth:>0,ScrollableHeight:0}&&Body.ActualHeight>25,"overflowing filter choices scroll horizontally without adding rows or hiding the catalog");
+        inlineCatalogFilterScroll!.ScrollToRightEnd();await Task.Delay(80);UpdateLayout();
+        var narrowQuality=FindVisual<Button>(RootGrid,b=>AutomationProperties.GetName(b)=="Качество каталога")??throw new Exception("Missing single quality menu in narrow catalog.");
+        var qualityBounds=narrowQuality.TransformToAncestor(inlineCatalogFilterScroll).TransformBounds(new Rect(new Point(),narrowQuality.RenderSize));
+        Check(qualityBounds.Right>0&&qualityBounds.Left<inlineCatalogFilterScroll.ViewportWidth,"horizontal filter scrolling reaches the quality menu");
+        narrowQuality.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Task.Delay(80);UpdateLayout();
+        Check(narrowQuality.ContextMenu is {IsOpen:true,ActualHeight:>0},"quality menu remains usable after horizontal scrolling");narrowQuality.ContextMenu!.IsOpen=false;
         CheckCards("narrow",1);
         MinWidth=1280;Width=1280;Height=800;await Task.Delay(100);UpdateLayout();
         current=rows[0] with{PageUrl=LiveCatalog.Base+"/movies/fixture-one"};requestedDetails.Add(current.Id);prefs.Favorites.Add(current.Id);
@@ -106,6 +119,20 @@ public partial class MainWindow
         await SearchDownloadsSmoke(output,Check);
         await CheckModernQueueVirtualization(output,Check);
         Close();
+    }
+
+    void CheckCatalogFilterLine(Action<bool,string> check,string stage)
+    {
+        check(RootGrid.ColumnDefinitions.Count==2&&FiltersPanel.IsVisible&&ReferenceEquals(FiltersPanel.Parent,HeaderArea)&&Grid.GetRow(FiltersPanel)==1,"catalog filters occupy the header below search without a right column ("+stage+")");
+        check(inlineCatalogFilters is StackPanel {Orientation:Orientation.Horizontal}&&ReferenceEquals(inlineCatalogFilterScroll?.Parent,catalogToolbar)&&ReferenceEquals(catalogToolbar?.Parent,FilterControls),"catalog filters remain one horizontal line ("+stage+")");
+        var searchBounds=SearchBar.TransformToAncestor(RootGrid).TransformBounds(new Rect(new Point(),SearchBar.RenderSize));
+        var filterBounds=FiltersPanel.TransformToAncestor(RootGrid).TransformBounds(new Rect(new Point(),FiltersPanel.RenderSize));
+        check(filterBounds.Top>=searchBounds.Bottom-.5,"catalog filter line sits below the search input ("+stage+")");
+        var buttons=VisualElements<Button>(inlineCatalogFilters!).Where(x=>x.IsVisible).ToArray();
+        var centers=buttons.Select(x=>x.TransformToAncestor(inlineCatalogFilters!).Transform(new Point(0,x.ActualHeight/2)).Y).ToArray();
+        check(buttons.Length>=8&&buttons.All(x=>x.ActualWidth>0&&x.ActualHeight>0)&&centers.Max()-centers.Min()<=2,"catalog buttons share one row with no wrapping ("+stage+")");
+        check(inlineCatalogFilterScroll is {VerticalScrollBarVisibility:ScrollBarVisibility.Disabled,ScrollableHeight:0},"filter overflow does not create vertical scrolling ("+stage+")");
+        check(buttons.Count(x=>AutomationProperties.GetName(x)=="Качество каталога")==1&&!buttons.Any(x=>AutomationProperties.GetName(x) is "Минимальное качество" or "Скрыть плохое качество"),"catalog has one quality dropdown instead of separate quality buttons ("+stage+")");
     }
 
     async Task CheckModernQueueVirtualization(string output,Action<bool,string> check)

@@ -22,6 +22,17 @@ static class ReleaseQualityTests
         Check(!item.HasQuality,"a metadata-only record cannot create a downloadable quality chip");
         item.SetReleaseQuality([Row("Film 720p"),Row("Film 2160p")]);
         Check(item.BestQuality=="4K","catalog selects the highest evidenced downloadable resolution");
+        Check(item.HasReleaseResolution(720)&&item.HasReleaseResolution(2160)&&!item.HasReleaseResolution(1080),"one film can match HD Ready and 4K independently without inventing FullHD");
+        Check(ReleaseQuality.HasResolution([Row("Film 1080p")],1080)&&!ReleaseQuality.HasResolution([Row("Film 2160p")],1080),"catalog resolution choices select available variants rather than a minimum height");
+        Check(!ReleaseQuality.HasResolution([Row("Film HDCAM 2160p"),Row("Film HDTS 720p")],2160)&&!ReleaseQuality.HasResolution([Row("Film HDCAM 2160p"),Row("Film HDTS 720p")],720),"screen recordings never satisfy HD Ready or 4K selections");
+        foreach(var unavailable in new[]{(string?)null,""," ","not-a-torrent","file:///tmp/video.torrent","magnet:?xt=urn:btih:invalid"})
+            Check(!ReleaseQuality.HasResolution([Row("Film 2160p") with{TorrentUrl=unavailable}],2160),"unavailable torrent URL cannot satisfy 4K: "+(unavailable??"null"));
+        Check(!ReleaseQuality.HasResolution([Row("Film WEBRip")],720)&&!ReleaseQuality.HasResolution([Row("Film 1440p")],1080),"unknown and other resolutions cannot be advertised as the selected resolution");
+        Check(ReleaseQuality.Downloadable(Row("Film 4K") with{TorrentUrl="https://downloads.example/film.torrent"})&&!ReleaseQuality.Downloadable(Row("Film 4K") with{TorrentUrl="https://user:password@downloads.example/film.torrent"}),"quality evidence accepts downloadable web links without URL credentials");
+        var archive=Row("Archive film 1080p") with{Source="Internet Archive",TorrentUrl=null,PageUrl="https://archive.org/details/quality-film"};
+        Check(ReleaseQuality.HasResolution([archive],1080)&&!ReleaseQuality.HasResolution([archive with{PageUrl="https://archive.org.attacker.example/details/quality-film"}],1080)&&!ReleaseQuality.HasResolution([archive with{PageUrl="https://archive.org/details/"}],1080),"resolvable Internet Archive entries retain quality evidence only for a valid archive item URL");
+        var copied=item with{Title="Копия"};copied.SetReleaseQuality([Row("Film 1080p")]);
+        Check(item.HasReleaseResolution(720)&&item.HasReleaseResolution(2160)&&!item.HasReleaseResolution(1080)&&copied.HasReleaseResolution(1080),"copying metadata does not let quality updates mutate another movie card");
         item.SetReleaseQuality([Row("Film HDCAM 2160p")]);
         Check(item.PosterQuality=="Экранка"&&item.HasPosterQuality&&!item.HasQuality,"screen capture uses a text poster badge instead of an advertised 4K resolution");
         item.SetReleaseQuality([Row("Film WEB-DL 480p")]);
@@ -42,6 +53,7 @@ static class ReleaseQualityTests
             Check(Preferences.Load().Light,"an explicitly selected light theme survives upgrades");
             var missing=Preferences.Load();
             Check(missing.HidePoorQuality&&missing.MinimumReleaseHeight==1080,"older settings without a quality preference use the enabled default and retain the quality minimum");
+            Check(missing.CatalogQualityHeight==0,"older minimum-quality settings do not silently narrow the catalog to one resolution");
             File.WriteAllText(settings,JsonSerializer.Serialize(new{HidePoorQuality=false,MinimumReleaseHeight=720}));
             var disabled=Preferences.Load();
             Check(disabled.HidePoorQuality&&disabled.QualityFilterConfigured,"upgrading old serialized defaults enables quality filtering once");
@@ -51,6 +63,22 @@ static class ReleaseQualityTests
             disabled.HidePoorQuality=true;disabled.MinimumReleaseHeight=1080;disabled.Save();
             var enabled=Preferences.Load();
             Check(enabled.HidePoorQuality&&enabled.MinimumReleaseHeight==1080,"enabled quality choice and minimum survive saving and reloading");
+            enabled.CatalogQualityHeight=2160;enabled.Save();
+            Check(Preferences.Load() is {CatalogQualityHeight:2160,MinimumReleaseHeight:1080,HidePoorQuality:true},"4K catalog choice persists independently of the existing release minimum and poor-quality flag");
+            enabled.CatalogQualityHeight=720;enabled.HidePoorQuality=false;enabled.Save();
+            Check(Preferences.Load() is {CatalogQualityHeight:720,MinimumReleaseHeight:1080,HidePoorQuality:false},"HD Ready catalog selection and disabled poor-quality option survive reload");
+            enabled.CatalogQualityHeight=0;enabled.Save();
+            Check(Preferences.Load().CatalogQualityHeight==0,"resetting a resolution selection persists the unrestricted catalog");
+            File.WriteAllText(settings,JsonSerializer.Serialize(new{CatalogQualityHeight=9000,MinimumReleaseHeight=1080,QualityFilterConfigured=true}));
+            Check(Preferences.Load() is {CatalogQualityHeight:0,MinimumReleaseHeight:1080},"unsupported saved catalog resolution returns to an unrestricted catalog without losing old preferences");
+            var cachedItem=item with{PageUrl=LiveCatalog.Base+"/movies/quality-tests"};
+            var index=new CatalogIndex(Path.Combine(settingsFolder,"cache"));
+            index.CacheReleasesAsync(cachedItem,[Row("Film 720p"),Row("Film 2160p")],[new("Fixture",SourceState.Ready,2,DateTime.UtcNow,DateTime.UtcNow)]).GetAwaiter().GetResult();
+            var reloaded=new CatalogIndex(Path.Combine(settingsFolder,"cache")).CachedReleaseSnapshot(cachedItem);
+            Check(reloaded is {Items.Length:2}&&ReleaseQuality.HasResolution(reloaded.Items,720)&&ReleaseQuality.HasResolution(reloaded.Items,2160)&&!ReleaseQuality.HasResolution(reloaded.Items,1080),"cached releases retain every evidenced resolution after reopening the app");
+            using var cancelled=new CancellationTokenSource();cancelled.Cancel();var cancelledItem=cachedItem with{Id=2,PageUrl=LiveCatalog.Base+"/movies/quality-cancelled"};
+            var interrupted=false;try{index.CacheReleasesAsync(cancelledItem,[Row("Film 1080p")],ct:cancelled.Token).GetAwaiter().GetResult();}catch(OperationCanceledException){interrupted=true;}
+            Check(interrupted&&index.CachedReleaseSnapshot(cancelledItem)==null,"cancelled quality checks cannot repopulate a cleared cache");
         }
         finally{Environment.SetEnvironmentVariable("KACHALKA_DATA",originalData);}
     }

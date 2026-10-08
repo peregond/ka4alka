@@ -32,6 +32,7 @@ public partial class MainWindow
                 foreach(var page in new[]{"Фильмы","Загрузки","Настройки"})
                 {
                     section=page;current=null;Render();UpdateLayout();
+                    if(page=="Фильмы")CheckCatalogFilterLine((ok,message)=>{if(!ok)throw new Exception(message);},"DPI-"+pixels.Width+"-"+scale);
                     if(ActualWidth>fit.MaxWidth+1||ActualHeight>fit.MaxHeight+1)throw new Exception("Window overflows scaled work area");
                     if(Body.ActualWidth<90||Body.ActualHeight<20)throw new Exception($"{page}: no usable content at {scale*100}%: body {Body.ActualWidth} x {Body.ActualHeight}, header {PageHeader.ActualHeight}, window {ActualWidth} x {ActualHeight}");
                     var lastNavigationBottom=Navigation.TransformToAncestor(SidePanel).Transform(new Point(0,Navigation.ActualHeight)).Y;

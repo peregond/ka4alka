@@ -137,51 +137,39 @@ public partial class MainWindow
     }
     void UpdateFilterRail()
     {
-        var rail=inlineCatalogFilterScroll!=null&&ActualWidth>=1420&&ActualHeight>=560&&current==null&&section is "Фильмы" or "Сериалы";
-        FilterColumn.Width=new GridLength(rail?232:0);
-        FiltersPanel.Visibility=rail?Visibility.Visible:Visibility.Collapsed;
-        CenterRegion.Margin=rail?new Thickness(0,0,16,0):new Thickness(0);
-        if(inlineCatalogFilterScroll==null||catalogToolbar==null)return;
-        if(rail)
+        var visible=inlineCatalogFilterScroll!=null&&catalogToolbar!=null&&current==null&&section is "Фильмы" or "Сериалы";
+        FiltersPanel.Visibility=visible?Visibility.Visible:Visibility.Collapsed;
+        CenterRegion.Margin=new(0);
+        if(!visible||inlineCatalogFilters==null)return;
+        var width=FiltersPanel.ActualWidth>0?FiltersPanel.ActualWidth:Math.Max(1,ActualWidth-(compactWidth?84:226));
+        var compact=width<1100;
+        if(catalogFiltersCompact!=compact)
         {
-            if(inlineCatalogFilterScroll.Parent is Panel parent&&parent!=FilterControls)parent.Children.Remove(inlineCatalogFilterScroll);
-            if(!FilterControls.Children.Contains(inlineCatalogFilterScroll))FilterControls.Children.Insert(0,inlineCatalogFilterScroll);
-            inlineCatalogFilterScroll.VerticalScrollBarVisibility=ScrollBarVisibility.Disabled;
-            inlineCatalogFilterScroll.MaxHeight=double.PositiveInfinity;
-            if(catalogRailPreview!=null&&!FilterControls.Children.Contains(catalogRailPreview))FilterControls.Children.Add(catalogRailPreview);
-            if(catalogRefreshButton!=null)
-            {
-                catalogToolbar.Children.Remove(catalogRefreshButton);
-                if(!FilterControls.Children.Contains(catalogRefreshButton))FilterControls.Children.Insert(1,catalogRefreshButton);
-                catalogRefreshButton.Content=IconLabel("Обновить каталог","IconRefresh");catalogRefreshButton.HorizontalAlignment=HorizontalAlignment.Left;
-            }
-            catalogToolbar.Visibility=Visibility.Collapsed;
+            catalogFiltersCompact=compact;
+            foreach(var (button,caption) in catalogFilterCaptions)
+                button.Content=caption.Icon==null?compact?caption.Compact:caption.Full:IconLabel(compact?caption.Compact:caption.Full,caption.Icon);
         }
-        else
+        foreach(var button in inlineCatalogFilters.Children.OfType<Button>())
         {
-            FilterControls.Children.Remove(inlineCatalogFilterScroll);
-            if(!catalogToolbar.Children.Contains(inlineCatalogFilterScroll))catalogToolbar.Children.Add(inlineCatalogFilterScroll);
-            inlineCatalogFilterScroll.VerticalScrollBarVisibility=ScrollBarVisibility.Auto;
-            if(catalogRefreshButton!=null)
-            {
-                FilterControls.Children.Remove(catalogRefreshButton);
-                if(!catalogToolbar.Children.Contains(catalogRefreshButton))catalogToolbar.Children.Insert(0,catalogRefreshButton);
-                catalogRefreshButton.Content=IconLabel("","IconRefresh");
-            }
-            catalogToolbar.Visibility=Visibility.Visible;
-            var header=PageHeader.ActualHeight-inlineCatalogFilterScroll.ActualHeight;
-            inlineCatalogFilterScroll.MaxHeight=Math.Clamp(CenterRegion.ActualHeight-header-90,40,180);
+            button.HorizontalContentAlignment=HorizontalAlignment.Center;button.MinHeight=34;button.FontSize=compact?12:13;
+            button.Padding=new(compact?9:12,7,compact?9:12,7);button.Margin=new(0,0,6,0);
         }
-        foreach(var button in inlineCatalogFilters!.Children.OfType<Button>())
-        {
-            button.Width=rail?200:double.NaN;button.HorizontalContentAlignment=rail?HorizontalAlignment.Left:HorizontalAlignment.Center;
-            button.MinHeight=rail?40:34;button.Margin=rail?new Thickness(0,0,0,7):new Thickness(0,0,6,6);
-        }
-        foreach(var button in inlineCatalogFilters.Children.OfType<WrapPanel>().SelectMany(x=>x.Children.OfType<Button>()))
-        {
-            button.Width=rail?200:double.NaN;button.HorizontalContentAlignment=rail?HorizontalAlignment.Left:HorizontalAlignment.Center;
-        }
-        UpdateDiscoveryLayout();
+        if(catalogRefreshButton!=null){catalogRefreshButton.Padding=new(9,7,9,7);catalogRefreshButton.Margin=new(0);}
+        UpdateCatalogFilterOverflow();UpdateDiscoveryLayout();
+    }
+    void UpdateCatalogFilterOverflow()
+    {
+        if(inlineCatalogFilterScroll==null||inlineCatalogFilters==null||catalogToolbar==null||catalogFilterBack==null||catalogFilterForward==null)return;
+        var overflow=catalogToolbar.ActualWidth>0&&inlineCatalogFilters.DesiredSize.Width>catalogToolbar.ActualWidth+1;
+        var visibility=overflow?Visibility.Visible:Visibility.Collapsed;
+        catalogFilterBack.Visibility=visibility;catalogFilterForward.Visibility=visibility;
+        catalogFilterBack.IsEnabled=inlineCatalogFilterScroll.HorizontalOffset>1;
+        catalogFilterForward.IsEnabled=inlineCatalogFilterScroll.HorizontalOffset+1<inlineCatalogFilterScroll.ScrollableWidth;
+    }
+    void ScrollCatalogFilters(int direction)
+    {
+        if(inlineCatalogFilterScroll is not {} scroll)return;
+        scroll.ScrollToHorizontalOffset(scroll.HorizontalOffset+direction*Math.Max(160,scroll.ViewportWidth*.65));
     }
     void ShowCatalog(IReadOnlyList<MediaItem> items)
     {

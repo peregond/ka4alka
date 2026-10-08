@@ -54,7 +54,7 @@ public partial class MainWindow
             qualitySnapshots.Remove(item.Id);ApplyKnownQuality(item);if(current?.Id==item.Id)ApplyKnownQuality(current);
             foreach(var card in liveItems.Concat(prefs.LiveFavorites).Concat(catalogDisplay).Where(x=>x.Id==item.Id))ApplyKnownQuality(card);
             RefreshDetail(item.Id);
-            if(!view.Checking&&prefs.HidePoorQuality&&current==null&&(section is "Фильмы" or "Сериалы")&&catalogDisplay.Any(x=>x.Id==item.Id&&x.OnlyPoorQuality))Render();
+            if(!view.Checking&&(prefs.HidePoorQuality||prefs.CatalogQualityHeight!=0)&&current==null&&(section is "Фильмы" or "Сериалы")&&liveItems.Concat(prefs.LiveFavorites).Any(x=>x.Id==item.Id))RenderCatalogKeepingPosition();
         }
         void IndexRows(IEnumerable<SourceEntry> rows,SourceState state)
         {
@@ -88,7 +88,7 @@ public partial class MainWindow
             if(!IsCurrent())return;
             view.Checking=false;Publish();
             // Do not change the cache timestamp when every provider fails. Partial success keeps saved alternatives.
-            if(fresh.Count>0||ReleaseAvailability.ConfirmedEmpty(fresh,result.Sources))try{await catalogIndex.CacheReleasesAsync(item,fresh.Count==0?[]:ReleaseSearch.WithSaved(fresh,saved),result.Sources);}catch(IOException){}catch(UnauthorizedAccessException){}
+            if(fresh.Count>0||ReleaseAvailability.ConfirmedEmpty(fresh,result.Sources))try{await catalogIndex.CacheReleasesAsync(item,fresh.Count==0?[]:ReleaseSearch.WithSaved(fresh,saved),result.Sources,token);}catch(IOException){}catch(UnauthorizedAccessException){}
         }
         catch(OperationCanceledException) when(token.IsCancellationRequested){}
         catch(Exception) when(!token.IsCancellationRequested){checks["Поиск источников"]=new("Поиск источников",SourceState.Unavailable,CheckedUtc:DateTime.UtcNow);}

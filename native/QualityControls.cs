@@ -10,43 +10,154 @@ public partial class MainWindow
     readonly Dictionary<int,ReleaseCache> qualitySnapshots=[];
     SourceEntry[] KnownQuality(MediaItem item)
     {
-        if(releaseViews.TryGetValue(item.Id,out var view))
-        {
-            if(view.Checking)return [];
-            if((view.ReceivedUtc??view.SavedUtc)>DateTime.UtcNow.AddDays(-1)&&liveReleases.TryGetValue(item.Id,out var rows))return rows.ToArray();
-        }
-        if(qualitySnapshots.TryGetValue(item.Id,out var known)&&known.SavedUtc>DateTime.UtcNow.AddDays(-1))return known.Items;
+        qualitySnapshots.TryGetValue(item.Id,out var known);
+        if(releaseViews.TryGetValue(item.Id,out var view)&&
+           (view.ReceivedUtc??view.SavedUtc)>DateTime.UtcNow.AddDays(-7)&&
+           (known==null||(view.ReceivedUtc??view.SavedUtc)>=known.SavedUtc)&&liveReleases.TryGetValue(item.Id,out var rows))return rows.ToArray();
+        if(known?.SavedUtc>DateTime.UtcNow.AddDays(-7))return known.Items;
         var snapshot=catalogIndex.CachedReleaseSnapshot(item);
-        var entries=snapshot?.SavedUtc>DateTime.UtcNow.AddDays(-1)?snapshot.Items:[];
+        var entries=snapshot?.Items??[];
         if(qualitySnapshots.Count>=300)qualitySnapshots.Remove(qualitySnapshots.Keys.First());
-        qualitySnapshots[item.Id]=new(snapshot?.SavedUtc??DateTime.UtcNow,entries);return entries;
+        qualitySnapshots[item.Id]=new(snapshot?.SavedUtc??DateTime.UtcNow,entries,snapshot?.Sources);return entries;
     }
-    void ApplyKnownQuality(MediaItem item)=>item.SetReleaseQuality(KnownQuality(item),QualityMinimum);
+    void ApplyKnownQuality(MediaItem item)=>item.SetReleaseQuality(KnownQuality(item),720);
+    bool CatalogQualityMatches(MediaItem item)
+    {
+        ApplyKnownQuality(item);
+        return (!prefs.HidePoorQuality||!item.OnlyPoorQuality)&&
+            (prefs.CatalogQualityHeight==0||item.HasReleaseResolution(prefs.CatalogQualityHeight));
+    }
+
+    readonly SemaphoreSlim catalogQualitySlots=new(2,2);
+    readonly Dictionary<int,DateTime> catalogQualityAttempts=[];
+    CancellationTokenSource? catalogQualityRequest;
+    string catalogQualityCheckKey="";
+    bool forceCatalogQualityCheck;
+    bool CatalogQualityChecking=>catalogQualityRequest is {IsCancellationRequested:false};
+    void CancelCatalogQualityCheck()
+    {
+        catalogQualityRequest?.Cancel();catalogQualityRequest=null;catalogQualityCheckKey="";
+    }
+    void ResetCatalogQualityChecks()
+    {
+        CancelCatalogQualityCheck();catalogQualityAttempts.Clear();qualitySnapshots.Clear();forceCatalogQualityCheck=true;
+    }
+    bool FreshQuality(MediaItem item)
+    {
+        var now=DateTime.UtcNow;
+        if(releaseViews.TryGetValue(item.Id,out var view)&&(view.ReceivedUtc??view.SavedUtc)>now.AddDays(-1))return true;
+        if(qualitySnapshots.TryGetValue(item.Id,out var memory)&&memory.SavedUtc>now.AddDays(-1)&&memory.Sources is {Length:>0}&&memory.Sources.Any(x=>x.State is SourceState.Ready or SourceState.Empty))return true;
+        return catalogIndex.CachedReleaseSnapshot(item)?.SavedUtc>now.AddDays(-1);
+    }
+    void StartCatalogQualityCheck(IReadOnlyList<MediaItem> currentPage)
+    {
+        if(prefs.CatalogQualityHeight==0||closed||current!=null||activePerson!=null){CancelCatalogQualityCheck();return;}
+        // Only this page is checked. Navigation cancels its work; a render or a
+        // failed provider cannot restart the same request in an endless loop.
+        var items=currentPage.Where(x=>x.IsLive).DistinctBy(x=>x.Id).Take(CatalogPaging.Size).ToArray();
+        var key=CurrentCatalogKey+"|"+favoritesOnly+"|"+prefs.CatalogQualityHeight+"|"+string.Join(',',items.Select(x=>x.Id));
+        if(catalogQualityCheckKey==key)return;
+        CancelCatalogQualityCheck();catalogQualityCheckKey=key;
+        if(items.Length==0||Environment.GetCommandLineArgs().Any(x=>x.EndsWith("-smoke-test",StringComparison.Ordinal)))return;
+        var force=forceCatalogQualityCheck;forceCatalogQualityCheck=false;
+        var pending=items.Where(x=>force||!FreshQuality(x)&&(!catalogQualityAttempts.TryGetValue(x.Id,out var attempted)||attempted<DateTime.UtcNow.AddMinutes(-5))).ToArray();
+        if(pending.Length==0)return;
+        var request=catalogQualityRequest=new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        _ = CheckCatalogQuality(pending,prefs.CatalogQualityHeight,request,key,force);
+    }
+    async Task CheckCatalogQuality(MediaItem[] items,int height,CancellationTokenSource request,string key,bool force)
+    {
+        var token=request.Token;var fallbackBudget=4;
+        bool IsCurrent()=>!closed&&!token.IsCancellationRequested&&ReferenceEquals(catalogQualityRequest,request)&&catalogQualityCheckKey==key&&current==null&&activePerson==null;
+        async Task Check(MediaItem item)
+        {
+            await catalogQualitySlots.WaitAsync(token);
+            try
+            {
+                token.ThrowIfCancellationRequested();
+                if(!force&&FreshQuality(item))return;
+                var saved=KnownQuality(item);var indexed=Array.Empty<SourceEntry>();
+                SourceCheck indexState;
+                using(var deadline=CancellationTokenSource.CreateLinkedTokenSource(token))
+                {
+                    deadline.CancelAfter(TimeSpan.FromSeconds(8));
+                    try
+                    {
+                        indexed=(await onlineIndex.Releases(item,deadline.Token).WaitAsync(deadline.Token)).ToArray();
+                        var now=DateTime.UtcNow;indexState=new("Онлайн-индекс",indexed.Length>0?SourceState.Ready:SourceState.Empty,indexed.Length,now,now);
+                    }
+                    catch(OperationCanceledException)when(token.IsCancellationRequested){throw;}
+                    catch(OperationCanceledException){indexState=new("Онлайн-индекс",SourceState.TimedOut,CheckedUtc:DateTime.UtcNow);}
+                    catch{indexState=new("Онлайн-индекс",SourceState.Unavailable,CheckedUtc:DateTime.UtcNow);}
+                }
+                token.ThrowIfCancellationRequested();
+                var fresh=indexed;var sources=new[]{indexState};
+                if(!ReleaseQuality.HasResolution(ReleaseSearch.WithSaved(indexed,saved),height)&&Interlocked.Decrement(ref fallbackBudget)>=0)
+                {
+                    // A small fallback budget avoids a full multi-tracker source
+                    // scan for every poster, and does not fetch movie metadata.
+                    var providers=NativeReleaseSources.Create(sourceClient,item).Where(x=>x.Name is "RuTor" or "RuTracker · через Knaben");
+                    var fallback=await ReleaseSearch.RunAsync(providers,ct:token,timeout:TimeSpan.FromSeconds(10));
+                    fresh=ReleaseSearch.WithSaved(indexed,fallback.Items);sources=sources.Concat(fallback.Sources).ToArray();
+                }
+                token.ThrowIfCancellationRequested();
+                var rows=ReleaseSearch.WithSaved(fresh,saved);
+                // A limited quality lookup cannot prove that every download
+                // source is empty, or make saved links look newly verified.
+                if(fresh.Length>0)await catalogIndex.CacheReleasesAsync(item,rows,sources,token);
+                if(!IsCurrent())return;
+                var nowChecked=DateTime.UtcNow;
+                if(catalogQualityAttempts.Count>=300)catalogQualityAttempts.Remove(catalogQualityAttempts.Keys.First());
+                catalogQualityAttempts[item.Id]=nowChecked;
+                var evidenceTime=fresh.Length>0||sources.Any(x=>x.State is SourceState.Ready or SourceState.Empty)?nowChecked:
+                    qualitySnapshots.GetValueOrDefault(item.Id)?.SavedUtc??DateTime.MinValue;
+                qualitySnapshots[item.Id]=new(evidenceTime,rows,sources);
+                ApplyKnownQuality(item);
+                if(!VisualElements<Button>(RootGrid).Any(x=>x.ContextMenu?.IsOpen==true))RenderCatalogKeepingPosition();
+            }
+            finally{catalogQualitySlots.Release();}
+        }
+        try{await Task.Yield();await Task.WhenAll(items.Select(Check));}
+        catch(OperationCanceledException)when(token.IsCancellationRequested){}
+        catch(System.IO.IOException){}
+        catch(UnauthorizedAccessException){}
+        catch(Exception error){ErrorLog.Write(error);}
+        finally
+        {
+            var active=ReferenceEquals(catalogQualityRequest,request);
+            if(active)catalogQualityRequest=null;
+            request.Dispose();
+            if(active&&!closed&&current==null&&activePerson==null&&(section is "Фильмы" or "Сериалы")&&!VisualElements<Button>(RootGrid).Any(x=>x.ContextMenu?.IsOpen==true))RenderCatalogKeepingPosition();
+        }
+    }
 
     FrameworkElement CatalogQualityControls(Action changed)
     {
-        var controls=new WrapPanel{VerticalAlignment=VerticalAlignment.Center};
-        void Save(bool hide,int minimum)
+        void Save(bool hide,int height)
         {
-            var oldHide=prefs.HidePoorQuality;var oldMinimum=prefs.MinimumReleaseHeight;
-            prefs.HidePoorQuality=hide;prefs.MinimumReleaseHeight=minimum;
-            try{prefs.Save();}catch(Exception error){prefs.HidePoorQuality=oldHide;prefs.MinimumReleaseHeight=oldMinimum;Status.Text="Не удалось сохранить фильтр: "+error.Message;return;}
-            changed();
+            var oldHide=prefs.HidePoorQuality;var oldHeight=prefs.CatalogQualityHeight;
+            prefs.HidePoorQuality=hide;prefs.CatalogQualityHeight=ReleaseQuality.CatalogHeight(height);
+            try{prefs.Save();}catch(Exception error){prefs.HidePoorQuality=oldHide;prefs.CatalogQualityHeight=oldHeight;Status.Text="Не удалось сохранить фильтр: "+error.Message;return;}
+            CancelCatalogQualityCheck();changed();
         }
-        var toggle=ActionButton("Без плохого качества","IconFilter",()=>Save(!prefs.HidePoorQuality,QualityMinimum),"PillButton");
-        toggle.SetResourceReference(Control.BackgroundProperty,prefs.HidePoorQuality?"Selected":"Panel");
-        toggle.ToolTip=prefs.HidePoorQuality?"Включено: экранки и видео ниже выбранного минимума скрыты. Нажми, чтобы показать.":"Выключено: показываем любое качество. Нажми, чтобы скрыть экранки и видео ниже выбранного минимума.";
-        AutomationProperties.SetName(toggle,"Скрыть плохое качество");AutomationProperties.SetItemStatus(toggle,prefs.HidePoorQuality?"Включён":"Выключен");controls.Children.Add(toggle);
-        var minimum=Button((QualityMinimum==1080?"Full HD":"HD Ready")+" ▾",()=>{});minimum.Style=(Style)FindResource("PillButton");
-        minimum.ToolTip="Минимальное качество: экранки скрываются при любом разрешении. Неизвестное качество остаётся видимым.";
-        AutomationProperties.SetName(minimum,"Минимальное качество");
-        var menu=new ToggleContextMenu{PlacementTarget=minimum,Placement=System.Windows.Controls.Primitives.PlacementMode.Bottom};
-        foreach(var choice in new[]{(Height:720,Label:"HD Ready · от 720p"),(Height:1080,Label:"Full HD · от 1080p")})
+        var label=prefs.CatalogQualityHeight switch{2160=>"Качество · 4K",1080=>"Качество · FullHD",720=>"Качество · HD Ready",_=>"Качество"};
+        var button=ActionButton(label+" ▾","IconFilter",()=>{},"PillButton");
+        button.SetResourceReference(Control.BackgroundProperty,prefs.CatalogQualityHeight!=0||prefs.HidePoorQuality?"Selected":"Panel");
+        button.ToolTip="Показывать фильмы и сериалы с раздачей выбранного разрешения. Экранки не считаются HD или 4K.";
+        AutomationProperties.SetName(button,"Качество каталога");
+        AutomationProperties.SetItemStatus(button,(prefs.HidePoorQuality?"Плохое качество скрыто. ":"")+(prefs.CatalogQualityHeight==0?"Любое разрешение":label));
+        var menu=new ToggleContextMenu{PlacementTarget=button,Placement=System.Windows.Controls.Primitives.PlacementMode.Bottom};
+        menu.SetResourceReference(Control.BackgroundProperty,"Panel");menu.SetResourceReference(Control.ForegroundProperty,"Text");
+        var hide=new MenuItem{Header="Скрывать плохое качество",Tag="hide-poor",IsCheckable=true,IsChecked=prefs.HidePoorQuality};
+        AutomationProperties.SetName(hide,"Скрывать плохое качество");
+        hide.Click+=(_,_)=>{menu.IsOpen=false;Save(!prefs.HidePoorQuality,prefs.CatalogQualityHeight);};menu.Items.Add(hide);menu.Items.Add(new Separator());
+        foreach(var choice in new[]{(Height:0,Label:"Любое качество"),(Height:2160,Label:"4K"),(Height:1080,Label:"FullHD"),(Height:720,Label:"HD Ready")})
         {
-            var option=new MenuItem{Header=choice.Label,Tag=choice.Height,IsCheckable=true,IsChecked=QualityMinimum==choice.Height};
-            option.Click+=(_,_)=>{menu.IsOpen=false;Save(prefs.HidePoorQuality,choice.Height);};menu.Items.Add(option);
+            var option=new MenuItem{Header=choice.Label,Tag=choice.Height,IsCheckable=true,IsChecked=prefs.CatalogQualityHeight==choice.Height};
+            option.ToolTip=choice.Height==0?"Снять ограничение по разрешению":"Есть доступная раздача "+choice.Height+"p";
+            option.Click+=(_,_)=>{menu.IsOpen=false;Save(prefs.HidePoorQuality,prefs.CatalogQualityHeight==choice.Height?0:choice.Height);};menu.Items.Add(option);
         }
-        AttachMenuToggle(minimum,menu);controls.Children.Add(minimum);return controls;
+        AttachMenuToggle(button,menu);return button;
     }
 
     FrameworkElement QualityControls(Action changed)
@@ -55,9 +166,9 @@ public partial class MainWindow
         var hide=new CheckBox{Content="Скрыть плохое качество",IsChecked=prefs.HidePoorQuality,VerticalAlignment=VerticalAlignment.Center,Margin=new(4,6,12,6),ToolTip="Скрывать экранки и видео ниже выбранного минимума. Неизвестное качество остаётся видимым."};
         hide.SetResourceReference(Control.ForegroundProperty,"Text");
         AutomationProperties.SetName(hide,"Скрыть плохое качество");controls.Children.Add(hide);
-        var caption=Text("Минимум",11,true);caption.VerticalAlignment=VerticalAlignment.Center;caption.Margin=new(0,0,6,0);controls.Children.Add(caption);
+        var caption=Text("Качество",11,true);caption.VerticalAlignment=VerticalAlignment.Center;caption.Margin=new(0,0,6,0);controls.Children.Add(caption);
         var minimum=new ComboBox{ItemsSource=new[]{"HD Ready","Full HD"},SelectedIndex=QualityMinimum==1080?1:0,Width=112,MinWidth=0,Margin=new(0,0,8,0),ToolTip="HD Ready — от 720p, Full HD — от 1080p. Экранки считаются плохими при любом разрешении."};
-        AutomationProperties.SetName(minimum,"Минимальное качество");controls.Children.Add(minimum);
+        AutomationProperties.SetName(minimum,"Качество раздач");controls.Children.Add(minimum);
         void Save()
         {
             prefs.HidePoorQuality=hide.IsChecked==true;prefs.MinimumReleaseHeight=minimum.SelectedIndex==1?1080:720;

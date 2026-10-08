@@ -64,7 +64,8 @@ public partial class MainWindow:Window
         if(!ready)return;personRequest?.Cancel();personRequest?.Dispose();personRequest=null;
         if(activePerson!=null&&(current==null||current.Id!=personOrigin?.Id||section!=personSection))activePerson=null;
         if(current==null||section is not ("Фильмы" or "Сериалы"))returnPerson=null;
-        try{catalogList=null;detailHero=null;detailMetaRow=null;detailRatings=null;detailInfo=null;detailPoster=null;detailSynopsis=null;detailTitle=null;detailDescription=null;descriptionToggle=null;inlineCatalogFilters=null;inlineCatalogFilterScroll=null;catalogToolbar=null;catalogRefreshButton=null;catalogRailPreview=null;discoveryHero=null;discoveryShelf=null;FilterControls.Children.Clear();PageHeader.Children.Clear();Body.Children.Clear();Body.RowDefinitions.Clear();SyncTimer();UpdateFilterRail();
+        if(current!=null||section is not ("Фильмы" or "Сериалы"))CancelCatalogQualityCheck();
+        try{catalogList=null;detailHero=null;detailMetaRow=null;detailRatings=null;detailInfo=null;detailPoster=null;detailSynopsis=null;detailTitle=null;detailDescription=null;descriptionToggle=null;inlineCatalogFilters=null;inlineCatalogFilterScroll=null;catalogToolbar=null;catalogRefreshButton=null;catalogFilterBack=null;catalogFilterForward=null;catalogFiltersCompact=null;catalogFilterCaptions.Clear();catalogRailPreview=null;discoveryHero=null;discoveryShelf=null;FilterControls.Children.Clear();PageHeader.Children.Clear();Body.Children.Clear();Body.RowDefinitions.Clear();SyncTimer();UpdateFilterRail();
         SearchBar.Visibility=current!=null||section is "Фильмы" or "Сериалы" or "Загрузки"?Visibility.Visible:Visibility.Collapsed;
         ContextLabel.Visibility=SearchBar.Visibility==Visibility.Visible||section=="Загрузки"?Visibility.Collapsed:Visibility.Visible;ContextLabel.Text=section;
         downloadView=null;downloadList=null;
@@ -145,7 +146,7 @@ public partial class MainWindow:Window
         if(closed)return;e.Cancel=true;if(closing)return;closing=true;
         DiagnosticLog.Write("closing",new{QueueCount=downloads.Items.Count});Status.Text="Сохраняем загрузки и закрываем приложение…";
         IsEnabled=false;personRequest?.Cancel();updateCancellation.Cancel();catalogRefreshTimer.Stop();refresh.Stop();searchDelay.Stop();liveRequest?.Cancel();sourceRequest?.Cancel();archiveRequest?.Cancel();broadcastRequest?.Cancel();
-        CancelDetailMetadata();foreach(var view in releaseViews.Values)view.Request?.Cancel();
+        CancelDetailMetadata();CancelCatalogQualityCheck();foreach(var view in releaseViews.Values)view.Request?.Cancel();
         bool saved=false;
         try{prefs.Save();await downloads.Close();saved=true;DiagnosticLog.Write("closed",new{QueueSaved=true});}
         catch(Exception ex){ErrorLog.Write(ex);MessageBox.Show(ex.Message,"Не удалось сохранить очередь");}
