@@ -1,0 +1,24 @@
+{
+  "RequestedViewport": {
+    "Width": 1500,
+    "Height": 920
+  },
+  "PhysicalWorkArea": {
+    "Width": 1024,
+    "Height": 720,
+    "Left": 0,
+    "Top": 0,
+    "Right": 1024,
+    "Bottom": 720
+  },
+  "WideButtonBounds": {
+    "Left": 1167,
+    "Top": 69,
+    "Right": 1203,
+    "Bottom": 105
+  },
+  "InputViewport": {
+    "Width": 1000,
+    "Height": 696
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "Checks": [
+    "Native notification switch persists its preference.",
+    "Notification switch can be restored.",
+    "Native recovery switch persists separately from startup resume.",
+    "Recovery switch can be restored.",
+    "Actual Windows Shell accepted a notification with the application icon (visibility is controlled by Windows).",
+    "Native notification has a temporary callback icon.",
+    "Disposing the notification removes its temporary icon and hooks.",
+    "Disabled notifications do not create a native icon or submit a banner.",
+    "Adapter event bursts coalesce while preserving a forced reconnect request.",
+    "Disposing the network monitor cancels queued callbacks and its timer."
+  ],
+  "DiagnosticDialog": true,
+  "WindowsNotificationAccepted": true,
+  "VisibilityVerified": false
+}

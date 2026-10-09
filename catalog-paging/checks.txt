@@ -1,0 +1,454 @@
+PASS: one catalog page displays 40 cards
+PASS: desktop: catalog realizes visible poster cards
+PASS: desktop: dense catalog has 6 cards in a row (6 columns)
+PASS: desktop: poster cards stay within the content width
+PASS: desktop: poster cards have no blur or shadow effects
+PASS: catalog filters sit below the search (pinned) or between the banner and the shelves, without a right column (desktop)
+PASS: catalog filters remain one horizontal line (desktop)
+PASS: catalog filter line has its own row below the search input (desktop)
+PASS: catalog filter remains available: Жанр (desktop)
+PASS: catalog filter remains available: Страна (desktop)
+PASS: catalog filter remains available: Рейтинг от (desktop)
+PASS: catalog filter remains available: Год выхода (desktop)
+PASS: catalog filter remains available: Порядок (desktop)
+PASS: catalog filter remains available: Качество каталога (desktop)
+PASS: collection filter matches the active catalog context (desktop)
+PASS: catalog buttons share one row with no wrapping (desktop)
+PASS: filter overflow does not create vertical scrolling (desktop)
+PASS: catalog has one quality dropdown instead of separate quality buttons (desktop)
+PASS: desktop-movies: default catalog has four independent discovery shelves
+PASS: desktop-movies: discovery shelves follow the requested movie or series order
+PASS: desktop-movies: Popular is one responsive row of at most eight posters
+PASS: desktop-movies: Popular uses the catalog's poster-card template
+PASS: desktop-movies: Popular contains real fixture cards
+PASS: desktop-movies: Popular poster cards have named navigation actions
+PASS: desktop-movies: Popular posters align in one row without overflowing its width
+PASS: desktop-movies: Popular poster artwork keeps its rounded corners and proportions
+PASS: desktop-movies: New is one responsive row of at most eight posters
+PASS: desktop-movies: New uses the catalog's poster-card template
+PASS: desktop-movies: New contains real fixture cards
+PASS: desktop-movies: New poster cards have named navigation actions
+PASS: desktop-movies: New posters align in one row without overflowing its width
+PASS: desktop-movies: New poster artwork keeps its rounded corners and proportions
+PASS: desktop-movies: Foreign is one responsive row of at most eight posters
+PASS: desktop-movies: Foreign uses the catalog's poster-card template
+PASS: desktop-movies: foreign shelf excludes unknown countries and home-country co-productions
+PASS: desktop-movies: Foreign poster cards have named navigation actions
+PASS: desktop-movies: Foreign posters align in one row without overflowing its width
+PASS: desktop-movies: Foreign poster artwork keeps its rounded corners and proportions
+PASS: desktop-movies: Native is one responsive row of at most eight posters
+PASS: desktop-movies: Native uses the catalog's poster-card template
+PASS: desktop-movies: native shelf contains confirmed home-country productions
+PASS: desktop-movies: Native poster cards have named navigation actions
+PASS: desktop-movies: Native posters align in one row without overflowing its width
+PASS: desktop-movies: Native poster artwork keeps its rounded corners and proportions
+PASS: desktop-movies: complete paged catalog appears after all four shelves
+PASS: New shelf opens the complete newest first page without skipping to page 2
+PASS: New shelf's All action scrolls to the complete catalog below the shelves (offset 1183.0, pending )
+PASS: New shelf's All action exposes the complete catalog heading in the actual viewport
+PASS: New shelf's explicit jump survives a following layout without being replaced by an old navigation restore
+PASS: Popular shelf opens the public source's popularity order on page 1
+PASS: Native shelf opens the confirmed home-country catalog filter
+PASS: Foreign shelf opens its confirmed country filter instead of the unfiltered list
+PASS: Foreign discovery pagination keeps the regional selection without repeating page 1
+PASS: Late shelf-only quality candidates join the current request without restarting main-page lookups
+PASS: Unknown shelf quality remains excluded until a real resolution result arrives
+PASS: Popular and native shelf-only titles receive one lookup through the existing two-slot quality queue
+PASS: Verified 4K shelf-only titles appear in their poster rows after quality lookup
+PASS: A completed discovery quality queue does not restart on an unchanged render
+PASS: Shelf quality selection requires the exact resolution and preserves verified country classification
+PASS: Leaving the catalog cancels queued discovery quality work
+PASS: A late quality response cannot restore old shelf results after navigation
+PASS: Saved is a separate sidebar destination above Downloads without duplicating the catalog filter line
+PASS: no redundant selection heading
+PASS: genre pill opens a visible dropdown menu
+PASS: catalog has no load-more button
+PASS: empty Saved section opens its own gallery without catalog rows
+PASS: empty Saved explains how to add a film without irrelevant source filters
+PASS: returning from the Saved destination restores the first catalog page
+PASS: wheel scrolls cards within paged catalog
+PASS: page navigation is reachable below the cards
+PASS: page 2 replaces page 1 without overlapping cards
+PASS: page change returns to top
+PASS: returning to page 1 restores its cards
+PASS: genre filter resets pagination and applies to source selection
+PASS: country and genre filters combine
+PASS: rating threshold combines with genre and country
+PASS: popular collection uses public source order
+PASS: high-rating collection uses source rating threshold
+PASS: sidebar Saved displays persisted films with their actual available scores
+PASS: returning from saved cards restores catalog pagination
+PASS: catalog filters sit below the search (pinned) or between the banner and the shelves, without a right column (1600-wide)
+PASS: catalog filters remain one horizontal line (1600-wide)
+PASS: catalog filter line has its own row below the search input (1600-wide)
+PASS: catalog filter remains available: Жанр (1600-wide)
+PASS: catalog filter remains available: Страна (1600-wide)
+PASS: catalog filter remains available: Рейтинг от (1600-wide)
+PASS: catalog filter remains available: Год выхода (1600-wide)
+PASS: catalog filter remains available: Порядок (1600-wide)
+PASS: catalog filter remains available: Качество каталога (1600-wide)
+PASS: collection filter matches the active catalog context (1600-wide)
+PASS: catalog buttons share one row with no wrapping (1600-wide)
+PASS: filter overflow does not create vertical scrolling (1600-wide)
+PASS: catalog has one quality dropdown instead of separate quality buttons (1600-wide)
+PASS: 1600-pixel window fits the default filters in one visible line
+PASS: catalog filters sit below the search (pinned) or between the banner and the shelves, without a right column (wide)
+PASS: catalog filters remain one horizontal line (wide)
+PASS: catalog filter line has its own row below the search input (wide)
+PASS: catalog filter remains available: Жанр (wide)
+PASS: catalog filter remains available: Страна (wide)
+PASS: catalog filter remains available: Рейтинг от (wide)
+PASS: catalog filter remains available: Год выхода (wide)
+PASS: catalog filter remains available: Порядок (wide)
+PASS: catalog filter remains available: Качество каталога (wide)
+PASS: collection filter matches the active catalog context (wide)
+PASS: catalog buttons share one row with no wrapping (wide)
+PASS: filter overflow does not create vertical scrolling (wide)
+PASS: catalog has one quality dropdown instead of separate quality buttons (wide)
+PASS: wide catalog retains cinematic banners below the single filter line
+PASS: single-line genre dropdown remains interactive after resizing
+PASS: catalog filters sit below the search (pinned) or between the banner and the shelves, without a right column (narrow)
+PASS: catalog filters remain one horizontal line (narrow)
+PASS: catalog filter line has its own row below the search input (narrow)
+PASS: catalog filter remains available: Жанр (narrow)
+PASS: catalog filter remains available: Страна (narrow)
+PASS: catalog filter remains available: Рейтинг от (narrow)
+PASS: catalog filter remains available: Год выхода (narrow)
+PASS: catalog filter remains available: Порядок (narrow)
+PASS: catalog filter remains available: Качество каталога (narrow)
+PASS: collection filter matches the active catalog context (narrow)
+PASS: catalog buttons share one row with no wrapping (narrow)
+PASS: filter overflow does not create vertical scrolling (narrow)
+PASS: catalog has one quality dropdown instead of separate quality buttons (narrow)
+PASS: catalog filters sit below the search (pinned) or between the banner and the shelves, without a right column (short)
+PASS: catalog filters remain one horizontal line (short)
+PASS: catalog filter line has its own row below the search input (short)
+PASS: catalog filter remains available: Жанр (short)
+PASS: catalog filter remains available: Страна (short)
+PASS: catalog filter remains available: Рейтинг от (short)
+PASS: catalog filter remains available: Год выхода (short)
+PASS: catalog filter remains available: Порядок (short)
+PASS: catalog filter remains available: Качество каталога (short)
+PASS: collection filter matches the active catalog context (short)
+PASS: catalog buttons share one row with no wrapping (short)
+PASS: filter overflow does not create vertical scrolling (short)
+PASS: catalog has one quality dropdown instead of separate quality buttons (short)
+PASS: short window preserves space for catalog cards below filters
+PASS: catalog filters sit below the search (pinned) or between the banner and the shelves, without a right column (narrow-short)
+PASS: catalog filters remain one horizontal line (narrow-short)
+PASS: catalog filter line has its own row below the search input (narrow-short)
+PASS: catalog filter remains available: Жанр (narrow-short)
+PASS: catalog filter remains available: Страна (narrow-short)
+PASS: catalog filter remains available: Рейтинг от (narrow-short)
+PASS: catalog filter remains available: Год выхода (narrow-short)
+PASS: catalog filter remains available: Порядок (narrow-short)
+PASS: catalog filter remains available: Качество каталога (narrow-short)
+PASS: collection filter matches the active catalog context (narrow-short)
+PASS: catalog buttons share one row with no wrapping (narrow-short)
+PASS: filter overflow does not create vertical scrolling (narrow-short)
+PASS: catalog has one quality dropdown instead of separate quality buttons (narrow-short)
+PASS: overflowing filter choices scroll horizontally without adding rows or hiding the catalog
+PASS: compact filter captions survive a catalog refresh in a narrow window
+PASS: horizontal filter scrolling reaches the quality menu
+PASS: quality menu remains usable after horizontal scrolling
+PASS: narrow: catalog realizes visible poster cards
+PASS: narrow: dense catalog has 2 cards in a row (2 columns)
+PASS: narrow: poster cards stay within the content width
+PASS: narrow: poster cards have no blur or shadow effects
+PASS: release quality menu displays friendly resolution names
+PASS: friendly quality names still sort by actual resolution
+PASS: Full HD filter keeps only matching releases
+PASS: saved movie detail heart is filled too
+PASS: known poor-quality releases survive cache reload
+PASS: catalog marks only confirmed poor-only titles and keeps unknown quality unmarked
+PASS: catalog poster shows the poor-quality badge and its tooltip
+PASS: catalog combines all quality choices in one button
+PASS: quality menu presents exact resolution choices instead of minimum thresholds
+PASS: quality menu includes the poor-quality toggle
+PASS: single catalog quality button opens its menu for hide-poor
+PASS: menu quality toggle hides poor-only titles and persists the choice
+PASS: enabled poor-quality toggle exposes its checked state
+PASS: single catalog quality button opens its menu for 2160
+PASS: 4K selection shows titles with downloadable 2160p releases and excludes unknown quality and screen recordings
+PASS: single catalog quality button opens its menu for 1080
+PASS: FullHD selection excludes 720p and 2160p-only titles
+PASS: single catalog quality button opens its menu for 720
+PASS: HD Ready selection keeps exact 720p availability including titles that also have 4K
+PASS: single catalog quality button opens its menu for 720
+PASS: selecting an active resolution again returns to any quality
+PASS: single catalog quality button opens its menu for hide-poor
+PASS: single catalog quality button opens its menu for 2160
+PASS: a 4K screen recording does not qualify as a 4K release even when poor-quality hiding is disabled
+PASS: single catalog quality button opens its menu for 1080
+PASS: catalog resolution persists independently of the release minimum
+PASS: single catalog quality button opens its menu for 0
+PASS: feed hides a successfully checked title with no download options
+PASS: a hidden title remains accessible in Saved for future rechecking
+PASS: opening a film hides catalog filters while retaining the selected resolution
+PASS: film detail retains its separate minimum and shows Full HD, 4K and unknown releases
+PASS: disabling the filter restores all releases with poor-quality tooltips
+PASS: existing poor-quality downloads stay in the queue and carry a visible badge
+PASS: quality controls remain available at window width 360
+PASS: single catalog quality dropdown remains available in the filter line at window width 360
+PASS: catalog filters sit below the search (pinned) or between the banner and the shelves, without a right column (quality-width-360)
+PASS: catalog filters remain one horizontal line (quality-width-360)
+PASS: catalog filter line has its own row below the search input (quality-width-360)
+PASS: catalog filter remains available: Жанр (quality-width-360)
+PASS: catalog filter remains available: Страна (quality-width-360)
+PASS: catalog filter remains available: Рейтинг от (quality-width-360)
+PASS: catalog filter remains available: Год выхода (quality-width-360)
+PASS: catalog filter remains available: Порядок (quality-width-360)
+PASS: catalog filter remains available: Качество каталога (quality-width-360)
+PASS: collection filter matches the active catalog context (quality-width-360)
+PASS: catalog buttons share one row with no wrapping (quality-width-360)
+PASS: filter overflow does not create vertical scrolling (quality-width-360)
+PASS: catalog has one quality dropdown instead of separate quality buttons (quality-width-360)
+PASS: quality controls remain available at window width 510
+PASS: single catalog quality dropdown remains available in the filter line at window width 510
+PASS: catalog filters sit below the search (pinned) or between the banner and the shelves, without a right column (quality-width-510)
+PASS: catalog filters remain one horizontal line (quality-width-510)
+PASS: catalog filter line has its own row below the search input (quality-width-510)
+PASS: catalog filter remains available: Жанр (quality-width-510)
+PASS: catalog filter remains available: Страна (quality-width-510)
+PASS: catalog filter remains available: Рейтинг от (quality-width-510)
+PASS: catalog filter remains available: Год выхода (quality-width-510)
+PASS: catalog filter remains available: Порядок (quality-width-510)
+PASS: catalog filter remains available: Качество каталога (quality-width-510)
+PASS: collection filter matches the active catalog context (quality-width-510)
+PASS: catalog buttons share one row with no wrapping (quality-width-510)
+PASS: filter overflow does not create vertical scrolling (quality-width-510)
+PASS: catalog has one quality dropdown instead of separate quality buttons (quality-width-510)
+PASS: quality controls remain available at window width 1280
+PASS: single catalog quality dropdown remains available in the filter line at window width 1280
+PASS: catalog filters sit below the search (pinned) or between the banner and the shelves, without a right column (quality-width-1280)
+PASS: catalog filters remain one horizontal line (quality-width-1280)
+PASS: catalog filter line has its own row below the search input (quality-width-1280)
+PASS: catalog filter remains available: Жанр (quality-width-1280)
+PASS: catalog filter remains available: Страна (quality-width-1280)
+PASS: catalog filter remains available: Рейтинг от (quality-width-1280)
+PASS: catalog filter remains available: Год выхода (quality-width-1280)
+PASS: catalog filter remains available: Порядок (quality-width-1280)
+PASS: catalog filter remains available: Качество каталога (quality-width-1280)
+PASS: collection filter matches the active catalog context (quality-width-1280)
+PASS: catalog buttons share one row with no wrapping (quality-width-1280)
+PASS: filter overflow does not create vertical scrolling (quality-width-1280)
+PASS: catalog has one quality dropdown instead of separate quality buttons (quality-width-1280)
+PASS: crossing the daily refresh boundary expires in-memory catalog pages once
+PASS: people search preserves distinct confirmed namesakes and omits duplicate or unidentified candidates
+PASS: a confirmed identity does not duplicate when a known name alias differs
+PASS: an explicitly linked catalog identity does not duplicate its professional profile
+PASS: matching names do not merge distinct unlinked source identities by guesswork
+PASS: ID-only catalog credits preserve different confirmed same-name people
+PASS: matching explicit catalog IDs link a raw credit to its known professional identity
+PASS: a professional profile without a catalog ID does not absorb unrelated ID-only credits
+PASS: typing does not submit a film or people query before Search or Enter
+PASS: submitted query defaults to both types with visible animated loading indicator
+PASS: search dispatches film, series and people requests together
+PASS: combined results include both types and hide completed loading indicator
+PASS: catalog filters sit below the search (pinned) or between the banner and the shelves, without a right column (unified-search)
+PASS: catalog filters remain one horizontal line (unified-search)
+PASS: catalog filter line has its own row below the search input (unified-search)
+PASS: catalog filter remains available: Жанр (unified-search)
+PASS: catalog filter remains available: Страна (unified-search)
+PASS: catalog filter remains available: Рейтинг от (unified-search)
+PASS: catalog filter remains available: Год выхода (unified-search)
+PASS: catalog filter remains available: Порядок (unified-search)
+PASS: catalog filter remains available: Качество каталога (unified-search)
+PASS: collection filter matches the active catalog context (unified-search)
+PASS: catalog buttons share one row with no wrapping (unified-search)
+PASS: filter overflow does not create vertical scrolling (unified-search)
+PASS: catalog has one quality dropdown instead of separate quality buttons (unified-search)
+PASS: all four search type tabs remain visible in the single filter line below search
+PASS: combined results include matching actors, directors, cinematographers and separate namesakes
+PASS: series tab filters existing results without another network request
+PASS: film results keep paged navigation
+PASS: people tab filters cached unified results without another film or people request
+PASS: namesake selection opens its own confirmed identity: https://kino-teatr.ua/ru/person/search-smoke-910001.phtml
+PASS: namesake selection loads its own cached biography instead of the same-name profile: https://kino-teatr.ua/ru/person/search-smoke-910001.phtml
+PASS: namesake selection opens its own confirmed identity: https://kino-teatr.ua/ru/person/search-smoke-910002.phtml
+PASS: namesake selection loads its own cached biography instead of the same-name profile: https://kino-teatr.ua/ru/person/search-smoke-910002.phtml
+PASS: search opens a person page without inventing an origin film
+PASS: search person page loads its cached verified biography
+PASS: a search person's filmography opens a film while retaining its person return destination
+PASS: film back restores the person opened from search
+PASS: person back restores the same search query, people tab and page without repeating requests
+PASS: opening a person from combined search restores its second film page without fetching results again
+PASS: returning from downloads restores submitted query and selected search type
+PASS: repeated active catalog navigation clears query and filters
+PASS: leaving search cancels an unfinished people request instead of leaving an endless loader
+PASS: search stays visible in the Фильмы detail
+PASS: search shortcut focuses the field without leaving the open card
+PASS: clearing the persistent search retains the open card
+PASS: search from a persistent header returns both media types
+PASS: submitting from a card opens unified search results
+PASS: search stays visible in the Сериалы detail
+PASS: search shortcut focuses the field without leaving the open card
+PASS: clearing the persistent search retains the open card
+PASS: search from a persistent header returns both media types
+PASS: submitting from a card opens unified search results
+PASS: each card search requests both catalogs
+PASS: release search shows its animated indicator inside the releases section
+PASS: finished release search hides its local indicator while preserving an open filter
+PASS: download queue defaults to newest-added first
+PASS: downloads page has one heading without a duplicate top label
+PASS: download management opens as a visible toolbar submenu
+PASS: download management menu includes Начать загрузки
+PASS: download management menu includes Остановить загрузки
+PASS: download management menu includes Запустить раздачи
+PASS: download management menu includes Остановить раздачи
+PASS: speed limit fields stay out of the compact queue header
+PASS: speed-limit dialog applies and persists both rates
+PASS: download rows fit within 120 pixels with both media and release titles
+PASS: download row displays its cached media poster on the left
+PASS: metadata repair repaints the existing poster without rebuilding its download row
+PASS: clearing a repaired poster removes the stale image from its existing row
+PASS: existing download row restores its poster after a later metadata update
+PASS: associated media title follows its poster
+PASS: download row keeps its raw release name in the title tooltip instead of a second text line
+PASS: pause or continue action is an icon button whose tooltip and accessible name state its action
+PASS: download action has an accessible label and recognizable icon: Подробнее
+PASS: download action has an accessible label and recognizable icon: Открыть папку
+PASS: download action has an accessible label and recognizable icon: Действия загрузки
+PASS: information icon fits inside its button padding without clipping its lower edge
+PASS: the row menu offers details, diagnostics and both removal actions
+PASS: keep-files removal is neutral gray and permanent file removal is red
+PASS: both removal actions explain their effect on downloaded files
+PASS: row actions disable the pause control and the action menu while their download is busy
+PASS: row actions re-enable their controls when the download is ready
+PASS: download sorting is discoverable through a toolbar menu
+PASS: queue sorting offers addition date, title, speed, size and progress
+PASS: download sort menu applies name
+PASS: download sort menu applies speed
+PASS: download sort menu applies size
+PASS: download sort menu applies progress
+PASS: download sort menu applies newest
+INFO: speed sort before moving cursor: mouse=False, keyboard=False, menu=False, timer=True, state=Normal, first=redesign-5
+PASS: speed sort can refresh while the pointer and focus are on the toolbar: mouse=False, keyboard=False, menu=False, timer=True, state=Normal, first=redesign-5
+PASS: speed sorting updates through the running refresh timer: ticks=1, mouse=False, keyboard=False, menu=False, timer=True, state=Normal, first=redesign-0
+PASS: torrent without a known poster keeps a visible native placeholder
+PASS: download media title follows the dark theme
+PASS: light theme keeps primary and secondary text legible on every main surface
+PASS: light theme keeps accent actions and primary buttons readable
+PASS: dark theme keeps primary and secondary text legible on every main surface
+PASS: dark theme keeps accent actions and primary buttons readable
+PASS: download action stays inside narrow queue: Открыть карточку по постеру
+PASS: download action stays inside narrow queue: Открыть карточку по названию
+PASS: download action stays inside narrow queue: Продолжить
+PASS: download action stays inside narrow queue: Открыть папку
+PASS: download action stays inside narrow queue: Подробнее
+PASS: download action stays inside narrow queue: Действия загрузки
+PASS: download toolbar leaves room for the queue in a short window
+PASS: Подробнее opens the queue row in place with its files, folder and sources
+PASS: a second click on Подробнее folds the row back
+PASS: details show episode names, individual progress and completed-file count
+PASS: file details can filter a specific episode
+PASS: clearing the episode filter restores the full file list
+PASS: file details retain selection across live progress refreshes
+PASS: dark file details use the readable theme color for episode names
+PASS: dark episode filename and downloaded byte count contrast clearly with their row background: 12.9:1 and 6.6:1
+PASS: file details resolve the file icon geometry inside the owned dialog
+PASS: file details remain usable in a minimum-size window
+PASS: the packaged Onest font is used by the window and contains Cyrillic glyphs
+PASS: application icon and transparent kettlebell logo load from packaged resources
+PASS: download native input monitor exposes its work area
+PASS: download card remains clickable with a plain title: Открыть карточку по постеру
+PASS: native mouse can position for open Открыть карточку по постеру
+PASS: native pointer reaches the physically visible download control: phase=open Открыть карточку по постеру, requested=316,312, actual=316,312, bounds=292,276..340,348, foreground=True, root=True, hover=True, captured=none; section=Загрузки, current=, count=6, queue=6, paused=6/6, downloadReturn=, person=, returnPerson=, generator=ContainersGenerated, row=ListBoxItem, rowData=redesign-5, buttons=Открыть карточку по постеру,Открыть карточку по названию,Продолжить,Открыть папку,Открыть папку,Подробнее,Действия загрузки,Все файлы и поиск,Другие раздачи, restore=, pendingOffset=
+PASS: native mouse activates the download control exactly once: {"Phase":"open \u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043A\u0430\u0440\u0442\u043E\u0447\u043A\u0443 \u043F\u043E \u043F\u043E\u0441\u0442\u0435\u0440\u0443","Button":"\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043A\u0430\u0440\u0442\u043E\u0447\u043A\u0443 \u043F\u043E \u043F\u043E\u0441\u0442\u0435\u0440\u0443","Requested":{"X":316,"Y":312},"Actual":{"X":316,"Y":312},"Bounds":{"Left":292,"Top":276,"Right":340,"Bottom":348},"PointerReady":true,"CaptureBefore":null,"CaptureAfter":null,"MouseDown":1,"MouseUp":1,"Clicks":1,"Before":"section=\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0438, current=, count=6, queue=6, paused=6/6, downloadReturn=, person=, returnPerson=, generator=ContainersGenerated, row=ListBoxItem, rowData=redesign-5, buttons=\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043A\u0430\u0440\u0442\u043E\u0447\u043A\u0443 \u043F\u043E \u043F\u043E\u0441\u0442\u0435\u0440\u0443,\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043A\u0430\u0440\u0442\u043E\u0447\u043A\u0443 \u043F\u043E \u043D\u0430\u0437\u0432\u0430\u043D\u0438\u044E,\u041F\u0440\u043E\u0434\u043E\u043B\u0436\u0438\u0442\u044C,\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043F\u0430\u043F\u043A\u0443,\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043F\u0430\u043F\u043A\u0443,\u041F\u043E\u0434\u0440\u043E\u0431\u043D\u0435\u0435,\u0414\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438,\u0412\u0441\u0435 \u0444\u0430\u0439\u043B\u044B \u0438 \u043F\u043E\u0438\u0441\u043A,\u0414\u0440\u0443\u0433\u0438\u0435 \u0440\u0430\u0437\u0434\u0430\u0447\u0438, restore=, pendingOffset=","After":"section=\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0438, current=-1826690569, count=, queue=6, paused=6/6, downloadReturn=redesign-5, person=, returnPerson=, generator=, row=missing, rowData=, buttons=, restore=, pendingOffset="}
+PASS: download poster/title opens its associated internal card while retaining the queue as the return destination
+PASS: native mouse can position for return Открыть карточку по постеру
+PASS: native pointer reaches the physically visible download control: phase=return Открыть карточку по постеру, requested=304,87, actual=304,87, bounds=280,63..328,111, foreground=True, root=True, hover=True, captured=none; section=Загрузки, current=-1826690569, count=, queue=6, paused=6/6, downloadReturn=redesign-5, person=, returnPerson=, generator=, row=missing, rowData=, buttons=, restore=, pendingOffset=
+PASS: native mouse activates the download control exactly once: {"Phase":"return \u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043A\u0430\u0440\u0442\u043E\u0447\u043A\u0443 \u043F\u043E \u043F\u043E\u0441\u0442\u0435\u0440\u0443","Button":"\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0438","Requested":{"X":304,"Y":87},"Actual":{"X":304,"Y":87},"Bounds":{"Left":280,"Top":63,"Right":328,"Bottom":111},"PointerReady":true,"CaptureBefore":null,"CaptureAfter":null,"MouseDown":1,"MouseUp":1,"Clicks":1,"Before":"section=\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0438, current=-1826690569, count=, queue=6, paused=6/6, downloadReturn=redesign-5, person=, returnPerson=, generator=, row=missing, rowData=, buttons=, restore=, pendingOffset=","After":"section=\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0438, current=, count=6, queue=6, paused=6/6, downloadReturn=, person=, returnPerson=, generator=ContainersGenerated, row=ListBoxItem, rowData=redesign-5, buttons=\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043A\u0430\u0440\u0442\u043E\u0447\u043A\u0443 \u043F\u043E \u043F\u043E\u0441\u0442\u0435\u0440\u0443,\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043A\u0430\u0440\u0442\u043E\u0447\u043A\u0443 \u043F\u043E \u043D\u0430\u0437\u0432\u0430\u043D\u0438\u044E,\u041F\u0440\u043E\u0434\u043E\u043B\u0436\u0438\u0442\u044C,\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043F\u0430\u043F\u043A\u0443,\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043F\u0430\u043F\u043A\u0443,\u041F\u043E\u0434\u0440\u043E\u0431\u043D\u0435\u0435,\u0414\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438,\u0412\u0441\u0435 \u0444\u0430\u0439\u043B\u044B \u0438 \u043F\u043E\u0438\u0441\u043A,\u0414\u0440\u0443\u0433\u0438\u0435 \u0440\u0430\u0437\u0434\u0430\u0447\u0438, restore=, pendingOffset="}
+PASS: returning from the internal card preserves the queue and its paused transfers; section=Загрузки, current=, count=6, queue=6, paused=6/6, downloadReturn=, person=, returnPerson=, generator=ContainersGenerated, row=ListBoxItem, rowData=redesign-5, buttons=Открыть карточку по постеру,Открыть карточку по названию,Продолжить,Открыть папку,Открыть папку,Подробнее,Действия загрузки,Все файлы и поиск,Другие раздачи, restore=, pendingOffset=
+PASS: download card remains clickable with a plain title: Открыть карточку по названию
+PASS: native cursor can reach the download title
+PASS: native cursor reaches the visible download title in the foreground app: requested=498,294, actual=498,294; section=Загрузки, current=, count=6, queue=6, paused=6/6, downloadReturn=, person=, returnPerson=, generator=ContainersGenerated, row=ListBoxItem, rowData=redesign-5, buttons=Открыть карточку по постеру,Открыть карточку по названию,Продолжить,Открыть папку,Открыть папку,Подробнее,Действия загрузки,Все файлы и поиск,Другие раздачи, restore=, pendingOffset=
+PASS: hovering a download title keeps plain text colour and transparent background without an underline
+PASS: native mouse can position for open Открыть карточку по названию
+PASS: native pointer reaches the physically visible download control: phase=open Открыть карточку по названию, requested=498,294, actual=498,294, bounds=352,284..644,304, foreground=True, root=True, hover=True, captured=none; section=Загрузки, current=, count=6, queue=6, paused=6/6, downloadReturn=, person=, returnPerson=, generator=ContainersGenerated, row=ListBoxItem, rowData=redesign-5, buttons=Открыть карточку по постеру,Открыть карточку по названию,Продолжить,Открыть папку,Открыть папку,Подробнее,Действия загрузки,Все файлы и поиск,Другие раздачи, restore=, pendingOffset=
+PASS: native mouse activates the download control exactly once: {"Phase":"open \u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043A\u0430\u0440\u0442\u043E\u0447\u043A\u0443 \u043F\u043E \u043D\u0430\u0437\u0432\u0430\u043D\u0438\u044E","Button":"\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043A\u0430\u0440\u0442\u043E\u0447\u043A\u0443 \u043F\u043E \u043D\u0430\u0437\u0432\u0430\u043D\u0438\u044E","Requested":{"X":498,"Y":294},"Actual":{"X":498,"Y":294},"Bounds":{"Left":352,"Top":284,"Right":644,"Bottom":304},"PointerReady":true,"CaptureBefore":null,"CaptureAfter":null,"MouseDown":1,"MouseUp":1,"Clicks":1,"Before":"section=\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0438, current=, count=6, queue=6, paused=6/6, downloadReturn=, person=, returnPerson=, generator=ContainersGenerated, row=ListBoxItem, rowData=redesign-5, buttons=\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043A\u0430\u0440\u0442\u043E\u0447\u043A\u0443 \u043F\u043E \u043F\u043E\u0441\u0442\u0435\u0440\u0443,\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043A\u0430\u0440\u0442\u043E\u0447\u043A\u0443 \u043F\u043E \u043D\u0430\u0437\u0432\u0430\u043D\u0438\u044E,\u041F\u0440\u043E\u0434\u043E\u043B\u0436\u0438\u0442\u044C,\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043F\u0430\u043F\u043A\u0443,\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043F\u0430\u043F\u043A\u0443,\u041F\u043E\u0434\u0440\u043E\u0431\u043D\u0435\u0435,\u0414\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438,\u0412\u0441\u0435 \u0444\u0430\u0439\u043B\u044B \u0438 \u043F\u043E\u0438\u0441\u043A,\u0414\u0440\u0443\u0433\u0438\u0435 \u0440\u0430\u0437\u0434\u0430\u0447\u0438, restore=, pendingOffset=","After":"section=\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0438, current=-1826690569, count=, queue=6, paused=6/6, downloadReturn=redesign-5, person=, returnPerson=, generator=, row=missing, rowData=, buttons=, restore=, pendingOffset="}
+PASS: download poster/title opens its associated internal card while retaining the queue as the return destination
+PASS: native mouse can position for return Открыть карточку по названию
+PASS: native pointer reaches the physically visible download control: phase=return Открыть карточку по названию, requested=304,87, actual=304,87, bounds=280,63..328,111, foreground=True, root=True, hover=True, captured=none; section=Загрузки, current=-1826690569, count=, queue=6, paused=6/6, downloadReturn=redesign-5, person=, returnPerson=, generator=, row=missing, rowData=, buttons=, restore=, pendingOffset=
+PASS: native mouse activates the download control exactly once: {"Phase":"return \u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043A\u0430\u0440\u0442\u043E\u0447\u043A\u0443 \u043F\u043E \u043D\u0430\u0437\u0432\u0430\u043D\u0438\u044E","Button":"\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0438","Requested":{"X":304,"Y":87},"Actual":{"X":304,"Y":87},"Bounds":{"Left":280,"Top":63,"Right":328,"Bottom":111},"PointerReady":true,"CaptureBefore":null,"CaptureAfter":null,"MouseDown":1,"MouseUp":1,"Clicks":1,"Before":"section=\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0438, current=-1826690569, count=, queue=6, paused=6/6, downloadReturn=redesign-5, person=, returnPerson=, generator=, row=missing, rowData=, buttons=, restore=, pendingOffset=","After":"section=\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0438, current=, count=6, queue=6, paused=6/6, downloadReturn=, person=, returnPerson=, generator=ContainersGenerated, row=ListBoxItem, rowData=redesign-5, buttons=\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043A\u0430\u0440\u0442\u043E\u0447\u043A\u0443 \u043F\u043E \u043F\u043E\u0441\u0442\u0435\u0440\u0443,\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043A\u0430\u0440\u0442\u043E\u0447\u043A\u0443 \u043F\u043E \u043D\u0430\u0437\u0432\u0430\u043D\u0438\u044E,\u041F\u0440\u043E\u0434\u043E\u043B\u0436\u0438\u0442\u044C,\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043F\u0430\u043F\u043A\u0443,\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043F\u0430\u043F\u043A\u0443,\u041F\u043E\u0434\u0440\u043E\u0431\u043D\u0435\u0435,\u0414\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438,\u0412\u0441\u0435 \u0444\u0430\u0439\u043B\u044B \u0438 \u043F\u043E\u0438\u0441\u043A,\u0414\u0440\u0443\u0433\u0438\u0435 \u0440\u0430\u0437\u0434\u0430\u0447\u0438, restore=, pendingOffset="}
+PASS: returning from the internal card preserves the queue and its paused transfers; section=Загрузки, current=, count=6, queue=6, paused=6/6, downloadReturn=, person=, returnPerson=, generator=ContainersGenerated, row=ListBoxItem, rowData=redesign-5, buttons=Открыть карточку по постеру,Открыть карточку по названию,Продолжить,Открыть папку,Открыть папку,Подробнее,Действия загрузки,Все файлы и поиск,Другие раздачи, restore=, pendingOffset=
+PASS: the actual indexed download origin contains its identified actor before native navigation
+PASS: native mouse can position for nested origin card
+PASS: native pointer reaches the physically visible download control: phase=nested origin card, requested=316,312, actual=316,312, bounds=292,276..340,348, foreground=True, root=True, hover=True, captured=none; section=Загрузки, current=, count=6, queue=6, paused=6/6, downloadReturn=, person=, returnPerson=, generator=ContainersGenerated, row=ListBoxItem, rowData=redesign-5, buttons=Открыть карточку по постеру,Открыть карточку по названию,Продолжить,Открыть папку,Открыть папку,Подробнее,Действия загрузки,Все файлы и поиск,Другие раздачи, restore=, pendingOffset=
+PASS: native mouse activates the download control exactly once: {"Phase":"nested origin card","Button":"\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043A\u0430\u0440\u0442\u043E\u0447\u043A\u0443 \u043F\u043E \u043F\u043E\u0441\u0442\u0435\u0440\u0443","Requested":{"X":316,"Y":312},"Actual":{"X":316,"Y":312},"Bounds":{"Left":292,"Top":276,"Right":340,"Bottom":348},"PointerReady":true,"CaptureBefore":null,"CaptureAfter":null,"MouseDown":1,"MouseUp":1,"Clicks":1,"Before":"section=\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0438, current=, count=6, queue=6, paused=6/6, downloadReturn=, person=, returnPerson=, generator=ContainersGenerated, row=ListBoxItem, rowData=redesign-5, buttons=\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043A\u0430\u0440\u0442\u043E\u0447\u043A\u0443 \u043F\u043E \u043F\u043E\u0441\u0442\u0435\u0440\u0443,\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043A\u0430\u0440\u0442\u043E\u0447\u043A\u0443 \u043F\u043E \u043D\u0430\u0437\u0432\u0430\u043D\u0438\u044E,\u041F\u0440\u043E\u0434\u043E\u043B\u0436\u0438\u0442\u044C,\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043F\u0430\u043F\u043A\u0443,\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043F\u0430\u043F\u043A\u0443,\u041F\u043E\u0434\u0440\u043E\u0431\u043D\u0435\u0435,\u0414\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438,\u0412\u0441\u0435 \u0444\u0430\u0439\u043B\u044B \u0438 \u043F\u043E\u0438\u0441\u043A,\u0414\u0440\u0443\u0433\u0438\u0435 \u0440\u0430\u0437\u0434\u0430\u0447\u0438, restore=, pendingOffset=","After":"section=\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0438, current=-1826690569, count=, queue=6, paused=6/6, downloadReturn=redesign-5, person=, returnPerson=, generator=, row=missing, rowData=, buttons=, restore=, pendingOffset="}
+PASS: native mouse can position for nested actor
+PASS: native pointer reaches the physically visible download control: phase=nested actor, requested=591,263, actual=591,263, bounds=511,253..670,272, foreground=True, root=True, hover=True, captured=none; section=Загрузки, current=-1826690569, count=, queue=6, paused=6/6, downloadReturn=redesign-5, person=, returnPerson=, generator=, row=missing, rowData=, buttons=, restore=, pendingOffset=
+PASS: native mouse activates the download control exactly once: {"Phase":"nested actor","Button":"\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0443: \u041F\u043E\u0438\u0441\u043A\u043E\u0432\u0430\u044F \u0418\u0441\u043A\u0440\u0430 \u0422\u0451\u0437\u043A\u0430, \u0412 \u0440\u043E\u043B\u044F\u0445","Requested":{"X":591,"Y":263},"Actual":{"X":591,"Y":263},"Bounds":{"Left":511,"Top":253,"Right":670,"Bottom":272},"PointerReady":true,"CaptureBefore":null,"CaptureAfter":null,"MouseDown":1,"MouseUp":1,"Clicks":1,"Before":"section=\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0438, current=-1826690569, count=, queue=6, paused=6/6, downloadReturn=redesign-5, person=, returnPerson=, generator=, row=missing, rowData=, buttons=, restore=, pendingOffset=","After":"section=\u0421\u0435\u0440\u0438\u0430\u043B\u044B, current=-1826690569, count=, queue=6, paused=6/6, downloadReturn=redesign-5, person=\u041F\u043E\u0438\u0441\u043A\u043E\u0432\u0430\u044F \u0418\u0441\u043A\u0440\u0430 \u0422\u0451\u0437\u043A\u0430, returnPerson=, generator=, row=missing, rowData=, buttons=, restore=, pendingOffset="}
+PASS: download actor retains the queue ancestor after changing to the series section; section=Сериалы, current=-1826690569, count=, queue=6, paused=6/6, downloadReturn=redesign-5, person=Поисковая Искра Тёзка, returnPerson=, generator=, row=missing, rowData=, buttons=, restore=, pendingOffset=
+PASS: native mouse can position for nested filmography film
+PASS: native pointer reaches the physically visible download control: phase=nested filmography film, requested=374,554, actual=374,554, bounds=299,408..448,700, foreground=True, root=True, hover=True, captured=none; section=Сериалы, current=-1826690569, count=, queue=6, paused=6/6, downloadReturn=redesign-5, person=Поисковая Искра Тёзка, returnPerson=, generator=, row=missing, rowData=, buttons=, restore=, pendingOffset=
+PASS: native mouse activates the download control exactly once: {"Phase":"nested filmography film","Button":"\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u041F\u043E\u0438\u0441\u043A\u043E\u0432\u0430\u044F \u0438\u0441\u043A\u0440\u0430 \u00B7 \u0444\u0438\u043B\u044C\u043C 1","Requested":{"X":374,"Y":554},"Actual":{"X":374,"Y":554},"Bounds":{"Left":299,"Top":408,"Right":448,"Bottom":700},"PointerReady":true,"CaptureBefore":null,"CaptureAfter":null,"MouseDown":1,"MouseUp":1,"Clicks":1,"Before":"section=\u0421\u0435\u0440\u0438\u0430\u043B\u044B, current=-1826690569, count=, queue=6, paused=6/6, downloadReturn=redesign-5, person=\u041F\u043E\u0438\u0441\u043A\u043E\u0432\u0430\u044F \u0418\u0441\u043A\u0440\u0430 \u0422\u0451\u0437\u043A\u0430, returnPerson=, generator=, row=missing, rowData=, buttons=, restore=, pendingOffset=","After":"section=\u0424\u0438\u043B\u044C\u043C\u044B, current=1301, count=, queue=6, paused=6/6, downloadReturn=redesign-5, person=, returnPerson=\u041F\u043E\u0438\u0441\u043A\u043E\u0432\u0430\u044F \u0418\u0441\u043A\u0440\u0430 \u0422\u0451\u0437\u043A\u0430, generator=, row=missing, rowData=, buttons=, restore=, pendingOffset="}
+PASS: download filmography film retains its actor and queue ancestors; section=Фильмы, current=1301, count=, queue=6, paused=6/6, downloadReturn=redesign-5, person=, returnPerson=Поисковая Искра Тёзка, generator=, row=missing, rowData=, buttons=, restore=, pendingOffset=
+PASS: native mouse can position for nested filmography back
+PASS: native pointer reaches the physically visible download control: phase=nested filmography back, requested=304,87, actual=304,87, bounds=280,63..328,111, foreground=True, root=True, hover=True, captured=none; section=Фильмы, current=1301, count=, queue=6, paused=6/6, downloadReturn=redesign-5, person=, returnPerson=Поисковая Искра Тёзка, generator=, row=missing, rowData=, buttons=, restore=, pendingOffset=
+PASS: native mouse activates the download control exactly once: {"Phase":"nested filmography back","Button":"\u041D\u0430\u0437\u0430\u0434 \u043A \u0444\u0438\u043B\u044C\u043C\u0443","Requested":{"X":304,"Y":87},"Actual":{"X":304,"Y":87},"Bounds":{"Left":280,"Top":63,"Right":328,"Bottom":111},"PointerReady":true,"CaptureBefore":null,"CaptureAfter":null,"MouseDown":1,"MouseUp":1,"Clicks":1,"Before":"section=\u0424\u0438\u043B\u044C\u043C\u044B, current=1301, count=, queue=6, paused=6/6, downloadReturn=redesign-5, person=, returnPerson=\u041F\u043E\u0438\u0441\u043A\u043E\u0432\u0430\u044F \u0418\u0441\u043A\u0440\u0430 \u0422\u0451\u0437\u043A\u0430, generator=, row=missing, rowData=, buttons=, restore=, pendingOffset=","After":"section=\u0421\u0435\u0440\u0438\u0430\u043B\u044B, current=-1826690569, count=, queue=6, paused=6/6, downloadReturn=redesign-5, person=\u041F\u043E\u0438\u0441\u043A\u043E\u0432\u0430\u044F \u0418\u0441\u043A\u0440\u0430 \u0422\u0451\u0437\u043A\u0430, returnPerson=, generator=, row=missing, rowData=, buttons=, restore=, pendingOffset="}
+PASS: filmography back restores the download origin actor first; section=Сериалы, current=-1826690569, count=, queue=6, paused=6/6, downloadReturn=redesign-5, person=Поисковая Искра Тёзка, returnPerson=, generator=, row=missing, rowData=, buttons=, restore=, pendingOffset=
+PASS: native mouse can position for nested actor back
+PASS: native pointer reaches the physically visible download control: phase=nested actor back, requested=304,87, actual=304,87, bounds=280,63..328,111, foreground=True, root=True, hover=True, captured=none; section=Сериалы, current=-1826690569, count=, queue=6, paused=6/6, downloadReturn=redesign-5, person=Поисковая Искра Тёзка, returnPerson=, generator=, row=missing, rowData=, buttons=, restore=, pendingOffset=
+PASS: native mouse activates the download control exactly once: {"Phase":"nested actor back","Button":"\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0438","Requested":{"X":304,"Y":87},"Actual":{"X":304,"Y":87},"Bounds":{"Left":280,"Top":63,"Right":328,"Bottom":111},"PointerReady":true,"CaptureBefore":null,"CaptureAfter":null,"MouseDown":1,"MouseUp":1,"Clicks":1,"Before":"section=\u0421\u0435\u0440\u0438\u0430\u043B\u044B, current=-1826690569, count=, queue=6, paused=6/6, downloadReturn=redesign-5, person=\u041F\u043E\u0438\u0441\u043A\u043E\u0432\u0430\u044F \u0418\u0441\u043A\u0440\u0430 \u0422\u0451\u0437\u043A\u0430, returnPerson=, generator=, row=missing, rowData=, buttons=, restore=, pendingOffset=","After":"section=\u0421\u0435\u0440\u0438\u0430\u043B\u044B, current=-1826690569, count=, queue=6, paused=6/6, downloadReturn=redesign-5, person=, returnPerson=, generator=, row=missing, rowData=, buttons=, restore=, pendingOffset="}
+PASS: actor back restores the same download card with a queue return label; section=Сериалы, current=-1826690569, count=, queue=6, paused=6/6, downloadReturn=redesign-5, person=, returnPerson=, generator=, row=missing, rowData=, buttons=, restore=, pendingOffset=
+PASS: native mouse can position for nested origin back
+PASS: native pointer reaches the physically visible download control: phase=nested origin back, requested=304,87, actual=304,87, bounds=280,63..328,111, foreground=True, root=True, hover=True, captured=none; section=Сериалы, current=-1826690569, count=, queue=6, paused=6/6, downloadReturn=redesign-5, person=, returnPerson=, generator=, row=missing, rowData=, buttons=, restore=, pendingOffset=
+PASS: native mouse activates the download control exactly once: {"Phase":"nested origin back","Button":"\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0438","Requested":{"X":304,"Y":87},"Actual":{"X":304,"Y":87},"Bounds":{"Left":280,"Top":63,"Right":328,"Bottom":111},"PointerReady":true,"CaptureBefore":null,"CaptureAfter":null,"MouseDown":1,"MouseUp":1,"Clicks":1,"Before":"section=\u0421\u0435\u0440\u0438\u0430\u043B\u044B, current=-1826690569, count=, queue=6, paused=6/6, downloadReturn=redesign-5, person=, returnPerson=, generator=, row=missing, rowData=, buttons=, restore=, pendingOffset=","After":"section=\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0438, current=, count=6, queue=6, paused=6/6, downloadReturn=, person=, returnPerson=, generator=ContainersGenerated, row=ListBoxItem, rowData=redesign-5, buttons=\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043A\u0430\u0440\u0442\u043E\u0447\u043A\u0443 \u043F\u043E \u043F\u043E\u0441\u0442\u0435\u0440\u0443,\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043A\u0430\u0440\u0442\u043E\u0447\u043A\u0443 \u043F\u043E \u043D\u0430\u0437\u0432\u0430\u043D\u0438\u044E,\u041F\u0440\u043E\u0434\u043E\u043B\u0436\u0438\u0442\u044C,\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043F\u0430\u043F\u043A\u0443,\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043F\u0430\u043F\u043A\u0443,\u041F\u043E\u0434\u0440\u043E\u0431\u043D\u0435\u0435,\u0414\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438,\u0412\u0441\u0435 \u0444\u0430\u0439\u043B\u044B \u0438 \u043F\u043E\u0438\u0441\u043A,\u0414\u0440\u0443\u0433\u0438\u0435 \u0440\u0430\u0437\u0434\u0430\u0447\u0438, restore=, pendingOffset="}
+PASS: nested actor and filmography navigation returns to the unchanged paused queue; section=Загрузки, current=, count=6, queue=6, paused=6/6, downloadReturn=, person=, returnPerson=, generator=ContainersGenerated, row=ListBoxItem, rowData=redesign-5, buttons=Открыть карточку по постеру,Открыть карточку по названию,Продолжить,Открыть папку,Открыть папку,Подробнее,Действия загрузки,Все файлы и поиск,Другие раздачи, restore=, pendingOffset=
+PASS: native mouse can position for search origin card
+PASS: native pointer reaches the physically visible download control: phase=search origin card, requested=316,312, actual=316,312, bounds=292,276..340,348, foreground=True, root=True, hover=True, captured=none; section=Загрузки, current=, count=6, queue=6, paused=6/6, downloadReturn=, person=, returnPerson=, generator=ContainersGenerated, row=ListBoxItem, rowData=redesign-5, buttons=Открыть карточку по постеру,Открыть карточку по названию,Продолжить,Открыть папку,Открыть папку,Подробнее,Действия загрузки,Все файлы и поиск,Другие раздачи, restore=, pendingOffset=
+PASS: native mouse activates the download control exactly once: {"Phase":"search origin card","Button":"\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043A\u0430\u0440\u0442\u043E\u0447\u043A\u0443 \u043F\u043E \u043F\u043E\u0441\u0442\u0435\u0440\u0443","Requested":{"X":316,"Y":312},"Actual":{"X":316,"Y":312},"Bounds":{"Left":292,"Top":276,"Right":340,"Bottom":348},"PointerReady":true,"CaptureBefore":null,"CaptureAfter":null,"MouseDown":1,"MouseUp":1,"Clicks":1,"Before":"section=\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0438, current=, count=6, queue=6, paused=6/6, downloadReturn=, person=, returnPerson=, generator=ContainersGenerated, row=ListBoxItem, rowData=redesign-5, buttons=\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043A\u0430\u0440\u0442\u043E\u0447\u043A\u0443 \u043F\u043E \u043F\u043E\u0441\u0442\u0435\u0440\u0443,\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043A\u0430\u0440\u0442\u043E\u0447\u043A\u0443 \u043F\u043E \u043D\u0430\u0437\u0432\u0430\u043D\u0438\u044E,\u041F\u0440\u043E\u0434\u043E\u043B\u0436\u0438\u0442\u044C,\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043F\u0430\u043F\u043A\u0443,\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043F\u0430\u043F\u043A\u0443,\u041F\u043E\u0434\u0440\u043E\u0431\u043D\u0435\u0435,\u0414\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438,\u0412\u0441\u0435 \u0444\u0430\u0439\u043B\u044B \u0438 \u043F\u043E\u0438\u0441\u043A,\u0414\u0440\u0443\u0433\u0438\u0435 \u0440\u0430\u0437\u0434\u0430\u0447\u0438, restore=, pendingOffset=","After":"section=\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0438, current=-1826690569, count=, queue=6, paused=6/6, downloadReturn=redesign-5, person=, returnPerson=, generator=, row=missing, rowData=, buttons=, restore=, pendingOffset="}
+PASS: search from a persistent header returns both media types
+PASS: a new explicit search clears the old download navigation ancestor
+PASS: download search stays visible and focuses without leaving the queue
+PASS: clearing download search preserves the queue
+PASS: search from a persistent header returns both media types
+PASS: submitting download search opens both-type results without changing queued tasks
+PASS: download design and menu fixtures do not start a torrent engine
+PASS: sidebar update prompt stays hidden until a package is ready
+PASS: ready update occupies its own row below Settings in the sidebar
+PASS: sidebar actions fit the visible panel (ready-update-desktop)
+PASS: Downloads, Settings and Update have separate ordered rows (ready-update-desktop)
+PASS: library scrolling stays above the sidebar footer (ready-update-desktop)
+PASS: catalog navigation remains fully visible beside the footer: Фильмы (ready-update-desktop)
+PASS: catalog navigation remains fully visible beside the footer: Сериалы (ready-update-desktop)
+PASS: ready update softly animates when system animations are enabled
+PASS: sidebar update remains available in narrow layout
+PASS: sidebar actions fit the visible panel (ready-update-narrow)
+PASS: Downloads, Settings and Update have separate ordered rows (ready-update-narrow)
+PASS: library scrolling stays above the sidebar footer (ready-update-narrow)
+PASS: catalog navigation remains fully visible beside the footer: Фильмы (ready-update-narrow)
+PASS: catalog navigation remains fully visible beside the footer: Сериалы (ready-update-narrow)
+PASS: sidebar minimum-height fixture reaches its requested viewport
+PASS: sidebar actions fit the visible panel (ready-update-minimum-height)
+PASS: Downloads, Settings and Update have separate ordered rows (ready-update-minimum-height)
+PASS: library scrolling stays above the sidebar footer (ready-update-minimum-height)
+PASS: catalog navigation remains fully visible beside the footer: Фильмы (ready-update-minimum-height)
+PASS: catalog navigation remains fully visible beside the footer: Сериалы (ready-update-minimum-height)
+PASS: sidebar Saved opens its own empty gallery with an explanation
+PASS: unified Saved shows films and series together on a paged gallery
+PASS: Saved exposes all, film and series filters below the persistent search
+PASS: Saved series filter retains saved series from the same collection
+PASS: Saved film filter preserves its own second page
+PASS: Saved navigation fixture has a real scroll position to restore
+PASS: opening a saved film records its collection, filter and page as the back destination
+PASS: film back restores the Saved filter, page and scroll position
+PASS: a person opened from a saved film retains the Saved navigation destination
+PASS: settings opens from the saved film's person page
+PASS: settings back restores the same person, origin film and Saved ancestor
+PASS: person filmography opens another film without losing its Saved ancestor
+PASS: settings back preserves the filmography film's person return destination and Saved ancestor
+PASS: back from filmography restores the saved film's person page first
+PASS: person back restores its saved origin film
+PASS: removing a saved film synchronizes its ID, card and persisted collection
+PASS: returning after removal refreshes the same Saved page without its deleted card
+PASS: the search shortcut focuses Saved search without leaving the collection or sending a request
+PASS: clearing search preserves the Saved filter and page
+PASS: submitting from Saved opens the existing unified film and series search
+PASS: queue performance fixture starts without active downloads or a torrent engine
+PASS: 200-item download queue keeps native recycling virtualization enabled
+PASS: 200-item download queue realizes only 4 native row containers
+PASS: virtualized queue can scroll to its final download
+PASS: download rows have no blur or shadow effects
+PASS: queue scrolling and styling do not create an engine or start paused downloads

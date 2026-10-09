@@ -1,0 +1,111 @@
+{
+  "AllFourCorners": true,
+  "ArtworkContained": true,
+  "OutlineIntact": true,
+  "HoverAndKeyboardFocus": true,
+  "Resizing": true,
+  "FractionalScales": [
+    1,
+    1.25,
+    1.5,
+    2
+  ],
+  "Checks": [
+    {
+      "Width": 1140,
+      "Height": 300,
+      "Scale": 1,
+      "AllFourCorners": true
+    },
+    {
+      "Width": 1140,
+      "Height": 300,
+      "Scale": 1.25,
+      "AllFourCorners": true
+    },
+    {
+      "Width": 1140,
+      "Height": 300,
+      "Scale": 1.5,
+      "AllFourCorners": true
+    },
+    {
+      "Width": 1140,
+      "Height": 300,
+      "Scale": 2,
+      "AllFourCorners": true
+    },
+    {
+      "Width": 760,
+      "Height": 280,
+      "Scale": 1,
+      "AllFourCorners": true
+    },
+    {
+      "Width": 760,
+      "Height": 280,
+      "Scale": 1.25,
+      "AllFourCorners": true
+    },
+    {
+      "Width": 760,
+      "Height": 280,
+      "Scale": 1.5,
+      "AllFourCorners": true
+    },
+    {
+      "Width": 760,
+      "Height": 280,
+      "Scale": 2,
+      "AllFourCorners": true
+    },
+    {
+      "Width": 392,
+      "Height": 300,
+      "Scale": 1,
+      "AllFourCorners": true
+    },
+    {
+      "Width": 392,
+      "Height": 300,
+      "Scale": 1.25,
+      "AllFourCorners": true
+    },
+    {
+      "Width": 392,
+      "Height": 300,
+      "Scale": 1.5,
+      "AllFourCorners": true
+    },
+    {
+      "Width": 392,
+      "Height": 300,
+      "Scale": 2,
+      "AllFourCorners": true
+    },
+    {
+      "Width": 316,
+      "Height": 320,
+      "Scale": 1,
+      "AllFourCorners": true
+    },
+    {
+      "Width": 316,
+      "Height": 320,
+      "Scale": 1.25,
+      "AllFourCorners": true
+    },
+    {
+      "Width": 316,
+      "Height": 320,
+      "Scale": 1.5,
+      "AllFourCorners": true
+    },
+    {
+      "Width": 316,
+      "Height": 320,
+      "Scale": 2,
+      "AllFourCorners": true
+    }
+  ]
+}

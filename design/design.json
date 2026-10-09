@@ -1,0 +1,305 @@
+{
+  "CatalogFallback": true,
+  "CatalogCacheFile": null,
+  "CatalogCount": 40,
+  "CachedPosters": 60,
+  "CatalogColumns": 9,
+  "ExternalSourcesRequired": false,
+  "FixtureHasCachedPoster": true,
+  "FeaturePosterWidths": [
+    900
+  ],
+  "FilterPersistedAfterRender": true,
+  "FilterPersistedAfterResize": true,
+  "DownloadStarted": false,
+  "EngineCreated": false,
+  "ShortDescriptionLength": 230,
+  "ShortDescriptionExpanded": true,
+  "ShortDescriptionExpandedHeight": 161,
+  "SeriesSeasonFilter": true,
+  "ReleaseToolbarChecks": [
+    {
+      "Stage": "collapsed-desktop",
+      "BodyWidth": 1444,
+      "ToolbarHeight": 48,
+      "SourceDetailsVisible": false,
+      "Checking": false,
+      "RefreshEnabled": true,
+      "InlineSourceActions": true,
+      "ReceiptDatesHidden": true
+    },
+    {
+      "Stage": "expanded-light",
+      "BodyWidth": 1444,
+      "ToolbarHeight": 48,
+      "SourceDetailsVisible": true,
+      "Checking": false,
+      "RefreshEnabled": true,
+      "InlineSourceActions": true,
+      "ReceiptDatesHidden": true
+    },
+    {
+      "Stage": "completed-dark",
+      "BodyWidth": 1444,
+      "ToolbarHeight": 48,
+      "SourceDetailsVisible": true,
+      "Checking": false,
+      "RefreshEnabled": true,
+      "InlineSourceActions": true,
+      "ReceiptDatesHidden": true
+    },
+    {
+      "Stage": "expanded-510",
+      "BodyWidth": 398,
+      "ToolbarHeight": 148,
+      "SourceDetailsVisible": true,
+      "Checking": false,
+      "RefreshEnabled": true,
+      "InlineSourceActions": true,
+      "ReceiptDatesHidden": true
+    },
+    {
+      "Stage": "collapsed-510",
+      "BodyWidth": 398,
+      "ToolbarHeight": 122,
+      "SourceDetailsVisible": false,
+      "Checking": false,
+      "RefreshEnabled": true,
+      "InlineSourceActions": true,
+      "ReceiptDatesHidden": true
+    },
+    {
+      "Stage": "empty-checking",
+      "BodyWidth": 398,
+      "ToolbarHeight": 123,
+      "SourceDetailsVisible": false,
+      "Checking": true,
+      "RefreshEnabled": false,
+      "InlineSourceActions": true,
+      "ReceiptDatesHidden": true
+    },
+    {
+      "Stage": "empty-unavailable",
+      "BodyWidth": 398,
+      "ToolbarHeight": 122,
+      "SourceDetailsVisible": false,
+      "Checking": false,
+      "RefreshEnabled": true,
+      "InlineSourceActions": true,
+      "ReceiptDatesHidden": true
+    }
+  ],
+  "DownloadTelemetryFitsNarrowWindow": true,
+  "DownloadTextFollowsTheme": true,
+  "BackgroundTheme": {
+    "Light": {
+      "Flat": true,
+      "Color": "#FFF3F5F7"
+    },
+    "Dark": {
+      "Flat": true,
+      "Color": "#FF0A0C0F"
+    }
+  },
+  "TextRendering": "Grayscale",
+  "TextFormatting": "Ideal",
+  "FractionalRasterScales": [
+    1.2,
+    1.25,
+    1.5
+  ],
+  "QualityBadgeOnPoster": true,
+  "SeriesPosterAlignment": true,
+  "MultilineSeriesMetadataContained": true,
+  "SearchAndSettings": {
+    "Checks": [
+      {
+        "Stage": "typing-light",
+        "Query": "\u0418\u043D\u0442\u0435\u0440\u0441\u0442\u0435\u043B\u043B\u0430\u0440",
+        "WindowWidth": 1044,
+        "SearchHeight": 48,
+        "TextViewportHeight": 46,
+        "CharacterHeight": 20
+      },
+      {
+        "Stage": "refresh-results",
+        "Query": "\u0418\u043D\u0442\u0435\u0440\u0441\u0442\u0435\u043B\u043B\u0430\u0440",
+        "WindowWidth": 1044,
+        "SearchHeight": 48,
+        "TextViewportHeight": 46,
+        "CharacterHeight": 20
+      },
+      {
+        "Stage": "typing-dark",
+        "Query": "\u0418\u043D\u0442\u0435\u0440\u0441\u0442\u0435\u043B\u043B\u0430\u0440",
+        "WindowWidth": 1044,
+        "SearchHeight": 48,
+        "TextViewportHeight": 46,
+        "CharacterHeight": 20
+      },
+      {
+        "Stage": "small-short-window",
+        "Query": "\u0418\u043D\u0442\u0435\u0440\u0441\u0442\u0435\u043B\u043B\u0430\u0440",
+        "WindowWidth": 510,
+        "SearchHeight": 40,
+        "TextViewportHeight": 38,
+        "CharacterHeight": 20
+      },
+      {
+        "Stage": "minimum-width",
+        "Query": "\u0418\u043D\u0442\u0435\u0440\u0441\u0442\u0435\u043B\u043B\u0430\u0440",
+        "WindowWidth": 360,
+        "SearchHeight": 40,
+        "TextViewportHeight": 38,
+        "CharacterHeight": 20
+      },
+      {
+        "Stage": "minimum-width-\u0424\u0438\u043B\u044C\u043C\u044B",
+        "Query": "\u0418\u043D\u0442\u0435\u0440\u0441\u0442\u0435\u043B\u043B\u0430\u0440",
+        "WindowWidth": 360,
+        "SearchHeight": 40,
+        "TextViewportHeight": 38,
+        "CharacterHeight": 20
+      },
+      {
+        "Stage": "minimum-width-\u0421\u0435\u0440\u0438\u0430\u043B\u044B",
+        "Query": "\u0418\u043D\u0442\u0435\u0440\u0441\u0442\u0435\u043B\u043B\u0430\u0440",
+        "WindowWidth": 360,
+        "SearchHeight": 40,
+        "TextViewportHeight": 38,
+        "CharacterHeight": 20
+      },
+      {
+        "Stage": "minimum-width-\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0438",
+        "Query": "\u0418\u043D\u0442\u0435\u0440\u0441\u0442\u0435\u043B\u043B\u0430\u0440",
+        "WindowWidth": 360,
+        "SearchHeight": 40,
+        "TextViewportHeight": 38,
+        "CharacterHeight": 20
+      },
+      {
+        "Stage": "return-from-downloads",
+        "Query": "\u0418\u043D\u0442\u0435\u0440\u0441\u0442\u0435\u043B\u043B\u0430\u0440",
+        "WindowWidth": 510,
+        "SearchHeight": 40,
+        "TextViewportHeight": 38,
+        "CharacterHeight": 20
+      },
+      {
+        "Stage": "latin-series-query",
+        "Query": "Severance",
+        "WindowWidth": 510,
+        "SearchHeight": 40,
+        "TextViewportHeight": 38,
+        "CharacterHeight": 20
+      }
+    ],
+    "SettingsIsPage": true,
+    "ThemePersisted": true,
+    "ResumePersisted": true,
+    "FolderPersisted": true,
+    "QueriesRetainedAcrossNavigation": true,
+    "SearchShortcutRestoresContext": true,
+    "SettingsFitsNarrowWindow": true,
+    "PendingSearchDoesNotChangeSettingsPage": true,
+    "SettingsReturnsToOpenedMovie": true
+  },
+  "UiActions": {
+    "NativeMouseMenuToggle": true,
+    "MenuDismissAnimations": [
+      "None",
+      "Fade"
+    ],
+    "MenuOutsideDismiss": true,
+    "KeyboardMenuToggle": true,
+    "WholeBannerOpensCard": true,
+    "KeyboardBanner": true,
+    "SingleUpdateAction": true,
+    "UpdateRetry": true,
+    "ReadyStatePreserved": true,
+    "FirstRunFirewallOptIn": true,
+    "StartupSwitchWorks": true
+  },
+  "WheelScrolling": {
+    "Immediate": {
+      "CatalogStep": 48,
+      "SystemWheelLines": 3,
+      "SmoothingEnabled": false,
+      "PixelScrolling": true,
+      "PrecisionDelta": true,
+      "RapidInput": true,
+      "DirectionReversal": true,
+      "KeyboardInterrupt": true,
+      "NestedControlsPreserved": true,
+      "IdleTimerStopped": true,
+      "VirtualizedItems": 1000,
+      "RealizedContainers": 6
+    },
+    "Smooth": {
+      "CatalogStep": 48,
+      "SystemWheelLines": 3,
+      "SmoothingEnabled": true,
+      "PixelScrolling": true,
+      "PrecisionDelta": true,
+      "RapidInput": true,
+      "DirectionReversal": true,
+      "KeyboardInterrupt": true,
+      "NestedControlsPreserved": true,
+      "IdleTimerStopped": true,
+      "VirtualizedItems": 1000,
+      "RealizedContainers": 6
+    }
+  },
+  "SourceFailureVisible": true,
+  "SourceProgressPreservesOpenFilter": true,
+  "SourceProgressPreservesScroll": true,
+  "SourceRetryState": true,
+  "WidthChecks": [
+    {
+      "Stage": "resize-720",
+      "WindowWidth": 720,
+      "BodyWidth": 608,
+      "TitleWidth": 403,
+      "SynopsisWidth": 403,
+      "Filter": "Full HD",
+      "DownloadActionVisible": true
+    },
+    {
+      "Stage": "resize-510",
+      "WindowWidth": 510,
+      "BodyWidth": 398,
+      "TitleWidth": 341,
+      "SynopsisWidth": 341,
+      "Filter": "Full HD",
+      "DownloadActionVisible": true
+    }
+  ],
+  "Screens": [
+    "sources-light",
+    "sources-dark",
+    "sources-510",
+    "search-light",
+    "search-dark",
+    "search-small",
+    "search-minimum",
+    "settings-light",
+    "settings-dark",
+    "settings-small",
+    "settings-minimum",
+    "catalog-light",
+    "catalog-dark",
+    "detail-wide-light",
+    "detail-wide-dark",
+    "detail-720",
+    "release-720",
+    "detail-510",
+    "release-510",
+    "short-description-expanded",
+    "series-season-filter",
+    "downloads-empty",
+    "downloads-light",
+    "downloads-dark",
+    "downloads-510",
+    "downloads-360"
+  ]
+}

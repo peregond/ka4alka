@@ -1,0 +1,17 @@
+| design | ok |
+| layout | ok |
+| dpi | ok |
+| interface-polish | ok |
+| download-reliability | ok |
+| release-freshness | ok |
+| cover-viewport | ok |
+| catalog-navigation | ok |
+| catalog-paging | ok |
+| person-performance | ok |
+| bug-report | ok |
+| lan | ok |
+| cinema | ok |
+| cache | ok |
+| end-to-end | ok |
+| text-rendering | ok |
+| close | ok |

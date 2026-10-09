@@ -1,0 +1,725 @@
+PASS: exception diagnostics retain details and rotate oversized log
+PASS: weekly cache cleanup removes unused data and preserves recently accessed metadata
+PASS: cache cleanup preserves settings, queue, torrent resume, signed updates and downloaded files
+PASS: weekly cache schedule survives an application restart
+PASS: missed weekly cleanup runs on the next application startup
+PASS: cache pressure evicts the least recently accessed file before the week expires
+PASS: an oversized entry cannot exceed the global cache budget
+PASS: concurrent cache writers stay within the global budget
+PASS: forced cache cleanup reports freed space and deletes all disposable cache entries
+PASS: cache boundaries exclude transfer state and nested download folders
+PASS: production cache is capped at one gigabyte
+PASS: no payload means zero file speed
+PASS: payload rate uses actual elapsed time
+PASS: displayed speed decays when data stops
+PASS: waiting timer follows last received payload
+PASS: resume discards old speed
+PASS: engine counter reset never creates negative speed
+PASS: long sampling gaps do not show stale speed
+PASS: missing peers explained without claiming zero seeds in swarm
+PASS: connected but silent peers distinguished from downloading
+PASS: file transfer has ETA and clears waiting warning
+PASS: active file telemetry supplies numeric speed and size sort keys
+PASS: metadata does not pretend to transfer movie bytes
+PASS: unavailable trackers distinguished from an empty swarm without inventing a regional block
+PASS: healthy tracker response with no connections explains why indexed seed counts are not a transfer guarantee
+PASS: a connected metadata peer clears the tracker waiting warning
+PASS: metadata traffic does not contribute to download sorting speed
+PASS: verification has no fake network rate
+PASS: file verification clears both displayed sorting rates
+PASS: paused tasks clear transient telemetry
+PASS: paused tasks cannot rank by stale speed
+PASS: completed task shows upload only
+PASS: seeding speed remains available for queue sorting
+PASS: engine error reason reaches download card
+PASS: failed tasks do not retain a previous transfer speed
+PASS: unknown total and invalid progress never produce an ETA
+PASS: an unknown download size clears its stale numeric sort value
+PASS: choosing a parent creates the real Ka4alka download directory
+PASS: choosing Ka4alka again reuses it and preserves existing files without nesting
+PASS: a disappeared selected parent is not silently recreated
+PASS: download folder requires a fully qualified parent path
+PASS: a conflicting Ka4alka file is preserved and folder selection fails safely
+PASS: poor video source recognized: Film HDCAM 1080p
+PASS: poor video source recognized: Film HDTS 2160p
+PASS: poor video source recognized: Film CAMRip 1080p
+PASS: poor video source recognized: Film DVDSCR 1080p
+PASS: poor video source recognized: The Weight (2026) Screener [H.264/1080p]
+PASS: poor video source recognized: Фильм экранка 4K
+PASS: poor video source recognized: Film WEB-DL 480p
+PASS: poor video source recognized: Film 640x360
+PASS: poor video source recognized: Film DVDRip
+PASS: HD or unknown source is not falsely marked: Film WEB-DL 720p
+PASS: HD or unknown source is not falsely marked: Film 1080p BluRay DTS
+PASS: HD or unknown source is not falsely marked: Film 4K
+PASS: HD or unknown source is not falsely marked: Film 1920x1080
+PASS: HD or unknown source is not falsely marked: Cambridge (2026) WEB-DL
+PASS: HD or unknown source is not falsely marked: Веб-кам / Cam (2018) WEBRip 1080p
+PASS: HD or unknown source is not falsely marked: Film HDTV
+PASS: HD or unknown source is not falsely marked: Film WEBRip
+PASS: Full HD minimum hides 720p and keeps 1080p
+PASS: catalog only marks titles with exclusively known poor releases
+PASS: catalog quality updates existing bound cards when a good release arrives
+PASS: catalog quality chip uses an evidenced downloadable HD release
+PASS: screen recordings and unknown resolution cannot create a 4K quality chip
+PASS: a metadata-only record cannot create a downloadable quality chip
+PASS: catalog selects the highest evidenced downloadable resolution
+PASS: one film can match HD Ready and 4K independently without inventing FullHD
+PASS: catalog resolution choices select available variants rather than a minimum height
+PASS: screen recordings never satisfy HD Ready or 4K selections
+PASS: unavailable torrent URL cannot satisfy 4K: null
+PASS: unavailable torrent URL cannot satisfy 4K: 
+PASS: unavailable torrent URL cannot satisfy 4K:  
+PASS: unavailable torrent URL cannot satisfy 4K: not-a-torrent
+PASS: unavailable torrent URL cannot satisfy 4K: file:///tmp/video.torrent
+PASS: unavailable torrent URL cannot satisfy 4K: magnet:?xt=urn:btih:invalid
+PASS: unknown and other resolutions cannot be advertised as the selected resolution
+PASS: quality evidence accepts downloadable web links without URL credentials
+PASS: magnet quality evidence accepts matching v1 and v2 hash formats and rejects swapped prefixes
+PASS: resolvable Internet Archive entries retain quality evidence only for a valid archive item URL
+PASS: copying metadata does not let quality updates mutate another movie card
+PASS: screen capture uses a text poster badge instead of an advertised 4K resolution
+PASS: low-resolution clean video is not falsely labelled as a screen capture
+PASS: unknown clean video does not invent a quality badge
+PASS: queue quality uses release title rather than friendly film title or filename
+PASS: new installations hide poor quality by default
+PASS: an explicitly selected light theme survives upgrades
+PASS: older settings without a quality preference use the enabled default and retain the quality minimum
+PASS: older minimum-quality settings do not silently narrow the catalog to one resolution
+PASS: upgrading old serialized defaults enables quality filtering once
+PASS: disabled quality choice survives saving and reloading
+PASS: saved quality choice records that the one-time default migration is complete
+PASS: enabled quality choice and minimum survive saving and reloading
+PASS: 4K catalog choice persists independently of the existing release minimum and poor-quality flag
+PASS: HD Ready catalog selection and disabled poor-quality option survive reload
+PASS: resetting a resolution selection persists the unrestricted catalog
+PASS: unsupported saved catalog resolution returns to an unrestricted catalog without losing old preferences
+PASS: cached releases retain every evidenced resolution after reopening the app
+PASS: cancelled quality checks cannot repopulate a cleared cache
+PASS: feature artwork uses a bounded-resolution poster for the exact IMDb identity
+PASS: similarly named films cannot replace a feature with another film's artwork
+PASS: feature poster rejects an unrelated or credential-bearing image URL
+PASS: feature poster rejects an unrelated or credential-bearing image URL
+PASS: feature poster rejects an unrelated or credential-bearing image URL
+PASS: a missing high-resolution image retains the existing catalog artwork
+PASS: BigFanGroup parses a real public Russian film row with correct torrent, size, seeders
+PASS: BigFanGroup recognizes animated series and mixed Latin/Cyrillic season labels
+PASS: BigFanGroup rejects wrong film year, soundtracks, and series in film searches
+PASS: BigFanGroup Cyrillic queries use its actual CP1251 search encoding
+PASS: APIBay accepts matched video magnets and rejects wrong years/categories, zero sentinel and invalid hashes
+PASS: APIBay supports matching Russian TV episodes with TV-specific categories
+PASS: the actual native search registry includes the new film and series providers
+PASS: newest-added download is first without changing insertion order
+PASS: sorting leaves the persisted queue and object identities untouched
+PASS: alphabetical sorting uses the associated media title
+PASS: speed sorting includes active downloads and uploads and clamps negative rates
+PASS: size sorting puts larger downloads first and unknown sizes last
+PASS: progress sorting handles an invalid progress value safely
+PASS: equal Newest keys have a stable identity order
+PASS: equal Name keys have a stable identity order
+PASS: equal Speed keys have a stable identity order
+PASS: equal Size keys have a stable identity order
+PASS: equal Progress keys have a stable identity order
+PASS: large combined rates do not overflow into negative speed
+PASS: speed ordering follows refreshed telemetry
+PASS: legacy downloads receive missing addition times
+PASS: legacy times preserve insertion order before known downloads
+PASS: legacy migration is stable across application restarts
+PASS: newest-first order also works for migrated legacy queues
+PASS: legacy download can recover a poster through an exact original-title match
+PASS: partial torrent names cannot acquire an unrelated poster
+PASS: ambiguous film and series names keep their neutral poster placeholder
+PASS: a legacy lookup preserves explicit download metadata
+PASS: legacy torrent title and year recover Russian card metadata despite episode and quality tags
+PASS: metadata repair retains the original torrent release filename
+PASS: a mismatching release year cannot acquire another work's poster
+PASS: an undated release keeps its placeholder when remakes share a title
+PASS: the release year disambiguates identically named works
+PASS: a bare original-title alias cannot bypass the remake year in a bilingual release name
+PASS: bilingual release names select the correct remake using their stated year
+PASS: a year-like number inside the actual title is preserved during release matching
+PASS: selected card identity enriches an English title and missing poster from its Russian catalog entry
+PASS: persisted card identity restores metadata even when torrent naming is unrelated
+PASS: download navigation restores the exact catalog identity rather than guessing from its torrent name
+PASS: older partial metadata or a zero score does not hide a confirmed catalog rating
+PASS: cached download details preserve the exact navigation ID, page and media category
+PASS: a lightweight cached row cannot hide known credits, awards, collections or a complete description when a download card reopens
+PASS: reopenedCard download cards retain confirmed genres, country provenance and external identity
+PASS: credits and related metadata survive a persisted cache round trip and another download-card opening
+PASS: matching names never copy another page's or media category's credits into a download card
+PASS: downloads without a trusted associated catalog page do not open an unrelated card
+PASS: cached release hash restores the correct card for an unrecognizable legacy torrent name
+PASS: conflicting cached release identities cannot silently choose an unrelated cover
+PASS: different Torznab ports cannot associate an unrelated release poster
+PASS: an exact Torznab URL still restores its own card metadata
+PASS: addition dates and associated media titles survive queue serialization
+PASS: live rates are not restored as stale network activity
+PASS: saving new release identities signals metadata repair even when the catalog card is unchanged
+PASS: restoring an old queue assigns addition dates without starting the torrent engine
+PASS: legacy queue addition dates are persisted once and retained after restart
+PASS: restored legacy queue presents its latest addition first
+PASS: background metadata repair updates an actual restored queue using release titles and historical cached torrent identity
+PASS: restored queue metadata repair persists its cover and Russian title while keeping release name and order
+PASS: metadata repair is stable after a repaired queue is reopened
+PASS: partly indexed catalog page is completed from direct source
+PASS: direct source failure retains usable partial index page
+PASS: short search result does not trigger catalog page completion
+PASS: initial catalog contains 100 cards and retains unused page remainder
+PASS: partial failed refresh retains previously visible cached selection
+PASS: successful shorter catalog is not padded with obsolete cache entries
+PASS: load more appends 100 without skipping or refetching the buffered 20 cards
+PASS: next catalog batch does not mutate previous state
+PASS: failed next page retains visible and buffered cards with a retry cursor
+PASS: catalog retry completes interrupted batch, retains existing order and avoids duplicate cards
+PASS: source repeating same page cannot loop or duplicate catalog
+PASS: catalog exhaustion keeps all remaining cards and hides load more
+PASS: end of source page limit drains buffer without offering impossible requests
+PASS: cancellation leaves previous catalog intact
+PASS: old saved cards with a missing genre retain their category and layout
+PASS: multiline cached series genres stay on one compact metadata line
+PASS: late series metadata cannot introduce line breaks into card layout
+PASS: empty metadata does not add a dangling separator
+PASS: smooth wheel starts gently instead of jumping on its first frame
+PASS: smooth wheel stays within bounds and reaches the same distance at 60 Hz
+PASS: smooth wheel starts gently instead of jumping on its first frame
+PASS: smooth wheel stays within bounds and reaches the same distance at 120 Hz
+PASS: wheel uses small pixel steps and preserves precision deltas
+PASS: wheel respects disabled scrolling and system page preference
+PASS: wheel reversal discards pending motion in old direction
+PASS: rapid wheel input accumulates within scroll bounds
+PASS: source filter combines genre, year, country and rating without changing their meanings
+PASS: collections map to verified public catalog routes
+PASS: catalog rejects injected filter paths
+PASS: catalog extracts source filter choices and real next-page link
+PASS: current-page or unrelated links cannot create a phantom next page
+PASS: source parser retains all 60 cards instead of discarding 20
+PASS: 40-card pages cover 60-card source pages without skipping films
+PASS: native client respects backend hasMore=false even on a full last page
+PASS: source next-page state matches UI page 1
+PASS: source next-page state matches UI page 2
+PASS: source next-page state matches UI page 3
+PASS: source next-page state matches UI page 4
+PASS: source next-page state matches UI page 5
+PASS: native source browsing retains all films across 60-to-40 page boundaries
+PASS: head rel=next link keeps the catalog navigable without a visible anchor
+PASS: application includes at least 2000 distinct real movies
+PASS: offline pages 1 and 50 contain distinct movies
+PASS: snapshot reports its actual last page
+PASS: page numbers cover current selection within source limits
+PASS: known last page removes impossible numbered destinations
+PASS: saved filters combine country and genre and reject missing or invalid ratings
+PASS: home country defaults to Russia and rejects unknown persisted selections
+PASS: regional shelves classify actual country keys relative to the selected home country
+PASS: a coproduction with the home country appears only in its native shelf
+PASS: a single confirmed country membership cannot prove a film is foreign after the home country changes
+PASS: country labels and film titles cannot invent missing source country keys
+PASS: invalid country keys are ignored while repeated source keys normalize safely
+PASS: changing the home country reverses the classification without changing film data
+PASS: regional selection preserves source order and removes duplicate and unclassified films
+PASS: native source browsing uses an exact country feed while foreign browsing never invents an unsupported negation filter
+PASS: saved filters enforce the regional classification as well as their existing criteria
+PASS: a selected source country filter proves only native membership without inventing a complete production-country list
+PASS: requesting a country filter alone cannot establish membership when the source does not confirm the selected filter
+PASS: regional loading excludes coproductions, unknown countries, incomplete country dictionaries and mismatched metadata while retaining source pagination
+PASS: country enrichment limits concurrent requests and publishes confirmed partial shelves
+PASS: positive country snapshots and confirmed unknown metadata are reused while incomplete or wrong-identity responses remain retryable
+PASS: a verified native feed avoids per-film detail requests
+PASS: existing detail snapshots supply verified countries offline without repeating metadata requests
+PASS: a cached native-feed country stamp preserves its partial provenance and never becomes foreign proof
+PASS: a partial detail cache still requests complete countries and excludes a confirmed home-country coproduction
+PASS: shared catalog metadata retains country provenance and rejects invalid country keys
+PASS: leaving a regional page cancels pending metadata work without writing canceled snapshots
+PASS: daily catalog refresh changes at 05:00 UTC rather than on every navigation
+PASS: shared catalog validates both libraries and places newer releases before older titles
+PASS: malformed, future or incomplete daily feed cannot replace the complete library
+PASS: malformed, future or incomplete daily feed cannot replace the complete library
+PASS: malformed, future or incomplete daily feed cannot replace the complete library
+PASS: a library without a complete feed is eligible for a background refresh
+PASS: one daily feed provides all 50 pages without repeated network downloads or overlapping movies
+PASS: a current complete feed does not trigger repeated background refreshes
+PASS: newly indexed series are available to the existing unified search
+PASS: a fresh persisted library remains available after restart without a network request
+PASS: an invalid persisted catalog is replaced by a complete current feed without breaking browsing
+PASS: failed daily refresh keeps the previous complete library instead of clearing it
+PASS: background refresh honors the offline retry delay
+PASS: offline retry delay avoids fetching the same failed feed for every page
+PASS: cancelled browsing cannot publish a daily catalog result
+PASS: unified search queries both catalogs and preserves cross-category identities
+PASS: exact title ranks first and duplicate cached records merge
+PASS: result type filters do not run another search
+PASS: one catalog failure retains working and saved search results
+PASS: cancelled query cannot publish fallback results
+PASS: opened film metadata bypasses a full catalog ratings queue
+PASS: fast source publishes usable release before slow source finishes
+PASS: failed source does not remove working source results
+PASS: empty successful reply is distinct from unavailable source
+PASS: progress ends with every attempted source settled
+PASS: timeout remains local to one source
+PASS: caller cancellation stops release search
+PASS: fresh seeder count replaces older higher cached count
+PASS: same torrent from multiple live sources is deduplicated
+PASS: partial source success retains distinct saved alternatives
+PASS: wrong declared film year is rejected beyond RuTor
+PASS: quality suffix without declared year can match title
+PASS: wrong declared year after original title alias is rejected
+PASS: number in film title is not mistaken for its release year
+PASS: release cache restores receipt time and per-source evidence
+PASS: empty failed refresh does not rewrite useful cache timestamp
+PASS: older release cache remains readable after source status upgrade
+PASS: release age uses its original receipt time
+PASS: release age follows the supplied clock
+PASS: legacy and invalid future receipts do not look fresh
+PASS: successful source reply stamps the received row at the actual response time
+PASS: source search does not mutate an older cache row
+PASS: index receipt is visibly distinct from a direct tracker response
+PASS: freshness does not claim peer availability or expose release URLs
+PASS: failed source records an attempt without a fresh successful reply
+PASS: failed source display shows attempt age while omitting raw exception URLs and passkeys
+PASS: failed refresh keeps the earlier successful response distinct from its new attempt
+PASS: Russian audio is visible while Russian subtitles alone do not become audio
+PASS: audio and participant hints state their evidence limits
+PASS: partial source success rewrites cache without refreshing retained older rows
+PASS: an all-failed request preserves useful cached dates
+PASS: expired cache evidence is rejected instead of looking current
+PASS: a rewritten legacy cache envelope does not invent a per-row receipt date
+PASS: bug-report export removes Личное кино
+PASS: bug-report export removes Another Person
+PASS: bug-report export removes private-server
+PASS: bug-report export removes private-user
+PASS: bug-report export removes private-hash
+PASS: bug-report export removes private-passkey
+PASS: bug-report export removes private-query
+PASS: bug-report export removes private-password
+PASS: bug-report export removes private-authorization
+PASS: bug-report export removes private-cookie
+PASS: bug-report export removes private quoted password
+PASS: bug-report export removes private-json-passkey
+PASS: bug-report export removes Unknown
+PASS: bug-report export removes private-access-token
+PASS: bug-report export removes private-client-secret
+PASS: redacted report retains useful tracker host and visible omission markers
+PASS: redaction is stable when reviewed reports are sanitized again before export
+PASS: recognizable GitHub credentials are removed even without a named secret field
+PASS: decoded nested JSON errors sanitize complete double/single-quoted secrets and multiword authentication headers
+PASS: plaintext single-quoted secrets are removed completely
+PASS: plaintext quoted authorization and cookie assignments are removed completely
+PASS: short reports open only the repository's existing GitHub issue form
+PASS: prefilled GitHub YAML fields preserve Russian, percent signs and line breaks
+PASS: report uses the real issue form field IDs rather than an ignored body parameter
+PASS: description, steps, diagnostic preview and browser parameters are all sanitized
+PASS: large diagnostic logs use a browser-safe link and explicit full-report clipboard fallback
+PASS: overflow never truncates the user's problem or steps and explains where the full report went
+PASS: a long description is kept intact for copy/save instead of silently losing critical instructions
+PASS: title length limit never splits a Unicode surrogate pair
+PASS: empty bug descriptions cannot open an empty issue
+PASS: overflow marker itself respects small URI budgets around the fallback boundary
+PASS: background report reading uses an immutable UI snapshot and does not start an idle torrent engine
+PASS: report tails stay bounded even when an existing log is large
+PASS: an incomplete log-tail record is omitted when its missing prefix could identify a secret
+PASS: closing a report can cancel pending background collection
+PASS: an original title in a catalog task cannot stand in for an opened film's description and credits
+PASS: description and actors appear before a stalled index settles
+PASS: deadline preserves completed source metadata even when another provider ignores cancellation
+PASS: failed details settle without persisting a loading or error placeholder as a film description
+PASS: a retry can recover complete details after both sources failed
+PASS: partial metadata and temporary placeholders cannot overwrite a confirmed biography, credits or rating
+PASS: canceling a detail request stops both metadata providers
+PASS: canceling a queued metadata task does not start a network request
+PASS: a complete recent metadata cache opens immediately without repeating a source request
+PASS: a source challenge cannot replace confirmed cached film metadata with an empty page
+PASS: a corrupt detail snapshot is bypassed and repaired from usable source metadata
+PASS: a fresh partial snapshot is supplemented instead of freezing an empty description and actor list
+PASS: Zona JSON supplies the identified film's own description, original title and separate Kinopoisk/IMDb scores
+PASS: Zona JSON preserves actor photo, official English name and source ID while leaving a director without a source photo unset
+PASS: Zona genres and countries include only rows selected by the identified film's exact source IDs
+PASS: an unmatched selected country ID keeps the country list partial instead of falsely classifying a coproduction as foreign
+PASS: an invalid selected country identifier cannot become proof of a complete production-country list
+PASS: missing or invalid source scores stay unknown without borrowing the unrelated aggregate rating
+PASS: Zona JSON rejects another title or another release year before using any cast or ratings
+PASS: an exact verified original title and year can identify a film with another localized title
+PASS: HTML and unrelated JSON shapes fall through to the existing source parser
+PASS: structured movie metadata only applies to the trusted catalog's detail route
+PASS: Zona actor photos reject a lookalike host and a different source person's image ID
+PASS: series metadata uses the actual serial root and cannot consume a film object's credits
+PASS: JSON headers are scoped to a single trusted detail request and cannot leak into concurrent torrent or catalog searches
+PASS: JSON detail requests enforce the same bounded response size as other sources
+PASS: film details request the catalog's richer JSON representation
+PASS: complete Zona JSON loads credits and photographs with one source request
+PASS: the recent detail cache retains source photographs and exact actor identity fields offline
+PASS: a server that ignores JSON headers uses its returned HTML without a second request
+PASS: a server that rejects the JSON request can still load HTML using a plain second request within the original source budget
+PASS: canceling a JSON detail request stops loading without starting a fallback HTML request
+PASS: an incomplete valid JSON response can supplement its missing description from HTML without losing source photos or ratings
+PASS: an optional HTML failure retains already verified JSON credits and actor photographs
+PASS: an unrelated JSON response cannot overwrite a verified expired detail cache
+PASS: richer structured credits preserve previously verified crew roles and portrait fields
+PASS: cast merging does not combine namesakes with different explicit source IDs
+PASS: cast merging cannot inherit a name-only portrait belonging to another explicit source ID
+PASS: cast merging preserves distinct verified profile identities of namesakes
+PASS: combined index and direct metadata retain the index's verified cinematographer together with the direct source's actor photos
+PASS: a large actor list cannot displace the director from bounded movie credits
+PASS: portrait lookup includes exact canonical surname and role-qualified Wikipedia titles
+PASS: canonical name order identifies an actor without fuzzy search
+PASS: portraits reject another profession and another person's exact name
+PASS: disambiguation pages never supply a photograph
+PASS: portrait thumbnails require the trusted Wikimedia image host
+PASS: modern Wikimedia thumbnail CDN is accepted while lookalike, HTTP and credential URLs are rejected
+PASS: professional portraits accept only the confirmed KinoUA image host and people-image paths
+PASS: Zona portraits require the four confirmed image hosts and exact numeric actor-image paths without credentials, redirects or film posters
+PASS: Scott Waugh uses the exact professional credit name and portrait, with cached reuse and no speculative Wikipedia alias
+PASS: a verified professional portrait remains available offline
+PASS: a film's exact credited person uses the supplied Zona portrait immediately without profile requests
+PASS: cached movie detail preserves the source-bound portrait and person identity
+PASS: an unscoped, spoofed or mismatched movie credit cannot supply a direct portrait and falls back to the verified professional profile
+PASS: a portrait from a different provider cannot masquerade as film-scoped Zona metadata
+PASS: cancelled direct portraits stop before work while validated cached fallback stays offline
+PASS: validated Zona portrait bytes reuse the normal image cache offline, including an older readable image
+PASS: a damaged cached Zona photograph is replaced once rather than retained as an empty tile
+PASS: a temporary professional source outage can retry even when the fallback has no matching identity
+PASS: an explicit Wikipedia alias safely resolves a canonical name containing a patronymic
+PASS: another namesake's redirect cannot identify the requested actor
+PASS: trusted redirect evidence supplies the actor portrait
+PASS: canonical patronymic identity retains its accepted alias in the offline cache
+PASS: legacy week-long empty portrait entries are refreshed immediately
+PASS: portrait resolution only queries bounded exact identity variants
+PASS: fresh confirmed identity thumbnails are available offline without requests
+PASS: expired positive portrait identities survive source outages
+PASS: a transient portrait error is distinct from a confirmed absent image
+PASS: transient portrait errors are not persisted as missing images
+PASS: a confirmed absent identity is cached briefly to avoid repeated requests while a crew card rerenders
+PASS: an explicit portrait retry bypasses the short confirmed-missing cache
+PASS: a confirmed person without an article or Wikidata photograph settles into the missing state
+PASS: an absent photograph is rechecked within an hour rather than remain hidden for a week
+PASS: temporary Wikipedia rate limits receive one delayed retry without producing an empty portrait cache
+PASS: rerendered portraits share in-flight identity work even when the old visual is cancelled
+PASS: missing article thumbnails and pageprops use the exact canonical Wikidata sitelink and original Wikimedia portrait
+PASS: person biography and known film appear before the filmography article finishes loading
+PASS: resolved biography is cached before long filmography requests finish
+PASS: leaving the person page cancels unfinished filmography without later progress callbacks
+PASS: a verified filmography card appears while another film source is still waiting
+PASS: a complete cached person biography and verified filmography publish immediately offline
+PASS: an early cached biography with two known films still refreshes unfinished filmography
+PASS: a primary-provider outage does not overwrite its useful cached biography with a Wikipedia fallback
+PASS: verified translated credit aliases survive reopening a cached person profile offline
+PASS: primary professional biography and translated verified credits appear before optional filmography without Wikipedia requests
+PASS: primary biography cache remains resumable while its filmography is unfinished
+PASS: a professional filmography outage retains biography and confirmed films with a resumable cache
+PASS: reopening an incomplete primary profile retries filmography without replacing the successful biography provider
+PASS: filmography translation matches exact original title and year and rejects unrelated or undated works
+PASS: bundled real catalog resolves a professional filmography title through its exact original title and year
+PASS: same-name participants with different explicit profile URLs retain their own cached biographies and filmographies offline
+PASS: an explicit participant rejects a cached biography with a conflicting professional source even under its correct cache filename
+PASS: an explicit participant rejects a cached biography with a conflicting person identity even under its correct cache filename
+PASS: profiles without an explicit source URL keep the existing offline cache filename
+PASS: numeric source person identities isolate same-name profile caches and reject conflicting known film credits
+PASS: an explicit professional profile does not publish another same-name film without a matching credit identity or verified work list
+PASS: an unrelated name-only known film remains excluded after the explicit professional filmography finishes
+PASS: professional JSON-LD supplies an exact name, official English alias, photograph and credited source
+PASS: an official professional alias identifies the same person without transliteration guesses
+PASS: a declared Zona original name must agree with the professional source's English identity alias
+PASS: professional profile cache keys separate exact source IDs and declared original names
+PASS: professional identities reject another name and an unrelated profession
+PASS: the professional cinema source's plain operator job title identifies a cinematographer
+PASS: a director of photography belongs to cinematographers rather than film directors
+PASS: an explicit professional job title takes precedence over another person's profession mentioned in the biography
+PASS: a page heading cannot override the professional source's structured identity
+PASS: a professional profile cannot supply an untrusted image host
+PASS: professional source identities reject credentials, ports and query redirects
+PASS: professional portrait validation restricts both image type and people-image directory
+PASS: unrelated primitive structured data does not break an otherwise verified profile
+PASS: professional filmography preserves original title and year for catalog translation matching
+PASS: professional filmography retains only the requested role and excludes footer recommendations
+PASS: a person's profile recommendations are never accepted as their filmography
+PASS: concurrent biography and portrait requests share one lookup while a canceled subscriber leaves the other lookup active
+PASS: a verified professional profile is reused from the managed cache
+PASS: manual profile refresh bypasses the fresh professional cache
+PASS: verified professional biography and portrait remain available without network access
+PASS: an expired positive professional profile survives a temporary source outage
+PASS: temporary source errors do not become cached missing identities
+PASS: an HTTP 200 challenge page is retryable instead of a confirmed missing actor
+PASS: a confirmed name mismatch is briefly cached to avoid repeated actor requests
+PASS: a successful manual refresh clears the earlier missing identity cache
+PASS: a verified profile can retain biography while the image is unavailable
+PASS: a profile without a photo refreshes after an hour rather than keeping an empty portrait for a week
+PASS: professional filmography caches remain separate for different roles of the same person
+PASS: professional filmography is reused without another source request
+PASS: a failed optional filmography request remains retryable and retains the already cached biography and portrait
+PASS: global professional search verifies exact names and roles using the discovered public surname form
+PASS: professional search preserves a verified English alias and shares the public form discovery
+PASS: same-name professionals are not selected without an identifying credit
+PASS: a same-name professional is identified by the exact original film title and year despite a different translated catalog title
+PASS: professional surname lookup follows the real page-two route while ignoring another filter, footer links and a lookalike host
+PASS: professional surname lookup is bounded to three pages rather than scanning an entire directory
+PASS: an incomplete bounded surname lookup remains retryable and never caches a false missing identity
+PASS: professional surname search reads three profiles concurrently and retains verified results when another profile is unavailable
+PASS: a global search with unavailable profile pages remains retryable rather than becoming confirmed empty results
+PASS: changing the global search cancels unfinished professional profile reads and publishes no stale results
+PASS: successfully checked film without any releases is hidden from the feed
+PASS: empty-release evidence survives restart
+PASS: a hidden film becomes eligible for a fresh check after one day
+PASS: future cache timestamps cannot hide catalog cards
+PASS: a Unavailable provider is not mistaken for an absent release
+PASS: a TimedOut provider is not mistaken for an absent release
+PASS: a Searching provider is not mistaken for an absent release
+PASS: a Saved provider is not mistaken for an absent release
+PASS: a found release restores the film even when indexed seed count is zero
+PASS: network failure preserves known download options and their timestamp
+PASS: default ordering prefers evidenced Russian audio while retaining alternatives and deprioritizing known zero-seed options
+PASS: foreign dubbing without Russian language evidence is not labeled Russian
+PASS: Russian-source voice markers are preferred over an unknown language
+PASS: copied logs redact plaintext and JSON paths, credentials, passkeys and bearer tokens
+PASS: collecting diagnostics includes errors and network state without starting the torrent engine
+PASS: copied report remains bounded when existing logs are large
+PASS: window fits physical work area at Windows scale 100%
+PASS: window fits physical work area at Windows scale 120%
+PASS: window fits physical work area at Windows scale 125%
+PASS: window fits physical work area at Windows scale 150%
+PASS: window fits physical work area at Windows scale 175%
+PASS: window fits physical work area at Windows scale 200%
+PASS: window fits physical work area at Windows scale 250%
+PASS: current-user startup enable/disable preserves unrelated shell and app entries
+PASS: explicit firewall setup is idempotent, limited to this executable and private TCP/UDP, and preserves firewall profiles
+PASS: native notification buffers bound long Russian names and control characters without splitting a supplementary glyph
+PASS: disabled Windows notifications never create a tray icon or submit a banner
+PASS: Windows Shell accepts a native notification with the real application icon (visible banners remain controlled by Focus Assist)
+PASS: dismissing notifications removes the transient tray entry
+PASS: completed download notifications are delivered once per task in a session
+PASS: repeated download errors are throttled per task
+PASS: one failing download does not suppress another download's warning
+PASS: low-space notices use an independent per-task throttle
+PASS: error notifications can be retried after five minutes while completion stays deduplicated
+PASS: turning notifications off cancels pending native notices
+PASS: test notification uses the same accepted native delivery channel
+PASS: fixture Shell entry removed before testing a taskbar recreation
+PASS: notification callback handles taskbar recreation and submits a new transient Shell entry
+PASS: native notification activation opens the existing Downloads view and clears the transient icon
+PASS: notification channel remains usable after activation
+PASS: closing the notification channel releases its Shell entry, native icon and HWND callback
+PASS: diagnostics identify missing connected peers without trusting advertised seed counts
+PASS: unknown adapter status is not reported as an outage
+PASS: an observed unavailable adapter produces a network reason
+PASS: manual pause has priority over an outage and cannot reconnect itself
+PASS: completed torrent does not pretend that zero download speed is an error
+PASS: local file verification is distinguished from a network wait
+PASS: actual payload traffic outranks a stale adapter observation
+PASS: a brief zero-rate interval after payload is not classified as a stall
+PASS: connected peers without recent payload are explained separately
+PASS: new connections get time to initialize before suggesting retries
+PASS: magnet metadata waiting is distinguished from payload downloading
+PASS: an absent manager does not invent observations or offer an impossible connection retry
+PASS: actual tracker failures suggest retry without assigning country or firewall blame
+PASS: tracker failures cannot override actual peer connections
+PASS: pending tracker responses are not counted as failures
+PASS: an answering tracker does not prove that a payload peer is available
+PASS: known lack of queue disk budget has priority over automatic safety pause
+PASS: an inaccessible disk is not misreported as a full disk
+PASS: space facts describe the queue and reserve rather than only the current file
+PASS: engine errors remain actionable even if network is present
+PASS: an offline engine error does not offer a retry that cannot run
+PASS: copyable diagnostics redact private paths and tokens while retaining tracker host observations
+PASS: disk budget includes existing bytes, other active files on the same volume and one fixed reserve
+PASS: one byte below the combined budget prevents a new transfer
+PASS: completed and partial paths for one payload are credited once
+PASS: fully preallocated payload is not budgeted again from reported progress
+PASS: verified complete files may seed even when the disk has no spare space
+PASS: shared payload paths are not reserved twice
+PASS: overlapping torrent paths budget the larger expected payload instead of silently skipping it
+PASS: cached completed progress cannot bypass the space guard after its file was deleted
+PASS: unavailable destination is explicit and does not pretend the drive is full
+PASS: failure to inspect another drive does not mark a healthy destination unavailable
+PASS: very large torrent budgets saturate without integer overflow
+PASS: actual existing file allocation is credited using the destination volume
+PASS: actual sparse file's large logical size and stale progress never stand in for allocated storage
+PASS: recovery fixture is seeding real data
+PASS: insufficient disk budget adds a safely paused task without starting transfer
+PASS: preflight shortage emits one low-space notice
+PASS: retry with insufficient space retains pause reason without repeating the notice
+PASS: disk-pause reason survives restart and never becomes a startup auto-resume
+PASS: explicit Continue rechecks freed space and resumes the same payload
+PASS: released disk pause enters actual download mode
+PASS: transfer receives real pieces before simulated network loss
+PASS: network loss is explained while preserving active queue intent
+PASS: stopped local peer sends no new payload while the network is offline
+PASS: offline signal never starts new connection attempts
+PASS: local peer becomes available after the outage
+PASS: network return reconnects exactly the active task
+PASS: automatic recovery preserves manual pauses and deleted tasks
+PASS: recovered transfer finishes from retained pieces
+PASS: network recovery retains the selected infohash and produces byte-identical payload
+PASS: network recovery downloads the explicitly retained missing file and verifies its SHA256
+PASS: real completion emits one notice despite repeated telemetry refreshes
+PASS: interrupted restart fixture retains an active but stopped manager
+PASS: later network return rescues active stopped managers without a manual-pause bypass
+PASS: disabled recovery still refreshes network observations without restarting tasks
+PASS: recovery-capable service closes within its bounded shutdown budget
+PASS: restored completed task validates its retained files
+PASS: restored completed downloads do not create historical completion notifications
+PASS: blocked-I/O fixture starts an active transfer
+PASS: recovery is waiting on a genuinely blocked disk query
+PASS: closing cancels a pending disk query without waiting for the removable/network drive
+PASS: canceled recovery cannot restart a transfer after shutdown
+PASS: a queued download cannot reopen the torrent engine during shutdown
+PASS: closing retains the original queue without starting an older pending add
+PASS: close during recovery persists active intent for the next launch
+PASS: magnet pauses immediately after discovering a payload that exceeds the available budget
+PASS: magnet shortage retains file metadata and emits exactly one low-space notice
+PASS: network recovery never resumes a task paused for disk space
+PASS: deletion removes readonly completed and partial payload, deduplicates paths and tolerates missing files
+PASS: deletion leaves unrelated content and attributes intact
+PASS: all paths are validated before any payload is deleted
+PASS: directory masquerading as a torrent file never deletes prior payload or directory contents
+PASS: successful deletion removes empty torrent parents and keeps the download root
+PASS: removing a queue entry preserves payload and the user's original torrent file
+PASS: a stale deleted queue item cannot later delete its retained payload
+PASS: canonical shared payload paths block deletion and retain both queue items
+PASS: deletion succeeds after the other reference is removed
+PASS: native Windows fixture creates an actual directory junction
+PASS: Windows junction is rejected before any legitimate or external payload is deleted
+PASS: transient Windows lock waits without deleting an open file
+PASS: deletion retries transient Windows sharing violation within a bounded time
+PASS: permanent file lock reports a useful reason without claiming deletion
+PASS: failed removal is bounded, retains the queue item and restores readonly attributes
+PASS: failed file deletion survives queue restart for a safe retry
+PASS: retry after the external handle closes deletes the retained task and payload
+PASS: removal failure logs contain the file stage and Windows error without private paths
+PASS: unknown-metadata removal deletes the task without guessing payload paths or erasing the user's torrent
+PASS: first payload is deleted while the second is held by a Windows handle
+PASS: Close preserves cancellation semantics and the actual partial-deletion count
+PASS: canceled removal retains the locked file, its readonly attribute and a useful partial-deletion warning
+PASS: canceled partial deletion keeps a persisted task for retry after restart
+PASS: canceled removal diagnostic reports one file already deleted
+PASS: LAN payload contains authored torrent bytes and catalog metadata without either computer's filesystem paths
+PASS: native LAN receiver refuses requests without an authenticated sender before creating a torrent engine
+PASS: remote download requires an already configured receiver folder and never opens a folder picker
+PASS: remote download refuses a relative persisted receiver folder without creating it
+PASS: remote download refuses a missing configured receiver folder without silently replacing the user's choice
+PASS: invalid torrent bytes and ambiguous magnet-plus-file requests do not enter the native queue
+PASS: canceled reception cannot add a native queue entry
+PASS: native LAN acknowledgement identifies an actual MonoTorrent queue entry in the receiver's chosen Ka4alka folder
+PASS: native reception preserves the Russian card title, poster, type, year, card link and separate raw torrent name
+PASS: received torrent is validated and durably cached before acknowledgement, independently of the sender's original file
+PASS: received staging file is cleaned and the sender's original torrent remains intact
+PASS: authenticated sender identity, request ID and content digest are saved in the first durable queue entry before success is acknowledged
+PASS: concurrent retries return the original native receipt without adding duplicate downloads
+PASS: another remote request for the same actual torrent hash acknowledges the existing native queue item
+PASS: durable queue identity prevents a retry from duplicating work after restart even without a core receipt ledger
+PASS: persisted native request digest refuses a conflicting payload with the same authenticated request ID even after restart
+PASS: receiver restart retains its own usable torrent metadata and never depends on the sender's file path
+PASS: sender validates an authored torrent before preparing a remote request
+PASS: sender refuses a torrent file above the transfer limit before reading it into a remote payload
+PASS: paired metadata cannot make the receiving app fetch a private image or open a private non-catalog movie page
+PASS: a synchronously completed image fetch still decodes outside the caller context
+PASS: a cached image decodes outside the caller context without downloading again
+PASS: a corrupt cached image still repairs through the background image pipeline
+PASS: a canceled unloaded image does not start a fetch or decode
+PASS: cancellation during decoding prevents publishing or storing an obsolete image
+PASS: tracker discovery fixture seeder ready
+PASS: magnet obtains file metadata through HTTP while its UDP tracker never responds
+PASS: tracker-discovered peer transfers the real payload without injected peers or DHT
+PASS: fallback discovery transfers bytes matching SHA256
+PASS: a failed HTTP tracker does not prevent another independent tier from finding a peer
+PASS: fallback tracker deduplication retains the original tracker
+PASS: discovery keeps the exact selected infohash
+PASS: closing with an unresponsive UDP tracker finishes promptly and persists the queue
+PASS: public magnet remains eligible for startup resume
+PASS: restored older TPB magnet gains fallback discovery without changing its payload path
+PASS: upgrading discovery preserves the original download folder
+PASS: public .torrent transfer discovers its seed through fallback trackers without an injected peer
+PASS: public source .torrent fallback preserves the selected payload bytes
+PASS: private torrents do not gain public trackers
+PASS: portraits accept only HTTPS Wikimedia image addresses
+PASS: person photograph is resolved from the confirmed biography
+PASS: person photograph metadata remains available offline
+PASS: ambiguous biographies never supply another person's photograph
+PASS: source HTML indentation cannot become multiline series genres or country names
+PASS: normalized series metadata remains usable from the offline cache
+PASS: RuTor recovers actual releases through its second public mirror when the primary fails
+PASS: credits preserve multiple roles, decode names, reject foreign links and deduplicate
+PASS: person links stay on trusted catalog routes
+PASS: collections use explicit membership rather than unrelated navigation
+PASS: current Zona unlinked person spans become local person cards
+PASS: filmography handles year rowspans without reading roles as titles
+PASS: person filmography keeps card ratings and excludes unknown scores from top
+PASS: person filmography and film connections survive offline restart
+PASS: broken cover cache is replaced by a valid downloaded image
+PASS: valid cover cache avoids another request
+PASS: temporary image request failure does not preserve broken cache
+PASS: Torznab result parsing
+PASS: release quality uses HD Ready, Full HD and 4K labels
+PASS: HDTV alone does not invent a resolution
+PASS: movie releases match title and year
+PASS: Knaben accepts RuTracker video with a valid hash and rejects other trackers, years, titles, and categories
+PASS: NNM-Club accepts the real Screener release in the Экранки category while preserving title/year matching
+PASS: NNM-Club movie results keep torrent URL, exact size and seeders, and reject wrong year/category/URL
+PASS: NNM-Club keeps matching series seasons despite a later release year
+PASS: MegaPeer movie search uses CP1251 title mode and rejects wrong year or mismatched download ID
+PASS: MegaPeer keeps matching series results
+PASS: series search matches aliases and excludes sequels
+PASS: season and episode labels are extracted
+PASS: TVMaze identity uses exact title and year
+PASS: EZTV filters unrelated titles
+PASS: Nyaa RSS parses torrent and seeder count
+PASS: online catalog maps posters and ratings while keeping existing favorite IDs
+PASS: online series catalog maps section and identity
+PASS: online detail fills original title, description, and both ratings
+PASS: direct online release reads stamp the actual index receipt for catalog quality and availability caches
+PASS: online RuTracker release keeps source attribution and download metadata
+PASS: online releases keep resolvable Archive entries and reject unusable URLs
+PASS: online requests use the configured API and encode search and media IDs
+PASS: online NNM-Club .torrent endpoint is accepted while altered query and host are rejected
+PASS: online MegaPeer .torrent endpoint is accepted while altered query and host are rejected
+PASS: local catalog index persists aliases and ranks exact matches
+PASS: release index survives restart
+PASS: window fits available desktop at normal and 200% scale
+PASS: poster columns follow available width
+PASS: new settings require one-time download folder choice
+PASS: unconfigured folder state survives restart
+PASS: older settings without folder choice require one-time prompt
+PASS: chosen download folder survives restart without prompting again
+PASS: favorites survive settings save and restart
+PASS: folder changed in settings survives restart
+PASS: XML external entities rejected
+PASS: local seeder ready
+PASS: speed limits configured without creating idle engine
+PASS: torrent enters actual queue
+PASS: adding a torrent with an empty source poster retains the selected catalog poster
+PASS: new download keeps Russian card metadata and the actual raw torrent filename separately
+PASS: magnet and .torrent share duplicate identity
+PASS: duplicate did not alter queue
+PASS: configured limits applied on engine creation
+PASS: speed limits apply to running engine without restart
+PASS: torrent starts waiting for peers
+PASS: stalled download explains missing peers
+PASS: BitTorrent transfer reaches 100%
+PASS: peer warning clears after transfer
+PASS: completed real transfer shows no stale download speed or ETA
+PASS: completed per-file progress available in download details
+PASS: stop seeding affects completed tasks only
+PASS: stop downloads affects unfinished tasks only
+PASS: start seeding leaves unfinished tasks paused
+PASS: start downloads resumes unfinished tasks
+PASS: pause stops torrent
+PASS: download bytes match SHA256
+PASS: duplicate rejected
+PASS: queue restores paused without network
+PASS: queue restore retains the original addition date, title, type and poster
+PASS: card identity and separate release labels persist through a real queue restart
+PASS: saved file list and per-file progress survive restart
+PASS: resume restarts torrent
+PASS: resuming a torrent does not change its addition order
+PASS: remove keeps downloaded files
+PASS: selected catalog artwork takes precedence over a torrent source poster
+PASS: magnet transfer reaches 100%
+PASS: magnet download matches SHA256
+PASS: invalid magnet rejected
+PASS: invalid link did not alter queue
+PASS: file deletion rejects paths outside download folder
+PASS: delete with files removes only torrent payload and preserves unrelated files
+PASS: invalid torrent rejected
+PASS: invalid torrent did not alter queue
+PASS: active task queued for startup resume
+PASS: startup resumes active task
+PASS: deliberately paused task stays paused
+PASS: quality filter data
+PASS: combined empty filter case
+All integration checks passed. D:\a\ka4alka\ka4alka\test-output\transfer-569624ed876a484d97f8b4f7a95d55ec

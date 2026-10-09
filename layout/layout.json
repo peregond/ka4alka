@@ -1,0 +1,34 @@
+[
+  {
+    "Name": "wide",
+    "Width": 1000,
+    "Height": 696,
+    "BodyWidth": 700,
+    "Columns": 4,
+    "FiltersVisible": false
+  },
+  {
+    "Name": "standard",
+    "Width": 1000,
+    "Height": 696,
+    "BodyWidth": 700,
+    "Columns": 4,
+    "FiltersVisible": false
+  },
+  {
+    "Name": "scaled",
+    "Width": 680,
+    "Height": 360,
+    "BodyWidth": 568,
+    "Columns": 3,
+    "FiltersVisible": false
+  },
+  {
+    "Name": "small",
+    "Width": 510,
+    "Height": 340,
+    "BodyWidth": 398,
+    "Columns": 2,
+    "FiltersVisible": false
+  }
+]

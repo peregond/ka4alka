@@ -1,0 +1,32 @@
+{
+  "Requested": {
+    "X": 693,
+    "Y": 87
+  },
+  "Actual": {
+    "X": 693,
+    "Y": 87
+  },
+  "GotCursor": true,
+  "PhysicalWorkArea": {
+    "Width": 1024,
+    "Height": 720,
+    "Left": 0,
+    "Top": 0,
+    "Right": 1024,
+    "Bottom": 720
+  },
+  "ButtonBounds": {
+    "Left": 675,
+    "Top": 69,
+    "Right": 711,
+    "Bottom": 105
+  },
+  "ForegroundIsApp": true,
+  "PointerRootIsApp": true,
+  "IsMouseOver": true,
+  "MouseTarget": "Path",
+  "FrameBrush": "#FF7BEBC6",
+  "ExpectedBrush": "#FF7BEBC6",
+  "BrushIsShared": true
+}

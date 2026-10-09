@@ -1,0 +1,40 @@
+[
+  {
+    "Stage": "release-freshness-dark",
+    "DirectReceiptAge": true,
+    "IndexProvenance": true,
+    "LegacyDateUnknown": true,
+    "RussianAudioVisible": true,
+    "ParticipantsUnconfirmed": true,
+    "FailedRefreshKeepsPriorReceipt": true,
+    "Toolbar": {
+      "Stage": "release-freshness-dark",
+      "BodyWidth": 1184,
+      "ToolbarHeight": 48,
+      "SourceDetailsVisible": true,
+      "Checking": false,
+      "RefreshEnabled": true,
+      "InlineSourceActions": true,
+      "ReceiptDatesHidden": true
+    }
+  },
+  {
+    "Stage": "release-freshness-light-compact",
+    "DirectReceiptAge": true,
+    "IndexProvenance": true,
+    "LegacyDateUnknown": true,
+    "RussianAudioVisible": true,
+    "ParticipantsUnconfirmed": true,
+    "FailedRefreshKeepsPriorReceipt": true,
+    "Toolbar": {
+      "Stage": "release-freshness-light-compact",
+      "BodyWidth": 772,
+      "ToolbarHeight": 74,
+      "SourceDetailsVisible": true,
+      "Checking": false,
+      "RefreshEnabled": true,
+      "InlineSourceActions": true,
+      "ReceiptDatesHidden": true
+    }
+  }
+]

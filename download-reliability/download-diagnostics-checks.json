@@ -1,0 +1,30 @@
+{
+  "RowCommand": true,
+  "CopyRedactsPaths": true,
+  "UnknownNetworkHonest": true,
+  "RetrySingleFlight": true,
+  "ExplicitResume": true,
+  "Observations": "Injected UI fixture; torrent transfers and reconnects are checked separately.",
+  "Photos": [
+    {
+      "Name": "diagnostics-wide-dark",
+      "Width": 600,
+      "Height": 660
+    },
+    {
+      "Name": "diagnostics-narrow-dark",
+      "Width": 340,
+      "Height": 390
+    },
+    {
+      "Name": "diagnostics-wide-light",
+      "Width": 600,
+      "Height": 660
+    },
+    {
+      "Name": "diagnostics-narrow-light",
+      "Width": 340,
+      "Height": 390
+    }
+  ]
+}
