@@ -45,13 +45,15 @@ public partial class MainWindow
             foreach(var (light,width,name) in new[]{(false,1500d,"release-freshness-dark"),(true,900d,"release-freshness-light-compact")})
             {
                 prefs.Light=light;ApplyTheme();MinWidth=width;Width=width;Height=760;Render();await Settle();
-                var texts=VisualElements<TextBlock>(Body).ToArray();
-                Check(texts.Any(x=>x.Text==ReleaseFreshness.Caption(direct,DateTime.UtcNow)),name+": direct source receipt age is missing.");
-                Check(texts.Any(x=>x.Text==ReleaseFreshness.Caption(indexed,DateTime.UtcNow)),name+": index provenance is missing.");
-                Check(texts.Any(x=>x.Text.EndsWith("время неизвестно",StringComparison.Ordinal)),name+": legacy cache date was invented.");
-                Check(texts.Any(x=>x.Text=="Русская · дубляж"||x.Text=="Озвучка: Русская · дубляж"),name+": Russian audio is hidden.");
-                Check(texts.Any(x=>x.Text==ReleaseFreshness.ConnectionNote),name+": advertised participants are presented as confirmed peers.");
-                Check(!texts.Any(x=>x.Text.Contains("source-secret")||x.Text.Contains("passkey=")),name+": source URL leaked into displayed status.");
+                var texts=VisualElements<TextBlock>(Body).ToArray();var misses=new List<string>();
+                void Expect(bool good,string message){if(!good)misses.Add(message);}
+                Expect(texts.Any(x=>x.Text==ReleaseFreshness.Age(direct.DataReceivedUtc,DateTime.UtcNow))&&texts.Any(x=>x.Text==ReleaseFreshness.SourceName(direct)),name+": direct source receipt age is missing.");
+                Expect(texts.Any(x=>x.Text==ReleaseFreshness.Age(indexed.DataReceivedUtc,DateTime.UtcNow))&&texts.Any(x=>x.Text==ReleaseFreshness.SourceName(indexed)+" · индекс"),name+": index provenance is missing.");
+                Expect(texts.Any(x=>x.Text.EndsWith("время неизвестно",StringComparison.Ordinal)),name+": legacy cache date was invented.");
+                Expect(texts.Any(x=>x.Text=="Русская · дубляж"||x.Text=="Озвучка: Русская · дубляж"),name+": Russian audio is hidden.");
+                Expect(texts.Any(x=>x.Text==ReleaseFreshness.ConnectionNote),name+": advertised participants are presented as confirmed peers.");
+                Expect(!texts.Any(x=>x.Text.Contains("source-secret")||x.Text.Contains("passkey=")),name+": source URL leaked into displayed status.");
+                if(misses.Count>0)Shot(name+"-initial");Check(misses.Count==0,string.Join(" | ",misses));
                 var toggle=FindVisual<Button>(Body,x=>AutomationProperties.GetName(x)=="Показать состояние источников")!;
                 toggle.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Settle();
                 var sourcePanel=FindVisual<StackPanel>(Body,x=>x.Name=="ReleaseSourceDetails")!;

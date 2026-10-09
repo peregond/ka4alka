@@ -333,7 +333,7 @@ public partial class MainWindow
                 var health=SeedHealth(entry);Grid.SetColumn(health,3);row.Children.Add(health);
                 var age=new StackPanel{VerticalAlignment=VerticalAlignment.Center,ToolTip=ReleaseFreshness.Details(entry,DateTime.UtcNow)};Grid.SetColumn(age,4);
                 var when=new TextBlock{Text=ReleaseFreshness.Age(entry.DataReceivedUtc,DateTime.UtcNow),FontSize=13};when.SetResourceReference(TextBlock.ForegroundProperty,"Muted");age.Children.Add(when);
-                var origin=new TextBlock{Text=ReleaseFreshness.SourceName(entry),FontSize=11,TextTrimming=TextTrimming.CharacterEllipsis,Margin=new(0,2,6,0)};origin.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");age.Children.Add(origin);row.Children.Add(age);
+                var origin=new TextBlock{Text=ReleaseFreshness.SourceName(entry)+(ReleaseFreshness.FromIndex(entry)?" · индекс":""),FontSize=11,TextTrimming=TextTrimming.CharacterEllipsis,Margin=new(0,2,6,0)};origin.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");age.Children.Add(origin);row.Children.Add(age);
                 var download=DownloadButton(entry);download.HorizontalAlignment=HorizontalAlignment.Right;download.VerticalAlignment=VerticalAlignment.Center;Grid.SetColumn(download,5);row.Children.Add(download);
                 var rowFrame=new Border{Child=row,CornerRadius=new(16),BorderThickness=new(1),Padding=new(16,12,16,12),Margin=new(0,0,0,8)};
                 rowFrame.SetResourceReference(Border.BackgroundProperty,isBest?"AccentFaint":"Panel");rowFrame.SetResourceReference(Border.BorderBrushProperty,isBest?"AccentLine":"EdgeSoft");results.Children.Add(rowFrame);
