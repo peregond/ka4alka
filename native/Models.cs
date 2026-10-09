@@ -42,7 +42,8 @@ public record MediaItem(int Id, string Title, string Section, string Genre, int 
         downloaded=complete;downloadPercent=percent;
         PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(DownloadPercent)));PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(HasDownloadProgress)));PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(IsDownloaded)));
     }
-    [JsonIgnore] public string CardMeta=>string.Join(" · ",new[]{Year>0?Year.ToString():"",CardGenre}.Where(x=>x.Length>0));
+    // Year and genres under a poster; the "Фильм"/"Сериал" fallback adds nothing inside its own section, so it is left out.
+    [JsonIgnore] public string CardMeta=>string.Join(" · ",new[]{Year>0?Year.ToString():"",InlineMetadata(liveGenre??Genre)}.Where(x=>x.Length>0));
     [JsonIgnore] public string CardRatingSource => KpAvailable?"Кинопоиск":ImdbAvailable?"IMDb":"Оценка пока недоступна";
     static string InlineMetadata(string? value)=>string.Join(", ",(value??"").Split(',').Select(part=>Regex.Replace(part,@"\s+"," ").Trim()).Where(part=>part.Length>0));
     [JsonIgnore] public string CardGenre {get{var value=InlineMetadata(liveGenre??Genre);return value.Length==0?Section=="Сериалы"?"Сериал":"Фильм":value;}}

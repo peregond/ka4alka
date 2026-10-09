@@ -22,6 +22,7 @@ public partial class MainWindow:Window
     public MainWindow()
     {
         InitializeComponent();
+        InitializeStatusToast();
         onlineIndex=new(sourceClient);sharedCatalog=new(sourceClient);
         catalogRefreshTimer.Tick+=(_,_)=>
         {
