@@ -4,6 +4,7 @@ using System.Net.Sockets;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Kachalka.Lan;
@@ -17,14 +18,14 @@ public partial class MainWindow
 
     void RenderLanSettings(StackPanel panel)
     {
-        var enable=new CheckBox{Name="SettingsLanEnabled",Style=(Style)FindResource("SettingsSwitch"),Content=Text("Загрузки на другом компьютере"),IsChecked=prefs.LanEnabled,Margin=new(0,0,0,8)};
+        var enable=new CheckBox{Name="SettingsLanEnabled",Style=(Style)FindResource("SettingsSwitch"),Content=SwitchTitle("Загрузки на другом компьютере"),IsChecked=prefs.LanEnabled,Margin=new(0,0,0,8)};
         AutomationProperties.SetName(enable,"Разрешить загрузки на связанных устройствах в локальной сети");panel.Children.Add(enable);
-        var description=Text("Включи на обоих компьютерах и свяжи их один раз. Файл скачает выбранный компьютер в свою папку Ka4alka; этот компьютер только передаст задачу.",12,true);panel.Children.Add(description);
-        var nameLabel=Text("Имя устройства",12,true);nameLabel.Margin=new(0,8,0,6);panel.Children.Add(nameLabel);
+        var description=Hint("Включи на обоих компьютерах и свяжи их один раз. Файл скачает выбранный компьютер в свою папку Ka4alka; этот компьютер только передаст задачу.");panel.Children.Add(description);
+        var nameLabel=Hint("Имя устройства");nameLabel.Margin=new(0,8,0,6);panel.Children.Add(nameLabel);
         var name=new TextBox{Name="SettingsLanDeviceName",Text=LanDeviceDisplayName,MaxLength=64,Margin=new(0,0,0,8),MinWidth=0,MaxWidth=400,HorizontalAlignment=HorizontalAlignment.Left};
         name.SetBinding(FrameworkElement.WidthProperty,new System.Windows.Data.Binding(nameof(FrameworkElement.ActualWidth)){Source=panel});
         AutomationProperties.SetName(name,"Имя этого устройства в локальной сети");panel.Children.Add(name);
-        panel.Children.Add(Text("По умолчанию — модель компьютера. Можно указать своё имя.",12,true));
+        panel.Children.Add(Hint("По умолчанию — модель компьютера. Можно указать своё имя."));
         var actions=new WrapPanel();panel.Children.Add(actions);
         var save=Button("Сохранить имя",()=>{});save.Name="SaveLanDeviceName";save.Margin=new(0,0,8,6);AutomationProperties.SetName(save,"Сохранить имя устройства");actions.Children.Add(save);
         var manage=ActionButton("Устройства","IconSeries",ShowLanDevices);manage.Name="ManageLanDevices";manage.IsEnabled=prefs.LanEnabled;manage.Margin=new(0,0,0,6);AutomationProperties.SetName(manage,"Связать компьютеры и управлять устройствами в сети");actions.Children.Add(manage);
@@ -221,15 +222,24 @@ public partial class MainWindow
         var window=LanWindow("Подтвердить связь",440,410);
         if(lanDevicesWindow?.IsVisible==true)window.Owner=lanDevicesWindow;
         var body=new StackPanel{Margin=new(18)};window.Content=new ScrollViewer{Content=body,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};
-        var heading=Text("Связать с «"+request.Device.Name+"»?",20);heading.FontWeight=FontWeights.SemiBold;body.Children.Add(heading);
-        body.Children.Add(Text(request.Incoming?"Этот компьютер хочет отправлять тебе загрузки.":"Ты сможешь отправлять загрузки на этот компьютер.",12,true));
-        body.Children.Add(Text("Сравни код в обеих Качалках. Нажимай «Код совпадает» только если он одинаковый на обоих экранах.",13));
-        var code=Text(request.VerificationCode,27);code.Name="LanPairingCode";code.FontWeight=FontWeights.SemiBold;code.HorizontalAlignment=HorizontalAlignment.Center;code.Margin=new(0);code.SetResourceReference(TextBlock.ForegroundProperty,"Accent");AutomationProperties.SetName(code,"Код проверки связи "+request.VerificationCode);
-        var frame=new Border{Child=code,CornerRadius=new(10),Padding=new(12),Margin=new(0,6,0,12),BorderThickness=new(1)};frame.SetResourceReference(Border.BackgroundProperty,"Panel");frame.SetResourceReference(Border.BorderBrushProperty,"EdgeSoft");body.Children.Add(frame);
+        var heading=Text(request.Incoming?"«"+request.Device.Name+"» хочет подключиться":"Связать с «"+request.Device.Name+"»?",20);heading.FontWeight=FontWeights.Bold;body.Children.Add(heading);
+        body.Children.Add(Hint(request.Incoming?"Этот компьютер хочет отправлять тебе загрузки.":"Ты сможешь отправлять загрузки на этот компьютер."));
+        body.Children.Add(Text("Сверь код: на другом компьютере должен быть такой же. Нажимай «Код совпадает» только если он одинаковый на обоих экранах.",13));
+        // The full code stays available to assistive tools; the visible form is six cells of two characters.
+        var code=Text(request.VerificationCode,27);code.Name="LanPairingCode";code.Visibility=Visibility.Collapsed;AutomationProperties.SetName(code,"Код проверки связи "+request.VerificationCode);body.Children.Add(code);
+        var digits=new string(request.VerificationCode.Where(Uri.IsHexDigit).ToArray());
+        var cells=new UniformGrid{Columns=digits.Length==12?6:1,Margin=new(0,6,0,12)};
+        var chunks=digits.Length==12?Enumerable.Range(0,6).Select(index=>digits.Substring(index*2,2)).ToArray():[request.VerificationCode];
+        foreach(var chunk in chunks)
+        {
+            var text=new TextBlock{Text=chunk,FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=24,FontWeight=FontWeights.SemiBold,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};text.SetResourceReference(TextBlock.ForegroundProperty,"Text");
+            var cell=new Border{Child=text,CornerRadius=new(12),BorderThickness=new(1),MinHeight=60,Margin=new(3,0,3,0)};cell.SetResourceReference(Border.BackgroundProperty,"PanelAlt");cell.SetResourceReference(Border.BorderBrushProperty,"Edge");cells.Children.Add(cell);
+        }
+        var frame=new Border{Name="LanPairingCodeFrame",Child=cells,Margin=new(-3,0,-3,0)};body.Children.Add(frame);
         var notice=Text("",12,true);notice.Name="LanPairingRemaining";body.Children.Add(notice);
         var actions=new WrapPanel{HorizontalAlignment=HorizontalAlignment.Right,Margin=new(0,10,0,0)};body.Children.Add(actions);
-        var reject=Button("Отмена",()=>{result.TrySetResult(false);window.Close();});reject.Name="LanPairingReject";reject.IsCancel=true;actions.Children.Add(reject);
-        var accept=Button("Код совпадает",()=>{result.TrySetResult(true);window.Close();});accept.Name="LanPairingConfirm";accept.Style=(Style)FindResource("PrimaryButton");accept.IsDefault=true;AutomationProperties.SetName(accept,"Подтвердить совпадение кода на обоих компьютерах");actions.Children.Add(accept);
+        var reject=Button("Отклонить",()=>{result.TrySetResult(false);window.Close();});reject.Name="LanPairingReject";reject.IsCancel=true;actions.Children.Add(reject);
+        var accept=ActionButton("Код совпадает","IconCheck",()=>{result.TrySetResult(true);window.Close();},"PrimaryButton");accept.Name="LanPairingConfirm";accept.IsDefault=true;AutomationProperties.SetName(accept,"Подтвердить совпадение кода на обоих компьютерах");actions.Children.Add(accept);
         var timer=new DispatcherTimer(DispatcherPriority.Background,window.Dispatcher){Interval=TimeSpan.FromSeconds(1)};
         void UpdateTime(){var seconds=Math.Max(0,(int)Math.Ceiling((request.ExpiresUtc-DateTimeOffset.UtcNow).TotalSeconds));notice.Text=$"Ожидаем подтверждение · {seconds/60}:{seconds%60:00}";if(seconds==0){result.TrySetResult(false);window.Close();}}
         timer.Tick+=(_,_)=>UpdateTime();

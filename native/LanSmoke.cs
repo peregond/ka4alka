@@ -122,8 +122,9 @@ public partial class MainWindow
             {
                 prefs.Light=light;ApplyTheme();var dialog=approvals[0];dialog.Width=360;dialog.Height=410;await Settle(dialog);
                 Shot(dialog,"lan-pairing-narrow-"+(light?"light":"dark"));
-                var code=Find<TextBlock>(dialog,"LanPairingCode");var frame=(Border)VisualTreeHelper.GetParent(code);
-                Check(code.ActualWidth<=frame.ActualWidth-frame.Padding.Left-frame.Padding.Right+1,"Pairing comparison code remains completely readable in a 360-DIP "+(light?"light":"dark")+" window.");
+                var frame=Find<Border>(dialog,"LanPairingCodeFrame");
+                var cellTexts=VisualElements<TextBlock>(frame).ToArray();
+                Check(cellTexts.Length==6&&string.Concat(cellTexts.Select(x=>x.Text)).Equals(new string(Find<TextBlock>(dialog,"LanPairingCode").Text.Where(Uri.IsHexDigit).ToArray()),StringComparison.Ordinal)&&cellTexts.All(x=>x.ActualWidth>0&&x.TransformToAncestor(dialog).TransformBounds(new Rect(x.RenderSize)).Right<=dialog.ActualWidth+1),"Pairing comparison code is shown as six readable cells inside a 360-DIP "+(light?"light":"dark")+" window.");
                 CheckGeometry(dialog,"pairing 360 "+(light?"light":"dark"));
             }
             foreach(var dialog in approvals){dialog.Width=440;dialog.Height=410;await Settle(dialog);await Click(dialog,Find<Button>(dialog,"LanPairingConfirm"));}

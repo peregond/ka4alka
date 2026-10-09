@@ -95,6 +95,18 @@
     </ControlTemplate>
    </Setter.Value></Setter>
   </Style>
+  <!-- Selectable card (theme choice): 16 px radius, 2 px border supplied by the caller. -->
+  <Style x:Key="ChoiceCard" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+   <Setter Property="Template"><Setter.Value>
+    <ControlTemplate TargetType="Button"><Grid>
+     <Border x:Name="Frame" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="16" Padding="{TemplateBinding Padding}"><ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="{TemplateBinding VerticalContentAlignment}" TextElement.Foreground="{TemplateBinding Foreground}"/></Border>
+     <Border x:Name="FocusRing" CornerRadius="16" BorderBrush="{DynamicResource Text}" BorderThickness="2" Visibility="Collapsed" IsHitTestVisible="False"/>
+    </Grid><ControlTemplate.Triggers>
+     <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="FocusRing" Property="Visibility" Value="Visible"/></Trigger>
+     <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Frame" Property="Opacity" Value="0.55"/></Trigger>
+    </ControlTemplate.Triggers></ControlTemplate>
+   </Setter.Value></Setter>
+  </Style>
   <Style x:Key="PosterButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
    <Setter Property="Background" Value="Transparent"/><Setter Property="BorderBrush" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="Padding" Value="0"/><Setter Property="MinHeight" Value="0"/><Setter Property="HorizontalContentAlignment" Value="Stretch"/>
    <Setter Property="Template"><Setter.Value>

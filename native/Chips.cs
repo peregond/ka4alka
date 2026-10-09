@@ -35,4 +35,15 @@ public partial class MainWindow
         button.SetResourceReference(Control.ForegroundProperty,active?"Accent":"TextSoft");
         button.FontWeight=active?FontWeights.SemiBold:FontWeights.Medium;
     }
+
+    // Secondary text used for descriptions and hints.
+    TextBlock Hint(string value)
+    {
+        var block=Text(value,13,true);block.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");return block;
+    }
+    // Title of a switch row: 15 px semibold.
+    TextBlock SwitchTitle(string value)
+    {
+        var block=Text(value,15);block.FontWeight=FontWeights.SemiBold;block.Margin=new(0);return block;
+    }
 }
