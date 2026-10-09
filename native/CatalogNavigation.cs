@@ -21,6 +21,14 @@ public partial class MainWindow
     bool navigationApplying,navigationResetRequested;
 
     void ResetCatalogNavigationPosition()=>navigationResetRequested=true;
+    void CancelCatalogPositionRestoreForUserJump()
+    {
+        // An explicit jump takes precedence over a previous render's restore.
+        // Discard its stored position as well, so an intervening extent event
+        // cannot schedule the same obsolete anchor again.
+        navigationRestore?.Abort();navigationRestore=null;navigationPendingPosition=null;
+        catalogPositions.Remove(navigationRoute);
+    }
 
     string CatalogNavigationRoute()
     {
