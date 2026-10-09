@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Threading;
 
 namespace Kachalka;
 public partial class MainWindow
@@ -33,9 +34,17 @@ public partial class MainWindow
             {PageUrl=LiveCatalog.Base+"/movies/saved-navigation-smoke-"+id,Description="Описание сохранённого фильма.",People=id<=5?[person]:[]}).ToArray();
         var series=Enumerable.Range(1,5).Select(id=>new MediaItem(-72000-id,"Сохранённый сериал "+id,"Сериалы","драма",2025,"8.0","7.5","#526B69")
             {PageUrl=LiveCatalog.Base+"/tvseries/saved-navigation-smoke-"+id,Description="Описание сохранённого сериала."}).ToArray();
-        Button Filter(string name)=>FindVisual<Button>(FilterControls,button=>AutomationProperties.GetName(button)=="Сохранённое: "+name)??throw new Exception("Missing unified Saved filter: "+name);
+        string State()=>$"section={section}, current={current?.Id}, person={activePerson?.Name}, category={savedCategory}, page={savedPage}, cards={catalogDisplay.Count}, scroll={savedScroll?.VerticalOffset}, restore={navigationRestore?.Status}, pendingOffset={navigationPendingPosition?.Offset}";
+        Button Control(DependencyObject root,Func<Button,bool> predicate,string label)=>FindVisual<Button>(root,predicate)??throw new Exception("Missing Saved control: "+label+"; "+State());
+        Button Filter(string name)=>Control(FilterControls,button=>AutomationProperties.GetName(button)=="Сохранённое: "+name,"filter "+name);
+        ScrollViewer Scroll()=>savedScroll??throw new Exception("Saved scroll viewer is missing; "+State());
         void Click(Button button)=>button.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
-        async Task Settle(){await Task.Delay(80);UpdateLayout();}
+        async Task Settle()
+        {
+            UpdateLayout();await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);
+            await Task.Delay(80);UpdateLayout();
+            await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);UpdateLayout();
+        }
         try
         {
             prefs.Favorites=[];prefs.LiveFavorites=[];SavedButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await Settle();
@@ -47,37 +56,37 @@ public partial class MainWindow
             check(new[]{"Все","Фильмы","Сериалы"}.All(name=>Filter(name).IsVisible)&&FiltersPanel.IsVisible,"Saved exposes all, film and series filters below the persistent search");
             Click(Filter("Сериалы"));await Settle();check(catalogDisplay.Count==5&&catalogDisplay.All(item=>item.Section=="Сериалы"),"Saved series filter retains saved series from the same collection");
             Click(Filter("Фильмы"));await Settle();
-            Click(FindVisual<Button>(Body,button=>AutomationProperties.GetName(button)=="Сохранённое: страница 2")!);await Settle();
+            Click(Control(Body,button=>AutomationProperties.GetName(button)=="Сохранённое: страница 2","page 2"));await Settle();
             check(savedPage==2&&catalogDisplay.Count==5&&catalogDisplay.All(item=>item.Section=="Фильмы"),"Saved film filter preserves its own second page");
             Height=Math.Max(MinHeight,420);await Settle();
-            var selected=catalogDisplay[0];savedScroll!.ScrollToVerticalOffset(80);await Settle();var previousOffset=savedScroll.VerticalOffset;
+            var selected=catalogDisplay[0];Scroll().ScrollToVerticalOffset(80);await Settle();var previousOffset=Scroll().VerticalOffset;
             check(previousOffset>0,"Saved navigation fixture has a real scroll position to restore");
             var biography="Биография участника для проверки возврата в Сохранённое.";
             Directory.CreateDirectory(Path.GetDirectoryName(CinemaPeople.ProfileCachePath(person))!);
             await File.WriteAllTextAsync(CinemaPeople.ProfileCachePath(person),JsonSerializer.Serialize(new PersonProfile(person,biography,films.Take(2).ToArray(),person.ProfileUrl)));
             var professional=new ProfessionalPerson(person,biography,"https://kino-teatr.ua/public/main/persons/person-search-smoke.jpg",person.ProfileUrl!,"Kino-Teatr.ua",[],[person.Name]);
             foreach(var origin in new MediaItem?[]{null,selected,films[0]}.DistinctBy(item=>item?.Id))await File.WriteAllTextAsync(ProfessionalCinemaPeople.CachePath(person,origin),JsonSerializer.Serialize(professional));
-            Click(FindVisual<Button>(Body,button=>button.Tag is MediaItem item&&item.Id==selected.Id)!);await Settle();
+            Click(Control(Body,button=>button.Tag is MediaItem item&&item.Id==selected.Id,"saved film "+selected.Id));await Settle();
             check(current?.Id==selected.Id&&SavedBackLabel()=="Сохранённое"&&savedReturn is{Category:"Фильмы",Page:2},"opening a saved film records its collection, filter and page as the back destination");
-            Click(FindVisual<Button>(PageHeader,button=>AutomationProperties.GetName(button)=="Сохранённое")!);await Settle();
-            check(section=="Сохранённое"&&current==null&&savedCategory=="Фильмы"&&savedPage==2&&Math.Abs(savedScroll!.VerticalOffset-previousOffset)<2,"film back restores the Saved filter, page and scroll position");
-            Click(FindVisual<Button>(Body,button=>button.Tag is MediaItem item&&item.Id==selected.Id)!);await Settle();
-            Click(FindVisual<Button>(Body,button=>button.Tag is CinemaPerson actor&&actor==person)!);await Settle();
+            Click(Control(PageHeader,button=>AutomationProperties.GetName(button)=="Сохранённое","back to Saved"));await Settle();
+            check(section=="Сохранённое"&&current==null&&savedCategory=="Фильмы"&&savedPage==2&&Math.Abs(Scroll().VerticalOffset-previousOffset)<2,"film back restores the Saved filter, page and scroll position");
+            Click(Control(Body,button=>button.Tag is MediaItem item&&item.Id==selected.Id,"saved film "+selected.Id));await Settle();
+            Click(Control(Body,button=>button.Tag is CinemaPerson actor&&actor==person,"saved film participant"));await Settle();
             check(activePerson==person&&personOrigin?.Id==selected.Id&&savedReturn!=null,"a person opened from a saved film retains the Saved navigation destination");
             Click(SettingsButton);await Settle();
             check(section=="Настройки"&&activePerson==null&&current==null,"settings opens from the saved film's person page");
-            Click(FindVisual<Button>(PageHeader,button=>AutomationProperties.GetName(button)=="Вернуться")!);await Settle();
+            Click(Control(PageHeader,button=>AutomationProperties.GetName(button)=="Вернуться","settings back to participant"));await Settle();
             check(activePerson==person&&personOrigin?.Id==selected.Id&&current?.Id==selected.Id&&savedReturn is{Category:"Фильмы",Page:2},"settings back restores the same person, origin film and Saved ancestor");
-            var deadline=DateTime.UtcNow.AddSeconds(3);while(FindVisual<Button>(Body,button=>button.Tag is MediaItem film&&film.Id==films[0].Id)==null&&DateTime.UtcNow<deadline)await Task.Delay(30);UpdateLayout();
-            Click(FindVisual<Button>(Body,button=>button.Tag is MediaItem film&&film.Id==films[0].Id)??throw new Exception("Saved person filmography fixture is missing."));await Settle();
+            var deadline=DateTime.UtcNow.AddSeconds(3);while(FindVisual<Button>(Body,button=>button.Tag is MediaItem film&&film.Id==films[0].Id)==null&&DateTime.UtcNow<deadline)await Settle();
+            Click(Control(Body,button=>button.Tag is MediaItem film&&film.Id==films[0].Id,"participant filmography fixture"));await Settle();
             check(returnPerson?.Person==person&&savedReturn!=null,"person filmography opens another film without losing its Saved ancestor");
             Click(SettingsButton);await Settle();
-            Click(FindVisual<Button>(PageHeader,button=>AutomationProperties.GetName(button)=="Вернуться")!);await Settle();
+            Click(Control(PageHeader,button=>AutomationProperties.GetName(button)=="Вернуться","settings back to filmography film"));await Settle();
             check(current?.Id==films[0].Id&&activePerson==null&&returnPerson?.Person==person&&returnPerson?.Origin?.Id==selected.Id&&savedReturn is{Category:"Фильмы",Page:2},"settings back preserves the filmography film's person return destination and Saved ancestor");
             CinemaBack();await Settle();check(activePerson==person&&personOrigin?.Id==selected.Id,"back from filmography restores the saved film's person page first");
-            Click(FindVisual<Button>(PageHeader,button=>AutomationProperties.GetName(button)=="Назад к фильму")!);await Settle();
+            Click(Control(PageHeader,button=>AutomationProperties.GetName(button)=="Назад к фильму","participant back to film"));await Settle();
             check(current?.Id==selected.Id&&activePerson==null,"person back restores its saved origin film");
-            Click(FindVisual<Button>(Body,button=>button.Name=="DetailFavorite")!);await Settle();
+            Click(Control(Body,button=>button.Name=="DetailFavorite","film favorite action"));await Settle();
             check(!prefs.Favorites.Contains(selected.Id)&&!prefs.LiveFavorites.Any(item=>item.Id==selected.Id)&&!Preferences.Load().LiveFavorites.Any(item=>item.Id==selected.Id),"removing a saved film synchronizes its ID, card and persisted collection");
             CinemaBack();await Settle();
             check(section=="Сохранённое"&&savedPage==2&&catalogDisplay.Count==4&&!catalogDisplay.Any(item=>item.Id==selected.Id),"returning after removal refreshes the same Saved page without its deleted card");
@@ -85,7 +94,7 @@ public partial class MainWindow
             Search.Text="Поиск из сохранённого";FocusCatalogSearch();await Settle();
             check(section=="Сохранённое"&&Search.IsKeyboardFocusWithin&&searchCalls==0,"the search shortcut focuses Saved search without leaving the collection or sending a request");
             Click(ClearSearchButton);await Settle();check(section=="Сохранённое"&&savedPage==2&&catalogDisplay.Count==4&&Search.Text=="","clearing search preserves the Saved filter and page");
-            Search.Text="Поиск из сохранённого";Click(SearchSubmitButton);deadline=DateTime.UtcNow.AddSeconds(3);while((liveLoading||PeopleSearchLoading)&&DateTime.UtcNow<deadline)await Task.Delay(30);UpdateLayout();
+            Search.Text="Поиск из сохранённого";Click(SearchSubmitButton);deadline=DateTime.UtcNow.AddSeconds(3);while((liveLoading||PeopleSearchLoading)&&DateTime.UtcNow<deadline)await Task.Delay(30);await Settle();
             check(section is "Фильмы" or "Сериалы"&&current==null&&SearchActive&&searchCategory==""&&searchCalls==2,"submitting from Saved opens the existing unified film and series search");
         }
         finally

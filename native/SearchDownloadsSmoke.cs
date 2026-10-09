@@ -5,6 +5,7 @@ using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -160,7 +161,14 @@ public partial class MainWindow
         var fixtures=Enumerable.Range(0,6).Select(i=>new DownloadItem{Id="redesign-"+i,Name="Series.Season."+(i+1)+".FullHD.WEB-DL.mkv",MediaTitle="Сериал · сезон "+(i+1),MediaSection="Сериалы",ImageUrl=i==0?null:posterUrl,AddedUtc=added.AddMinutes(i),Folder=folder,Progress=20+i*10,Paused=true,DownloadRate=i*1024,TotalBytes=(6-i)*1024L*1024*1024,Stats="50% · 1.0 ГБ из 2.0 ГБ · ↓ 0 КБ/с",Files=[new("Сезон 1/Серия 01.mkv",Path.Combine(folder,"episode1.mkv"),Path.Combine(folder,"episode1.mkv"),1024*1024,100),new("Сезон 1/Серия 02.mkv",Path.Combine(folder,"episode2.mkv"),Path.Combine(folder,"episode2.mkv"),1024*1024,35)]}).ToArray();
         foreach(var fixture in fixtures)downloads.Items.Add(fixture);
         var originalLight=prefs.Light;var originalSort=prefs.DownloadSort;var originalMinWidth=MinWidth;
-        async Task SettleDownloads(){await Task.Delay(150);UpdateLayout();}
+        async Task SettleDownloads()
+        {
+            UpdateLayout();await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);
+            await Task.Delay(150);UpdateLayout();
+            // The final layout may realize a recycled row or enqueue its
+            // ContextIdle scroll restoration. Wait for that work as well.
+            await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);UpdateLayout();
+        }
         ListBox Queue()=>FindVisual<ListBox>(Body,_=>true)??throw new Exception("Download queue is missing.");
         ListBoxItem FirstRow()=>Queue().ItemContainerGenerator.ContainerFromIndex(0) as ListBoxItem??throw new Exception("First download row is not realized.");
         Button Toolbar(string name)=>FindVisual<Button>(PageHeader,b=>AutomationProperties.GetName(b)==name)??throw new Exception("Missing download toolbar "+name);
@@ -296,28 +304,57 @@ public partial class MainWindow
             check(Icon is BitmapSource&&BrandLogo.Source is BitmapSource,"application icon and transparent kettlebell logo load from packaged resources");
             Width=1280;Height=800;section="Загрузки";current=null;Render();await SettleDownloads();
             fixtures[^1].MediaPageUrl="https://w6.zona.plus/tvseries/download-fixture";fixtures[^1].Refresh();await SettleDownloads();
-            var linked=DownloadMetadata.Card(fixtures[^1])!;requestedDetails.Add(linked.Id);
+            var linked=DownloadMetadata.Card(fixtures[^1])??throw new Exception("The associated download card fixture is missing.");requestedDetails.Add(linked.Id);
+            // Wide screenshots can exceed a CI runner's physical desktop.
+            // Fit the real mouse interactions, using the application's own
+            // monitor/DPI sizing, before testing hover and navigation.
+            var nativeHandle=new WindowInteropHelper(this).Handle;
+            var monitorInfo=new MonitorInfo{Size=(uint)Marshal.SizeOf<MonitorInfo>()};
+            check(GetMonitorInfo(MonitorFromWindow(nativeHandle,MonitorDefaultNearest),ref monitorInfo),"download native input monitor exposes its work area");
+            var dpi=VisualTreeHelper.GetDpi(this);var nativeFit=WindowSizing.FitPixels(monitorInfo.Work.Width,monitorInfo.Work.Height,dpi.DpiScaleX,dpi.DpiScaleY);
+            MinWidth=Math.Min(360,nativeFit.Width);MinHeight=Math.Min(300,nativeFit.Height);Width=Math.Min(1280,nativeFit.Width);Height=Math.Min(800,nativeFit.Height);
+            PlaceWithinWorkArea(nativeHandle,monitorInfo.Work,true);await SettleDownloads();
+            string DownloadUiState()
+            {
+                var list=downloadList;var row=list?.ItemContainerGenerator.ContainerFromItem(fixtures[^1]) as ListBoxItem;
+                var labels=row==null?Array.Empty<string>():VisualElements<Button>(row).Select(button=>AutomationProperties.GetName(button)).ToArray();
+                return $"section={section}, current={current?.Id}, count={list?.Items.Count}, generator={list?.ItemContainerGenerator.Status}, row={row?.GetType().Name??"missing"}, rowData={(row?.DataContext as DownloadItem)?.Id}, buttons={string.Join(",",labels)}, restore={navigationRestore?.Status}, pendingOffset={navigationPendingPosition?.Offset}";
+            }
+            async Task<Button> DownloadLink(string label)
+            {
+                var list=Queue();list.ScrollIntoView(fixtures[^1]);var deadline=DateTime.UtcNow.AddSeconds(3);
+                do
+                {
+                    await SettleDownloads();
+                    if(list.ItemContainerGenerator.ContainerFromItem(fixtures[^1]) is ListBoxItem row&&ReferenceEquals(row.DataContext,fixtures[^1])&&
+                        FindVisual<Button>(row,b=>AutomationProperties.GetName(b)==label&&ReferenceEquals(b.Tag,fixtures[^1])) is {IsVisible:true,ActualWidth:>0,ActualHeight:>0} link)return link;
+                }while(DateTime.UtcNow<deadline);
+                throw new Exception("Realized download action is missing: "+label+"; "+DownloadUiState());
+            }
             foreach(var label in new[]{"Открыть карточку по постеру","Открыть карточку по названию"})
             {
-                var link=FindVisual<Button>(FirstRow(),b=>AutomationProperties.GetName(b)==label)!;
+                var link=await DownloadLink(label);
                 check(link.IsEnabled&&link.Cursor==(label=="Открыть карточку по названию"?Cursors.Arrow:Cursors.Hand),"download card remains clickable with a plain title: "+label);
                 if(label=="Открыть карточку по названию")
                 {
-                    var text=FindVisual<TextBlock>(link,t=>t.Text==fixtures[^1].DisplayName)!;
+                    var text=FindVisual<TextBlock>(link,t=>t.Text==fixtures[^1].DisplayName)??throw new Exception("Realized download title text is missing; "+DownloadUiState());
                     var expected=((SolidColorBrush)FindResource("Text")).Color;
                     GetCursorPos(out var previous);
                     try
                     {
-                        Activate();var target=link.PointToScreen(new Point(link.ActualWidth/2,link.ActualHeight/2));SetCursorPos((int)target.X,(int)target.Y);Mouse.Synchronize();await SettleDownloads();
-                        var frame=FindVisual<Border>(link,b=>b.Name=="Frame")!;
+                        SetForegroundWindow(nativeHandle);var target=link.PointToScreen(new Point(link.ActualWidth/2,link.ActualHeight/2));
+                        check(SetCursorPos((int)target.X,(int)target.Y),"native cursor can reach the download title");Mouse.Synchronize();await SettleDownloads();
+                        check(GetCursorPos(out var actual)&&Math.Abs(actual.X-(int)target.X)<=1&&Math.Abs(actual.Y-(int)target.Y)<=1&&GetForegroundWindow()==nativeHandle&&GetAncestor(WindowFromPoint(actual),2)==nativeHandle,$"native cursor reaches the visible download title in the foreground app: requested={target}, actual={actual.X},{actual.Y}; "+DownloadUiState());
+                        var frame=FindVisual<Border>(link,b=>b.Name=="Frame")??throw new Exception("Realized download title frame is missing; "+DownloadUiState());
                         check(link.IsMouseOver&&text.Foreground is SolidColorBrush titleInk&&titleInk.Color==expected&&(text.TextDecorations==null||text.TextDecorations.Count==0)&&frame.Background is SolidColorBrush background&&background.Color.A==0,"hovering a download title keeps plain text colour and transparent background without an underline");
                         Shot(FirstRow(),"downloads-plain-title-hover");
                     }
                     finally{SetCursorPos(previous.X,previous.Y);}
                 }
-                link.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await SettleDownloads();
+                await ClickWithMouse(link);await SettleDownloads();
                 check(current?.Id==linked.Id&&detailTitle?.Text==fixtures[^1].MediaTitle&&section=="Загрузки","download poster/title opens its associated internal card while retaining the queue as the return destination");
-                FindVisual<Button>(PageHeader,b=>AutomationProperties.GetName(b)=="Загрузки")!.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await SettleDownloads();
+                var back=FindVisual<Button>(PageHeader,b=>AutomationProperties.GetName(b)=="Загрузки")??throw new Exception("Download detail has no return-to-queue action; "+DownloadUiState());
+                await ClickWithMouse(back);await SettleDownloads();
                 check(current==null&&Queue().Items.Count==fixtures.Length&&fixtures.All(x=>x.Paused),"returning from the internal card preserves the queue and its paused transfers");
             }
             searchProvider=(kind,query,token)=>Task.FromResult<IReadOnlyList<MediaItem>>(kind=="Фильмы"?films:series);
@@ -336,9 +373,9 @@ public partial class MainWindow
         check(SidebarUpdateButton.Visibility==Visibility.Visible&&SidebarUpdateButton.IsEnabled&&SidebarUpdateButton.TransformToAncestor(SidebarFooter).Transform(new Point()).Y>=SettingsButton.TransformToAncestor(SidebarFooter).Transform(new Point(0,SettingsButton.ActualHeight)).Y,"ready update occupies its own row below Settings in the sidebar");
         CheckSidebarFooter(check,"ready-update-desktop");
         check(!SystemParameters.ClientAreaAnimation||SidebarUpdateButton.HasAnimatedProperties,"ready update softly animates when system animations are enabled");
-        Width=680;await Task.Delay(100);UpdateLayout();check(SidebarUpdateButton.Visibility==Visibility.Visible&&SidebarUpdateButton.ActualWidth>0,"sidebar update remains available in narrow layout");CheckSidebarFooter(check,"ready-update-narrow");
-        var footerMinimumHeight=MinHeight;MinHeight=300;Height=300;await Task.Delay(100);UpdateLayout();CheckSidebarFooter(check,"ready-update-minimum-height");
-        preparedUpdateJob=null;RefreshSidebarUpdate();Width=1280;Height=800;MinHeight=footerMinimumHeight;
+        var footerMinimumWidth=MinWidth;MinWidth=360;Width=680;await SettleDownloads();check(ActualWidth<=681&&SidebarUpdateButton.Visibility==Visibility.Visible&&SidebarUpdateButton.ActualWidth>0,"sidebar update remains available in narrow layout");CheckSidebarFooter(check,"ready-update-narrow");
+        var footerMinimumHeight=MinHeight;MinHeight=300;Height=300;await SettleDownloads();check(ActualHeight<=301,"sidebar minimum-height fixture reaches its requested viewport");CheckSidebarFooter(check,"ready-update-minimum-height");
+        preparedUpdateJob=null;RefreshSidebarUpdate();Width=1280;Height=800;MinWidth=footerMinimumWidth;MinHeight=footerMinimumHeight;
         await SavedSmoke(check);
     }
 }
