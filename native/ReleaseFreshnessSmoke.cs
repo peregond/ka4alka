@@ -61,6 +61,8 @@ public partial class MainWindow
                 var toolbarCheck=CheckReleaseToolbar(name,false,true);
                 var first=FindVisual<Button>(Body,x=>x.Tag is SourceEntry entry&&entry.Id==direct.Id)!;first.BringIntoView();await Settle();Shot(name);
                 checks.Add(new{Stage=name,DirectReceiptAge=true,IndexProvenance=true,LegacyDateUnknown=true,RussianAudioVisible=true,ParticipantsUnconfirmed=true,FailedRefreshKeepsPriorReceipt=true,Toolbar=toolbarCheck});
+                // The toolbar check may have re-rendered the page, so look the controls up again.
+                toggle=FindVisual<Button>(Body,x=>AutomationProperties.GetName(x)=="Показать состояние источников")!;sourcePanel=FindVisual<StackPanel>(Body,x=>x.Name=="ReleaseSourceDetails")!;
                 toggle.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Settle();
                 Check(sourcePanel.Visibility==Visibility.Collapsed,name+": repeated click did not collapse the source details.");
             }
