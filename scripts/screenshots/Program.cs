@@ -31,7 +31,10 @@ internal static class Program
             var path=Path.Combine(releaseDirectory,name.Name+".dll");
             return File.Exists(path)?AssemblyLoadContext.Default.LoadFromAssemblyPath(path):null;
         };
-        AssemblyLoadContext.Default.LoadFromAssemblyPath(Path.Combine(releaseDirectory,"Kachalka.dll"));
+        var released=AssemblyLoadContext.Default.LoadFromAssemblyPath(Path.Combine(releaseDirectory,"Kachalka.dll"));
+        // WPF discovers pack resources from the process entry assembly. Set
+        // the actual application before its Application type initializes.
+        Assembly.SetEntryAssembly(released);
         return StartReleasedApplication();
     }
 
@@ -49,7 +52,6 @@ internal static class Program
             AutoResumeDownloads=false,NotifyDownloads=false,LanEnabled=false,QualityFilterConfigured=true,HidePoorQuality=true
         }));
         Directory.SetCurrentDirectory(releaseDirectory);
-        Application.ResourceAssembly=typeof(Kachalka.App).Assembly;
         var app=new Kachalka.App();app.InitializeComponent();
         var exitCode=1;
         var watchdog=new DispatcherTimer{Interval=TimeSpan.FromSeconds(2)};
