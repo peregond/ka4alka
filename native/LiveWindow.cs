@@ -173,8 +173,9 @@ public partial class MainWindow
         Body.Children.Remove(list);ScrollViewer.SetVerticalScrollBarVisibility(list,ScrollBarVisibility.Disabled);ScrollViewer.SetHorizontalScrollBarVisibility(list,ScrollBarVisibility.Disabled);WheelScroll.SetIsEnabled(list,false);
         // The scroll viewer extends 6 px past the gutter so hover rings and focus rings are not clipped.
         var content=new StackPanel{Margin=new(6,6,6,0)};RenderPeopleSearchResults(content,false);
-        var filterRow=TakeFiltersPanel();AddDiscovery(content,cards,filterRow);
-        if(!content.Children.Contains(filterRow))content.Children.Add(filterRow);
+        // The main page keeps its filter row between the banner and the shelves. Filtered, searched and paged
+        // lists keep the row pinned under the search so selected-filter chips never move the list below them.
+        AddDiscovery(content,cards,DiscoveryCatalog?TakeFiltersPanel():null);
         content.Children.Add(list);
         if(cards.Length==0)
         {

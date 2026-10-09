@@ -132,13 +132,13 @@ public partial class MainWindow
         var control=tiny?40d:shortView?44d:48d;
         AddTorrentButton.Content=IconLabel(tiny?"":narrow?"Добавить":"Добавить торрент","IconMagnet",18);
         AddTorrentButton.Padding=new Thickness(tiny?0:narrow?14:18,0,tiny?0:narrow?14:18,0);AddTorrentButton.MinHeight=control;AddTorrentButton.Height=control;AddTorrentButton.MinWidth=tiny?control:0;AddTorrentButton.Margin=new Thickness(0,0,tiny?8:12,0);
-        BackButton.Width=control;BackButton.Height=control;BackButton.Margin=new Thickness(0,0,tiny?8:12,0);ThemeButton.Width=control;ThemeButton.Height=control;
+        BackButton.Width=control;BackButton.Height=control;BackButton.Margin=new Thickness(0,0,tiny?8:12,0);ThemeButton.Width=control;ThemeButton.Height=control;ThemeButton.Visibility=ActualWidth>0&&ActualWidth<480?Visibility.Collapsed:Visibility.Visible;
         HeaderArea.Margin=new Thickness(gutter,veryShort?6:shortView?12:20,gutter,veryShort?6:shortView?10:20);
         CenterRegion.Margin=new Thickness(gutter,0,gutter,0);Status.Margin=new Thickness(gutter,6,gutter,8);
         SearchBar.Margin=new Thickness(0,0,tiny?8:12,0);SearchBar.Height=control;Search.MinHeight=control;
-        Search.Padding=new Thickness(narrowSearch?12:48,0,narrowSearch?76:110,0);
+        Search.Padding=new Thickness(narrowSearch?12:48,0,narrowSearch?72:110,0);
         SearchMagnifier.Visibility=narrowSearch?Visibility.Collapsed:Visibility.Visible;
-        SearchPlaceholder.Text=narrowSearch?"Поиск":"Найти фильм, сериал или человека";SearchPlaceholder.Margin=new Thickness(narrowSearch?12:48,0,narrowSearch?76:110,0);
+        SearchPlaceholder.Text=narrowSearch?"Поиск":"Найти фильм, сериал или человека";SearchPlaceholder.Margin=new Thickness(narrowSearch?12:48,0,narrowSearch?72:110,0);
         foreach(var subtitle in PageHeader.Children.OfType<TextBlock>().Where(x=>Equals(x.Tag,"CatalogSubtitle")))subtitle.Visibility=shortView?Visibility.Collapsed:Visibility.Visible;
         RenderNavSelection();
         UpdateSavedCount();UpdateDownloadsWidget();

@@ -129,7 +129,7 @@ public partial class MainWindow
             foreach(var width in new[]{360d,510d,720d})
             {
                 await Size(width,580);Render();await Settle();Search.Text="Проверка";searchDelay.Stop();await Settle();
-                foreach(var action in new Control[]{Search,SearchSubmitButton,AddTorrentButton,ThemeButton})
+                foreach(var action in width<480?new Control[]{Search,SearchSubmitButton,AddTorrentButton}:new Control[]{Search,SearchSubmitButton,AddTorrentButton,ThemeButton})
                 {
                     var bounds=action.TransformToAncestor(RootGrid).TransformBounds(new Rect(new Point(),action.RenderSize));
                     Check(action.IsVisible&&action.ActualWidth>0&&bounds.Left>=-1&&bounds.Right<=RootGrid.ActualWidth+1,"Header action stays inside "+width+" DIP viewport: "+AutomationProperties.GetName(action));

@@ -126,11 +126,11 @@ public partial class MainWindow
 
     void CheckCatalogFilterLine(Action<bool,string> check,string stage)
     {
-        check(RootGrid.ColumnDefinitions.Count==2&&FiltersPanel.IsVisible&&FiltersPanel.Parent is StackPanel,"catalog filters scroll with the page, below the banner and the search, without a right column ("+stage+")");
+        check(RootGrid.ColumnDefinitions.Count==2&&FiltersPanel.IsVisible&&(ReferenceEquals(FiltersPanel.Parent,HeaderArea)&&Grid.GetRow(FiltersPanel)==1||FiltersPanel.Parent is StackPanel&&DiscoveryCatalog),"catalog filters sit below the search (pinned) or between the banner and the shelves, without a right column ("+stage+")");
         check(inlineCatalogFilters is StackPanel {Orientation:Orientation.Horizontal}&&ReferenceEquals(inlineCatalogFilterScroll?.Parent,catalogToolbar)&&ReferenceEquals(catalogToolbar?.Parent,FilterControls),"catalog filters remain one horizontal line ("+stage+")");
         var searchBounds=SearchBar.TransformToAncestor(RootGrid).TransformBounds(new Rect(new Point(),SearchBar.RenderSize));
         var filterBounds=FiltersPanel.TransformToAncestor(RootGrid).TransformBounds(new Rect(new Point(),FiltersPanel.RenderSize));
-        check(filterBounds.Width>0&&filterBounds.Height>0&&searchBounds.Width>0,"catalog filter line has its own row in the page ("+stage+")");
+        check(filterBounds.Width>0&&filterBounds.Height>0&&(FiltersPanel.Parent is StackPanel||filterBounds.Top>=searchBounds.Bottom-.5),"catalog filter line has its own row below the search input ("+stage+")");
         var buttons=VisualElements<Button>(catalogToolbar!).Where(x=>x.IsVisible).ToArray();
         var centers=buttons.Select(x=>x.TransformToAncestor(catalogToolbar!).Transform(new Point(0,x.ActualHeight/2)).Y).ToArray();
         foreach(var name in new[]{"Жанр","Страна","Рейтинг от","Год выхода","Порядок","Качество каталога"})
