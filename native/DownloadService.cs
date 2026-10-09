@@ -219,7 +219,7 @@ public sealed partial class DownloadService
         }
         catch(Exception error)
         {
-            var deleted=error is DownloadFileDeletionException deletion?deletion.DeletedFiles:0;
+            var deleted=error switch {DownloadFileDeletionException deletion=>deletion.DeletedFiles,DownloadFileDeletionCanceledException canceled=>canceled.DeletedFiles,_=>0};
             DiagnosticLog.Write("download-remove-failed",new{item.Id,DeleteFiles=deleteFiles,Phase=phase,ErrorType=error.GetType().Name,HResult=error.InnerException?.HResult??error.HResult,DeletedFiles=deleted,Files=item.Files.Count});
             if(Items.Contains(item))
             {

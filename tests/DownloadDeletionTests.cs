@@ -42,6 +42,20 @@ static class DownloadDeletionTests
 
             if(OperatingSystem.IsWindows())
             {
+                var externalFolder=Path.Combine(root,"junction-external");Directory.CreateDirectory(externalFolder);
+                var externalPayload=Path.Combine(externalFolder,"external.mkv");await File.WriteAllTextAsync(externalPayload,"external stays");
+                var junction=Path.Combine(folder,"junction");var junctionStart=new ProcessStartInfo("cmd.exe"){UseShellExecute=false,RedirectStandardOutput=true,RedirectStandardError=true};
+                foreach(var argument in new[]{"/d","/c","mklink","/J",junction,externalFolder})junctionStart.ArgumentList.Add(argument);
+                using(var creation=Process.Start(junctionStart)??throw new Exception("Cannot start Windows junction fixture"))
+                {
+                    var stdout=creation.StandardOutput.ReadToEndAsync();var stderr=creation.StandardError.ReadToEndAsync();await creation.WaitForExitAsync();await Task.WhenAll(stdout,stderr);
+                    Check(creation.ExitCode==0&&(File.GetAttributes(junction)&FileAttributes.ReparsePoint)!=0,"native Windows fixture creates an actual directory junction");
+                }
+                var normal=Path.Combine(folder,"before-junction.mkv");await File.WriteAllTextAsync(normal,"normal stays");
+                try{await DownloadFiles.DeleteAsync(folder,[normal,Path.Combine(junction,"external.mkv")]);throw new Exception("junction deletion allowed");}catch(IOException){ }
+                Check(File.Exists(normal)&&File.ReadAllText(externalPayload)=="external stays","Windows junction is rejected before any legitimate or external payload is deleted");
+                Directory.Delete(junction);await DownloadFiles.DeleteAsync(folder,[normal]);
+
                 var transient=Path.Combine(folder,"transient-lock.mkv");await File.WriteAllTextAsync(transient,"locked");
                 var blocker=new FileStream(transient,FileMode.Open,FileAccess.Read,FileShare.ReadWrite);
                 var clock=Stopwatch.StartNew();var delete=DownloadFiles.DeleteAsync(folder,[transient]);
@@ -69,6 +83,27 @@ static class DownloadDeletionTests
             else Console.WriteLine("Windows-only sharing lock and readonly deletion semantics are validated by native Windows CI.");
             var noMetadata=new DownloadItem{Folder=folder,Source=originalTorrent,Name="no metadata"};service.Items.Add(noMetadata);await service.Remove(noMetadata,true);
             Check(service.Items.Count==0&&File.Exists(unrelated)&&File.Exists(originalTorrent),"unknown-metadata removal deletes the task without guessing payload paths or erasing the user's torrent");
+            if(OperatingSystem.IsWindows())
+            {
+                var alreadyDeleted=Path.Combine(folder,"cancel-first.mkv");var retained=Path.Combine(folder,"cancel-locked.mkv");
+                await File.WriteAllTextAsync(alreadyDeleted,"first");await File.WriteAllTextAsync(retained,"locked");File.SetAttributes(retained,FileAttributes.ReadOnly);
+                var canceledItem=new DownloadItem{Folder=folder,Name="cancel midway",Files=[new("first",alreadyDeleted,alreadyDeleted,5,100),new("locked",retained,retained,6,100)]};
+                service.Items.Add(canceledItem);service.Save();
+                using(var held=new FileStream(retained,FileMode.Open,FileAccess.Read,FileShare.ReadWrite))
+                {
+                    var removing=service.Remove(canceledItem,true);var until=DateTime.UtcNow.AddSeconds(3);
+                    while(File.Exists(alreadyDeleted)&&DateTime.UtcNow<until)await Task.Delay(10);
+                    Check(!File.Exists(alreadyDeleted)&&!removing.IsCompleted,"first payload is deleted while the second is held by a Windows handle");
+                    await Task.Delay(40);var closing=service.Close();
+                    try{await removing;throw new Exception("midway cancellation was lost");}
+                    catch(DownloadFileDeletionCanceledException error){Check(error.DeletedFiles==1&&error.CancellationToken.IsCancellationRequested,"Close preserves cancellation semantics and the actual partial-deletion count");}
+                    await closing;
+                    Check(File.Exists(retained)&&(File.GetAttributes(retained)&FileAttributes.ReadOnly)!=0&&service.Items.Contains(canceledItem)&&!canceledItem.Busy&&canceledItem.Hint.Contains("Удалена часть файлов"),"canceled removal retains the locked file, its readonly attribute and a useful partial-deletion warning");
+                    Check(new DownloadService().Items.Any(item=>item.Id==canceledItem.Id),"canceled partial deletion keeps a persisted task for retry after restart");
+                    using var eventJson=JsonDocument.Parse(File.ReadAllLines(Path.Combine(Preferences.DataDir,"diagnostic.log")).Last(line=>line.Contains("download-remove-failed")));
+                    Check(eventJson.RootElement.GetProperty("Details").GetProperty("DeletedFiles").GetInt32()==1,"canceled removal diagnostic reports one file already deleted");
+                }
+            }
         }
         finally{await service.Close();Environment.SetEnvironmentVariable("KACHALKA_DATA",previous);}
     }

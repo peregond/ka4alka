@@ -13,6 +13,8 @@ jobs:
   preview:
     runs-on: windows-latest
     timeout-minutes: 8
+    env:
+      KACHALKA_DATA: ${{ github.workspace }}/test-output/ui-preview/data
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4

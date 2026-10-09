@@ -58,6 +58,8 @@ public static class DownloadFiles
                         }
                     }
                 }
+                catch(OperationCanceledException error)
+                {throw new DownloadFileDeletionCanceledException(deleted,error);}
                 catch(Exception error)when(error is IOException or UnauthorizedAccessException)
                 {throw new DownloadFileDeletionException(FailureMessage(error),deleted,error);}
             }
@@ -95,6 +97,11 @@ public static class DownloadFiles
 }
 
 public sealed class DownloadFileDeletionException(string message,int deletedFiles,Exception innerException):IOException(message,innerException)
+{
+    public int DeletedFiles {get;}=deletedFiles;
+}
+
+public sealed class DownloadFileDeletionCanceledException(int deletedFiles,OperationCanceledException innerException):OperationCanceledException("Удаление файлов отменено.",innerException,innerException.CancellationToken)
 {
     public int DeletedFiles {get;}=deletedFiles;
 }

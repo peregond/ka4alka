@@ -148,6 +148,24 @@ public partial class MainWindow
         scroll.ScrollToTop();await Until(()=>leavingToken.IsCancellationRequested,"Scrolling away did not cancel a poster request.");fixture.Release(6);await Task.Delay(150);
         if(images[6].Source!=null||coverCache.ContainsKey(url+"6.png"))throw new Exception("A late offscreen response changed an image or entered the decoded cache.");
 
+        // The production poster template sizes its Grid/Border, rather than
+        // its Image. An empty WPF bitmap has no render size until it loads.
+        // That must not deadlock the request waiting for visible image bounds.
+        Body.Children.Clear();var posterContainer=new Grid{Width=80,Height=120,HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Top};
+        var emptyPoster=new Image{DataContext=Card(13,url+"13.png"),Stretch=Stretch.UniformToFill};var emptyBeforeRequest=false;var containerEligible=false;
+        emptyPoster.Loaded+=SourceCover;emptyPoster.DataContextChanged+=SourceCoverChanged;
+        emptyPoster.Loaded+=(_,_)=>{emptyBeforeRequest=emptyPoster.Source==null&&(emptyPoster.ActualWidth<=0||emptyPoster.ActualHeight<=0);containerEligible=coverViewport?.Measure(emptyPoster).Near==true;};
+        posterContainer.Children.Add(emptyPoster);Body.Children.Add(posterContainer);
+        await Until(()=>emptyPoster.Source!=null,"A source-less poster in a sized container could not start its image request.");
+        if(!emptyBeforeRequest||!containerEligible)throw new Exception("The production poster fixture did not exercise zero-sized bitmap visibility through its sized container.");
+        if(emptyPoster.ActualWidth<=0||emptyPoster.ActualHeight<=0||coverViewport?.Measure(emptyPoster).Visible!=true)throw new Exception("A decoded poster did not regain its own visible bounds.");
+
+        var hiddenPoster=Poster(14,url+"14.png");hiddenPoster.Visibility=Visibility.Collapsed;posterContainer.Children.Clear();posterContainer.Children.Add(hiddenPoster);
+        await Until(()=>hiddenPoster.IsLoaded,"Collapsed poster fixture did not load its native container.");
+        await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.Background);
+        if(fixture.Count(14)!=0||coverViewport?.Measure(hiddenPoster).Near==true)throw new Exception("A collapsed image inherited its visible parent's IO eligibility.");
+        hiddenPoster.Visibility=Visibility.Visible;await Until(()=>hiddenPoster.Source!=null,"Showing a previously collapsed poster did not start loading.");
+
         // Hidden banner Image is measured through its visible Grid ancestor.
         Body.Children.Clear();var banner=new Grid{Width=420,Height=210,VerticalAlignment=VerticalAlignment.Top};var feature=Poster(15,url+"15.png");feature.Width=feature.Height=0;feature.Opacity=0;feature.Tag="FeaturePoster";banner.Children.Add(feature);Body.Children.Add(banner);
         await Until(()=>feature.Source!=null,"The zero-sized FeaturePoster failed to load through its banner viewport.");
@@ -200,7 +218,7 @@ public partial class MainWindow
         if(coverViewport.SweepCount-before!=1)throw new Exception("Repeated viewport notifications were not coalesced into one background sweep.");
         Body.Children.Clear();await Task.Delay(30);
         if(coverViewport.TrackedCount!=0)throw new Exception("Unloaded posters retain viewport scroll subscriptions.");
-        await File.WriteAllTextAsync(Path.Combine(output,"checks.json"),JsonSerializer.Serialize(new{VisiblePosters=true,NearestRowPrefetched=true,OffscreenNetworkAvoided=true,ScrollStartsRequests=true,ScrollAwayCancels=true,LayoutPositionStartsRequest=true,OwnedWindowPosters=true,OwnedWindowObserverCleanup=true,UnloadingCancels=true,RecycledContextRejectsLateResponse=true,HiddenFeaturePosterAnchored=true,SharedFeatureLookup=true,IndependentFeatureSubscriberCancellation=true,CanceledFeatureLookupCanRetry=true,FrozenBoundedDecode=true,MemoryCacheNoRefetch=true,DiskCacheNoRefetch=true,DiskCacheWorker=true,CoalescedViewportSweep=true,UnloadedObserverCleanup=true}));
+        await File.WriteAllTextAsync(Path.Combine(output,"checks.json"),JsonSerializer.Serialize(new{VisiblePosters=true,NearestRowPrefetched=true,OffscreenNetworkAvoided=true,ScrollStartsRequests=true,ScrollAwayCancels=true,EmptyPosterContainerAnchored=true,DecodedPosterOwnBounds=true,CollapsedPosterAvoidsNetwork=true,LayoutPositionStartsRequest=true,OwnedWindowPosters=true,OwnedWindowObserverCleanup=true,UnloadingCancels=true,RecycledContextRejectsLateResponse=true,HiddenFeaturePosterAnchored=true,SharedFeatureLookup=true,IndependentFeatureSubscriberCancellation=true,CanceledFeatureLookupCanRetry=true,FrozenBoundedDecode=true,MemoryCacheNoRefetch=true,DiskCacheNoRefetch=true,DiskCacheWorker=true,CoalescedViewportSweep=true,UnloadedObserverCleanup=true}));
         StopCoverViewport();Close();
     }
 }

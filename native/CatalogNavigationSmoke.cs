@@ -22,6 +22,15 @@ public partial class MainWindow
         void Check(bool ok,string message){if(!ok)throw new Exception(message);checks.Add(message);}
         void Click(Button button)=>button.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
         async Task Settle(){await Task.Delay(130);UpdateLayout();await Task.Delay(70);UpdateLayout();}
+        async Task Size(double width,double height=640)
+        {
+            // Windows Server's virtual monitor limits the native max-track size.
+            // Pin this fixture's minimum to its requested viewport, as in the
+            // design smoke, so its wide and narrow layouts are actually tested.
+            WindowState=WindowState.Normal;MinWidth=width;MinHeight=height;Width=width;Height=height;await Settle();
+            Check(Math.Abs(ActualWidth-width)<2&&Math.Abs(ActualHeight-height)<2,
+                $"the navigation fixture renders its requested {width}x{height} viewport (actual {ActualWidth:F1}x{ActualHeight:F1})");
+        }
         ScrollViewer Scroll()=>FindVisual<ScrollViewer>(Body,viewer=>viewer.VerticalScrollBarVisibility!=ScrollBarVisibility.Disabled)??throw new Exception("Navigation fixture has no page scroll viewer.");
         Button Back(string name)=>FindVisual<Button>(PageHeader,button=>AutomationProperties.GetName(button)==name)??throw new Exception("Missing back action: "+name);
         Button Card(int id)=>FindVisual<Button>(Body,button=>button.Tag is MediaItem film&&film.Id==id)??throw new Exception("Missing film card: "+id);
@@ -57,7 +66,7 @@ public partial class MainWindow
         var photo=new RenderTargetBitmap(20,30,96,96,PixelFormats.Pbgra32);var drawing=new DrawingVisual();using(var context=drawing.RenderOpen())context.DrawRectangle(Brushes.Teal,null,new Rect(0,0,20,30));photo.Render(drawing);
         var photoEncoder=new PngBitmapEncoder();photoEncoder.Frames.Add(BitmapFrame.Create(photo));using(var stream=File.Create(Path.Combine(photoDir,Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(photoUrl)))+".img")))photoEncoder.Save(stream);
 
-        designFixedViewport=true;MaxWidth=1800;MaxHeight=1200;MinWidth=620;MinHeight=420;Width=1440;Height=640;await Settle();
+        designFixedViewport=true;MaxWidth=1800;MaxHeight=1200;await Size(1440);
         section="Фильмы";lastCatalogSection=section;current=null;activePerson=null;returnPerson=null;savedReturn=null;
         submittedQuery="Проверочная история";Search.Text=submittedQuery;searchCategory="";livePage=2;favoritesOnly=false;
         ResetCatalogFilters();catalogGenre="drama";catalogCountry="russia";catalogYear=2025;catalogRating=7;catalogOrder="По рейтингу";
@@ -106,10 +115,11 @@ public partial class MainWindow
         Check(SearchActive&&livePage==2&&catalogGenre=="drama"&&catalogCountry=="russia","returning from Downloads restores query, page and filters");
         Position(catalogPosition,"returning from Downloads retains the catalog's visible title");
 
-        var beforeResize=CaptureCatalogPosition()!;var wideColumns=catalogColumns;Width=820;await Settle();
-        Check(catalogColumns<wideColumns,"the navigation fixture really reflows its poster columns at a smaller window width");
+        var beforeResize=CaptureCatalogPosition()!;var wideColumns=catalogColumns;var wideWindowWidth=ActualWidth;var wideBodyWidth=Body.ActualWidth;await Size(820);
+        Check(ActualWidth<wideWindowWidth-100&&Body.ActualWidth<wideBodyWidth-100&&catalogColumns<wideColumns,
+            $"the navigation fixture really reflows its poster columns at a smaller window width (window {wideWindowWidth:F1} → {ActualWidth:F1}, body {wideBodyWidth:F1} → {Body.ActualWidth:F1}, columns {wideColumns} → {catalogColumns})");
         Position(beforeResize,"resizing the catalog keeps its same title at the viewport edge");Shot("catalog-navigation-narrow");
-        var narrowPosition=CaptureCatalogPosition()!;Click(Card(narrowPosition.ItemId!.Value));await Settle();Width=1440;await Settle();CinemaBack();await Settle();
+        var narrowPosition=CaptureCatalogPosition()!;Click(Card(narrowPosition.ItemId!.Value));await Settle();await Size(1440);CinemaBack();await Settle();
         Position(narrowPosition,"returning from a film after resizing uses its catalog title instead of an obsolete pixel offset");
         var beforeRefresh=CaptureCatalogPosition()!;var previousItems=liveItems;
         liveLoading=true;liveItems=[];Render();await Settle();
@@ -127,7 +137,7 @@ public partial class MainWindow
             prefs.LiveFavorites=films.ToList();prefs.Favorites=films.Select(film=>film.Id).ToHashSet();savedCategory="";savedPage=1;
             Click(SavedButton);await Settle();Scroll().ScrollToVerticalOffset(600);await Settle();var savedPosition=CaptureCatalogPosition()!;
             Check(savedPosition.Offset>0&&savedPosition.ItemId!=null,"the Saved fixture has a real title anchor");
-            Click(Card(savedPosition.ItemId!.Value));await Settle();Width=820;await Settle();CinemaBack();await Settle();
+            Click(Card(savedPosition.ItemId!.Value));await Settle();await Size(820);CinemaBack();await Settle();
             Check(section=="Сохранённое"&&savedPage==1,"Saved retains its existing collection return destination");
             Position(savedPosition,"Saved film back after resizing restores its title across a different column count");
         }

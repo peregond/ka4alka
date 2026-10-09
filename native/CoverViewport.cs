@@ -55,18 +55,22 @@ internal sealed class CoverViewport(Window owner):IDisposable
     internal Position Measure(Image image)=>entries.TryGetValue(image,out var entry)?Measure(entry):default;
     static FrameworkElement? Anchor(Image image)
     {
-        // FeaturePoster deliberately has zero dimensions: its bitmap is used
-        // by the visible banner brush, so measure the first visible ancestor.
-        if(image.Tag?.ToString()!="FeaturePoster")return image;
+        // An Image with no Source can arrange to 0 × 0 even inside a sized
+        // poster. Measuring that empty bitmap would prevent the very request
+        // which gives it dimensions. Use the visible poster container until
+        // the bitmap exists, and always do so for hidden banner brush images.
+        if(image.Tag?.ToString()!="FeaturePoster"&&image.ActualWidth>0&&image.ActualHeight>0)return image;
         for(DependencyObject? parent=VisualTreeHelper.GetParent(image);parent!=null;parent=VisualTreeHelper.GetParent(parent))
             if(parent is FrameworkElement element&&element.ActualWidth>0&&element.ActualHeight>0)return element;
         return null;
     }
     Position Measure(Entry entry)
     {
-        if(disposed||!entry.Image.IsLoaded||!owner.IsVisible||owner.WindowState==WindowState.Minimized)return default;
+        if(disposed||!entry.Image.IsLoaded||!entry.Image.IsVisible||!owner.IsVisible||owner.WindowState==WindowState.Minimized)return default;
         var anchor=entry.Anchor;
-        if(anchor==null||anchor.ActualWidth<=0||anchor.ActualHeight<=0)
+        // Revisit a fallback after layout/decoding: a closer poster container
+        // may have acquired its size, or the Image may now have its own bounds.
+        if(anchor==null||anchor!=entry.Image||anchor.ActualWidth<=0||anchor.ActualHeight<=0)
         {
             var updated=Anchor(entry.Image);
             if(updated!=anchor){if(anchor!=null&&anchor!=entry.Image)anchor.SizeChanged-=Resized;entry.Anchor=anchor=updated;if(anchor!=null&&anchor!=entry.Image)anchor.SizeChanged+=Resized;}
