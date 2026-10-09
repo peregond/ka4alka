@@ -32,7 +32,7 @@ public partial class MainWindow
     {
         slides=slides.Take(5).ToArray();
         var frame=new Border{Name="FeatureFrame",CornerRadius=new(22),MinHeight=260};
-        frame.SetResourceReference(Border.BackgroundProperty,"Panel");
+        frame.Background=(Brush)FindResource("BannerBase");
         var grid=new Grid{Name="FeatureArtwork"};frame.Child=grid;
         grid.SizeChanged+=(_,e)=>
         {

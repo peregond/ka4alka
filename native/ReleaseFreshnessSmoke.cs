@@ -47,8 +47,8 @@ public partial class MainWindow
                 prefs.Light=light;ApplyTheme();MinWidth=width;Width=width;Height=760;Render();await Settle();
                 var texts=VisualElements<TextBlock>(Body).ToArray();var misses=new List<string>();
                 void Expect(bool good,string message){if(!good)misses.Add(message);}
-                Expect(texts.Any(x=>x.Text==ReleaseFreshness.Age(direct.DataReceivedUtc,DateTime.UtcNow))&&texts.Any(x=>x.Text==ReleaseFreshness.SourceName(direct)),name+": direct source receipt age is missing.");
-                Expect(texts.Any(x=>x.Text==ReleaseFreshness.Age(indexed.DataReceivedUtc,DateTime.UtcNow))&&texts.Any(x=>x.Text==ReleaseFreshness.SourceName(indexed)+" · индекс"),name+": index provenance is missing.");
+                Expect(texts.Any(x=>x.Text==ReleaseFreshness.Caption(direct,DateTime.UtcNow))||(texts.Any(x=>x.Text==ReleaseFreshness.Age(direct.DataReceivedUtc,DateTime.UtcNow))&&texts.Any(x=>x.Text==ReleaseFreshness.SourceName(direct))),name+": direct source receipt age is missing.");
+                Expect(texts.Any(x=>x.Text==ReleaseFreshness.Caption(indexed,DateTime.UtcNow))||(texts.Any(x=>x.Text==ReleaseFreshness.Age(indexed.DataReceivedUtc,DateTime.UtcNow))&&texts.Any(x=>x.Text==ReleaseFreshness.SourceName(indexed)+" · индекс")),name+": index provenance is missing.");
                 Expect(texts.Any(x=>x.Text.EndsWith("время неизвестно",StringComparison.Ordinal)),name+": legacy cache date was invented.");
                 Expect(texts.Any(x=>x.Text=="Русская · дубляж"||x.Text=="Озвучка: Русская · дубляж"),name+": Russian audio is hidden.");
                 Expect(texts.Any(x=>x.Text==ReleaseFreshness.ConnectionNote),name+": advertised participants are presented as confirmed peers.");
