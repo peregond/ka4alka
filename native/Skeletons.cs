@@ -29,7 +29,14 @@ public partial class MainWindow
             }
         }
         Fill();
-        grid.SizeChanged+=(_,e)=>{if(!e.WidthChanged)return;var columns=Math.Max(1,WindowSizing.PosterColumns(e.NewSize.Width-16));if(columns==grid.Columns)return;grid.Columns=columns;Fill();};
+        // Only a real resize regroups the cards: a scroll bar appearing or disappearing (a few pixels) must not,
+        // or the new height would toggle the scroll bar again and the layout would never settle.
+        var measured=0d;
+        grid.SizeChanged+=(_,e)=>
+        {
+            if(!e.WidthChanged||Math.Abs(e.NewSize.Width-measured)<48)return;measured=e.NewSize.Width;
+            var columns=Math.Max(1,WindowSizing.PosterColumns(e.NewSize.Width-16));if(columns==grid.Columns)return;grid.Columns=columns;Fill();
+        };
         return grid;
     }
     FrameworkElement BannerSkeleton()
@@ -52,7 +59,8 @@ public partial class MainWindow
             var portrait=new Border{Width=88,Height=88,CornerRadius=new(44),Margin=new(0,10,0,10),HorizontalAlignment=HorizontalAlignment.Center};portrait.SetResourceReference(Border.BackgroundProperty,"Raised");cell.Children.Add(portrait);
             var name=SkeletonBar(11,new(0,0,0,6));name.Width=84;cell.Children.Add(name);var role=SkeletonBar(9,new(0),.7);role.Width=52;cell.Children.Add(role);grid.Children.Add(cell);
         }
-        grid.SizeChanged+=(_,e)=>{if(!e.WidthChanged)return;var columns=Math.Clamp((int)Math.Floor(e.NewSize.Width/124),1,6);if(grid.Columns!=columns)grid.Columns=columns;};
+        var measured=0d;
+        grid.SizeChanged+=(_,e)=>{if(!e.WidthChanged||Math.Abs(e.NewSize.Width-measured)<48)return;measured=e.NewSize.Width;var columns=Math.Clamp((int)Math.Floor(e.NewSize.Width/124),1,6);if(grid.Columns!=columns)grid.Columns=columns;};
         return grid;
     }
 }
