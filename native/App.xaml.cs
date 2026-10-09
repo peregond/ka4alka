@@ -62,6 +62,7 @@ public partial class App : Application
         RegisterSmoke("--interface-polish-smoke-test",window.InterfacePolishSmokeTest);
         RegisterSmoke("--bug-report-smoke-test",window.BugReportSmokeTest);
         RegisterSmoke("--lan-smoke-test",window.LanSmokeTest);
+        RegisterSmoke("--text-rendering-smoke-test",window.TextRenderingSmokeTest);
         window.Show();
     }
     protected override void OnExit(ExitEventArgs e){installPresence?.Dispose();instance?.Dispose();base.OnExit(e);}

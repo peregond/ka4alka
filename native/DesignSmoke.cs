@@ -141,7 +141,7 @@ public partial class MainWindow
             await Settle();liveKey=CurrentCatalogKey;
             await Size(1760,950);
             Render();await Settle();
-            if(TextOptions.GetTextFormattingMode(this)!=TextFormattingMode.Ideal||TextOptions.GetTextRenderingMode(this)!=TextRenderingMode.Grayscale)throw new Exception("Text does not use smooth grayscale fractional metrics.");
+            if(TextOptions.GetTextFormattingMode(this)!=TextFormattingMode.Display||TextOptions.GetTextRenderingMode(this)!=TextRenderingMode.Auto)throw new Exception("Text does not use Windows display metrics and system antialiasing.");
             var wheelScrolling=await CheckWheelScrolling();
             MinWidth=360;MinHeight=300;
             var searchSettings=await CheckSearchAndSettings(output);

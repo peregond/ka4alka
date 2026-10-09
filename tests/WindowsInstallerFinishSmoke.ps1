@@ -45,7 +45,7 @@ try {
   $process.Refresh()
   if($process.HasExited){throw 'Installer exited before the final page'}
   $texts=$root.FindAll([System.Windows.Automation.TreeScope]::Descendants,[System.Windows.Automation.Condition]::TrueCondition)
-  $guide=@($texts) | Where-Object {$_.Current.Name.StartsWith('При первом запуске выбери папку')} | Select-Object -First 1
+  $guide=@($texts) | Where-Object {([string]$_.Current.Name).StartsWith('При первом запуске выбери папку')} | Select-Object -First 1
   # NSIS uses IDOK (1) for Next, Install, and Finish on the outer dialog.
   # Native activation also works when accessibility includes a mnemonic in Name.
   $next=[InstallerScreen]::GetDlgItem($process.MainWindowHandle,1)

@@ -44,7 +44,7 @@ public partial class MainWindow
                 // Only seven lines are needed to decide whether six visible
                 // lines overflow. Avoid shaping the entire biography again on
                 // every filmography progress tick or unrelated layout pass.
-                var formatted=new FormattedText(biography.Text,CultureInfo.CurrentCulture,FlowDirection.LeftToRight,new Typeface(biography.FontFamily,biography.FontStyle,biography.FontWeight,biography.FontStretch),biography.FontSize,Brushes.Black,dpi){MaxTextWidth=width,LineHeight=21,MaxLineCount=7};
+                var formatted=new FormattedText(biography.Text,CultureInfo.CurrentCulture,FlowDirection.LeftToRight,new Typeface(biography.FontFamily,biography.FontStyle,biography.FontWeight,biography.FontStretch),biography.FontSize,Brushes.Black,null,TextOptions.GetTextFormattingMode(biography),dpi){MaxTextWidth=width,LineHeight=21,MaxLineCount=7};
                 biographyOverflows=formatted.Height>127;measuredBiography=biography.Text;measuredWidth=width;measuredDpi=dpi;
             }
             expand.Visibility=biographyOverflows?Visibility.Visible:Visibility.Collapsed;
