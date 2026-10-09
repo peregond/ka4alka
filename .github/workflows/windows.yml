@@ -56,6 +56,8 @@ jobs:
           dotnet-version: '10.0.x'
       - name: Install NSIS
         run: ./scripts/install-nsis.ps1
+      - name: Verify published TMDB backdrops through the desktop HTTP client
+        run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --probe-backdrops
       - name: Validate installer and signed update on Windows
         if: ${{ !cancelled() }}
         shell: pwsh
@@ -72,6 +74,7 @@ jobs:
         with:
           name: windows-update-evidence
           path: |
+            test-output/transfer-*/backdrop-source/*
             test-output/transfer-*/portrait-source/*
             test-output/cache-reliability/*
             test-output/download-reliability/*

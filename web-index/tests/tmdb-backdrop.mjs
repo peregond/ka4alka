@@ -22,7 +22,7 @@ assert.equal(api.selectBackdrop([image('/portrait.jpg', 1280, 1920, null), image
 assert.equal(api.selectBackdrop([image('/portrait.jpg', 1280, 1920, null)]), null);
 let calls = [];
 const fake = async (url, options) => {
-  assert.equal(options.headers.Authorization, 'Bearer fixture-token'); assert(!url.includes('fixture-token')); assert.equal(options.redirect, 'error');
+  assert.equal(options.headers.Authorization, 'Bearer fixture-token'); assert(!url.includes('fixture-token')); assert.equal(options.redirect, 'manual');
   calls.push(url);
   return Response.json(url.includes('/search/') ? { results: rows } : url.includes('/find/') ? { movie_results: [rows[1]], tv_results: [{ id: 4 }] } : { backdrops: [image('/clean.jpg', 1920, 1080, null)] });
 };
@@ -35,6 +35,12 @@ let noIdentityCalls = 0;
 assert.equal(await api.fetchBackdrop({ ...movie, imdbId: 'tt1234567' }, 'fixture-token', async () => { noIdentityCalls++; return Response.json({ movie_results: [] }); }), null);
 assert.equal(noIdentityCalls, 1);
 await assert.rejects(api.fetchBackdrop(movie, 'fixture-token', async () => new Response('private-response', { status: 401 })), error => !error.message.includes('private-response'));
+let redirectCalls = 0;
+await assert.rejects(api.fetchBackdrop(movie, 'fixture-token', async (url, options) => {
+  redirectCalls++; assert.equal(options.redirect, 'manual');
+  return new Response(null, { status: 302, headers: { Location: 'https://untrusted.example/token-collector' } });
+}), /temporarily unavailable/);
+assert.equal(redirectCalls, 1, 'TMDB API redirect must never cause a second request');
 await assert.rejects(api.fetchBackdrop(movie, 'fixture-token', async () => new Response(' '.repeat(1_000_001))), /too large/);
 let now = 0, count = 0, finish;
 const cached = api.backdropCache(async () => { count++; await new Promise(resolve => { finish = resolve; }); return { url: 'https://image.tmdb.org/t/p/w1280/x.jpg', tmdbId: 2, source: 'TMDB' }; }, () => now);
@@ -60,7 +66,8 @@ const response = await route.GET(req('movies:dune')); assert.equal(response.stat
 assert.equal((await response.json()).id, 'movies:dune'); assert.equal(response.headers.get('Cache-Control'), 'public, max-age=86400, s-maxage=604800');
 let imageCalls = 0, upstreamMode = 'jpeg';
 const proxy = load('../app/api/backdrop-image/route.ts', { '@/lib/tmdb-backdrop': api }, { fetch: async (url, options) => {
-  imageCalls++; assert.equal(url, 'https://image.tmdb.org/t/p/w1280/x.jpg'); assert.equal(options.redirect, 'error');
+  imageCalls++; assert.equal(url, 'https://image.tmdb.org/t/p/w1280/x.jpg'); assert.equal(options.redirect, 'manual');
+  if (upstreamMode === 'redirect') return new Response(null, { status: 302, headers: { Location: 'https://untrusted.example/image.jpg' } });
   return new Response(upstreamMode === 'jpeg' ? new Uint8Array([255,216,255,0]) : upstreamMode === 'oversized' ? new Uint8Array(2*1024*1024+1) : 'unexpected HTML');
 } });
 const imageReq = file => new Request(`https://example.test/api/backdrop-image?file=${encodeURIComponent(file)}`);
@@ -68,4 +75,7 @@ assert.equal((await proxy.GET(imageReq('https://evil.test/x.jpg'))).status, 400)
 const jpeg = await proxy.GET(imageReq('/x.jpg')); assert.equal(jpeg.status, 200); assert.equal(jpeg.headers.get('Content-Type'), 'image/jpeg');
 upstreamMode = 'html'; assert.equal((await proxy.GET(imageReq('/x.jpg'))).status, 502);
 upstreamMode = 'oversized'; assert.equal((await proxy.GET(imageReq('/x.jpg'))).status, 413);
+upstreamMode = 'redirect'; const beforeRedirect = imageCalls;
+assert.equal((await proxy.GET(imageReq('/x.jpg'))).status, 502);
+assert.equal(imageCalls, beforeRedirect + 1, 'Image redirect must never cause a second request');
 console.log('PASS: movie/TV identity, remake ambiguity, landscape selection, bounded authenticated requests, secret-free output, coalescing, TTL, failure cooldown, route validation and constrained JPEG proxy');

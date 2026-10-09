@@ -7,7 +7,7 @@ export async function GET(request: Request) {
   const url = imageUrl(path);
   if (!url) return new Response(null, { status: 400 });
   try {
-    const response = await fetch(url, { signal: AbortSignal.timeout(6000), redirect: "error" });
+    const response = await fetch(url, { signal: AbortSignal.timeout(6000), redirect: "manual" });
     if (!response.ok) return new Response(null, { status: 502 });
     if (Number(response.headers.get("content-length") ?? 0) > 2 * 1024 * 1024) return new Response(null, { status: 413 });
     const reader = response.body?.getReader(); if (!reader) return new Response(null, { status: 502 });

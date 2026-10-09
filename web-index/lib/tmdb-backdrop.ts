@@ -28,7 +28,8 @@ export async function fetchBackdrop(item: BackdropIdentity, token: string, reque
   const signal = AbortSignal.timeout(7000);
   async function read(path: string) {
     const response = await request(`https://api.themoviedb.org/3/${path}`, {
-      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" }, signal, redirect: "error",
+      // Workers supports manual redirects; !ok below rejects 3xx without forwarding credentials.
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" }, signal, redirect: "manual",
     });
     if (!response.ok) throw new Error("TMDB is temporarily unavailable");
     if (Number(response.headers.get("content-length") ?? 0) > 1_000_000) throw new Error("TMDB response is too large");
