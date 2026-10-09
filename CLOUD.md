@@ -1,11 +1,11 @@
 # Работа с проектом в Codex Cloud
 
-Репозиторий: `peregond/ka4alka`, ветка `main`.
+Репозиторий: `peregond/ka4alka`, ветка `main`. Актуальные исходники опубликованной 0.39.0 находятся в [теге `v0.39.0`](https://github.com/peregond/ka4alka/tree/v0.39.0); `main` содержит более раннюю версию приложения и общую документацию.
 
 - `native/` — приложение Windows, C# / WPF, .NET 10 и MonoTorrent.
 - `tests/` — исходники интеграционных проверок нативного приложения.
 - `web-index/` — сайт «Ка4алка Онл@йн», TypeScript, React, Next/Vinext и Cloudflare D1.
-- `distribution/` — подготовленные материалы для распространения. Публикация бинарных релизов пока не выполнена.
+- `distribution/` — руководство и скриншоты приложения. Готовые установщики опубликованы в [GitHub Releases](https://github.com/peregond/ka4alka/releases).
 - `build.ps1` и `package-release.ps1` — сборка Windows-приложения и подготовка релиза.
 
 Исходники можно редактировать в облачной среде. Полный запуск WPF-приложения, UI-проверки и тесты, которым нужна Windows Desktop Runtime, выполняются на Windows; Linux-среда не заменяет эти проверки. Для кросс-компиляции на Linux требуется .NET 10 SDK и свойство `EnableWindowsTargeting=true` при сборке проекта. Не отмечайте Windows-проверки выполненными, если они не запускались.

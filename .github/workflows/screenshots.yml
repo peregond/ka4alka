@@ -1,9 +1,6 @@
 name: Capture published 0.39 screenshots
 on:
   workflow_dispatch:
-  push:
-    branches: [codex/screenshots-0.39.0]
-    paths: [.github/workflows/screenshots.yml, 'scripts/screenshots/**']
 permissions:
   contents: write
 concurrency:

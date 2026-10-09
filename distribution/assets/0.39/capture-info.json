@@ -1,0 +1,88 @@
+{
+  "Version": "0.39.0",
+  "ReleaseArchiveSha256": "368b53704560168bdc17421d18d2a89d70a06e034fdbf427e136b36d91ea6985",
+  "ReleaseDllSha256": "a1b0a1d4b93411b35ed0454b84199ad231160fbef18cad4104764ec223b4fe07",
+  "Captures": [
+    {
+      "File": "catalog-dark.png",
+      "Width": 1424,
+      "Height": 861,
+      "LoadedVisiblePosters": 18,
+      "PendingVisiblePosters": 0,
+      "Titles": [
+        "Курьер",
+        "Человек-паук: Новый день",
+        "Одиссея",
+        "Последний богатырь. Колобок",
+        "Моана",
+        "Мстители: Финал",
+        "Мошенники",
+        "Холоп 3",
+        "Мангуст",
+        "Комната внизу",
+        "Шумахер 1994: Рождение легенды",
+        "Арахнид",
+        "Унабомбер",
+        "Твоя мать, твоя мать, твоя мать",
+        "Водитель-каскадёр",
+        "Не стесняйся!"
+      ]
+    },
+    {
+      "File": "catalog-light.png",
+      "Width": 1424,
+      "Height": 861,
+      "LoadedVisiblePosters": 18,
+      "PendingVisiblePosters": 0,
+      "Titles": [
+        "Курьер",
+        "Человек-паук: Новый день",
+        "Одиссея",
+        "Последний богатырь. Колобок",
+        "Моана",
+        "Мстители: Финал",
+        "Мошенники",
+        "Холоп 3",
+        "Мангуст",
+        "Комната внизу",
+        "Шумахер 1994: Рождение легенды",
+        "Арахнид",
+        "Унабомбер",
+        "Твоя мать, твоя мать, твоя мать",
+        "Водитель-каскадёр",
+        "Не стесняйся!"
+      ]
+    },
+    {
+      "File": "series-dark.png",
+      "Width": 1424,
+      "Height": 861,
+      "LoadedVisiblePosters": 11,
+      "PendingVisiblePosters": 0,
+      "Titles": [
+        "Жизнь без ошибок",
+        "Истина и измена",
+        "Гангстерленд",
+        "Джентльмены",
+        "Укрытие",
+        "Сверхъестественное",
+        "Джек Ричер",
+        "Ходячие мертвецы",
+        "Первый отдел",
+        "Американская история ужасов"
+      ]
+    }
+  ],
+  "CaptureWorkflowRun": "https://github.com/peregond/ka4alka/actions/runs/37925548009",
+  "AdditionalCaptures": [
+    {
+      "File": "downloads-dark.png",
+      "Description": "Demonstration queue captured during Windows release checks."
+    },
+    {
+      "File": "lan-pairing-dark.png",
+      "Description": "Device pairing dialog captured during Windows release checks."
+    }
+  ],
+  "AdditionalCaptureSourceCommit": "d1b12a7a8814ea0f51173cb25706d4f04f7a772a"
+}
