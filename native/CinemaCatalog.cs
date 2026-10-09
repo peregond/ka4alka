@@ -32,6 +32,7 @@ public partial class MainWindow
             discoveryHero.Children.Add(BuildFeatureCarousel(banners));
             content.Children.Add(discoveryHero);
         }
+        else if(liveLoading||featuredRequests.Contains(section))content.Children.Add(BannerSkeleton());
         if(filterRow!=null)content.Children.Add(filterRow);
         var regions=DiscoveryRegionalItems(section,prefs.HomeCountry,cards);
         var order=section=="Фильмы"?new[]{DiscoveryShelfKind.Popular,DiscoveryShelfKind.New,DiscoveryShelfKind.Foreign,DiscoveryShelfKind.Native}:new[]{DiscoveryShelfKind.Popular,DiscoveryShelfKind.Foreign,DiscoveryShelfKind.New,DiscoveryShelfKind.Native};
@@ -41,7 +42,7 @@ public partial class MainWindow
             switch(kind)
             {
                 case DiscoveryShelfKind.Popular:view.Set(popular,featuredRequests.Contains(section)&&!featuredFallback.Contains(section));discoveryShelf=view.Row;break;
-                case DiscoveryShelfKind.New:view.Set(cards,false);break;
+                case DiscoveryShelfKind.New:view.Set(cards,liveLoading);break;
                 case DiscoveryShelfKind.Foreign:view.Set(regions.Foreign,regions.Loading);break;
                 case DiscoveryShelfKind.Native:view.Set(regions.Native,regions.Loading);break;
             }

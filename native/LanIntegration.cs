@@ -13,7 +13,7 @@ public partial class MainWindow
     readonly SemaphoreSlim lanLifecycleGate=new(1,1);
     readonly CancellationTokenSource lanLifetime=new();
     (Guid DeviceId,string ReleaseKey,LanDownloadRequest Request)? pendingLanDownload;
-    bool lanSending;
+    bool lanSending,lanActionsShown;
     long lanLastTransportError;
     string LanDeviceDisplayName=>string.IsNullOrWhiteSpace(prefs.LanDeviceName)?DeviceDisplayName.Default():prefs.LanDeviceName;
 
@@ -39,6 +39,8 @@ public partial class MainWindow
             if(closing||closed||Dispatcher.HasShutdownStarted)return Task.FromResult(false);
             return Dispatcher.InvokeAsync(()=>ConfirmLanPairingAsync(request,token)).Task.Unwrap();
         };
+        // Pairing or forgetting a computer while a film is open shows or hides the laptop actions in place.
+        service.Changed+=(_,_)=>{if(!closing&&!closed&&!Dispatcher.HasShutdownStarted)Dispatcher.BeginInvoke(new Action(RefreshLanActions));};
         service.ReceiveDownloadAsync=(request,token)=>
         {
             if(closing||closed||Dispatcher.HasShutdownStarted)return Task.FromResult(new LanDownloadReceipt{RequestId=request.RequestId,Message="Приложение закрывается. Повтори отправку после запуска."});
@@ -87,7 +89,15 @@ public partial class MainWindow
             else if(!enabled&&previous&&!closing&&!closed&&lanService==null)lanService=await CreateLanServiceAsync();
             throw;
         }
-        finally{lanLifecycleGate.Release();}
+        finally{lanLifecycleGate.Release();RefreshLanActions();}
+    }
+    bool LanActionAvailable=>prefs.LanEnabled&&lanService?.IsRunning==true&&lanService.Devices.Any(device=>device.Paired);
+    void RefreshLanActions()
+    {
+        if(closing||closed)return;
+        var shown=LanActionAvailable;if(shown==lanActionsShown)return;lanActionsShown=shown;
+        foreach(var button in VisualElements<Button>(Body).Where(x=>AutomationProperties.GetName(x).StartsWith("Скачать на другом устройстве: ",StringComparison.Ordinal)))
+            button.Visibility=shown?Visibility.Visible:Visibility.Collapsed;
     }
 
     async Task RenameLanDeviceAsync(string value)
@@ -129,7 +139,9 @@ public partial class MainWindow
         var glyph=new System.Windows.Shapes.Path{Data=(Geometry)FindResource("IconDownload"),Width=16,Height=16,Stretch=Stretch.Uniform,StrokeThickness=1.8,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,StrokeLineJoin=PenLineJoin.Round,Margin=new(0,0,8,0),VerticalAlignment=VerticalAlignment.Center};glyph.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty,"Accent");
         localRow.Children.Add(glyph);localRow.Children.Add(new TextBlock{Text="Скачать",VerticalAlignment=VerticalAlignment.Center});local.Content=localRow;
         AutomationProperties.SetName(local,"Скачать раздачу: "+entry.Title);local.Click+=SourceDownload;
-        var remote=new Button{Style=(Style)FindResource("IconButton"),Width=44,Height=44,Margin=new(6,0,0,0),ToolTip="Скачать на другом устройстве"};
+        var remote=new Button{Style=(Style)FindResource("IconButton"),Width=44,Height=44,Margin=new(6,0,0,0),ToolTip="Отправить на другой компьютер в сети: он скачает раздачу сам"};
+        // The laptop action only makes sense once another computer is paired; until then it stays out of every row.
+        lanActionsShown=LanActionAvailable;remote.Visibility=lanActionsShown?Visibility.Visible:Visibility.Collapsed;
         remote.Content=IconLabel("","IconLaptop",18);
         AutomationProperties.SetName(remote,"Скачать на другом устройстве: "+entry.Title);
         remote.Click+=async(_,_)=>await SendReleaseToLanAsync(remote,entry);

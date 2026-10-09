@@ -22,7 +22,7 @@ public partial class MainWindow
         var people=new StackPanel();
         if(item.People.Length==0)
         {
-            people.Children.Add(Text(DetailMetadataLoading(item.Id)?"Загружаем участников…":"Участники пока недоступны у источника.",12,true));
+            if(DetailMetadataLoading(item.Id))people.Children.Add(PeopleSkeleton());else people.Children.Add(Text("Участники пока недоступны у источника.",12,true));
             if(DetailMetadataNeedsRetry(item.Id)){var retry=ActionButton("Загрузить участников","IconRefresh",()=>RetryDetailMetadata(item));retry.HorizontalAlignment=HorizontalAlignment.Left;people.Children.Add(retry);}
         }
         if(item.People.Length>0)
