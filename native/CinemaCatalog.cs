@@ -112,7 +112,7 @@ public partial class MainWindow
             if(e.NewSize.Width<=0||e.NewSize.Height<=0)return;
             var clip=new RectangleGeometry(new Rect(e.NewSize),15,15);clip.Freeze();grid.Clip=clip;
         };
-        var image=new Image{DataContext=item,Width=0,Height=0,Opacity=0,Tag="FeaturePoster"};image.Loaded+=SourceCover;image.DataContextChanged+=SourceCoverChanged;image.Loaded+=async(_,_)=>await ImproveFeaturePoster(image,item);grid.Children.Add(image);
+        var image=new Image{DataContext=item,Width=0,Height=0,Opacity=0,Tag="FeaturePoster"};image.Loaded+=SourceCover;image.DataContextChanged+=SourceCoverChanged;grid.Children.Add(image);
         var picture=new ImageBrush{Stretch=Stretch.UniformToFill,AlignmentX=AlignmentX.Center,AlignmentY=AlignmentY.Top};
         BindingOperations.SetBinding(picture,ImageBrush.ImageSourceProperty,new Binding("Source"){Source=image});
         var backdrop=new Border{Background=picture};grid.Children.Add(backdrop);
@@ -123,7 +123,7 @@ public partial class MainWindow
         var title=new TextBlock{Text=item.Title,FontSize=primary?25:22,FontWeight=FontWeights.SemiBold,Foreground=Brushes.White,TextWrapping=TextWrapping.Wrap,TextTrimming=TextTrimming.CharacterEllipsis,MaxHeight=65,ToolTip=item.Title,Margin=new(0,0,0,6)};content.Children.Add(title);
         content.Children.Add(new TextBlock{Text=string.Join(" · ",new[]{item.Year>0?item.Year.ToString():"",item.CardGenre}.Where(x=>x.Length>0)),Foreground=new SolidColorBrush(Color.FromRgb(202,212,237)),FontSize=12,TextTrimming=TextTrimming.CharacterEllipsis,Margin=new(0,0,0,12)});
         var action=new Border{CornerRadius=new(9),Padding=new(12,9,12,9),HorizontalAlignment=HorizontalAlignment.Left,BorderThickness=new(1)};
-        action.SetResourceReference(Border.BackgroundProperty,primary?"PrimaryFill":"AccentSoft");action.SetResourceReference(Border.BorderBrushProperty,primary?"Primary":"Edge");
+        action.SetResourceReference(Border.BackgroundProperty,primary?"PrimaryFill":"BannerAction");action.SetResourceReference(Border.BorderBrushProperty,primary?"Primary":"Edge");
         var actionLabel=IconLabel("Подробнее","IconChevron");actionLabel.IsHitTestVisible=false;
         foreach(var label in VisualElements<TextBlock>(actionLabel))label.Foreground=Brushes.White;
         foreach(var glyph in VisualElements<System.Windows.Shapes.Path>(actionLabel))glyph.Stroke=Brushes.White;

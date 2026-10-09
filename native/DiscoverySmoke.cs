@@ -61,7 +61,13 @@ public partial class MainWindow
         var firstPage=liveItems.Select(item=>item.Id).ToArray();var originalKey=liveKey;
         All(DiscoveryShelfKind.New).RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await settle();
         check(livePage==1&&liveKey==originalKey&&CatalogSelection.IsDefault&&liveItems.Select(item=>item.Id).SequenceEqual(firstPage),"New shelf opens the complete newest first page without skipping to page 2");
-        check(FindVisual<ScrollViewer>(Body,_=>true) is {VerticalOffset:>0},"New shelf's All action scrolls to the complete catalog below the shelves");
+        var newestScroll=FindVisual<ScrollViewer>(Body,viewer=>viewer.VerticalScrollBarVisibility!=ScrollBarVisibility.Disabled)??throw new Exception("New shelf navigation has no page scroll viewer.");
+        check(newestScroll.VerticalOffset>0,$"New shelf's All action scrolls to the complete catalog below the shelves (offset {newestScroll.VerticalOffset:F1}, pending {navigationPendingPosition?.ItemId})");
+        var newestHeading=FindVisual<TextBlock>(Body,text=>text.Name=="CatalogAllHeading")??throw new Exception("New shelf navigation has no complete catalog heading.");
+        var headingBounds=newestHeading.TransformToAncestor(newestScroll).TransformBounds(new Rect(new Point(),newestHeading.RenderSize));
+        check(headingBounds.Bottom>0&&headingBounds.Top<newestScroll.ViewportHeight,"New shelf's All action exposes the complete catalog heading in the actual viewport");
+        var jumpedOffset=newestScroll.VerticalOffset;await settle();
+        check(newestScroll.VerticalOffset>=jumpedOffset-.5,"New shelf's explicit jump survives a following layout without being replaced by an old navigation restore");
         await Default();All(DiscoveryShelfKind.Popular).RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await settle();
         check(livePage==1&&catalogCollection=="popular"&&CatalogSelection.Filter==""&&liveItems.Select(item=>item.Id).SequenceEqual(catalogPages[category+"||1"].Items.Select(item=>item.Id)),"Popular shelf opens the public source's popularity order on page 1");
         await Default();All(DiscoveryShelfKind.Native).RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await settle();

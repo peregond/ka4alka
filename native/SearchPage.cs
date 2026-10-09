@@ -10,6 +10,7 @@ public partial class MainWindow
     internal Func<string,string,CancellationToken,Task<IReadOnlyList<MediaItem>>>? searchProvider;
     void SubmitSearch(object sender,RoutedEventArgs e)
     {
+        ResetCatalogNavigationPosition();
         searchDelay.Stop();
         if(section is not ("Фильмы" or "Сериалы"))section=current?.Section is "Фильмы" or "Сериалы"?current.Section:lastCatalogSection;
         CancelPeopleSearch(true);personSearchReturn=null;activePerson=null;returnPerson=null;

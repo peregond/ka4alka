@@ -71,9 +71,13 @@ public static class DownloadMetadata
         var image=rows.Select(media=>media.ImageUrl).FirstOrDefault(url=>!string.IsNullOrWhiteSpace(url));
         var original=rows.Select(media=>media.OriginalTitle).FirstOrDefault(title=>!string.IsNullOrWhiteSpace(title))??
             rows.Where(media=>!Regex.IsMatch(media.Title,@"[А-Яа-яЁё]")&&Normalize(media.Title)!=Normalize(preferred.Title)).Select(media=>media.Title).FirstOrDefault();
-        return preferred with{ImageUrl=!string.IsNullOrWhiteSpace(preferred.ImageUrl)?preferred.ImageUrl:image,OriginalTitle=preferred.OriginalTitle??original,
+        // An exact identity may appear as a lightweight shelf row and a full
+        // cached detail row. Keep their confirmed credits and other details,
+        // with the caller's first nonempty source taking precedence.
+        var metadata=rows.Reverse().Aggregate(preferred,(merged,row)=>MediaMetadata.Merge(merged,row));
+        return metadata with{ImageUrl=!string.IsNullOrWhiteSpace(preferred.ImageUrl)?preferred.ImageUrl:image,OriginalTitle=preferred.OriginalTitle??original,
             Kinopoisk=rows.FirstOrDefault(media=>Rating(media.Kinopoisk))?.Kinopoisk??"—",Imdb=rows.FirstOrDefault(media=>Rating(media.Imdb))?.Imdb??"—",
-            Description=rows.FirstOrDefault(media=>!string.IsNullOrWhiteSpace(media.Description))?.Description};
+            Description=rows.FirstOrDefault(MediaMetadata.HasDescription)?.Description};
     }
 
     static bool TitleMatches(string value,MediaItem media)
@@ -111,7 +115,7 @@ public static class DownloadMetadata
         var best=Unique(known.Where(candidate=>candidate.Section==media.Section&&
             (SamePage(candidate.PageUrl,media.PageUrl)||string.IsNullOrWhiteSpace(media.PageUrl)&&candidate.Id==media.Id&&candidate.Year==media.Year&&Normalize(candidate.Title)==Normalize(media.Title))));
         if(best==null)return media with{Kinopoisk=Rating(media.Kinopoisk)?media.Kinopoisk:"—",Imdb=Rating(media.Imdb)?media.Imdb:"—"};
-        return media with
+        return MediaMetadata.Merge(media,best) with
         {
             Title=Regex.IsMatch(best.Title,@"[А-Яа-яЁё]")?best.Title:media.Title,
             ImageUrl=!string.IsNullOrWhiteSpace(best.ImageUrl)?best.ImageUrl:media.ImageUrl,

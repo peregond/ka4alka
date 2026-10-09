@@ -55,6 +55,7 @@ public partial class MainWindow
     {
         if(kind==DiscoveryShelfKind.New)
         {
+            CancelCatalogPositionRestoreForUserJump();
             FindVisual<TextBlock>(Body,element=>element.Name=="CatalogAllHeading")?.BringIntoView();return;
         }
         ChangeCatalogFilter(()=>

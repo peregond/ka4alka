@@ -28,7 +28,7 @@ static class ReleaseSearchTests
             new("Slow",_=>slow.Task)
         ],reporter);
         var partial=await first.Task.WaitAsync(TimeSpan.FromSeconds(2));
-        Check(partial.Items.Single()==row&&!scan.IsCompleted,"fast source publishes usable release before slow source finishes");
+        Check((partial.Items.Single() with{DataReceivedUtc=null,DataProvider=null})==row&&!scan.IsCompleted,"fast source publishes usable release before slow source finishes");
         slow.SetResult([]);var result=await scan;
         Check(result.Items.Length==1&&result.Sources.Single(x=>x.Name=="Broken").State==SourceState.Unavailable,"failed source does not remove working source results");
         Check(result.Sources.Single(x=>x.Name=="Slow") is {State:SourceState.Empty,LastSuccessUtc:not null},"empty successful reply is distinct from unavailable source");

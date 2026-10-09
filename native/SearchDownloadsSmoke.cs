@@ -1,10 +1,12 @@
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -160,7 +162,14 @@ public partial class MainWindow
         var fixtures=Enumerable.Range(0,6).Select(i=>new DownloadItem{Id="redesign-"+i,Name="Series.Season."+(i+1)+".FullHD.WEB-DL.mkv",MediaTitle="Сериал · сезон "+(i+1),MediaSection="Сериалы",ImageUrl=i==0?null:posterUrl,AddedUtc=added.AddMinutes(i),Folder=folder,Progress=20+i*10,Paused=true,DownloadRate=i*1024,TotalBytes=(6-i)*1024L*1024*1024,Stats="50% · 1.0 ГБ из 2.0 ГБ · ↓ 0 КБ/с",Files=[new("Сезон 1/Серия 01.mkv",Path.Combine(folder,"episode1.mkv"),Path.Combine(folder,"episode1.mkv"),1024*1024,100),new("Сезон 1/Серия 02.mkv",Path.Combine(folder,"episode2.mkv"),Path.Combine(folder,"episode2.mkv"),1024*1024,35)]}).ToArray();
         foreach(var fixture in fixtures)downloads.Items.Add(fixture);
         var originalLight=prefs.Light;var originalSort=prefs.DownloadSort;var originalMinWidth=MinWidth;
-        async Task SettleDownloads(){await Task.Delay(150);UpdateLayout();}
+        async Task SettleDownloads()
+        {
+            UpdateLayout();await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);
+            await Task.Delay(150);UpdateLayout();
+            // The final layout may realize a recycled row or enqueue its
+            // ContextIdle scroll restoration. Wait for that work as well.
+            await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);UpdateLayout();
+        }
         ListBox Queue()=>FindVisual<ListBox>(Body,_=>true)??throw new Exception("Download queue is missing.");
         ListBoxItem FirstRow()=>Queue().ItemContainerGenerator.ContainerFromIndex(0) as ListBoxItem??throw new Exception("First download row is not realized.");
         Button Toolbar(string name)=>FindVisual<Button>(PageHeader,b=>AutomationProperties.GetName(b)==name)??throw new Exception("Missing download toolbar "+name);
@@ -296,31 +305,124 @@ public partial class MainWindow
             check(Icon is BitmapSource&&BrandLogo.Source is BitmapSource,"application icon and transparent kettlebell logo load from packaged resources");
             Width=1280;Height=800;section="Загрузки";current=null;Render();await SettleDownloads();
             fixtures[^1].MediaPageUrl="https://w6.zona.plus/tvseries/download-fixture";fixtures[^1].Refresh();await SettleDownloads();
-            var linked=DownloadMetadata.Card(fixtures[^1])!;requestedDetails.Add(linked.Id);
+            var linked=DownloadMetadata.Card(fixtures[^1])??throw new Exception("The associated download card fixture is missing.");requestedDetails.Add(linked.Id);
+            // Wide screenshots can exceed a CI runner's physical desktop.
+            // Fit the real mouse interactions, using the application's own
+            // monitor/DPI sizing, before testing hover and navigation.
+            var nativeHandle=new WindowInteropHelper(this).Handle;
+            var monitorInfo=new MonitorInfo{Size=(uint)Marshal.SizeOf<MonitorInfo>()};
+            check(GetMonitorInfo(MonitorFromWindow(nativeHandle,MonitorDefaultNearest),ref monitorInfo),"download native input monitor exposes its work area");
+            var dpi=VisualTreeHelper.GetDpi(this);var nativeFit=WindowSizing.FitPixels(monitorInfo.Work.Width,monitorInfo.Work.Height,dpi.DpiScaleX,dpi.DpiScaleY);
+            MinWidth=Math.Min(360,nativeFit.Width);MinHeight=Math.Min(300,nativeFit.Height);Width=Math.Min(1280,nativeFit.Width);Height=Math.Min(800,nativeFit.Height);
+            PlaceWithinWorkArea(nativeHandle,monitorInfo.Work,true);await SettleDownloads();
+            string DownloadUiState()
+            {
+                var list=downloadList;var row=list?.ItemContainerGenerator.ContainerFromItem(fixtures[^1]) as ListBoxItem;
+                var labels=row==null?Array.Empty<string>():VisualElements<Button>(row).Select(button=>AutomationProperties.GetName(button)).ToArray();
+                return $"section={section}, current={current?.Id}, count={list?.Items.Count}, queue={downloads.Items.Count}, paused={fixtures.Count(item=>item.Paused)}/{fixtures.Length}, downloadReturn={downloadReturnItem?.Id}, person={activePerson?.Name}, returnPerson={returnPerson?.Person.Name}, generator={list?.ItemContainerGenerator.Status}, row={row?.GetType().Name??"missing"}, rowData={(row?.DataContext as DownloadItem)?.Id}, buttons={string.Join(",",labels)}, restore={navigationRestore?.Status}, pendingOffset={navigationPendingPosition?.Offset}";
+            }
+            async Task<Button> DownloadLink(string label)
+            {
+                var list=Queue();list.ScrollIntoView(fixtures[^1]);var deadline=DateTime.UtcNow.AddSeconds(3);
+                do
+                {
+                    await SettleDownloads();
+                    if(list.ItemContainerGenerator.ContainerFromItem(fixtures[^1]) is ListBoxItem row&&ReferenceEquals(row.DataContext,fixtures[^1])&&
+                        FindVisual<Button>(row,b=>AutomationProperties.GetName(b)==label&&ReferenceEquals(b.Tag,fixtures[^1])) is {IsVisible:true,ActualWidth:>0,ActualHeight:>0} link)return link;
+                }while(DateTime.UtcNow<deadline);
+                throw new Exception("Realized download action is missing: "+label+"; "+DownloadUiState());
+            }
+            async Task NativeDownloadClick(Button button,string phase)
+            {
+                var down=0;var up=0;var clicks=0;
+                MouseButtonEventHandler onDown=(_,_)=>down++;MouseButtonEventHandler onUp=(_,_)=>up++;
+                RoutedEventHandler onClick=(_,_)=>clicks++;
+                button.AddHandler(PreviewMouseDownEvent,onDown,true);button.AddHandler(PreviewMouseUpEvent,onUp,true);button.AddHandler(ButtonBase.ClickEvent,onClick,true);
+                try
+                {
+                    SetForegroundWindow(nativeHandle);await SettleDownloads();
+                    var target=button.PointToScreen(new Point(button.ActualWidth/2,button.ActualHeight/2));
+                    var topLeft=button.PointToScreen(new Point());var bottomRight=button.PointToScreen(new Point(button.ActualWidth,button.ActualHeight));
+                    var before=DownloadUiState();var captureBefore=Mouse.Captured?.GetType().Name;
+                    check(SetCursorPos((int)target.X,(int)target.Y),"native mouse can position for "+phase);Mouse.Synchronize();await SettleDownloads();
+                    var gotCursor=GetCursorPos(out var actual);
+                    var pointerReady=gotCursor&&Math.Abs(actual.X-(int)target.X)<=1&&Math.Abs(actual.Y-(int)target.Y)<=1&&
+                        GetForegroundWindow()==nativeHandle&&GetAncestor(WindowFromPoint(actual),2)==nativeHandle&&button.IsMouseOver&&
+                        topLeft.X>=monitorInfo.Work.Left&&bottomRight.X<=monitorInfo.Work.Right&&topLeft.Y>=monitorInfo.Work.Top&&bottomRight.Y<=monitorInfo.Work.Bottom;
+                    var pointer=$"phase={phase}, requested={target}, actual={actual.X},{actual.Y}, bounds={topLeft}..{bottomRight}, foreground={GetForegroundWindow()==nativeHandle}, root={GetAncestor(WindowFromPoint(actual),2)==nativeHandle}, hover={button.IsMouseOver}, captured={captureBefore??"none"}; "+before;
+                    check(pointerReady,"native pointer reaches the physically visible download control: "+pointer);
+                    await ClickWithMouse(button);await SettleDownloads();
+                    var evidence=new{Phase=phase,Button=AutomationProperties.GetName(button),Requested=new{target.X,target.Y},Actual=new{actual.X,actual.Y},Bounds=new{Left=topLeft.X,Top=topLeft.Y,Right=bottomRight.X,Bottom=bottomRight.Y},PointerReady=pointerReady,CaptureBefore=captureBefore,CaptureAfter=Mouse.Captured?.GetType().Name,MouseDown=down,MouseUp=up,Clicks=clicks,Before=before,After=DownloadUiState()};
+                    File.AppendAllText(Path.Combine(output,"native-download-navigation.jsonl"),JsonSerializer.Serialize(evidence)+Environment.NewLine);
+                    check(down==1&&up==1&&clicks==1,"native mouse activates the download control exactly once: "+JsonSerializer.Serialize(evidence));
+                }
+                finally{button.RemoveHandler(PreviewMouseDownEvent,onDown);button.RemoveHandler(PreviewMouseUpEvent,onUp);button.RemoveHandler(ButtonBase.ClickEvent,onClick);}
+            }
             foreach(var label in new[]{"Открыть карточку по постеру","Открыть карточку по названию"})
             {
-                var link=FindVisual<Button>(FirstRow(),b=>AutomationProperties.GetName(b)==label)!;
+                var link=await DownloadLink(label);
                 check(link.IsEnabled&&link.Cursor==(label=="Открыть карточку по названию"?Cursors.Arrow:Cursors.Hand),"download card remains clickable with a plain title: "+label);
                 if(label=="Открыть карточку по названию")
                 {
-                    var text=FindVisual<TextBlock>(link,t=>t.Text==fixtures[^1].DisplayName)!;
+                    var text=FindVisual<TextBlock>(link,t=>t.Text==fixtures[^1].DisplayName)??throw new Exception("Realized download title text is missing; "+DownloadUiState());
                     var expected=((SolidColorBrush)FindResource("Text")).Color;
                     GetCursorPos(out var previous);
                     try
                     {
-                        Activate();var target=link.PointToScreen(new Point(link.ActualWidth/2,link.ActualHeight/2));SetCursorPos((int)target.X,(int)target.Y);Mouse.Synchronize();await SettleDownloads();
-                        var frame=FindVisual<Border>(link,b=>b.Name=="Frame")!;
+                        SetForegroundWindow(nativeHandle);var target=link.PointToScreen(new Point(link.ActualWidth/2,link.ActualHeight/2));
+                        check(SetCursorPos((int)target.X,(int)target.Y),"native cursor can reach the download title");Mouse.Synchronize();await SettleDownloads();
+                        check(GetCursorPos(out var actual)&&Math.Abs(actual.X-(int)target.X)<=1&&Math.Abs(actual.Y-(int)target.Y)<=1&&GetForegroundWindow()==nativeHandle&&GetAncestor(WindowFromPoint(actual),2)==nativeHandle,$"native cursor reaches the visible download title in the foreground app: requested={target}, actual={actual.X},{actual.Y}; "+DownloadUiState());
+                        var frame=FindVisual<Border>(link,b=>b.Name=="Frame")??throw new Exception("Realized download title frame is missing; "+DownloadUiState());
                         check(link.IsMouseOver&&text.Foreground is SolidColorBrush titleInk&&titleInk.Color==expected&&(text.TextDecorations==null||text.TextDecorations.Count==0)&&frame.Background is SolidColorBrush background&&background.Color.A==0,"hovering a download title keeps plain text colour and transparent background without an underline");
                         Shot(FirstRow(),"downloads-plain-title-hover");
                     }
                     finally{SetCursorPos(previous.X,previous.Y);}
                 }
-                link.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await SettleDownloads();
+                await NativeDownloadClick(link,"open "+label);
                 check(current?.Id==linked.Id&&detailTitle?.Text==fixtures[^1].MediaTitle&&section=="Загрузки","download poster/title opens its associated internal card while retaining the queue as the return destination");
-                FindVisual<Button>(PageHeader,b=>AutomationProperties.GetName(b)=="Загрузки")!.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await SettleDownloads();
-                check(current==null&&Queue().Items.Count==fixtures.Length&&fixtures.All(x=>x.Paused),"returning from the internal card preserves the queue and its paused transfers");
+                var back=FindVisual<Button>(PageHeader,b=>AutomationProperties.GetName(b)=="Загрузки")??throw new Exception("Download detail has no return-to-queue action; "+DownloadUiState());
+                await NativeDownloadClick(back,"return "+label);
+                check(section=="Загрузки"&&current==null&&Queue().Items.Count==fixtures.Length&&fixtures.All(x=>x.Paused),"returning from the internal card preserves the queue and its paused transfers; "+DownloadUiState());
             }
+            // Reuse the cached, identified actor and filmography fixture. An
+            // actor page changes section to its origin's media category; the
+            // queue ancestor must nevertheless remain the final back target.
+            var linkedWithActor=linked with{People=[namesakeOne],Description="Описание сериала из очереди для проверки вложенного возврата."};
+            cardMetadata[linked.Id]=Task.FromResult(linkedWithActor);await catalogIndex.AddAsync([linkedWithActor]);
+            var cachedDownloadOrigin=DownloadMetadata.EnrichMedia(DownloadMetadata.Card(fixtures[^1])!,catalogIndex.Recent(linked.Section,200));
+            check(cachedDownloadOrigin.Id==linked.Id&&cachedDownloadOrigin.PageUrl==linked.PageUrl&&cachedDownloadOrigin.People.Contains(namesakeOne),"the actual indexed download origin contains its identified actor before native navigation");
+            await File.WriteAllTextAsync(ProfessionalCinemaPeople.CachePath(namesakeOne,linkedWithActor),JsonSerializer.Serialize(new ProfessionalPerson(namesakeOne,NamesakeBiography(namesakeOne),namesakePortraitUrl,namesakeOne.ProfileUrl!,"Kino-Teatr.ua",[],[namesakeOne.Name])));
+            async Task<Button> NavigationControl(DependencyObject root,Func<Button,bool> predicate,string description)
+            {
+                var deadline=DateTime.UtcNow.AddSeconds(3);
+                do
+                {
+                    await SettleDownloads();
+                    if(FindVisual<Button>(root,predicate) is {IsVisible:true} button)
+                    {
+                        button.BringIntoView();await SettleDownloads();return button;
+                    }
+                }while(DateTime.UtcNow<deadline);
+                throw new Exception("Nested download navigation control is missing: "+description+"; "+DownloadUiState());
+            }
+            await NativeDownloadClick(await DownloadLink("Открыть карточку по постеру"),"nested origin card");
+            var actor=await NavigationControl(Body,b=>b.Tag is CinemaPerson person&&person==namesakeOne,"cached actor");
+            await NativeDownloadClick(actor,"nested actor");
+            check(activePerson==namesakeOne&&personOrigin?.Id==linked.Id&&DownloadBackLabel()=="Загрузки","download actor retains the queue ancestor after changing to the series section; "+DownloadUiState());
+            var filmography=await NavigationControl(Body,b=>b.Tag is MediaItem film&&film.Id==films[0].Id,"cached filmography film");
+            await NativeDownloadClick(filmography,"nested filmography film");
+            check(current?.Id==films[0].Id&&returnPerson?.Person==namesakeOne&&returnPerson?.Origin?.Id==linked.Id&&DownloadBackLabel()=="Загрузки","download filmography film retains its actor and queue ancestors; "+DownloadUiState());
+            await NativeDownloadClick(await NavigationControl(PageHeader,b=>AutomationProperties.GetName(b)==namesakeOne.Name,"filmography back to actor"),"nested filmography back");
+            check(activePerson==namesakeOne&&personOrigin?.Id==linked.Id&&DownloadBackLabel()=="Загрузки","filmography back restores the download origin actor first; "+DownloadUiState());
+            await NativeDownloadClick(await NavigationControl(PageHeader,b=>AutomationProperties.GetName(b)=="Назад к фильму","actor back to origin"),"nested actor back");
+            check(activePerson==null&&current?.Id==linked.Id&&DownloadBackLabel()=="Загрузки","actor back restores the same download card with a queue return label; "+DownloadUiState());
+            await NativeDownloadClick(await NavigationControl(PageHeader,b=>AutomationProperties.GetName(b)=="Загрузки","origin back to queue"),"nested origin back");
+            check(section=="Загрузки"&&current==null&&downloadReturnItem==null&&Queue().Items.Count==fixtures.Length&&fixtures.All(item=>item.Paused),"nested actor and filmography navigation returns to the unchanged paused queue; "+DownloadUiState());
             searchProvider=(kind,query,token)=>Task.FromResult<IReadOnlyList<MediaItem>>(kind=="Фильмы"?films:series);
+            await NativeDownloadClick(await DownloadLink("Открыть карточку по постеру"),"search origin card");
+            Search.Text="Новый поиск из карточки загрузки";SearchSubmitButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await WaitSearch();
+            check(downloadReturnItem==null&&current==null&&SearchActive,"a new explicit search clears the old download navigation ancestor");
+            ShowDownloads(this,new RoutedEventArgs());await SettleDownloads();
             Search.Text="Поиск из загрузок";FocusCatalogSearch();UpdateLayout();
             check(section=="Загрузки"&&current==null&&SearchBar.IsVisible&&Search.IsKeyboardFocusWithin,"download search stays visible and focuses without leaving the queue");
             ClearSearchButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));UpdateLayout();
@@ -336,9 +438,9 @@ public partial class MainWindow
         check(SidebarUpdateButton.Visibility==Visibility.Visible&&SidebarUpdateButton.IsEnabled&&SidebarUpdateButton.TransformToAncestor(SidebarFooter).Transform(new Point()).Y>=SettingsButton.TransformToAncestor(SidebarFooter).Transform(new Point(0,SettingsButton.ActualHeight)).Y,"ready update occupies its own row below Settings in the sidebar");
         CheckSidebarFooter(check,"ready-update-desktop");
         check(!SystemParameters.ClientAreaAnimation||SidebarUpdateButton.HasAnimatedProperties,"ready update softly animates when system animations are enabled");
-        Width=680;await Task.Delay(100);UpdateLayout();check(SidebarUpdateButton.Visibility==Visibility.Visible&&SidebarUpdateButton.ActualWidth>0,"sidebar update remains available in narrow layout");CheckSidebarFooter(check,"ready-update-narrow");
-        var footerMinimumHeight=MinHeight;MinHeight=300;Height=300;await Task.Delay(100);UpdateLayout();CheckSidebarFooter(check,"ready-update-minimum-height");
-        preparedUpdateJob=null;RefreshSidebarUpdate();Width=1280;Height=800;MinHeight=footerMinimumHeight;
+        var footerMinimumWidth=MinWidth;MinWidth=360;Width=680;await SettleDownloads();check(ActualWidth<=681&&SidebarUpdateButton.Visibility==Visibility.Visible&&SidebarUpdateButton.ActualWidth>0,"sidebar update remains available in narrow layout");CheckSidebarFooter(check,"ready-update-narrow");
+        var footerMinimumHeight=MinHeight;MinHeight=300;Height=300;await SettleDownloads();check(ActualHeight<=301,"sidebar minimum-height fixture reaches its requested viewport");CheckSidebarFooter(check,"ready-update-minimum-height");
+        preparedUpdateJob=null;RefreshSidebarUpdate();Width=1280;Height=800;MinWidth=footerMinimumWidth;MinHeight=footerMinimumHeight;
         await SavedSmoke(check);
     }
 }

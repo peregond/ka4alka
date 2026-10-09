@@ -1,7 +1,7 @@
 name: Native UI preview
 on:
   push:
-    branches: [codex/download-reliability-0.35.0, codex/film-ux-0.35]
+    branches: [codex/download-reliability-0.35.0, codex/film-ux-0.35, codex/catalog-experience-0.37.0]
     paths: ['native/**', 'tests/**', '.github/workflows/ui-preview.yml']
   workflow_dispatch:
 permissions:
@@ -13,6 +13,8 @@ jobs:
   preview:
     runs-on: windows-latest
     timeout-minutes: 8
+    env:
+      KACHALKA_DATA: ${{ github.workspace }}/test-output/ui-preview/data
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -58,6 +60,22 @@ jobs:
           if(Test-Path (Join-Path $output 'error.txt')){throw (Get-Content (Join-Path $output 'error.txt') -Raw)}
           if($app.ExitCode -ne 0 -or -not(Test-Path (Join-Path $output 'checks.json'))){throw 'Person performance UI evidence missing'}
           Get-Content (Join-Path $output 'checks.json')
+      - name: Verify catalog performance, navigation, source freshness and reporting
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          $failures=@()
+          foreach($scenario in @('cover-viewport','catalog-navigation','release-freshness','interface-polish','bug-report')){
+            try {
+              $output=Join-Path $PWD ('test-output/ui-preview/'+$scenario)
+              $app=Start-Process (Join-Path $PWD 'dist/ui-preview/Kachalka.exe') -ArgumentList @('--'+$scenario+'-smoke-test',('"'+$output+'"')) -PassThru
+              if(-not $app.WaitForExit(60000)){$app.Kill($true);throw ($scenario+' UI timed out')}
+              if(Test-Path (Join-Path $output 'error.txt')){throw (Get-Content (Join-Path $output 'error.txt') -Raw)}
+              if($app.ExitCode -ne 0 -or -not(Test-Path (Join-Path $output 'checks.json'))){throw ($scenario+' UI evidence missing')}
+              Get-Content (Join-Path $output 'checks.json')
+            } catch { $failures+=($scenario+': '+$_.Exception.Message); Write-Output ('FAILED '+$failures[-1]) }
+          }
+          if($failures.Count -gt 0){throw ($failures -join "`n")}
       - name: Save rendered previews in a temporary draft
         if: always()
         shell: pwsh
@@ -65,7 +83,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           # Keep review asset names portable across GitHub upload clients.
-          $files=@(Get-ChildItem 'test-output/ui-preview/render' -Filter '*.png' -ErrorAction SilentlyContinue | Where-Object {$_.Name -match '^[a-z0-9.-]+$'} | ForEach-Object {$_.FullName})
+          $files=@(Get-ChildItem 'test-output/ui-preview' -Recurse -Filter '*.png' -ErrorAction SilentlyContinue | Where-Object {$_.Name -match '^[a-z0-9.-]+$'} | ForEach-Object {$_.FullName})
           if($files.Count -gt 0){
             $tag='ui-preview-${{ github.run_id }}'
             $existing=gh release view $tag --json isDraft --jq '.isDraft' 2>$null

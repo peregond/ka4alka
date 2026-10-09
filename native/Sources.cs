@@ -10,6 +10,9 @@ public record SourceEntry(string Id,string Title,string Source,string PageUrl,st
 {
     public string? Via {get;init;}
     public int? Leechers {get;init;}
+    // Receipt of this row, not proof that a peer or its advertised audio is available.
+    public DateTime? DataReceivedUtc {get;init;}
+    public string? DataProvider {get;init;}
     public SeriesReleaseInfo Series => SeriesReleaseInfo.Parse(Title);
     public string Quality => System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(2160[pi]?\b|\b4[ .-]?K\b|\bUHD\b)")?"4K":System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(1080[pi]?\b|\bFull[ .-]?HD\b)")?"Full HD":System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(720p?\b|HD[ .-]?Ready\b)")?"HD Ready":"Не указано";
     public string Type => System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(Blu.?Ray|BDRip|BDRemux)")?"BluRay":System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(WEB.?DL|WEBRip)")?"WEB-DL":"Не указано";

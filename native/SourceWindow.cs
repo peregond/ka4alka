@@ -16,6 +16,8 @@ public partial class MainWindow
     readonly SemaphoreSlim coverSlots=new(2);
     readonly Dictionary<string,BitmapImage> coverCache=[];
     readonly ConditionalWeakTable<Image,CoverRequest> coverRequests=new();
+    readonly Dictionary<Window,CoverViewport> coverViewports=[];
+    CoverViewport? coverViewport;
     sealed class CoverRequest
     {
         public DownloadItem? Subject;
@@ -23,7 +25,12 @@ public partial class MainWindow
         public object? Context;
         public string? Url;
         public CancellationTokenSource? Request;
+        public CancellationTokenSource? FeatureRequest;
+        public bool FeatureAttempted;
+        public object? RatingsContext;
         public DateTime RetryAfterUtc;
+        public DateTime NextCacheTouchUtc;
+        public Exception? LastFailure;
     }
     IReadOnlyList<SourceEntry> sourceResults=[];
     string sourceQuery="",sourceCategory="Фильмы";
@@ -70,41 +77,96 @@ public partial class MainWindow
         catch(Exception error){var message=error is HttpRequestException?"Не удалось получить раздачу из источника.":error.Message;Status.Text=message;MessageBox.Show(this,message,"Не удалось начать загрузку",MessageBoxButton.OK,MessageBoxImage.Warning);}finally{if(!closing&&!closed)button.IsEnabled=true;}
     }
     void SourcePage(object sender,RoutedEventArgs e){var item=(SourceEntry)((Button)sender).Tag;if(string.IsNullOrEmpty(item.PageUrl))return;System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(SourceClient.WebUri(item.PageUrl).AbsoluteUri){UseShellExecute=true});}
-    async void SourceCover(object sender,RoutedEventArgs e)
+    void SourceCover(object sender,RoutedEventArgs e)
     {
-        var image=(Image)sender;var state=ObserveDownloadCover(image);var item=image.DataContext;var url=CoverUrl(item);
-        if(item is MediaItem card&&card.IsLive)_=UpdateCardRatings(card);
+        if(closing||closed)return;
+        var image=(Image)sender;var state=ObserveDownloadCover(image);
+        CoverViewportFor(image,true)?.Track(image,position=>CoverVisibilityChanged(image,state,position));
+    }
+    void CoverVisibilityChanged(Image image,CoverRequest state,CoverViewport.Position position)
+    {
+        if(!position.Near||closing||closed){CancelCover(state);CancelFeatureCover(state);return;}
+        var item=image.DataContext;var url=CoverUrl(item);
+        if(!ReferenceEquals(state.Context,item)||state.Url!=url)
+        {
+            CancelCover(state);CancelFeatureCover(state);state.Context=item;state.Url=url;state.RetryAfterUtc=default;state.NextCacheTouchUtc=default;state.FeatureAttempted=false;image.Source=null;
+        }
+        if(item is MediaItem card&&card.IsLive&&!ReferenceEquals(state.RatingsContext,item)){state.RatingsContext=item;_=UpdateCardRatings(card);}
+        _=LoadCover(image,state,item,url);
+        if(image.Tag?.ToString()=="FeaturePoster"&&item is MediaItem feature&&!state.FeatureAttempted&&state.FeatureRequest==null)
+            _=LoadFeatureCover(image,state,feature);
+    }
+    async Task LoadFeatureCover(Image image,CoverRequest state,MediaItem item)
+    {
+        using var request=new CancellationTokenSource(TimeSpan.FromSeconds(15));state.FeatureRequest=request;state.FeatureAttempted=true;
+        try{await ImproveFeaturePoster(image,item,request.Token);}
+        catch(OperationCanceledException)when(request.IsCancellationRequested){}
+        catch{ /* A normal poster remains available when the larger banner is unavailable. */ }
+        finally{if(ReferenceEquals(state.FeatureRequest,request))state.FeatureRequest=null;}
+    }
+    async Task LoadCover(Image image,CoverRequest state,object? item,string? url)
+    {
         if(string.IsNullOrWhiteSpace(url))
         {
-            CancelCover(state);state.Context=item;state.Url=null;state.RetryAfterUtc=default;image.Source=null;return;
+            CancelCover(state);state.Context=item;state.Url=null;state.RetryAfterUtc=default;return;
         }
-        var same=ReferenceEquals(state.Context,item)&&state.Url==url;
-        if(same&&(state.Request!=null||image.Source!=null||DateTime.UtcNow<state.RetryAfterUtc))return;
-        CancelCover(state);state.Context=item;state.Url=url;state.RetryAfterUtc=default;
-        if(!same)image.Source=null;
-        if(coverCache.TryGetValue(url,out var cached)){CacheFiles.Touch(Path.Combine(Preferences.DataDir,"covers",Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(url)))+".img"));image.Source=cached;return;}
+        if(state.Request!=null||image.Source!=null||DateTime.UtcNow<state.RetryAfterUtc)return;
+        if(coverCache.TryGetValue(url,out var cached))
+        {
+            image.Source=cached;
+            if(item is MediaItem or DownloadItem&&DateTime.UtcNow>=state.NextCacheTouchUtc)
+            {
+                state.NextCacheTouchUtc=DateTime.UtcNow.AddMinutes(10);var path=CoverPath(url);
+                _=Task.Run(()=>CacheFiles.Touch(path));
+            }
+            return;
+        }
         var sourceToken=item is MediaItem or DownloadItem?CancellationToken.None:sourceRequest?.Token??CancellationToken.None;
+        state.LastFailure=null;
         var request=state.Request=CancellationTokenSource.CreateLinkedTokenSource(sourceToken);request.CancelAfter(TimeSpan.FromSeconds(30));var token=request.Token;
         try
         {
             await coverSlots.WaitAsync(token);
             try
             {
-                if(!image.IsLoaded||!ReferenceEquals(image.DataContext,item)||CoverUrl(image.DataContext)!=url)return;
-                var cachePath=item is MediaItem or DownloadItem?Path.Combine(Preferences.DataDir,"covers",Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(url)))+".img"):null;
+                if(closing||closed||!image.IsLoaded||!ReferenceEquals(image.DataContext,item)||CoverUrl(image.DataContext)!=url||CoverViewportFor(image)?.Measure(image).Near!=true)return;
+                var cachePath=item is MediaItem or DownloadItem?CoverPath(url):null;
                 var (bitmap,downloaded)=await CoverCache.Load(cachePath,1024*1024,
                     ct=>sourceClient.Read(SourceClient.WebUri(url),1024*1024,ct),
                     bytes=>{using var stream=new MemoryStream(bytes);var result=new BitmapImage();result.BeginInit();result.CacheOption=BitmapCacheOption.OnLoad;result.DecodePixelWidth=item is MediaItem or DownloadItem?280:100;result.StreamSource=stream;result.EndInit();result.Freeze();return result;},token);
+                token.ThrowIfCancellationRequested();
                 if(coverCache.Count>=48)coverCache.Remove(coverCache.Keys.First());coverCache[url]=bitmap;
-                if(image.IsLoaded&&ReferenceEquals(image.DataContext,item)&&CoverUrl(image.DataContext)==url&&ReferenceEquals(state.Request,request))image.Source=bitmap;
+                if(!closing&&!closed&&image.IsLoaded&&ReferenceEquals(image.DataContext,item)&&CoverUrl(image.DataContext)==url&&ReferenceEquals(state.Request,request)&&CoverViewportFor(image)?.Measure(image).Near==true)image.Source=bitmap;
             }
             finally{coverSlots.Release();}
         }
-        catch{if(ReferenceEquals(state.Request,request))state.RetryAfterUtc=DateTime.UtcNow.AddMinutes(2);}
+        catch(Exception error){if(ReferenceEquals(state.Request,request)){state.LastFailure=error;state.RetryAfterUtc=DateTime.UtcNow.AddMinutes(2);}}
         finally{if(ReferenceEquals(state.Request,request))state.Request=null;request.Dispose();}
     }
     static string? CoverUrl(object? item)=>item switch{SourceEntry source=>source.ImageUrl,MediaItem media=>media.ImageUrl,DownloadItem download=>download.ImageUrl,_=>null};
+    static string CoverPath(string url)=>Path.Combine(Preferences.DataDir,"covers",Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(url)))+".img");
     static void CancelCover(CoverRequest state){var request=state.Request;state.Request=null;request?.Cancel();}
+    static void CancelFeatureCover(CoverRequest state){var request=state.FeatureRequest;state.FeatureRequest=null;if(request!=null){state.FeatureAttempted=false;request.Cancel();}}
+    CoverViewport? CoverViewportFor(Image image,bool create=false)
+    {
+        var host=Window.GetWindow(image);if(host==null)return null;
+        if(coverViewports.TryGetValue(host,out var viewport))return viewport;
+        if(!create||closing||closed)return null;
+        viewport=new(host);coverViewports.Add(host,viewport);host.Closed+=CoverHostClosed;
+        if(host==this)coverViewport=viewport;
+        return viewport;
+    }
+    void CoverHostClosed(object? sender,EventArgs args)
+    {
+        if(sender is not Window host)return;host.Closed-=CoverHostClosed;
+        if(coverViewports.Remove(host,out var viewport))viewport.Dispose();
+        if(host==this)coverViewport=null;
+    }
+    void StopCoverViewport()
+    {
+        foreach(var pair in coverViewports.ToArray()){pair.Key.Closed-=CoverHostClosed;pair.Value.Dispose();}
+        coverViewports.Clear();coverViewport=null;
+    }
     CoverRequest ObserveDownloadCover(Image image)
     {
         var state=coverRequests.GetValue(image,key=>
@@ -117,7 +179,7 @@ public partial class MainWindow
             key.Unloaded+=(_,_)=>
             {
                 if(created.Subject!=null)PropertyChangedEventManager.RemoveHandler(created.Subject,created.Changed!,string.Empty);
-                created.Subject=null;CancelCover(created);
+                created.Subject=null;CancelCover(created);CancelFeatureCover(created);
             };
             return created;
         });
@@ -132,7 +194,7 @@ public partial class MainWindow
     }
     void SourceCoverChanged(object sender,DependencyPropertyChangedEventArgs e)
     {
-        var image=(Image)sender;var state=ObserveDownloadCover(image);CancelCover(state);state.Context=null;state.Url=null;state.RetryAfterUtc=default;image.Source=null;
+        var image=(Image)sender;var state=ObserveDownloadCover(image);CancelCover(state);CancelFeatureCover(state);state.Context=null;state.Url=null;state.RetryAfterUtc=default;state.NextCacheTouchUtc=default;state.FeatureAttempted=false;state.RatingsContext=null;image.Source=null;
         if(image.IsLoaded)SourceCover(image,new RoutedEventArgs());
     }
     void AddIndexer()

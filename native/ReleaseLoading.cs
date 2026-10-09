@@ -58,7 +58,14 @@ public partial class MainWindow
         }
         void IndexRows(IEnumerable<SourceEntry> rows,SourceState state)
         {
-            foreach(var group in rows.GroupBy(x=>x.Source+(x.Via==null?"":" · через "+x.Via)))checks[group.Key]=Remember(new(group.Key,state,group.Count()));
+            foreach(var group in rows.GroupBy(ReleaseFreshness.SourceName))
+            {
+                // A reply from the online index does not mean that the named
+                // tracker answered our request. Preserve each provider's own state.
+                if(checks.TryGetValue(group.Key,out var checkedSource)&&checkedSource.State!=SourceState.Saved)continue;
+                var rowState=state==SourceState.Ready&&group.All(x=>x.DataProvider!=group.Key)?SourceState.Indexed:state;
+                checks[group.Key]=Remember(new(group.Key,rowState,group.Count()));
+            }
         }
         IndexRows(saved,SourceState.Saved);checks["Онлайн-индекс"]=Remember(new("Онлайн-индекс",SourceState.Searching));view.Sources=checks.Values.ToArray();
         await Task.Yield();if(!IsCurrent())return;
@@ -79,7 +86,7 @@ public partial class MainWindow
             {
                 fresh.Clear();fresh.AddRange(update.Items);
                 foreach(var source in update.Sources)checks[source.Name]=Remember(source);
-                if(update.Items.Length>0)view.ReceivedUtc=DateTime.UtcNow;
+                if(update.Items.Length>0)view.ReceivedUtc=update.Items.Select(x=>x.DataReceivedUtc).Max();
                 IndexRows(update.Items,SourceState.Ready);Publish();
             }
             var progress=new Progress<ReleaseSearchUpdate>(update=>{if(IsCurrent()&&!settled)Apply(update);});

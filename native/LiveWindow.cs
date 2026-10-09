@@ -148,6 +148,7 @@ public partial class MainWindow
         catalogFilterBack=ActionButton("","IconBack",()=>ScrollCatalogFilters(-1),"QuietButton");catalogFilterBack.ToolTip="Предыдущие фильтры";System.Windows.Automation.AutomationProperties.SetName(catalogFilterBack,"Фильтры: назад");catalogFilterBack.Padding=new(6);catalogFilterBack.Width=30;catalogFilterBack.MinHeight=34;catalogFilterBack.Margin=new(0,0,4,0);DockPanel.SetDock(catalogFilterBack,Dock.Left);toolbar.Children.Add(catalogFilterBack);
         catalogFilterForward=ActionButton("","IconChevron",()=>ScrollCatalogFilters(1),"QuietButton");catalogFilterForward.ToolTip="Следующие фильтры";System.Windows.Automation.AutomationProperties.SetName(catalogFilterForward,"Фильтры: вперёд");catalogFilterForward.Padding=new(6);catalogFilterForward.Width=30;catalogFilterForward.MinHeight=34;catalogFilterForward.Margin=new(4,0,0,0);DockPanel.SetDock(catalogFilterForward,Dock.Right);toolbar.Children.Add(catalogFilterForward);
         toolbar.Children.Add(inlineCatalogFilterScroll);FilterControls.Children.Add(toolbar);
+        RenderActiveCatalogFilters();
         UpdateFilterRail();
         if(PeopleOnlySearch)
         {
@@ -160,7 +161,7 @@ public partial class MainWindow
         if(favoritesOnly)shown=catalogOrder=="По рейтингу"?shown.OrderByDescending(CatalogPaging.Rating):shown.OrderByDescending(x=>x.Year);
         var local=favoritesOnly||SearchActive;
         var all=shown.Where(x=>favoritesOnly||SearchActive||!NoDownloads(x)).ToArray();
-        if(local){catalogLastPage=Math.Max(1,(all.Length+CatalogPaging.Size-1)/CatalogPaging.Size);livePage=Math.Min(livePage,catalogLastPage.Value);catalogHasNext=livePage<catalogLastPage;}
+        if(local&&!liveLoading){catalogLastPage=Math.Max(1,(all.Length+CatalogPaging.Size-1)/CatalogPaging.Size);livePage=Math.Min(livePage,catalogLastPage.Value);catalogHasNext=livePage<catalogLastPage;}
         var rawPage=local?all.Skip((livePage-1)*CatalogPaging.Size).Take(CatalogPaging.Size).ToArray():all;
         StartCatalogQualityCheck(rawPage);
         var cards=rawPage.Where(CatalogQualityMatches).ToArray();
@@ -232,12 +233,12 @@ public partial class MainWindow
         Choice("Год выхода",new[]{new CatalogChoice("","Любой год")}.Concat(Enumerable.Range(2010,DateTime.UtcNow.Year-2009).Reverse().Select(x=>new CatalogChoice(x.ToString(),x.ToString()))),catalogYear?.ToString()??"",v=>catalogYear=int.TryParse(v,out var y)?y:null);
         var effectiveOrder=catalogCollection=="popular"?"По популярности":catalogCollection=="rated"?"По рейтингу":catalogOrder;
         Choice("Порядок",favoritesOnly?[new("Сначала новые","Сначала новые"),new("По рейтингу","По рейтингу")]:[new("Сначала новые","Сначала новые"),new("По популярности","По популярности"),new("По рейтингу","По рейтингу")],effectiveOrder,v=>{catalogOrder=v;catalogCollection="all";});
-        if(!CatalogSelection.IsDefault){var reset=Button("Сбросить",()=>ChangeCatalogFilter(ResetCatalogFilters));reset.Style=(Style)FindResource("QuietButton");reset.HorizontalAlignment=HorizontalAlignment.Left;reset.Margin=new(0);target.Children.Add(reset);}
     }
     void RenderCatalogKeepingPosition()
     {
-        var offset=FindVisual<ScrollViewer>(Body,_=>true)?.VerticalOffset??0;
-        Render();UpdateLayout();FindVisual<ScrollViewer>(Body,_=>true)?.ScrollToVerticalOffset(offset);
+        // Render retains the visible title through CatalogNavigation. Replaying
+        // the old pixel offset would undo its anchor when a row is inserted.
+        Render();
     }
     async Task FetchCatalog(string key,string category,string query,int page)
     {
@@ -308,7 +309,7 @@ public partial class MainWindow
         }
         ApplyKnownQuality(item);
         if(descriptionItemId!=item.Id){descriptionItemId=item.Id;descriptionExpanded=false;}
-        var back=ActionButton(returnPerson?.Person.Name??SavedBackLabel()??section,"IconBack",CinemaBack);back.Style=(Style)FindResource("QuietButton");back.HorizontalAlignment=HorizontalAlignment.Left;back.Margin=new(0,0,0,10);PageHeader.Children.Add(back);
+        var back=ActionButton(returnPerson?.Person.Name??SavedBackLabel()??DownloadBackLabel()??section,"IconBack",CinemaBack);back.Style=(Style)FindResource("QuietButton");back.HorizontalAlignment=HorizontalAlignment.Left;back.Margin=new(0,0,0,10);PageHeader.Children.Add(back);
         var panel=new StackPanel{Margin=new(0,0,10,0)};Body.Children.Add(new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=panel,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});
         detailHero=new Grid{Name="DetailHero"};detailHero.ColumnDefinitions.Add(new(){Width=new GridLength(174)});detailHero.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});detailHero.RowDefinitions.Add(new(){Height=GridLength.Auto});detailHero.RowDefinitions.Add(new(){Height=GridLength.Auto});detailHero.RowDefinitions.Add(new(){Height=GridLength.Auto});
         detailPoster=new Border{Width=150,Height=225,CornerRadius=new(12),ClipToBounds=true,Background=item.Cover,HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Top,Margin=new(0,0,24,0)};

@@ -94,7 +94,9 @@ public partial class MainWindow
                 Check(origin.X>=-.5&&origin.X+block.ActualWidth<=Body.ActualWidth+1,"Settings content overflows minimum window width.");
             }
             var copy=FindVisual<Button>(Body,b=>AutomationProperties.GetName(b)=="Скопировать логи")??throw new Exception("Diagnostics copy button missing.");
+            Clipboard.Clear();
             copy.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            for(var attempt=0;attempt<100&&(!Clipboard.ContainsText()||!Clipboard.GetText().Contains("Диагностика Качалки"));attempt++)await Task.Delay(25);
             Check(Clipboard.ContainsText()&&Clipboard.GetText().Contains("Диагностика Качалки"),"Settings copies a diagnostic report to the real Windows clipboard.");
             Check(FindVisual<Button>(Body,b=>AutomationProperties.GetName(b)=="Сообщить об ошибке")!=null,"Bug report action is available in settings.");
             Width=510;await Settle();

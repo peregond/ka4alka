@@ -105,6 +105,7 @@ public partial class MainWindow
         var veryShort=ActualHeight>0&&ActualHeight<360;
         var narrowSearch=ActualWidth>0&&ActualWidth<560;
         FitDownloadsToolbar();
+        if(activeCatalogFilterScroll!=null)activeCatalogFilterScroll.MaxHeight=shortView?68:double.PositiveInfinity;
         if(layoutInitialized&&narrow==compactWidth&&tiny==tinyWidth&&shortView==compactHeight&&veryShort==veryCompactHeight&&narrowSearch==compactSearch){UpdateFilterRail();return;}
         layoutInitialized=true;compactWidth=narrow;tinyWidth=tiny;compactHeight=shortView;veryCompactHeight=veryShort;compactSearch=narrowSearch;
         RootGrid.Margin=narrow?new Thickness(10):new Thickness(16);
@@ -187,8 +188,10 @@ public partial class MainWindow
         var width=Body.ActualWidth>0?Body.ActualWidth:Math.Max(1,Width-(compactWidth?190:250));
         var columns=WindowSizing.PosterColumns(width);
         if(!force&&columns==catalogColumns)return;
+        var position=CaptureCatalogReflow();
         catalogColumns=columns;
         catalogList.ItemsSource=catalogDisplay.Chunk(columns).Select(x=>new CatalogRow(x,columns)).ToArray();
         UpdateDiscoveryLayout();
+        RestoreCatalogReflow(position);
     }
 }
