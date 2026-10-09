@@ -11,12 +11,12 @@ public partial class MainWindow
     void RenderPerson(CinemaPerson person,MediaItem? origin)
     {
         personProfileLoading=true;
-        PageHeader.Children.Add(ActionButton(origin==null?"К результатам поиска":"Назад к фильму","IconBack",()=>
+        SetBack(origin==null?"К результатам поиска":"Назад к фильму",()=>
         {
             activePerson=null;
             if(origin==null){RestorePersonSearch();return;}
             current=personOrigin??origin;Render();
-        },"QuietButton"));
+        });
         var body=new StackPanel{Margin=new(0,0,10,0)};
         var request=personRequest=new CancellationTokenSource();
         var scroll=new ScrollViewer{Name="PersonPageScroll",Style=(Style)FindResource("PageScroll"),Content=body,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};Body.Children.Add(scroll);

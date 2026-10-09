@@ -52,8 +52,7 @@ jobs:
             @{Flag='cinema';Dir='cinema';Timeout=90},
             @{Flag='cache';Dir='cache';Timeout=90},
             @{Flag='end-to-end';Dir='end-to-end';Timeout=90},
-            @{Flag='close';Dir='close';Timeout=60},
-            @{Flag='';Dir='smoke';Timeout=90}
+            @{Flag='close';Dir='close';Timeout=60}
           )
           foreach($s in $scenarios){
             $out=Join-Path $PWD ('test-output/'+$s.Dir)

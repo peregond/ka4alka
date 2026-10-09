@@ -127,6 +127,7 @@ public record DownloadFile(string Name,string FullPath,string IncompletePath,lon
 {
     [JsonIgnore] public string Summary=>$"{Math.Clamp(Progress,0,100):F1}% · {DownloadService.FormatBytes(Size)}";
 }
+public enum DownloadStatusKind{Downloading,Waiting,Seeding,Paused,Checking,Error}
 public class DownloadItem : INotifyPropertyChanged
 {
     public string Id {get;set;}=Guid.NewGuid().ToString("N");
@@ -177,6 +178,24 @@ public class DownloadItem : INotifyPropertyChanged
     public bool SpaceCheckFailed {get;set;}
     [JsonIgnore] public bool Completed=>Progress>=100;
     public string Action => Paused?"Продолжить":"Пауза";
+    // Presentation helpers for the status pill, widget and queue rows. They only read state the engine already reports.
+    [JsonIgnore] public DownloadStatusKind StatusKind
+    {
+        get
+        {
+            if(Status.StartsWith("Ошибка",StringComparison.Ordinal)||Status.StartsWith("Не удалось",StringComparison.Ordinal)||Status.StartsWith("Недостаточно места",StringComparison.Ordinal)||Status.StartsWith("Папка недоступна",StringComparison.Ordinal)||LowSpacePaused)return DownloadStatusKind.Error;
+            if(Paused)return DownloadStatusKind.Paused;
+            if(Completed)return DownloadStatusKind.Seeding;
+            if(Status.StartsWith("Проверка файлов",StringComparison.Ordinal)||Status.StartsWith("Получение метаданных",StringComparison.Ordinal))return DownloadStatusKind.Checking;
+            if(Status=="Скачивание")return DownloadStatusKind.Downloading;
+            return DownloadStatusKind.Waiting;
+        }
+    }
+    [JsonIgnore] public string StatusBrushKey=>StatusKind switch{DownloadStatusKind.Downloading=>"Accent",DownloadStatusKind.Waiting=>"Warning",DownloadStatusKind.Seeding=>"Info",DownloadStatusKind.Paused=>"Subtle",DownloadStatusKind.Checking=>"Muted",_=>"Danger"};
+    [JsonIgnore] public string StatusSoftKey=>StatusKind switch{DownloadStatusKind.Downloading=>"AccentSoft",DownloadStatusKind.Waiting=>"WarningSoft",DownloadStatusKind.Seeding=>"InfoSoft",DownloadStatusKind.Paused=>"Raised",DownloadStatusKind.Checking=>"Raised",_=>"DangerSoft"};
+    [JsonIgnore] public string PercentLabel=>$"{(int)Math.Floor(double.IsFinite(Progress)?Math.Clamp(Progress,0,100):0)}%";
+    [JsonIgnore] public string WidgetCaption=>StatusKind==DownloadStatusKind.Downloading&&Remaining.Length>0?Remaining:Status;
+    [JsonIgnore] public bool IsActiveDownload=>!Paused&&!Completed&&StatusKind!=DownloadStatusKind.Error;
     public event PropertyChangedEventHandler? PropertyChanged;
     public void Refresh()=>PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(null));
 }

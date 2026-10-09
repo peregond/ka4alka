@@ -54,7 +54,7 @@ public partial class MainWindow
                 $"the navigation fixture renders its requested {width}x{height} viewport (actual {ActualWidth:F1}x{ActualHeight:F1})");
         }
         ScrollViewer Scroll()=>FindVisual<ScrollViewer>(Body,viewer=>viewer.VerticalScrollBarVisibility!=ScrollBarVisibility.Disabled)??throw new Exception("Navigation fixture has no page scroll viewer.");
-        Button Back(string name)=>FindVisual<Button>(PageHeader,button=>AutomationProperties.GetName(button)==name)??throw new Exception("Missing back action: "+name);
+        Button Back(string name)=>FindVisual<Button>(HeaderArea,button=>AutomationProperties.GetName(button)==name)??throw new Exception("Missing back action: "+name);
         Button Card(int id)=>FindVisual<Button>(Body,button=>button.Tag is MediaItem film&&film.Id==id)??throw new Exception("Missing film card: "+id);
         void Position(CatalogScrollPosition expected,string message)
         {

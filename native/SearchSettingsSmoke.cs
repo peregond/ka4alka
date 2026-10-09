@@ -100,11 +100,11 @@ public partial class MainWindow
             Check(Clipboard.ContainsText()&&Clipboard.GetText().Contains("Диагностика Качалки"),"Settings copies a diagnostic report to the real Windows clipboard.");
             Check(FindVisual<Button>(Body,b=>AutomationProperties.GetName(b)=="Сообщить об ошибке")!=null,"Bug report action is available in settings.");
             Width=510;await Settle();
-            var back=FindVisual<Button>(PageHeader,b=>AutomationProperties.GetName(b)=="Вернуться")??throw new Exception("Settings back action missing.");
+            var back=FindVisual<Button>(HeaderArea,b=>AutomationProperties.GetName(b)=="Вернуться")??throw new Exception("Settings back action missing.");
             back.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await Settle();
             Check(section=="Фильмы"&&Search.Text=="Интерстеллар","Returning from settings lost catalog context.");
             var selectedMovie=liveItems.First();current=selectedMovie;Render();SettingsButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
-            var detailBack=FindVisual<Button>(PageHeader,b=>AutomationProperties.GetName(b)=="Вернуться")??throw new Exception("Settings return to detail missing.");
+            var detailBack=FindVisual<Button>(HeaderArea,b=>AutomationProperties.GetName(b)=="Вернуться")??throw new Exception("Settings return to detail missing.");
             detailBack.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));Check(current?.Id==selectedMovie.Id&&Search.Text=="Интерстеллар","Settings did not return to the opened movie.");current=null;Render();
             ShowDownloads(this,new RoutedEventArgs());liveKey=CurrentCatalogKey;ShowCatalogSection("Фильмы");await Settle();CheckText("Интерстеллар","return-from-downloads");
             liveKey="Сериалы||1";ShowCatalogSection("Сериалы");await Type("Severance");CheckText("Severance","latin-series-query");

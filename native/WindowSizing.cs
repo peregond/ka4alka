@@ -22,7 +22,8 @@ public static class WindowSizing
         if(!double.IsFinite(scaleX)||!double.IsFinite(scaleY)||scaleX<=0||scaleY<=0)throw new ArgumentOutOfRangeException(nameof(scaleX));
         return Fit(width/scaleX,height/scaleY);
     }
-    public static int PosterColumns(double contentWidth)=>Math.Clamp((int)Math.Floor(contentWidth/140),1,8);
+    // A poster cell is 144 wide plus a 16 gap, so rows hold as many whole cards as fit.
+    public static int PosterColumns(double contentWidth)=>Math.Clamp((int)Math.Floor(contentWidth/160),1,10);
 }
 
 public partial class MainWindow
@@ -104,38 +105,42 @@ public partial class MainWindow
         var shortView=ActualHeight>0&&ActualHeight<560;
         var veryShort=ActualHeight>0&&ActualHeight<360;
         var narrowSearch=ActualWidth>0&&ActualWidth<560;
+        // Windows scale changes the size of the window in device independent units, so every
+        // threshold is expressed in those units: 200 % on a 1080p laptop leaves roughly 960 x 520.
+        var gutter=narrow?(tiny?16d:24d):ActualWidth<1180?24d:32d;
         FitDownloadsToolbar();
         if(activeCatalogFilterScroll!=null)activeCatalogFilterScroll.MaxHeight=shortView?68:double.PositiveInfinity;
-        if(layoutInitialized&&narrow==compactWidth&&tiny==tinyWidth&&shortView==compactHeight&&veryShort==veryCompactHeight&&narrowSearch==compactSearch){UpdateFilterRail();return;}
-        layoutInitialized=true;compactWidth=narrow;tinyWidth=tiny;compactHeight=shortView;veryCompactHeight=veryShort;compactSearch=narrowSearch;
-        RootGrid.Margin=narrow?new Thickness(10):new Thickness(16);
-        SidebarColumn.Width=new GridLength(narrow?64:194);
-        SidePanel.Margin=narrow?new Thickness(0,0,12,0):new Thickness(0,0,16,0);
-        SidePanel.Padding=new Thickness(narrow?8:10);
-        Brand.Margin=narrow?new Thickness(0,6,0,shortView?10:18):new Thickness(6,8,0,shortView?12:24);
+        if(layoutInitialized&&narrow==compactWidth&&tiny==tinyWidth&&shortView==compactHeight&&veryShort==veryCompactHeight&&narrowSearch==compactSearch&&gutter==contentGutter){UpdateFilterRail();UpdateDownloadsWidget();return;}
+        layoutInitialized=true;compactWidth=narrow;tinyWidth=tiny;compactHeight=shortView;veryCompactHeight=veryShort;compactSearch=narrowSearch;contentGutter=gutter;
+        SidebarColumn.Width=new GridLength(narrow?64:236);
+        SidePanel.Padding=narrow?new Thickness(8,veryShort?8:16,8,10):new Thickness(14,veryShort?8:shortView?14:20,14,12);
+        Brand.Margin=narrow?new Thickness(0,0,0,shortView?10:18):new Thickness(8,0,0,shortView?12:24);
         Brand.HorizontalAlignment=narrow?HorizontalAlignment.Center:HorizontalAlignment.Stretch;
         Brand.Visibility=veryShort?Visibility.Collapsed:Visibility.Visible;
-        BrandLogo.Width=narrow?30:34;BrandLogo.Height=narrow?30:34;BrandLogo.Margin=new Thickness(0,0,narrow?0:10,0);
+        BrandLogo.Width=narrow?32:36;BrandLogo.Height=narrow?32:36;BrandLogo.Margin=new Thickness(0,0,narrow?0:12,0);
         BrandText.Visibility=narrow?Visibility.Collapsed:Visibility.Visible;
         LibraryLabel.Visibility=narrow||shortView?Visibility.Collapsed:Visibility.Visible;
-        foreach(var nav in Navigation.Children.OfType<Button>()){var name=nav.Tag?.ToString()??"";nav.Content=IconLabel(narrow?"":name,name=="Фильмы"?"IconMovies":"IconSeries");}
-        SavedButton.Content=IconLabel(narrow?"":"Сохранённое","IconHeart");DownloadsButton.Content=IconLabel(narrow?"":"Загрузки","IconDownload");SettingsButton.Content=IconLabel(narrow?"":"Настройки","IconSettings");
+        foreach(var nav in Navigation.Children.OfType<Button>()){var name=nav.Tag?.ToString()??"";nav.Content=NavContent(name,name=="Фильмы"?"IconFilm":"IconTv",narrow);}
+        SavedButton.Content=NavContent("Сохранённое","IconHeart",narrow,1);DownloadsButton.Content=NavContent("Загрузки","IconDownload",narrow,2);SettingsButton.Content=NavContent("Настройки","IconSettings",narrow);
         foreach(var nav in Navigation.Children.OfType<Button>().Concat(new[]{SavedButton,DownloadsButton,SettingsButton}))
         {
-            nav.HorizontalContentAlignment=narrow?HorizontalAlignment.Center:HorizontalAlignment.Left;
-            nav.Padding=new Thickness(narrow?6:12,veryShort?4:shortView?7:10,narrow?6:12,veryShort?4:shortView?7:10);
-            nav.MinHeight=veryShort?26:shortView?36:42;nav.Margin=new(0,0,0,veryShort?2:4);
+            nav.HorizontalContentAlignment=narrow?HorizontalAlignment.Center:HorizontalAlignment.Stretch;
+            nav.Padding=new Thickness(narrow?6:12,0,narrow?6:12,0);
+            nav.MinHeight=veryShort?30:shortView?40:44;nav.Margin=new(0,0,0,veryShort?2:4);
         }
-        SidebarDivider.Margin=new Thickness(narrow?4:10,veryShort?3:shortView?8:16,narrow?4:10,veryShort?3:shortView?8:14);
-        AddTorrentButton.Content=IconLabel(tiny?"":narrow?"Добавить":"Добавить торрент","IconPlus");
-        HeaderArea.Margin=new Thickness(0,2,0,veryShort?6:shortView?12:22);
-        SearchBar.Margin=new Thickness(0,0,tiny?10:18,0);SearchBar.Height=shortView?40:44;
-        Search.Padding=new Thickness(narrowSearch?10:42,8,narrowSearch?30:40,8);
+        SidebarUpdateButton.MinHeight=veryShort?30:40;
+        AddTorrentButton.Content=IconLabel(tiny?"":narrow?"Добавить":"Добавить торрент","IconMagnet",18);
+        AddTorrentButton.Padding=new Thickness(tiny?13:18,0,tiny?13:18,0);AddTorrentButton.MinHeight=shortView?44:48;AddTorrentButton.Height=shortView?44:48;
+        BackButton.Width=shortView?44:48;BackButton.Height=shortView?44:48;ThemeButton.Width=shortView?44:48;ThemeButton.Height=shortView?44:48;
+        HeaderArea.Margin=new Thickness(gutter,veryShort?6:shortView?12:20,gutter,veryShort?6:shortView?10:20);
+        CenterRegion.Margin=new Thickness(gutter,0,gutter,0);Status.Margin=new Thickness(gutter,6,gutter,8);
+        SearchBar.Margin=new Thickness(0,0,tiny?8:12,0);SearchBar.Height=shortView?44:48;Search.MinHeight=shortView?44:48;
+        Search.Padding=new Thickness(narrowSearch?14:48,0,narrowSearch?84:110,0);
         SearchMagnifier.Visibility=narrowSearch?Visibility.Collapsed:Visibility.Visible;
-        SearchPlaceholder.Text=narrowSearch?"Поиск":"Найти фильм, сериал или человека";SearchPlaceholder.Margin=new Thickness(narrowSearch?10:42,0,0,0);
-        SearchSubmitButton.Content=narrowSearch?IconLabel("","IconSearch"):"Поиск";
-        SearchSubmitButton.Padding=new Thickness(narrowSearch?8:10,6,narrowSearch?8:10,6);
+        SearchPlaceholder.Text=narrowSearch?"Поиск":"Найти фильм, сериал или человека";SearchPlaceholder.Margin=new Thickness(narrowSearch?14:48,0,narrowSearch?84:110,0);
         foreach(var subtitle in PageHeader.Children.OfType<TextBlock>().Where(x=>Equals(x.Tag,"CatalogSubtitle")))subtitle.Visibility=shortView?Visibility.Collapsed:Visibility.Visible;
+        RenderNavSelection();
+        UpdateSavedCount();UpdateDownloadsWidget();
         UpdateFilterRail();
         UpdateCatalogColumns();RefreshSidebarUpdate();
     }
@@ -145,7 +150,7 @@ public partial class MainWindow
         FiltersPanel.Visibility=visible?Visibility.Visible:Visibility.Collapsed;
         CenterRegion.Margin=new(0);
         if(!visible||inlineCatalogFilters==null)return;
-        var width=FiltersPanel.ActualWidth>0?FiltersPanel.ActualWidth:Math.Max(1,ActualWidth-(compactWidth?84:226));
+        var width=FiltersPanel.ActualWidth>0?FiltersPanel.ActualWidth:Math.Max(1,ActualWidth-(compactWidth?64:236)-2*contentGutter);
         var compact=width<1100;
         if(catalogFiltersCompact!=compact)
         {
@@ -185,7 +190,7 @@ public partial class MainWindow
     void UpdateCatalogColumns(bool force=false)
     {
         if(catalogList==null)return;
-        var width=Body.ActualWidth>0?Body.ActualWidth:Math.Max(1,Width-(compactWidth?190:250));
+        var width=Body.ActualWidth>0?Body.ActualWidth:Math.Max(1,Width-(compactWidth?64:236)-2*contentGutter);
         var columns=WindowSizing.PosterColumns(width);
         if(!force&&columns==catalogColumns)return;
         var position=CaptureCatalogReflow();

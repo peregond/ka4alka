@@ -37,13 +37,10 @@ public partial class MainWindow
     }
     void RenderSettings()
     {
-        var back=ActionButton("Вернуться","IconBack",ReturnFromSettings);
-        back.Content=IconLabel("","IconBack");back.ToolTip="Вернуться";back.Style=(Style)FindResource("QuietButton");back.Width=36;back.Height=36;back.MinHeight=36;back.Padding=new(9);back.Margin=new(0,0,10,0);
-        var header=new Grid{Margin=new(0,0,0,compactHeight?8:12)};
-        header.ColumnDefinitions.Add(new(){Width=GridLength.Auto});header.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});
-        header.Children.Add(back);
-        var title=Text("Настройки",compactHeight?23:28);title.FontWeight=FontWeights.SemiBold;title.Margin=new(0);title.VerticalAlignment=VerticalAlignment.Center;Grid.SetColumn(title,1);header.Children.Add(title);PageHeader.Children.Add(header);
-        var subtitle=Text("Изменения сохраняются автоматически.",12,true);subtitle.Margin=new(46,0,0,16);subtitle.Visibility=compactHeight?Visibility.Collapsed:Visibility.Visible;PageHeader.Children.Add(subtitle);
+        SetBack("Вернуться",ReturnFromSettings);
+        var header=new Grid{Margin=new(0,0,0,compactHeight?4:6)};
+        var title=Text("Настройки",compactHeight?23:28);title.FontFamily=(FontFamily)FindResource("DisplayFont");title.FontWeight=FontWeights.Bold;title.Margin=new(0);title.VerticalAlignment=VerticalAlignment.Center;header.Children.Add(title);PageHeader.Children.Add(header);
+        var subtitle=Text("Изменения сохраняются автоматически.",13,true);subtitle.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");subtitle.Margin=new(0,0,0,20);subtitle.Visibility=compactHeight?Visibility.Collapsed:Visibility.Visible;PageHeader.Children.Add(subtitle);
         var content=new StackPanel{MaxWidth=800,HorizontalAlignment=HorizontalAlignment.Stretch,Margin=new(0,0,6,12)};
         Body.Children.Add(new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=content,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});
         StackPanel Card(string heading,string description,string icon)

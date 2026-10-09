@@ -70,7 +70,7 @@ public partial class MainWindow
         film.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
         if(current?.Id!=next.Id||activePerson!=null)throw new Exception("Film → person → film navigation failed.");
         CinemaBack();if(activePerson!=person)throw new Exception("Movie back did not restore person page.");
-        var back=FindVisual<Button>(PageHeader,x=>AutomationProperties.GetName(x).Contains("Назад к фильму")||FindVisual<TextBlock>(x,t=>t.Text.StartsWith("Назад к фильму"))!=null)??throw new Exception("Person back action missing.");
+        var back=FindVisual<Button>(HeaderArea,x=>AutomationProperties.GetName(x).Contains("Назад к фильму")||FindVisual<TextBlock>(x,t=>t.Text.StartsWith("Назад к фильму"))!=null)??throw new Exception("Person back action missing.");
         back.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));if(activePerson!=null||current?.Id!=original.Id)throw new Exception("Person back did not restore original movie.");
         MinWidth=1600;Width=1600;await Task.Delay(150);UpdateLayout();Shot("film-wide");
         var cards=FindVisual<Grid>(Body,x=>x.Name=="CinemaCards")??throw new Exception("Film cards missing.");

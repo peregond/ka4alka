@@ -72,16 +72,11 @@ public partial class MainWindow:Window
         if(activePerson==null&&(current==null||section is not ("Фильмы" or "Сериалы")))returnPerson=null;
         if(activePerson!=null||current!=null||section is not ("Фильмы" or "Сериалы"))CancelCatalogQualityCheck();
         if(activePerson!=null||current!=null||section is not ("Фильмы" or "Сериалы")||!SearchActive)CancelPeopleSearch(!SearchActive);
-        try{catalogList=null;detailHero=null;detailMetaRow=null;detailRatings=null;detailInfo=null;detailPoster=null;detailSynopsis=null;detailTitle=null;detailDescription=null;descriptionToggle=null;inlineCatalogFilters=null;inlineCatalogFilterScroll=null;catalogToolbar=null;catalogRefreshButton=null;catalogFilterBack=null;catalogFilterForward=null;catalogFiltersCompact=null;catalogFilterCaptions.Clear();catalogRailPreview=null;discoveryHero=null;discoveryShelf=null;FilterControls.Children.Clear();PageHeader.Children.Clear();Body.Children.Clear();Body.RowDefinitions.Clear();SyncTimer();UpdateFilterRail();
+        try{catalogList=null;detailHero=null;detailMetaRow=null;detailRatings=null;detailInfo=null;detailPoster=null;detailSynopsis=null;detailTitle=null;detailDescription=null;descriptionToggle=null;inlineCatalogFilters=null;inlineCatalogFilterScroll=null;catalogToolbar=null;catalogRefreshButton=null;catalogFilterBack=null;catalogFilterForward=null;catalogFiltersCompact=null;catalogFilterCaptions.Clear();catalogRailPreview=null;discoveryHero=null;discoveryShelf=null;FilterControls.Children.Clear();PageHeader.Children.Clear();ClearBack();Body.Children.Clear();Body.RowDefinitions.Clear();SyncTimer();UpdateFilterRail();
         SearchBar.Visibility=current!=null||section is "Фильмы" or "Сериалы" or "Сохранённое" or "Загрузки"?Visibility.Visible:Visibility.Collapsed;
         ContextLabel.Visibility=SearchBar.Visibility==Visibility.Visible||section=="Загрузки"?Visibility.Collapsed:Visibility.Visible;ContextLabel.Text=section;
         downloadView=null;downloadList=null;
-        foreach(Button b in Navigation.Children){var selected=!SearchActive&&savedReturn==null&&b.Tag?.ToString()==section;b.SetResourceReference(System.Windows.Controls.Button.BackgroundProperty,selected?"Selected":"Sidebar");b.SetResourceReference(Control.ForegroundProperty,selected?"Accent":"Muted");b.FontWeight=selected?FontWeights.SemiBold:FontWeights.Normal;}
-        DownloadsButton.SetResourceReference(Control.BackgroundProperty,section=="Загрузки"?"Selected":"Sidebar");
-        SavedButton.SetResourceReference(Control.BackgroundProperty,section=="Сохранённое"||savedReturn!=null&&section!="Настройки"?"Selected":"Sidebar");
-        SettingsButton.SetResourceReference(Control.BackgroundProperty,section=="Настройки"?"Selected":"Sidebar");
-        DownloadsButton.SetResourceReference(Control.ForegroundProperty,section=="Загрузки"?"Accent":"Muted");SettingsButton.SetResourceReference(Control.ForegroundProperty,section=="Настройки"?"Accent":"Muted");
-        SavedButton.SetResourceReference(Control.ForegroundProperty,section=="Сохранённое"||savedReturn!=null&&section!="Настройки"?"Accent":"Muted");
+        RenderNavSelection();UpdateDownloadsWidget();
         if(section=="Настройки"){RenderSettings();return;}
         if(section=="Источники"){RenderSources();return;}
         if(activePerson!=null){RenderPerson(activePerson,personOrigin);return;}
@@ -101,6 +96,13 @@ public partial class MainWindow:Window
         var cards=result.ToArray();ShowCatalog(cards);if(cards.Length==0)PageHeader.Children.Add(Text("Ничего не найдено. Измени поиск или фильтры.",14,true));
         }finally{EndCatalogNavigationRender();RefreshLoadingIndicator();}
     }
+    void RenderNavSelection()
+    {
+        foreach(Button b in Navigation.Children)StyleNav(b,!SearchActive&&savedReturn==null&&b.Tag?.ToString()==section);
+        StyleNav(DownloadsButton,section=="Загрузки");
+        StyleNav(SavedButton,section=="Сохранённое"||savedReturn!=null&&section!="Настройки");
+        StyleNav(SettingsButton,section=="Настройки");
+    }
     void OpenCard(object sender,RoutedEventArgs e)
     {
         if(section=="Сохранённое"&&current==null&&activePerson==null)savedReturn=new(savedCategory,savedPage,savedScroll?.VerticalOffset??0);
@@ -110,7 +112,7 @@ public partial class MainWindow:Window
     void Detail(MediaItem item)
     {
         var panel=new StackPanel();Body.Children.Add(new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=panel,VerticalScrollBarVisibility=ScrollBarVisibility.Auto});
-        PageHeader.Children.Add(ActionButton(SavedBackLabel()??DownloadBackLabel()??section,"IconBack",CinemaBack));
+        SetBack(SavedBackLabel()??DownloadBackLabel()??section,CinemaBack);
         var intro=new Grid{Margin=new(0,8,0,20)};intro.ColumnDefinitions.Add(new(){Width=new GridLength(180)});intro.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});
         var cover=new Border{Background=item.Cover,CornerRadius=new(18),Height=225,Margin=new(0,0,20,0)};intro.Children.Add(cover);
         var info=new StackPanel();Grid.SetColumn(info,1);intro.Children.Add(info);info.Children.Add(Text(item.Title,28));info.Children.Add(Text(item.Subtitle,12,true));
@@ -149,7 +151,8 @@ public partial class MainWindow:Window
     void ApplyTheme()
     {
         ApplyInterfaceTheme(prefs.Light);
-        ApplyBackgroundTheme(prefs.Light);
+        ThemeIcon.Data=(Geometry)FindResource(prefs.Light?"IconTheme":"IconMoon");
+        foreach(var item in downloads.Items)item.Refresh();
         SidePanel.SetResourceReference(Border.BackgroundProperty,"Sidebar");
         SystemWindowTheme.Apply(this,prefs.Light);
     }

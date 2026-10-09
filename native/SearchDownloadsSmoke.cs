@@ -87,7 +87,7 @@ public partial class MainWindow
             check(activePerson?.ProfileUrl==namesake.ProfileUrl&&personOrigin==null,"namesake selection opens its own confirmed identity: "+namesake.ProfileUrl);
             end=DateTime.UtcNow.AddSeconds(2);while(FindVisual<TextBlock>(Body,text=>text.Text==NamesakeBiography(namesake))==null&&DateTime.UtcNow<end)await Task.Delay(25);UpdateLayout();
             check(FindVisual<TextBlock>(Body,text=>text.Text==NamesakeBiography(namesake))!=null,"namesake selection loads its own cached biography instead of the same-name profile: "+namesake.ProfileUrl);
-            FindVisual<Button>(PageHeader,button=>AutomationProperties.GetName(button)=="К результатам поиска")!.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));UpdateLayout();
+            FindVisual<Button>(HeaderArea,button=>AutomationProperties.GetName(button)=="К результатам поиска")!.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));UpdateLayout();
         }
         FindVisual<Button>(Body,button=>button.Tag is CinemaPerson person&&person==searchedPeople[0])!.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));UpdateLayout();
         check(activePerson==searchedPeople[0]&&current==null&&personOrigin==null,"search opens a person page without inventing an origin film");
@@ -97,13 +97,13 @@ public partial class MainWindow
         personFilm.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));UpdateLayout();
         check(current?.Id==films[0].Id&&activePerson==null&&returnPerson?.Person==searchedPeople[0]&&returnPerson?.Origin==null,"a search person's filmography opens a film while retaining its person return destination");
         CinemaBack();UpdateLayout();check(activePerson==searchedPeople[0]&&personOrigin==null,"film back restores the person opened from search");
-        var personSearchBack=FindVisual<Button>(PageHeader,button=>AutomationProperties.GetName(button)=="К результатам поиска")??throw new Exception("Search person back action is missing.");
+        var personSearchBack=FindVisual<Button>(HeaderArea,button=>AutomationProperties.GetName(button)=="К результатам поиска")??throw new Exception("Search person back action is missing.");
         personSearchBack.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));UpdateLayout();
         check(activePerson==null&&current==null&&Search.Text=="Поисковая искра"&&PeopleOnlySearch&&livePage==1&&calls==2&&peopleCalls==1,"person back restores the same search query, people tab and page without repeating requests");
         Filter("Все").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));UpdateLayout();
         FindVisual<Button>(Body,button=>AutomationProperties.GetName(button)=="Страница 2")!.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));UpdateLayout();
         FindVisual<Button>(Body,button=>button.Tag is CinemaPerson person&&person==searchedPeople[0])!.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));UpdateLayout();
-        FindVisual<Button>(PageHeader,button=>AutomationProperties.GetName(button)=="К результатам поиска")!.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));UpdateLayout();
+        FindVisual<Button>(HeaderArea,button=>AutomationProperties.GetName(button)=="К результатам поиска")!.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));UpdateLayout();
         check(SearchActive&&searchCategory==""&&livePage==2&&catalogDisplay.Count==10&&calls==2&&peopleCalls==1,"opening a person from combined search restores its second film page without fetching results again");
         Filter("Фильмы").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));UpdateLayout();
         ShowDownloads(this,new RoutedEventArgs());ShowCatalogSection("Фильмы");UpdateLayout();
@@ -301,7 +301,7 @@ public partial class MainWindow
                 prefs.Light=true;ApplyTheme();dialog.UpdateLayout();Shot(dialog,"downloads-details-light");dialog.Width=360;dialog.Height=300;dialog.UpdateLayout();Shot(dialog,"downloads-details-minimum");check(files.ActualHeight>30,"file details remain usable in a minimum-size window");
             });
             var font=new Typeface(FontFamily,FontStyles.Normal,FontWeights.Normal,FontStretches.Normal);
-            check(FontFamily.Source.Contains("Fonts/#Inter")&&font.TryGetGlyphTypeface(out var glyph)&&glyph.FamilyNames.Values.Any(name=>name=="Inter")&&glyph.CharacterToGlyphMap.ContainsKey('М'),"the packaged Inter font is used by the window and contains Cyrillic glyphs");
+            check(FontFamily.Source.Contains("Fonts/#Onest")&&font.TryGetGlyphTypeface(out var glyph)&&glyph.FamilyNames.Values.Any(name=>name=="Onest")&&glyph.CharacterToGlyphMap.ContainsKey('М'),"the packaged Onest font is used by the window and contains Cyrillic glyphs");
             check(Icon is BitmapSource&&BrandLogo.Source is BitmapSource,"application icon and transparent kettlebell logo load from packaged resources");
             Width=1280;Height=800;section="Загрузки";current=null;Render();await SettleDownloads();
             fixtures[^1].MediaPageUrl="https://w6.zona.plus/tvseries/download-fixture";fixtures[^1].Refresh();await SettleDownloads();
@@ -380,7 +380,7 @@ public partial class MainWindow
                 }
                 await NativeDownloadClick(link,"open "+label);
                 check(current?.Id==linked.Id&&detailTitle?.Text==fixtures[^1].MediaTitle&&section=="Загрузки","download poster/title opens its associated internal card while retaining the queue as the return destination");
-                var back=FindVisual<Button>(PageHeader,b=>AutomationProperties.GetName(b)=="Загрузки")??throw new Exception("Download detail has no return-to-queue action; "+DownloadUiState());
+                var back=FindVisual<Button>(HeaderArea,b=>AutomationProperties.GetName(b)=="Загрузки")??throw new Exception("Download detail has no return-to-queue action; "+DownloadUiState());
                 await NativeDownloadClick(back,"return "+label);
                 check(section=="Загрузки"&&current==null&&Queue().Items.Count==fixtures.Length&&fixtures.All(x=>x.Paused),"returning from the internal card preserves the queue and its paused transfers; "+DownloadUiState());
             }
@@ -412,11 +412,11 @@ public partial class MainWindow
             var filmography=await NavigationControl(Body,b=>b.Tag is MediaItem film&&film.Id==films[0].Id,"cached filmography film");
             await NativeDownloadClick(filmography,"nested filmography film");
             check(current?.Id==films[0].Id&&returnPerson?.Person==namesakeOne&&returnPerson?.Origin?.Id==linked.Id&&DownloadBackLabel()=="Загрузки","download filmography film retains its actor and queue ancestors; "+DownloadUiState());
-            await NativeDownloadClick(await NavigationControl(PageHeader,b=>AutomationProperties.GetName(b)==namesakeOne.Name,"filmography back to actor"),"nested filmography back");
+            await NativeDownloadClick(await NavigationControl(HeaderArea,b=>AutomationProperties.GetName(b)==namesakeOne.Name,"filmography back to actor"),"nested filmography back");
             check(activePerson==namesakeOne&&personOrigin?.Id==linked.Id&&DownloadBackLabel()=="Загрузки","filmography back restores the download origin actor first; "+DownloadUiState());
-            await NativeDownloadClick(await NavigationControl(PageHeader,b=>AutomationProperties.GetName(b)=="Назад к фильму","actor back to origin"),"nested actor back");
+            await NativeDownloadClick(await NavigationControl(HeaderArea,b=>AutomationProperties.GetName(b)=="Назад к фильму","actor back to origin"),"nested actor back");
             check(activePerson==null&&current?.Id==linked.Id&&DownloadBackLabel()=="Загрузки","actor back restores the same download card with a queue return label; "+DownloadUiState());
-            await NativeDownloadClick(await NavigationControl(PageHeader,b=>AutomationProperties.GetName(b)=="Загрузки","origin back to queue"),"nested origin back");
+            await NativeDownloadClick(await NavigationControl(HeaderArea,b=>AutomationProperties.GetName(b)=="Загрузки","origin back to queue"),"nested origin back");
             check(section=="Загрузки"&&current==null&&downloadReturnItem==null&&Queue().Items.Count==fixtures.Length&&fixtures.All(item=>item.Paused),"nested actor and filmography navigation returns to the unchanged paused queue; "+DownloadUiState());
             searchProvider=(kind,query,token)=>Task.FromResult<IReadOnlyList<MediaItem>>(kind=="Фильмы"?films:series);
             await NativeDownloadClick(await DownloadLink("Открыть карточку по постеру"),"search origin card");
