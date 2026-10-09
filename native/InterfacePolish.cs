@@ -36,6 +36,7 @@ public partial class MainWindow
     void InitializeInterfacePolish()
     {
         Search.SizeChanged+=(_,_)=>RefreshSearchHint();
+        SizeChanged+=(_,_)=>RefreshSearchHint();
         Search.TextChanged+=(_,_)=>RefreshSearchHint();
         Search.IsKeyboardFocusWithinChanged+=(_,_)=>RefreshSearchHint();
         RefreshSearchHint();
@@ -43,7 +44,10 @@ public partial class MainWindow
 
     void RefreshSearchHint()
     {
-        var show=Search.Text.Length==0&&!Search.IsKeyboardFocusWithin&&Search.ActualWidth>=320;
+        // Compact navigation prioritizes the search text. A wide text box alone
+        // is not enough to expose the shortcut in that reduced shell; it can
+        // become wide after the sidebar and header labels collapse.
+        var show=!compactWidth&&Search.Text.Length==0&&!Search.IsKeyboardFocusWithin&&Search.ActualWidth>=320;
         SearchShortcutHint.Visibility=show?Visibility.Visible:Visibility.Collapsed;
         var margin=SearchPlaceholder.Margin;
         // Responsive layout still owns the left inset. Reserve space for the

@@ -8,6 +8,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 
 namespace Kachalka;
 
@@ -19,9 +20,30 @@ public partial class MainWindow
         Directory.CreateDirectory(output);await Task.Delay(180);
         liveRequest?.Cancel();liveLoading=false;searchDelay.Stop();catalogRefreshTimer.Stop();
         var checks=new List<string>();
-        void Check(bool ok,string message){if(!ok)throw new Exception(message);checks.Add(message);}
+        string NavigationState()
+        {
+            catalogPositions.TryGetValue(navigationRoute,out var remembered);
+            return JsonSerializer.Serialize(new{Page=livePage,Loading=liveLoading,PersonLoading=personProfileLoading,Route=navigationRoute,
+                Pending=navigationPendingPosition,Remembered=remembered,Current=CaptureCatalogPosition(),
+                Restore=navigationRestore?.Status.ToString(),Offset=navigationScroll?.VerticalOffset,
+                Extent=navigationScroll?.ExtentHeight,Viewport=navigationScroll?.ViewportHeight,
+                WindowWidth=ActualWidth,BodyWidth=Body.ActualWidth,Columns=catalogColumns});
+        }
+        void Check(bool ok,string message){if(!ok)throw new Exception(message+"\nNavigation state: "+NavigationState());checks.Add(message);}
         void Click(Button button)=>button.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
-        async Task Settle(){await Task.Delay(130);UpdateLayout();await Task.Delay(70);UpdateLayout();}
+        async Task Settle()
+        {
+            await Task.Delay(130);UpdateLayout();await Task.Delay(70);
+            // Restoration verifies the queued WPF scroll at ContextIdle. A
+            // timer alone can observe the new row before that verification
+            // canonicalizes its leading title, especially after a reflow.
+            for(var pass=0;pass<12;pass++)
+            {
+                UpdateLayout();await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ContextIdle);UpdateLayout();
+                if(navigationRestore is not {Status:DispatcherOperationStatus.Pending or DispatcherOperationStatus.Executing})return;
+            }
+            Check(false,"the native navigation restoration settles before its position is observed");
+        }
         async Task Size(double width,double height=640)
         {
             // Windows Server's virtual monitor limits the native max-track size.
@@ -158,8 +180,11 @@ public partial class MainWindow
         var moviesNavigation=Navigation.Children.OfType<Button>().First(button=>Equals(button.Tag,"Фильмы"));
         Click(moviesNavigation);deadline=DateTime.UtcNow.AddSeconds(5);while(liveLoading&&DateTime.UtcNow<deadline)await Task.Delay(40);await Settle();
         Check(DiscoveryCatalog&&catalogDisplay.Count==40,"default route fixture contains its real discovery shelves and paged catalog");
-        FindVisual<TextBlock>(Body,text=>text.Name=="CatalogAllHeading")!.BringIntoView();await Settle();
-        Scroll().ScrollToVerticalOffset(Scroll().VerticalOffset+100);await Settle();var discoveryPosition=CaptureCatalogPosition()!;
+        var discoveryScroll=Scroll();var gridTop=catalogList!.TransformToAncestor(discoveryScroll).Transform(new Point()).Y;
+        // BringIntoView only exposes a heading near the viewport's bottom and
+        // can leave a discovery shelf at its top. Scroll to the measured grid
+        // itself, so the reload really exercises a title below those shelves.
+        discoveryScroll.ScrollToVerticalOffset(discoveryScroll.VerticalOffset+gridTop+100);await Settle();var discoveryPosition=CaptureCatalogPosition()!;
         Check(discoveryPosition.Offset>0&&discoveryPosition.ItemId!=null&&discoveryPosition.Scope=="catalog","default route is anchored to a title beneath its discovery shelves");
         liveLoading=true;liveItems=[];Render();await Settle();
         Check(Scroll().ScrollableHeight>0&&navigationPendingPosition?.ItemId==discoveryPosition.ItemId,

@@ -50,6 +50,7 @@ public partial class MainWindow
             {
                 prefs.Light=light;ApplyTheme();Render();await Settle();SearchSubmitButton.Focus();await Settle();
                 Check(InterfacePalette.For(light).All(pair=>pair.Value.IsFrozen&&ReferenceEquals(FindResource(pair.Key),pair.Value)),"Theme reuses its frozen palette: "+(light?"light":"dark"));
+                Check(SearchShortcutHint.IsVisible&&SearchPlaceholder.Margin.Right>=70,"Wide idle search shows its keyboard hint with reserved text space: "+(light?"light":"dark"));
                 CheckCards(light?"light":"dark");Shot("interface-"+(light?"light":"dark"));
             }
             // A RenderTargetBitmap can capture a viewport larger than the actual
@@ -129,7 +130,7 @@ public partial class MainWindow
                     var bounds=action.TransformToAncestor(RootGrid).TransformBounds(new Rect(new Point(),action.RenderSize));
                     Check(action.IsVisible&&action.ActualWidth>0&&bounds.Left>=-1&&bounds.Right<=RootGrid.ActualWidth+1,"Header action stays inside "+width+" DIP viewport: "+AutomationProperties.GetName(action));
                 }
-                Check(!SearchShortcutHint.IsVisible,"Compact search hides its keyboard hint: "+width);
+                Check(!SearchShortcutHint.IsVisible&&SearchPlaceholder.Margin.Right==40,"Compact search hides its keyboard hint and returns text space: "+width);
             }
             await Size(360,360);
             Search.Text="Интерстеллар";searchDelay.Stop();submittedQuery=Search.Text;searchCategory="";
