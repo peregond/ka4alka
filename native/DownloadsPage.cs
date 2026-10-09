@@ -225,7 +225,8 @@ public partial class MainWindow
         if(downloadAddButton!=null)downloadAddButton.Content=IconLabel(tiny?"":"Добавить торрент","IconPlus");
         var label=DownloadSortChoices.FirstOrDefault(x=>x.Key==downloadSort).Label??"Сначала новые";
         downloadOrder.Content=ChipContent(tiny?"":label,false,"IconFilter");downloadOrder.ToolTip="Сортировка: "+label;
-        if(downloadHeading!=null)downloadHeading.FontSize=shortView?22:28;
+        if(downloadHeading!=null)downloadHeading.FontSize=ActualWidth>0&&ActualWidth<440?20:shortView?22:28;
+        foreach(var count in downloadTabCounts.Values)count.Visibility=ActualWidth>0&&ActualWidth<640?Visibility.Collapsed:Visibility.Visible;
         if(downloadHeadingHost!=null)downloadHeadingHost.Visibility=veryShort?Visibility.Collapsed:Visibility.Visible;
         if(downloadHeadingRow!=null)downloadHeadingRow.Margin=new(0,0,0,veryShort?2:shortView?8:16);
         if(downloadToolbar!=null)downloadToolbar.Margin=new(0);
