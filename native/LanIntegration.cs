@@ -1,5 +1,6 @@
 using System.IO;
 using System.Windows;
+using System.Windows.Media;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using Kachalka.Lan;
@@ -122,9 +123,14 @@ public partial class MainWindow
 
     FrameworkElement LanDownloadAction(SourceEntry entry)
     {
-        var local=new Button{Content="Скачать",Tag=entry,Style=(Style)FindResource("PrimaryButton"),Margin=new(0),Padding=new(12,9,12,9),ToolTip="Скачать на этом компьютере"};
+        // A quiet secondary action in the row; the one primary download lives on the banner.
+        var local=new Button{Tag=entry,Margin=new(0),Padding=new(16,0,16,0),Height=44,MinHeight=44,ToolTip="Скачать на этом компьютере"};
+        var localRow=new StackPanel{Orientation=Orientation.Horizontal};
+        var glyph=new System.Windows.Shapes.Path{Data=(Geometry)FindResource("IconDownload"),Width=16,Height=16,Stretch=Stretch.Uniform,StrokeThickness=1.8,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,StrokeLineJoin=PenLineJoin.Round,Margin=new(0,0,8,0),VerticalAlignment=VerticalAlignment.Center};glyph.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty,"Accent");
+        localRow.Children.Add(glyph);localRow.Children.Add(new TextBlock{Text="Скачать",VerticalAlignment=VerticalAlignment.Center});local.Content=localRow;
         AutomationProperties.SetName(local,"Скачать раздачу: "+entry.Title);local.Click+=SourceDownload;
-        var remote=ActionButton("","IconDevice",()=>{});remote.Margin=new(4,0,0,0);remote.Padding=new(8);remote.Width=36;remote.MinHeight=36;remote.ToolTip="Скачать на другом устройстве";
+        var remote=new Button{Style=(Style)FindResource("IconButton"),Width=44,Height=44,Margin=new(6,0,0,0),ToolTip="Скачать на другом устройстве"};
+        remote.Content=IconLabel("","IconLaptop",18);
         AutomationProperties.SetName(remote,"Скачать на другом устройстве: "+entry.Title);
         remote.Click+=async(_,_)=>await SendReleaseToLanAsync(remote,entry);
         var actions=new StackPanel{Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center,HorizontalAlignment=HorizontalAlignment.Right};actions.Children.Add(local);actions.Children.Add(remote);return actions;

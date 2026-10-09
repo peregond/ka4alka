@@ -21,7 +21,8 @@ public partial class MainWindow
     bool? catalogFiltersCompact;
     sealed record CatalogFilterCaption(string Full,string Compact,string? Icon=null);
     readonly Dictionary<Button,CatalogFilterCaption> catalogFilterCaptions=[];
-    Grid? detailHero,detailMetaRow;
+    Grid? detailHero;
+    WrapPanel? detailMetaRow;
     WrapPanel? detailRatings;
     StackPanel? detailInfo;
     Border? detailPoster;
@@ -312,119 +313,5 @@ public partial class MainWindow
         catch(OperationCanceledException){}
         catch(Exception){if(IsCurrent())liveError="Источник временно недоступен. Повтори загрузку или выбери другую страницу.";}
         finally{if(IsCurrent()){liveLoading=false;if(!closed&&current==null&&activePerson==null&&section==category&&!favoritesOnly)Render();}}
-    }
-    void RenderLiveDetail(MediaItem item)
-    {
-        if(requestedDetails.Add(item.Id))
-        {
-            var cached=catalogIndex.CachedReleaseSnapshot(item);
-            if(cached is {Items.Length:>0}&&!liveReleases.ContainsKey(item.Id))
-            {
-                liveReleases[item.Id]=cached.Items;cachedReleaseViews.Add(item.Id);
-                releaseViews[item.Id]=new(){Saved=true,SavedUtc=cached.SavedUtc,Sources=cached.Sources??[]};
-            }
-            _ = FetchDetails(item);
-        }
-        ApplyKnownQuality(item);
-        if(descriptionItemId!=item.Id){descriptionItemId=item.Id;descriptionExpanded=false;}
-        SetBack(returnPerson?.Person.Name??SavedBackLabel()??DownloadBackLabel()??section,CinemaBack);
-        var panel=new StackPanel{Margin=new(0,0,10,0)};Body.Children.Add(new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=panel,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});
-        detailHero=new Grid{Name="DetailHero"};detailHero.ColumnDefinitions.Add(new(){Width=new GridLength(174)});detailHero.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});detailHero.RowDefinitions.Add(new(){Height=GridLength.Auto});detailHero.RowDefinitions.Add(new(){Height=GridLength.Auto});detailHero.RowDefinitions.Add(new(){Height=GridLength.Auto});
-        detailPoster=new Border{Width=150,Height=225,CornerRadius=new(12),ClipToBounds=true,Background=item.Cover,HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Top,Margin=new(0,0,24,0)};
-        detailPoster.SizeChanged+=(sender,_)=>ClipPoster((Border)sender);
-        var posterGrid=new Grid();posterGrid.Children.Add(new TextBlock{Text="Постер\nнедоступен",Foreground=Brushes.White,Opacity=.75,TextAlignment=TextAlignment.Center,VerticalAlignment=VerticalAlignment.Center,FontSize=11});
-        var image=new Image{DataContext=item,Stretch=Stretch.UniformToFill};image.Loaded+=SourceCover;posterGrid.Children.Add(image);detailPoster.Child=posterGrid;detailHero.Children.Add(detailPoster);
-        detailInfo=new StackPanel{Name="DetailIdentity",VerticalAlignment=VerticalAlignment.Top};detailInfo.SizeChanged+=(sender,_)=>{if(ReferenceEquals(sender,detailInfo))UpdateDetailLayout();};Grid.SetColumn(detailInfo,1);detailHero.Children.Add(detailInfo);
-        detailMetaRow=new Grid{Name="DetailMetaRow",Margin=new(0,0,0,12)};detailMetaRow.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});detailMetaRow.ColumnDefinitions.Add(new(){Width=GridLength.Auto});detailMetaRow.RowDefinitions.Add(new(){Height=GridLength.Auto});detailMetaRow.RowDefinitions.Add(new(){Height=GridLength.Auto});detailInfo.Children.Add(detailMetaRow);
-        var meta=Text(item.Section+(item.Year>0?"  ·  "+item.Year:""),12,true);meta.Name="DetailYear";meta.Margin=new(0,0,12,0);meta.VerticalAlignment=VerticalAlignment.Center;detailMetaRow.Children.Add(meta);
-        detailRatings=new WrapPanel{Name="DetailRatings",HorizontalAlignment=HorizontalAlignment.Right};Grid.SetColumn(detailRatings,1);detailMetaRow.Children.Add(detailRatings);
-        Border Rating(string name,string value)
-        {
-            var row=new StackPanel{Orientation=Orientation.Horizontal};row.Children.Add(Text(name+"  ",10,true));var score=Text(value,12);score.FontWeight=FontWeights.SemiBold;row.Children.Add(score);foreach(var label in row.Children.OfType<TextBlock>()){label.Margin=new(0);label.VerticalAlignment=VerticalAlignment.Center;}
-            return new Border{Child=row,Padding=new(0,3,0,3),BorderThickness=new(0),Background=Brushes.Transparent,Margin=new(12,0,0,0),ToolTip=name+" · "+value};
-        }
-        detailRatings.Children.Add(Rating("Кинопоиск",item.Kinopoisk));detailRatings.Children.Add(Rating("IMDb",item.Imdb));
-        var hasOriginal=!string.IsNullOrWhiteSpace(item.OriginalTitle)&&!item.OriginalTitle.Equals(item.Title,StringComparison.OrdinalIgnoreCase);
-        detailTitle=Text(item.Title,28);detailTitle.Name="DetailTitle";detailTitle.FontWeight=FontWeights.SemiBold;detailTitle.Margin=new(0,0,0,hasOriginal?5:14);detailInfo.Children.Add(detailTitle);
-        if(hasOriginal){var original=Text(item.OriginalTitle!,13,true);original.Name="DetailOriginalTitle";original.Margin=new(0,0,0,14);detailInfo.Children.Add(original);}
-        Button favorite=null!;favorite=ActionButton(IsSaved(item)?"Сохранено":"Сохранить",IsSaved(item)?"IconHeartFilled":"IconHeart",()=>
-        {
-            ToggleSaved(item);var saved=IsSaved(item);favorite.Content=IconLabel(saved?"Сохранено":"Сохранить",saved?"IconHeartFilled":"IconHeart");
-            System.Windows.Automation.AutomationProperties.SetName(favorite,saved?"Сохранено":"Сохранить");
-        },"QuietButton");favorite.Name="DetailFavorite";favorite.HorizontalAlignment=HorizontalAlignment.Left;favorite.Margin=new(0,0,0,14);favorite.Padding=new(12,7,12,7);favorite.BorderThickness=new(0);favorite.SetResourceReference(Control.BackgroundProperty,"Selected");detailInfo.Children.Add(favorite);
-        if(item.OnlyPoorQuality)detailInfo.Children.Add(PoorQualityBadge(item.PosterQuality));
-        var traits=string.Join("  ·  ",new[]{item.Genre,item.Country}.Where(x=>!string.IsNullOrWhiteSpace(x)));if(traits.Length>0){var genre=Text(traits,12,true);genre.Name="DetailTraits";genre.Margin=new(0);detailInfo.Children.Add(genre);}
-        detailDescription=new StackPanel{Name="DetailDescription",Margin=new(0,16,0,0)};Grid.SetColumn(detailDescription,0);Grid.SetRow(detailDescription,1);Grid.SetColumnSpan(detailDescription,2);detailHero.Children.Add(detailDescription);
-        detailSynopsis=Text(DetailDescriptionText(item),13,true);detailSynopsis.Name="DetailSynopsis";detailSynopsis.LineHeight=20;detailSynopsis.MaxHeight=descriptionExpanded?double.PositiveInfinity:80;detailSynopsis.TextTrimming=TextTrimming.CharacterEllipsis;detailSynopsis.Margin=new(0);detailDescription.Children.Add(detailSynopsis);
-        descriptionToggle=Button(descriptionExpanded?"Свернуть описание":"Читать дальше",()=>
-        {
-            if(descriptionItemId!=item.Id||detailSynopsis==null)return;
-            descriptionExpanded=!descriptionExpanded;detailSynopsis.MaxHeight=descriptionExpanded?double.PositiveInfinity:80;UpdateDescriptionToggle();
-        });descriptionToggle.Name="DescriptionToggle";descriptionToggle.Style=(Style)FindResource("QuietButton");descriptionToggle.HorizontalAlignment=HorizontalAlignment.Left;descriptionToggle.Padding=new(0,5,0,5);descriptionToggle.Margin=new(0);descriptionToggle.MinHeight=26;descriptionToggle.Visibility=Visibility.Collapsed;detailDescription.Children.Add(descriptionToggle);
-        if(DetailMetadataNeedsRetry(item.Id)&&!MediaMetadata.HasDescription(item)){var retry=ActionButton("Повторить загрузку карточки","IconRefresh",()=>RetryDetailMetadata(item));retry.Name="DetailMetadataRetry";retry.HorizontalAlignment=HorizontalAlignment.Left;retry.Margin=new(0,8,0,0);detailDescription.Children.Add(retry);}
-        detailSynopsis.SizeChanged+=(sender,_)=>{if(ReferenceEquals(sender,detailSynopsis))UpdateDescriptionToggle();};
-        var heroFrame=new Border{Child=detailHero,Background=(Brush)FindResource("Panel"),BorderBrush=(Brush)FindResource("Edge"),BorderThickness=new(1),CornerRadius=new(22),Padding=new(20),Margin=new(0,0,0,24)};heroFrame.Name="CinemaFilm";heroFrame.VerticalAlignment=VerticalAlignment.Top;
-        var cards=new Grid{Name="CinemaCards",Margin=new(0,0,0,24)};cards.ColumnDefinitions.Add(new());cards.ColumnDefinitions.Add(new());cards.RowDefinitions.Add(new(){Height=GridLength.Auto});cards.RowDefinitions.Add(new(){Height=GridLength.Auto});panel.Children.Add(cards);cards.Children.Add(heroFrame);heroFrame.Margin=new(0);
-        var participants=RenderCinemaConnections(panel,item,cards);
-        var participantScroll=FindVisual<ScrollViewer>(participants,x=>x.Name=="CinemaPeopleScroll")!;
-        bool? aligned=null;
-        void ArrangeCards()
-        {
-            // Keep the breakpoint stable when a longer synopsis adds a page scrollbar.
-            var alongside=Body.ActualWidth>=1080;
-            cards.ColumnDefinitions[0].Width=new GridLength(1,GridUnitType.Star);cards.ColumnDefinitions[1].Width=alongside?new GridLength(1,GridUnitType.Star):new GridLength(0);
-            heroFrame.Margin=alongside?new(0,0,10,0):new(0);
-            Grid.SetColumn(participants,alongside?1:0);Grid.SetRow(participants,alongside?0:1);participants.Margin=alongside?new(10,0,0,0):new(0,20,0,0);
-            if(aligned!=alongside)
-            {
-                aligned=alongside;
-                if(alongside)
-                {
-                    BindingOperations.ClearBinding(participantScroll,FrameworkElement.MaxHeightProperty);participantScroll.MaxHeight=double.PositiveInfinity;
-                    BindingOperations.SetBinding(participants,FrameworkElement.HeightProperty,new Binding(nameof(ActualHeight)){Source=heroFrame,Mode=BindingMode.OneWay});
-                }
-                else
-                {
-                    BindingOperations.ClearBinding(participants,FrameworkElement.HeightProperty);
-                    BindingOperations.SetBinding(participantScroll,FrameworkElement.MaxHeightProperty,new Binding(nameof(ActualHeight)){Source=Body,Converter=crewViewportHeight,Mode=BindingMode.OneWay});
-                }
-            }
-            UpdateDetailLayout();
-        }
-        cards.SizeChanged+=(_,_)=>ArrangeCards();ArrangeCards();
-        var releasesTitle=Text("Раздачи",23);releasesTitle.FontWeight=FontWeights.SemiBold;releasesTitle.Margin=new(0,0,0,13);panel.Children.Add(releasesTitle);
-        RenderReleaseToolbar(panel,item);
-        if(!liveReleases.TryGetValue(item.Id,out var releases)||releases.Count==0)
-        {
-            var checking=releaseViews.TryGetValue(item.Id,out var scan)&&scan.Checking;
-            if(checking)return;
-            var empty=new StackPanel{Margin=new(2,16,2,20)};var noReleases=Text("Подходящих раздач пока нет",17);noReleases.FontWeight=FontWeights.SemiBold;empty.Children.Add(noReleases);empty.Children.Add(Text("Можно обновить поиск раздач или вернуться позже.",13,true));
-            panel.Children.Add(empty);return;
-        }
-        RenderReleasePicker(panel,releases);
-    }
-    void UpdateDetailLayout()
-    {
-        if(detailHero==null||detailPoster==null||detailTitle==null||detailDescription==null||detailInfo==null)return;
-        var narrow=detailHero.ActualWidth>0&&detailHero.ActualWidth<520;
-        var tiny=detailHero.ActualWidth>0&&detailHero.ActualWidth<340;
-        var posterWidth=narrow?94d:150d;detailPoster.Width=posterWidth;detailPoster.Height=posterWidth*1.5;
-        detailHero.ColumnDefinitions[0].Width=new GridLength(posterWidth+(narrow?18:24));detailPoster.Margin=new(0,0,tiny?0:narrow?18:24,0);
-        Grid.SetColumn(detailInfo,tiny?0:1);Grid.SetRow(detailInfo,tiny?1:0);Grid.SetColumnSpan(detailInfo,tiny?2:1);detailInfo.Margin=tiny?new(0,16,0,0):new(0);
-        Grid.SetColumnSpan(detailPoster,tiny?2:1);detailPoster.HorizontalAlignment=tiny?HorizontalAlignment.Center:HorizontalAlignment.Left;
-        Grid.SetRow(detailDescription,tiny?2:1);detailTitle.FontSize=narrow?22:28;
-        if(detailMetaRow!=null&&detailRatings!=null)
-        {
-            var stack=detailInfo.ActualWidth>0&&detailInfo.ActualWidth<300;
-            Grid.SetColumn(detailRatings,stack?0:1);Grid.SetRow(detailRatings,stack?1:0);Grid.SetColumnSpan(detailRatings,stack?2:1);
-            detailRatings.HorizontalAlignment=stack?HorizontalAlignment.Left:HorizontalAlignment.Right;detailRatings.Margin=stack?new(-12,8,0,0):new(0);
-        }
-    }
-    void UpdateDescriptionToggle()
-    {
-        if(detailSynopsis==null||descriptionToggle==null||detailSynopsis.ActualWidth<=0)return;
-        descriptionToggle.Content=descriptionExpanded?"Свернуть описание":"Читать дальше";
-        var formatted=new FormattedText(detailSynopsis.Text,System.Globalization.CultureInfo.CurrentCulture,detailSynopsis.FlowDirection,new Typeface(detailSynopsis.FontFamily,detailSynopsis.FontStyle,detailSynopsis.FontWeight,detailSynopsis.FontStretch),detailSynopsis.FontSize,detailSynopsis.Foreground,VisualTreeHelper.GetDpi(detailSynopsis).PixelsPerDip){MaxTextWidth=detailSynopsis.ActualWidth,LineHeight=20};
-        descriptionToggle.Visibility=descriptionExpanded||formatted.Height>80.5?Visibility.Visible:Visibility.Collapsed;
     }
 }

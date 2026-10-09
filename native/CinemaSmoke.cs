@@ -76,7 +76,7 @@ public partial class MainWindow
         var cards=FindVisual<Grid>(Body,x=>x.Name=="CinemaCards")??throw new Exception("Film cards missing.");
         var participants=FindVisual<Border>(Body,x=>x.Name=="CinemaParticipants")??throw new Exception("Participants card missing.");
         var crew=FindVisual<System.Windows.Controls.Primitives.UniformGrid>(participants,x=>x.Name=="CinemaPeopleGrid")??throw new Exception("Crew portrait grid missing.");
-        if(crew.Columns!=3)throw new Exception("Wide participant card does not arrange three portraits per row.");
+        if(crew.Columns<4)throw new Exception("The full-width participant card does not use its width for several portraits per row.");
         var title=FindVisual<TextBlock>(Body,x=>x.Name=="DetailTitle")!;var favorite=FindVisual<Button>(Body,x=>x.Name=="DetailFavorite")!;
         if(favorite.TransformToAncestor(Body).Transform(new Point()).Y<title.TransformToAncestor(Body).Transform(new Point()).Y+title.ActualHeight)throw new Exception("Save action must follow the movie title.");
         void CheckIdentityOrder()
@@ -85,8 +85,9 @@ public partial class MainWindow
             var heading=FindVisual<TextBlock>(identity,x=>x.Name=="DetailTitle")!;
             var originalTitle=FindVisual<TextBlock>(identity,x=>x.Name=="DetailOriginalTitle")??throw new Exception("Original movie title is missing.");
             var save=FindVisual<Button>(identity,x=>x.Name=="DetailFavorite")!;
-            if(identity.Children.IndexOf(originalTitle)!=identity.Children.IndexOf(heading)+1||identity.Children.IndexOf(save)!=identity.Children.IndexOf(originalTitle)+1)throw new Exception("Movie identity must be title, original title, then Save.");
-            if(originalTitle.TransformToAncestor(identity).Transform(new Point()).Y<heading.TransformToAncestor(identity).Transform(new Point()).Y+heading.ActualHeight-.5||save.TransformToAncestor(identity).Transform(new Point()).Y<originalTitle.TransformToAncestor(identity).Transform(new Point()).Y+originalTitle.ActualHeight-.5)throw new Exception("Movie title, original title and Save overlap.");
+            var actions=FindVisual<StackPanel>(identity,x=>x.Name=="DetailActions")??throw new Exception("Movie actions row is missing.");
+            if(identity.Children.IndexOf(originalTitle)!=identity.Children.IndexOf(heading)+1||!identity.Children.Contains(actions)||identity.Children.IndexOf(actions)<=identity.Children.IndexOf(originalTitle)||!actions.Children.Contains(save))throw new Exception("Movie identity must be title, original title, details and then the actions row with Save.");
+            if(originalTitle.TransformToAncestor(identity).Transform(new Point()).Y<heading.TransformToAncestor(identity).Transform(new Point()).Y+heading.ActualHeight-.5||save.TransformToAncestor(identity).Transform(new Point()).Y<originalTitle.TransformToAncestor(identity).Transform(new Point()).Y+originalTitle.ActualHeight-.5)throw new Exception("Movie title, original title and the actions overlap.");
         }
         void CheckCrewTiles()
         {
@@ -104,21 +105,18 @@ public partial class MainWindow
         CheckIdentityOrder();CheckCrewTiles();
         var filmCard=FindVisual<Border>(Body,x=>x.Name=="CinemaFilm")!;var hero=detailHero!;
                 var ratings=FindVisual<WrapPanel>(filmCard,x=>x.Name=="DetailRatings")!;var year=FindVisual<TextBlock>(filmCard,x=>x.Name=="DetailYear")!;
-        if(Grid.GetRow(ratings)!=0||Grid.GetColumn(ratings)!=1)throw new Exception("Wide ratings should share the type/year row.");
-        if(ratings.Children.OfType<Border>().Any(x=>x.BorderThickness!=new Thickness(0)))throw new Exception("Ratings must share the metadata row without separate outlined boxes.");
-        if(detailSynopsis!.ActualWidth<detailHero!.ActualWidth-1||detailDescription!.Parent!=detailHero)throw new Exception("The synopsis must use the movie card's full content width.");
+        if(!ReferenceEquals(ratings.Parent,detailMetaRow)||ratings.Children.OfType<Border>().Any(x=>x.BorderThickness!=new Thickness(0)))throw new Exception("Ratings must share the metadata line without separate outlined boxes.");
+        if(detailSynopsis!.ActualWidth<=0||!ReferenceEquals(detailDescription!.Parent,detailInfo))throw new Exception("The synopsis must sit in the banner's text column.");
         var wasSaved=IsSaved(original);favorite.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
         if(IsSaved(original)==wasSaved||!ReferenceEquals(participants,FindVisual<Border>(Body,x=>x.Name=="CinemaParticipants"))||AutomationProperties.GetName(favorite)!=(IsSaved(original)?"Сохранено":"Сохранить"))throw new Exception("Save must update its state without restarting participant photographs.");
         favorite.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));if(IsSaved(original)!=wasSaved)throw new Exception("Save did not restore its previous state.");
-        if(filmCard.ActualHeight-hero.ActualHeight>44)throw new Exception("Movie card leaves excess blank space below its content.");
-        if(Grid.GetColumn(participants)!=1)throw new Exception($"Wide layout did not place participants next to the movie: window={ActualWidth}, cards={cards.ActualWidth}.");
+        if(filmCard.ActualHeight-hero.ActualHeight>64)throw new Exception("Movie card leaves excess blank space below its content.");
+        if(Grid.GetColumn(participants)!=0||Grid.GetRow(participants)!=1)throw new Exception($"Participants must sit below the banner at full width: window={ActualWidth}, cards={cards.ActualWidth}.");
         void CheckAlignedCrew()
         {
             if(Math.Abs(filmCard.ActualWidth-participants.ActualWidth)>1)throw new Exception("Wide film and participant cards must have the same width.");
-            if(Math.Abs(filmCard.ActualHeight-participants.ActualHeight)>1)throw new Exception("Wide film and participant cards must have the same height.");
-            var filmTop=filmCard.TransformToAncestor(cards).Transform(new Point()).Y;var crewTop=participants.TransformToAncestor(cards).Transform(new Point()).Y;
-            if(Math.Abs(filmTop-crewTop)>1)throw new Exception("Wide film and participant cards do not start on the same baseline.");
-            if(filmCard.ActualHeight-detailHero!.ActualHeight>44)throw new Exception("Participants stretched the movie card beyond its natural content height.");
+            if(participants.TransformToAncestor(cards).Transform(new Point()).Y<filmCard.ActualHeight)throw new Exception("The participant card must start below the banner.");
+            if(filmCard.ActualHeight-detailHero!.ActualHeight>64)throw new Exception("Participants stretched the movie card beyond its natural content height.");
         }
         CheckAlignedCrew();
         var crewScroll=FindVisual<ScrollViewer>(participants,x=>x.Name=="CinemaPeopleScroll")!;

@@ -53,6 +53,7 @@ static class InterfacePalette
         ("EdgeStrong","#2C333D","#B9C2CC"),    // рамка при наведении, рамка меню и разделители внутри меню
         ("EdgeFocus","#3A424E","#8D99A8"),     // рамка поля ввода в фокусе
         ("TextSoft","#C9D0D8","#2B3540"),      // текст чипов и вторичных кнопок
+        ("AccentFaint","#0D5BE3B5","#120B7A5E"),// ~5 % акцента: фон рекомендованной раздачи
     ];
 
     static readonly IReadOnlyDictionary<string,Brush> dark=Create(false),light=Create(true);

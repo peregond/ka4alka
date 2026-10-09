@@ -28,7 +28,7 @@ public partial class MainWindow
         if(item.People.Length>0)
         {
             var row=new UniformGrid{Name="CinemaPeopleGrid",Columns=3,Margin=new(0,0,-12,0)};people.Children.Add(row);
-            row.SizeChanged+=(_,_)=>{var columns=row.ActualWidth>=366?3:row.ActualWidth>=236?2:1;if(row.Columns!=columns)row.Columns=columns;};
+            row.SizeChanged+=(_,_)=>{var columns=Math.Clamp((int)Math.Floor(row.ActualWidth/124),1,8);if(row.Columns!=columns)row.Columns=columns;};
             foreach(var person in item.People)
             {
                 var button=Button(person.Name,()=>OpenPerson(person,item));button.Name="CinemaPersonTile";button.Tag=person;button.Style=(Style)FindResource("PosterButton");
@@ -39,11 +39,11 @@ public partial class MainWindow
             }
         }
         var participantContent=new Grid();participantContent.RowDefinitions.Add(new(){Height=GridLength.Auto});participantContent.RowDefinitions.Add(new(){Height=new GridLength(1,GridUnitType.Star)});
-        var heading=Text("Актёры и съёмочная группа",18);heading.Name="CinemaPeopleHeading";heading.FontWeight=FontWeights.SemiBold;heading.Margin=new(0,0,0,16);participantContent.Children.Add(heading);
+        var heading=Text("Актёры и съёмочная группа",18);heading.Name="CinemaPeopleHeading";heading.FontWeight=FontWeights.Bold;heading.Margin=new(0,0,0,16);participantContent.Children.Add(heading);
         var participantScroll=new ScrollViewer{Name="CinemaPeopleScroll",Style=(Style)FindResource("PageScroll"),Content=people,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};Grid.SetRow(participantScroll,1);participantContent.Children.Add(participantScroll);
         BindingOperations.SetBinding(participantScroll,FrameworkElement.MaxHeightProperty,new Binding(nameof(ActualHeight)){Source=Body,Converter=crewViewportHeight,Mode=BindingMode.OneWay});
-        var participants=new Border{Name="CinemaParticipants",Child=participantContent,CornerRadius=new(22),Padding=new(20),BorderThickness=new(1),VerticalAlignment=VerticalAlignment.Top};
-        participants.SetResourceReference(Border.BackgroundProperty,"Panel");participants.SetResourceReference(Border.BorderBrushProperty,"Edge");
+        var participants=new Border{Name="CinemaParticipants",Child=participantContent,CornerRadius=new(20),Padding=new(24),BorderThickness=new(1),VerticalAlignment=VerticalAlignment.Top};
+        participants.SetResourceReference(Border.BackgroundProperty,"Panel");participants.SetResourceReference(Border.BorderBrushProperty,"EdgeSoft");
         if(participantsHost!=null)participantsHost.Children.Add(participants);else panel.Children.Add(participants);
         if(item.Awards.Length>0)
         {

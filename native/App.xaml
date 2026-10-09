@@ -10,7 +10,7 @@
   <SolidColorBrush x:Key="Danger" Color="#FF8A7A"/><SolidColorBrush x:Key="RatingInk" Color="#F2B35B"/><SolidColorBrush x:Key="BannerAction" Color="#14EEF1F4"/>
   <SolidColorBrush x:Key="Raised" Color="#1A1F26"/><SolidColorBrush x:Key="NavSelected" Color="#181C23"/><SolidColorBrush x:Key="Subtle" Color="#7F8995"/><SolidColorBrush x:Key="AccentLine" Color="#595BE3B5"/><SolidColorBrush x:Key="DangerSoft" Color="#24FF8A7A"/>
   <SolidColorBrush x:Key="Warning" Color="#F2B35B"/><SolidColorBrush x:Key="WarningSoft" Color="#24F2B35B"/><SolidColorBrush x:Key="Info" Color="#7FA9FF"/><SolidColorBrush x:Key="InfoSoft" Color="#247FA9FF"/>
-  <SolidColorBrush x:Key="Track" Color="#1F242C"/><SolidColorBrush x:Key="TrackOff" Color="#2A303A"/><SolidColorBrush x:Key="EdgeStrong" Color="#2C333D"/><SolidColorBrush x:Key="EdgeFocus" Color="#3A424E"/><SolidColorBrush x:Key="TextSoft" Color="#C9D0D8"/>
+  <SolidColorBrush x:Key="Track" Color="#1F242C"/><SolidColorBrush x:Key="TrackOff" Color="#2A303A"/><SolidColorBrush x:Key="EdgeStrong" Color="#2C333D"/><SolidColorBrush x:Key="EdgeFocus" Color="#3A424E"/><SolidColorBrush x:Key="TextSoft" Color="#C9D0D8"/><SolidColorBrush x:Key="AccentFaint" Color="#0D5BE3B5"/>
   <!-- Theme-independent brushes: the backdrop scrim and the text drawn on it are always dark/light. Created once and frozen. -->
   <LinearGradientBrush x:Key="ScrimHorizontal" StartPoint="0,0.5" EndPoint="1,0.5" po:Freeze="True"><GradientStop Color="#F00A0C0F" Offset="0"/><GradientStop Color="#B80A0C0F" Offset="0.38"/><GradientStop Color="#0F0A0C0F" Offset="0.78"/></LinearGradientBrush>
   <LinearGradientBrush x:Key="ScrimVertical" StartPoint="0.5,1" EndPoint="0.5,0" po:Freeze="True"><GradientStop Color="#CC0A0C0F" Offset="0"/><GradientStop Color="#000A0C0F" Offset="0.45"/></LinearGradientBrush>
@@ -189,6 +189,22 @@
      </ControlTemplate.Triggers>
     </ControlTemplate>
    </Setter.Value></Setter>
+  </Style>
+  <!-- Plain checkboxes: 20 px box with a check mark; the settings switch keeps its own style. -->
+  <Style TargetType="CheckBox">
+   <Setter Property="Foreground" Value="{DynamicResource Text}"/><Setter Property="MinHeight" Value="32"/><Setter Property="FocusVisualStyle" Value="{x:Null}"/><Setter Property="Cursor" Value="Hand"/><Setter Property="VerticalContentAlignment" Value="Center"/>
+   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="CheckBox">
+    <StackPanel Orientation="Horizontal" Background="Transparent">
+     <Grid VerticalAlignment="Center" Margin="0,0,10,0"><Border x:Name="Box" Width="20" Height="20" CornerRadius="6" BorderThickness="1.5" Background="{DynamicResource Panel}" BorderBrush="{DynamicResource EdgeFocus}"/><Path x:Name="Mark" Data="M5,10.5 L8.5,14 L15,6.5" Stroke="{DynamicResource AccentInk}" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Visibility="Collapsed" Width="20" Height="20"/><Border x:Name="Focus" Width="24" Height="24" CornerRadius="8" BorderThickness="2" BorderBrush="{DynamicResource Text}" Visibility="Collapsed" IsHitTestVisible="False"/></Grid>
+     <ContentPresenter VerticalAlignment="Center" RecognizesAccessKey="True" TextElement.Foreground="{TemplateBinding Foreground}"/>
+    </StackPanel>
+    <ControlTemplate.Triggers>
+     <Trigger Property="IsChecked" Value="True"><Setter TargetName="Box" Property="Background" Value="{DynamicResource Accent}"/><Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource Accent}"/><Setter TargetName="Mark" Property="Visibility" Value="Visible"/></Trigger>
+     <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource Muted}"/></Trigger>
+     <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Focus" Property="Visibility" Value="Visible"/></Trigger>
+     <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.55"/></Trigger>
+    </ControlTemplate.Triggers>
+   </ControlTemplate></Setter.Value></Setter>
   </Style>
   <Style x:Key="SettingsSwitch" TargetType="CheckBox">
    <Setter Property="Foreground" Value="{DynamicResource Text}"/><Setter Property="MinHeight" Value="34"/><Setter Property="IsThreeState" Value="False"/><Setter Property="FocusVisualStyle" Value="{x:Null}"/><Setter Property="Cursor" Value="Hand"/>
