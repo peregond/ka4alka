@@ -76,7 +76,7 @@ jobs:
           # Persist only public screenshot metadata, never the isolated profile or keys.
           $captures=@($info.Captures | ForEach-Object {
             if($_.File -notmatch '^[a-z0-9][a-z0-9.-]*\.png$'){throw 'Invalid capture filename'}
-            [ordered]@{File=$_.File;LoadedVisiblePosters=$_.LoadedVisiblePosters;PendingVisiblePosters=$_.PendingVisiblePosters;Titles=@($_.Titles)}
+            [ordered]@{File=$_.File;Width=$_.Width;Height=$_.Height;LoadedVisiblePosters=$_.LoadedVisiblePosters;PendingVisiblePosters=$_.PendingVisiblePosters;Titles=@($_.Titles)}
           })
           [ordered]@{Version='0.39.0';ReleaseArchiveSha256='368b53704560168bdc17421d18d2a89d70a06e034fdbf427e136b36d91ea6985';ReleaseDllSha256=$dllHash;Captures=$captures} | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $infoPath -Encoding utf8NoBOM
           Get-Content -LiteralPath $infoPath

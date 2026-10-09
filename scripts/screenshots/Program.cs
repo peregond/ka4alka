@@ -3,6 +3,7 @@ using System.IO;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.Loader;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Windows;
@@ -26,6 +27,7 @@ internal static class Program
     {
         if(args.Length!=2){Console.Error.WriteLine("Usage: CaptureReleaseScreenshot <verified-release-directory> <output-directory>");return 2;}
         releaseDirectory=Path.GetFullPath(args[0]);outputDirectory=Path.GetFullPath(args[1]);Directory.CreateDirectory(outputDirectory);
+        using var desktop=CaptureDesktop.Create();
         AssemblyLoadContext.Default.Resolving+=(_,name)=>
         {
             var path=Path.Combine(releaseDirectory,name.Name+".dll");
@@ -152,7 +154,13 @@ internal static class Program
     {
         window.UpdateLayout();var content=window.Content as FrameworkElement??throw new InvalidOperationException("Actual application client area is missing.");
         var dpi=VisualTreeHelper.GetDpi(content);var width=(int)Math.Ceiling(content.ActualWidth*dpi.DpiScaleX);var height=(int)Math.Ceiling(content.ActualHeight*dpi.DpiScaleY);
-        var bitmap=new RenderTargetBitmap(width,height,dpi.PixelsPerInchX,dpi.PixelsPerInchY,PixelFormats.Pbgra32);bitmap.Render(content);
+        var bitmap=new RenderTargetBitmap(width,height,dpi.PixelsPerInchX,dpi.PixelsPerInchY,PixelFormats.Pbgra32);
+        // Window.Background is normally painted by the containing Window.
+        // Render its actual brush under the actual client area, just as WPF
+        // does onscreen, while excluding the native title bar and frame.
+        var background=new DrawingVisual();
+        using(var drawing=background.RenderOpen())drawing.DrawRectangle(window.Background,null,new Rect(0,0,content.ActualWidth,content.ActualHeight));
+        bitmap.Render(background);bitmap.Render(content);
         var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(bitmap));using(var file=File.Create(Path.Combine(outputDirectory,filename)))png.Save(file);
         var posters=VisiblePosters(window);
         captures.Add(new{File=filename,Width=width,Height=height,LoadedVisiblePosters=posters.Count(Loaded),PendingVisiblePosters=posters.Count(image=>!Loaded(image)),
@@ -167,7 +175,7 @@ internal static class Program
         window.WindowState=WindowState.Normal;window.MaxWidth=1920;window.MaxHeight=1200;window.Width=1440;window.Height=900;window.Left=0;window.Top=0;
         await Settle(window);
         await Until(()=>Field(window,"liveLoading") is false&&Field(window,"liveItems") is IEnumerable rows&&rows.Cast<object>().Any(),TimeSpan.FromSeconds(80),"Actual default source catalogue did not load.");
-        await Task.Delay(2000);FreezeRefresh(window);await WaitPosters(window,"Film catalogue");Save(window,"catalog-dark.png");
+        await Task.Delay(2000);FreezeRefresh(window);await WaitPosters(window,"Film catalogue");await Task.Delay(8000);await Settle(window);Save(window,"catalog-dark.png");
         Call(window,"ToggleTheme",window,new RoutedEventArgs());await Settle(window);FreezeRefresh(window);await WaitPosters(window,"Light film catalogue");Save(window,"catalog-light.png");
         Call(window,"ToggleTheme",window,new RoutedEventArgs());await Settle(window);
         var movieButton=Visuals<Button>(window).FirstOrDefault(button=>button.Tag is MediaItem movie&&movie.Section=="Фильмы"&&movie.IsLive&&
@@ -194,5 +202,56 @@ internal static class Program
             Version=typeof(Kachalka.App).Assembly.GetName().Version!.ToString(3),ReleaseDllSha256=Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(releasedDll))),
             ActualApplicationStartup=true,ModifiedApplicationBinary=false,SyntheticMedia=false,Utc=DateTimeOffset.UtcNow,Captures=captures,Skipped=skipped
         },new JsonSerializerOptions{WriteIndented=true}));
+    }
+}
+
+// The Windows runner starts with a 1024 × 768 desktop. Configure the display
+// through Windows before WPF caches monitor bounds, then restore it on exit.
+// This changes only the temporary capture desktop, never application state.
+internal sealed class CaptureDesktop(CaptureDesktop.DisplayMode original,bool changed):IDisposable
+{
+    const int CurrentSettings=-1;
+    const uint PixelDimensions=0x00080000|0x00100000,Test=0x00000002;
+
+    [StructLayout(LayoutKind.Sequential,CharSet=CharSet.Unicode)]
+    internal struct DisplayMode
+    {
+        [MarshalAs(UnmanagedType.ByValTStr,SizeConst=32)] public string DeviceName;
+        public ushort SpecVersion,DriverVersion,Size,DriverExtra;
+        public uint Fields;
+        public int PositionX,PositionY;
+        public uint DisplayOrientation,DisplayFixedOutput;
+        public short Color,Duplex,YResolution,TTOption,Collate;
+        [MarshalAs(UnmanagedType.ByValTStr,SizeConst=32)] public string FormName;
+        public ushort LogPixels;
+        public uint BitsPerPel,PelsWidth,PelsHeight,DisplayFlags,DisplayFrequency;
+        public uint IcmMethod,IcmIntent,MediaType,DitherType,Reserved1,Reserved2,PanningWidth,PanningHeight;
+    }
+    [DllImport("user32.dll",CharSet=CharSet.Unicode,EntryPoint="EnumDisplaySettingsW")]
+    [return:MarshalAs(UnmanagedType.Bool)]
+    static extern bool EnumDisplaySettings(string? deviceName,int mode,ref DisplayMode settings);
+    [DllImport("user32.dll",CharSet=CharSet.Unicode,EntryPoint="ChangeDisplaySettingsW")]
+    static extern int ChangeDisplaySettings(ref DisplayMode mode,uint flags);
+
+    public static CaptureDesktop Create()
+    {
+        var current=new DisplayMode{Size=(ushort)Marshal.SizeOf<DisplayMode>(),DeviceName="",FormName=""};
+        if(!EnumDisplaySettings(null,CurrentSettings,ref current))throw new InvalidOperationException("Windows did not report its capture display mode.");
+        if(current.PelsWidth>=1600&&current.PelsHeight>=1000)return new(current,false);
+        foreach(var (width,height) in new[]{(1920u,1080u),(1600u,1000u)})
+        {
+            var requested=current;requested.Fields=PixelDimensions;requested.PelsWidth=width;requested.PelsHeight=height;
+            var result=ChangeDisplaySettings(ref requested,Test);
+            if(result==0)result=ChangeDisplaySettings(ref requested,0);
+            Console.WriteLine("Windows capture display "+width+"x"+height+": "+result);
+            if(result==0)return new(current,true);
+        }
+        throw new InvalidOperationException("Windows capture desktop does not support a resolution large enough for the actual 1440 × 900 application window.");
+    }
+    public void Dispose()
+    {
+        if(!changed)return;
+        var restore=original;restore.Fields=PixelDimensions;
+        ChangeDisplaySettings(ref restore,0);
     }
 }
