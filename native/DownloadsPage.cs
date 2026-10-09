@@ -123,7 +123,11 @@ public partial class MainWindow
         }
         order.Click+=(_,_)=>OpenDownloadMenu(order);DockPanel.SetDock(order,Dock.Right);tabsRow.Children.Add(order);
         var segmentFrame=new Border{CornerRadius=new(12),BorderThickness=new(1),Padding=new(4),HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center};segmentFrame.SetResourceReference(Border.BackgroundProperty,"Panel");segmentFrame.SetResourceReference(Border.BorderBrushProperty,"EdgeSoft");AutomationProperties.SetName(segmentFrame,"Вкладки загрузок");
-        var segmentRow=new StackPanel{Orientation=Orientation.Horizontal};segmentFrame.Child=segmentRow;tabsRow.Children.Add(segmentFrame);
+        var segmentRow=new StackPanel{Orientation=Orientation.Horizontal};segmentFrame.Child=segmentRow;
+        // On narrow windows the strip scrolls sideways instead of being cut off; the wheel still scrolls the page.
+        var segmentScroll=new ScrollViewer{Name="DownloadTabsScroll",Content=segmentFrame,HorizontalScrollBarVisibility=ScrollBarVisibility.Auto,VerticalScrollBarVisibility=ScrollBarVisibility.Disabled,HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center};
+        segmentScroll.PreviewMouseWheel+=(sender,e)=>{if(e.Handled||sender is not ScrollViewer {Parent:UIElement parent})return;e.Handled=true;parent.RaiseEvent(new System.Windows.Input.MouseWheelEventArgs(e.MouseDevice,e.Timestamp,e.Delta){RoutedEvent=UIElement.MouseWheelEvent,Source=sender});};
+        tabsRow.Children.Add(segmentScroll);
         foreach(var (key,label) in new[]{("all","Все"),("active","Качаются"),("seeding","Раздаются"),("errors","Ошибки")})
         {
             var count=new TextBlock{FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=11,Opacity=.7,Margin=new(6,1,0,0),VerticalAlignment=VerticalAlignment.Center};downloadTabCounts[key]=count;
@@ -234,7 +238,7 @@ public partial class MainWindow
             var columns=ActualWidth<780?1:3;
             for(var index=0;index<3;index++)
             {
-                var tile=downloadTiles.Children[index];Grid.SetColumn(tile,columns==1?0:index);Grid.SetRow(tile,columns==1?index:0);
+                var tile=downloadTiles.Children[index];Grid.SetColumn(tile,columns==1?0:index);Grid.SetRow(tile,columns==1?index:0);Grid.SetColumnSpan(tile,columns==1?3:1);
                 if(tile is FrameworkElement element)element.Margin=columns==1?new(0,0,0,index==2?0:8):new(index==0?0:6,0,index==2?0:6,0);
             }
             if(columns==1&&downloadTiles.RowDefinitions.Count<3)for(var index=0;index<3;index++)downloadTiles.RowDefinitions.Add(new(){Height=GridLength.Auto});

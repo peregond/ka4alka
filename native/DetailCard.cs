@@ -14,7 +14,7 @@ namespace Kachalka;
 public partial class MainWindow
 {
     ScrollViewer? detailScroll;
-    StackPanel? detailActions;
+    Panel? detailActions;
     TextBlock? releaseCountLabel;
     StackPanel? releaseControlsHost;
     string detailActionState="";
@@ -129,7 +129,7 @@ public partial class MainWindow
         if(DetailMetadataNeedsRetry(item.Id)&&!MediaMetadata.HasDescription(item)){var retry=ActionButton("Повторить загрузку карточки","IconRefresh",()=>RetryDetailMetadata(item));retry.Name="DetailMetadataRetry";retry.HorizontalAlignment=HorizontalAlignment.Left;retry.Margin=new(0,8,0,0);detailDescription.Children.Add(retry);}
         detailSynopsis.SizeChanged+=(sender,_)=>{if(ReferenceEquals(sender,detailSynopsis))UpdateDescriptionToggle();};
         // actions follow the state of the title
-        detailActions=new StackPanel{Name="DetailActions",Orientation=Orientation.Horizontal};detailInfo.Children.Add(detailActions);
+        detailActions=new WrapPanel{Name="DetailActions",Margin=new(0,0,0,-8)};detailInfo.Children.Add(detailActions);
         liveReleases.TryGetValue(item.Id,out var known);
         BuildDetailActions(item,known??[]);
 
@@ -201,10 +201,10 @@ public partial class MainWindow
         if(detailActions==null)return;
         detailActions.Children.Clear();detailActionState=DetailActionState(item,releases);
         var owned=DownloadsOf(item);var done=owned.FirstOrDefault(x=>x.Completed);var active=owned.FirstOrDefault(x=>!x.Completed);
-        FrameworkElement Spaced(FrameworkElement element){element.Margin=new(0,0,10,0);return element;}
+        FrameworkElement Spaced(FrameworkElement element){element.Margin=new(0,0,10,8);return element;}
         Button Action(string text,string icon,bool primary,Action click)
         {
-            var button=new Button{Style=(Style)FindResource(primary?"PrimaryButton":typeof(Button)),Height=52,MinHeight=52,Padding=new(22,0,22,0),FontSize=15,Margin=new(0,0,10,0)};
+            var button=new Button{Style=(Style)FindResource(primary?"PrimaryButton":typeof(Button)),Height=52,MinHeight=52,Padding=new(22,0,22,0),FontSize=15,Margin=new(0,0,10,8)};
             if(!primary){button.SetResourceReference(Control.BackgroundProperty,"BannerAction");button.SetResourceReference(Control.BorderBrushProperty,"BannerEdge");button.Foreground=(Brush)FindResource("BannerText");}
             button.Content=IconLabel(text,icon,18);AutomationProperties.SetName(button,text);button.Click+=(_,_)=>click();return button;
         }
@@ -219,7 +219,7 @@ public partial class MainWindow
         }
         else if(ReleaseRecommendation.Pick(releases,QualityMinimum) is {} pick)
         {
-            var button=new Button{Name="DetailDownload",Style=(Style)FindResource("PrimaryButton"),Tag=pick.Entry,Height=52,MinHeight=52,Padding=new(22,0,22,0),FontSize=15,Margin=new(0,0,10,0),ToolTip="Скачать рекомендованную раздачу: "+pick.Entry.Title};
+            var button=new Button{Name="DetailDownload",Style=(Style)FindResource("PrimaryButton"),Tag=pick.Entry,Height=52,MinHeight=52,Padding=new(22,0,22,0),FontSize=15,Margin=new(0,0,10,8),ToolTip="Скачать рекомендованную раздачу: "+pick.Entry.Title};
             var row=new StackPanel{Orientation=Orientation.Horizontal};
             row.Children.Add(IconLabel("Скачать","IconDownload",18));
             var detail=string.Join(" · ",new[]{(ReleaseQuality.Height(pick.Entry) is int h?h+"p":pick.Entry.Quality),pick.Entry.Size.HasValue?DownloadService.FormatBytes(pick.Entry.Size.Value):""}.Where(x=>x.Length>0));
@@ -237,7 +237,7 @@ public partial class MainWindow
             AutomationProperties.SetName(all,"Все раздачи");detailActions.Children.Add(all);
         }
         var saved=IsSaved(item);
-        Button favorite=null!;favorite=new Button{Name="DetailFavorite",Style=(Style)FindResource("IconButton"),Width=52,Height=52,Margin=new(0,0,10,0)};
+        Button favorite=null!;favorite=new Button{Name="DetailFavorite",Style=(Style)FindResource("IconButton"),Width=52,Height=52,Margin=new(0,0,10,8)};
         favorite.SetResourceReference(Control.BackgroundProperty,"BannerAction");favorite.SetResourceReference(Control.BorderBrushProperty,"BannerEdge");favorite.Foreground=(Brush)FindResource("BannerText");
         void Paint(){var now=IsSaved(item);favorite.Content=IconLabel("",now?"IconHeartFilled":"IconHeart",20);favorite.ToolTip=now?"Сохранено":"Сохранить";AutomationProperties.SetName(favorite,now?"Сохранено":"Сохранить");}
         Paint();favorite.Click+=(_,_)=>{ToggleSaved(item);Paint();UpdateSavedCount();};
@@ -245,7 +245,7 @@ public partial class MainWindow
     }
     FrameworkElement DownloadProgressButton(DownloadItem item)
     {
-        var frame=new Border{Name="DetailProgress",Height=52,MinWidth=300,CornerRadius=new(12),BorderThickness=new(1),Cursor=System.Windows.Input.Cursors.Hand,DataContext=item,ToolTip="Открыть загрузки",Background=Brushes.Transparent};
+        var frame=new Border{Name="DetailProgress",Height=52,MinWidth=200,CornerRadius=new(12),BorderThickness=new(1),Cursor=System.Windows.Input.Cursors.Hand,DataContext=item,ToolTip="Открыть загрузки",Background=Brushes.Transparent};
         frame.SetResourceReference(Border.BorderBrushProperty,"AccentLine");
         var inner=new Grid();frame.Child=inner;
         inner.SizeChanged+=(_,e)=>{if(e.NewSize.Width<=0||e.NewSize.Height<=0)return;var clip=new RectangleGeometry(new Rect(e.NewSize),11,11);clip.Freeze();inner.Clip=clip;};
