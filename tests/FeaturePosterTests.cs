@@ -6,13 +6,16 @@ static class FeaturePosterTests
 {
     public static void Run()
     {
-        static byte[] Response(string id,string url)=>Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new{d=new[]{new{id,i=new{imageUrl=url}}}}));
+        static byte[] Response(string id,string url)=>Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new{id,backdrop=new{url,source="TMDB",tmdbId=1}}));
         static void Check(bool value,string reason){if(!value)throw new Exception(reason);Console.WriteLine("PASS: "+reason);}
-        const string id="tt1234567",original="https://m.media-amazon.com/images/M/real-poster._V1_.jpg";
-        Check(FeaturePoster.FromSuggestion(Response(id,original),id)=="https://m.media-amazon.com/images/M/real-poster._V1_QL85_UX1000_.jpg","feature artwork uses a bounded-resolution poster for the exact IMDb identity");
-        Check(FeaturePoster.FromSuggestion(Response("tt7654321",original),id)==null,"similarly named films cannot replace a feature with another film's artwork");
-        foreach(var url in new[]{"http://m.media-amazon.com/images/M/poster.jpg","https://m.media-amazon.com.evil.test/images/M/poster.jpg","https://user:password@m.media-amazon.com/images/M/poster.jpg"})
-            Check(FeaturePoster.FromSuggestion(Response(id,url),id)==null,"feature poster rejects an unrelated or credential-bearing image URL");
-        Check(FeaturePoster.FromSuggestion(Encoding.UTF8.GetBytes("{\"d\":[]}"),id)==null,"a missing high-resolution image retains the existing catalog artwork");
+        const string id="movies:film",original="https://image.tmdb.org/t/p/w1280/landscape.jpg";
+        Check(FeatureBackdrop.FromResponse(Response(id,original),id)==original,"landscape response belongs to the exact catalog identity");
+        static bool Rejected(Action action){try{action();return false;}catch(Exception e)when(e is InvalidDataException or JsonException or InvalidOperationException){return true;}}
+        Check(Rejected(()=>FeatureBackdrop.FromResponse(Response("series:film",original),id)),"films and series cannot exchange their banner artwork");
+        foreach(var url in new[]{"http://image.tmdb.org/t/p/w1280/x.jpg","https://image.tmdb.org.evil.test/t/p/w1280/x.jpg","https://u:p@image.tmdb.org/t/p/w1280/x.jpg","https://image.tmdb.org:123/t/p/w1280/x.jpg","https://image.tmdb.org/t/p/original/x.jpg","https://image.tmdb.org/t/p/w1280/x.jpg?token=secret","https://image.tmdb.org/t/p/w1280/../x.jpg"})
+            Check(Rejected(()=>FeatureBackdrop.FromResponse(Response(id,url),id)),"untrusted or unbounded image addresses are rejected");
+        Check(FeatureBackdrop.FromResponse(Encoding.UTF8.GetBytes("{\"id\":\"movies:film\",\"backdrop\":null}"),id)==null,"missing artwork keeps the portrait separate from the banner background");
+        Check(Rejected(()=>FeatureBackdrop.FromResponse(Encoding.UTF8.GetBytes("{\"id\":\"movies:film\"}"),id)),"malformed responses cannot poison the no-artwork cache");
+        Check(FeatureBackdrop.Landscape(1280,720)&&!FeatureBackdrop.Landscape(1280,1920)&&!FeatureBackdrop.Landscape(300,168)&&!FeatureBackdrop.Landscape(1280,100),"portrait, undersized and excessively wide images are rejected");
     }
 }

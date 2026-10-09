@@ -101,7 +101,10 @@ public partial class MainWindow
             foreach(var size in new[]{new Size(1140,300),new Size(760,280),new Size(392,300),new Size(316,320)})
             {
                 banner.Width=size.Width;banner.Height=size.Height;banner.Measure(size);banner.Arrange(new Rect(size));banner.UpdateLayout();
-                var image=VisualElements<Image>(banner).Single(x=>x.Tag?.ToString()=="FeaturePoster");image.Source=poster;
+                var image=VisualElements<Image>(banner).Single(x=>x.Tag?.ToString()=="FeaturePoster");image.Source=null;banner.UpdateLayout();
+                if(carousel!.LiteCover.Visibility!=Visibility.Visible)throw new Exception("A missing backdrop hides the separate portrait fallback.");
+                image.Source=poster;banner.UpdateLayout();
+                if(!prefs.LiteMode&&carousel.LiteCover.Visibility!=Visibility.Collapsed)throw new Exception("The portrait fallback covers loaded landscape artwork.");
                 var artwork=(Grid)banner.Child;
                 foreach(var scale in new[]{1d,1.25,1.5,2d})
                 {

@@ -133,6 +133,7 @@ public partial class MainWindow
         AutomationProperties.SetName(homeCountry,"Страна отечественных подборок");catalogue.Children.Add(homeCountry);
         var countryHint=Hint("Учитываем страну производства. Фильмы совместного производства с выбранной страной тоже входят в отечественные подборки.");countryHint.Margin=new(0,8,0,0);catalogue.Children.Add(countryHint);
         var countryNotice=Notice(catalogue);
+        var artworkAttribution=Hint("Широкие фоны — TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.");artworkAttribution.Name="TmdbAttribution";artworkAttribution.Margin=new(0,16,0,0);catalogue.Children.Add(artworkAttribution);
         homeCountry.SelectionChanged+=(_,_)=>
         {
             if(homeCountry.SelectedItem is not CatalogChoice choice)return;

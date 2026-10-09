@@ -53,9 +53,14 @@ public partial class MainWindow
             grid.Children.Add(new Border{Background=(Brush)FindResource("ScrimHorizontal"),IsHitTestVisible=false});
             grid.Children.Add(new Border{Background=(Brush)FindResource("ScrimVertical"),IsHitTestVisible=false});
         }
-        // Light mode keeps the flat Panel surface and shows the small poster instead of a backdrop.
-        var liteCover=new Border{Width=96,Height=144,CornerRadius=new(10),ClipToBounds=true,HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,36,0),Visibility=prefs.LiteMode?Visibility.Visible:Visibility.Collapsed};
-        if(prefs.LiteMode){var liteImage=new Image{Stretch=Stretch.UniformToFill};liteImage.Loaded+=SourceCover;liteImage.DataContextChanged+=SourceCoverChanged;liteCover.Child=liteImage;liteCover.Tag=liteImage;}
+        // Lite mode and missing landscape artwork use a portrait poster without stretching it.
+        var liteCover=new Border{Width=96,Height=144,CornerRadius=new(10),ClipToBounds=true,HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,36,0),Visibility=Visibility.Visible};
+        var liteImage=new Image{Stretch=Stretch.UniformToFill};liteImage.Loaded+=SourceCover;liteImage.DataContextChanged+=SourceCoverChanged;liteCover.Child=liteImage;liteCover.Tag=liteImage;
+        if(!prefs.LiteMode)
+        {
+            var fallback=new Style(typeof(Border));fallback.Setters.Add(new Setter(UIElement.VisibilityProperty,Visibility.Collapsed));
+            var missing=new DataTrigger{Binding=new Binding("Source"){Source=image},Value=null};missing.Setters.Add(new Setter(UIElement.VisibilityProperty,Visibility.Visible));fallback.Triggers.Add(missing);liteCover.Style=fallback;liteCover.ClearValue(UIElement.VisibilityProperty);
+        }
         grid.Children.Add(liteCover);
 
         var content=new StackPanel{Name="FeatureContent",VerticalAlignment=VerticalAlignment.Bottom,HorizontalAlignment=HorizontalAlignment.Left,MaxWidth=660,Margin=new(36,32,36,32)};grid.Children.Add(content);
@@ -180,6 +185,7 @@ public partial class MainWindow
         view.Title.FontSize=tiny?28:narrow?36:52;view.Title.LineHeight=tiny?30:narrow?38:54;view.Title.MaxHeight=view.Title.LineHeight*2;
         featureCompactText=narrow;
         if(view.Bound!=null)UpdateFeaturePeople(view,view.Bound);
+        view.LiteCover.Width=width<900?0:96;view.LiteCover.Height=width<900?0:144;
         view.About.Visibility=tiny?Visibility.Collapsed:Visibility.Visible;
         if(view.Frame.Child is Grid grid&&grid.Children.OfType<StackPanel>().FirstOrDefault(x=>x.Name=="FeatureContent") is {} content)content.Margin=tiny?new(20,24,20,22):narrow?new(24,28,24,26):new(36,32,36,32);
         view.Primary.Padding=new(tiny?16:22,0,tiny?16:22,0);

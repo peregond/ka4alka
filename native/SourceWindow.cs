@@ -94,16 +94,16 @@ public partial class MainWindow
             CancelCover(state);CancelFeatureCover(state);state.Context=item;state.Url=url;state.RetryAfterUtc=default;state.NextCacheTouchUtc=default;state.FeatureAttempted=false;image.Source=null;
         }
         if(item is MediaItem card&&card.IsLive&&!ReferenceEquals(state.RatingsContext,item)){state.RatingsContext=item;_=UpdateCardRatings(card);}
-        _=LoadCover(image,state,item,url);
+        if(image.Tag?.ToString()!="FeaturePoster")_=LoadCover(image,state,item,url);
         if(image.Tag?.ToString()=="FeaturePoster"&&item is MediaItem feature&&!state.FeatureAttempted&&state.FeatureRequest==null)
             _=LoadFeatureCover(image,state,feature);
     }
     async Task LoadFeatureCover(Image image,CoverRequest state,MediaItem item)
     {
-        using var request=new CancellationTokenSource(TimeSpan.FromSeconds(15));state.FeatureRequest=request;state.FeatureAttempted=true;
+        using var request=new CancellationTokenSource(TimeSpan.FromSeconds(25));state.FeatureRequest=request;state.FeatureAttempted=true;
         try{await ImproveFeaturePoster(image,item,request.Token);}
         catch(OperationCanceledException)when(request.IsCancellationRequested){}
-        catch{ /* A normal poster remains available when the larger banner is unavailable. */ }
+        catch{ /* The flat banner and separate poster remain available if no backdrop is returned. */ }
         finally{if(ReferenceEquals(state.FeatureRequest,request))state.FeatureRequest=null;}
     }
     async Task LoadCover(Image image,CoverRequest state,object? item,string? url)

@@ -1,7 +1,7 @@
 name: Windows release validation
 on:
   push:
-    branches: [release/0.30.0, codex/cinema-cards-0.30, codex/film-detail-polish-0.31, codex/catalog-filters-0.33, codex/person-cards-0.34, codex/download-reliability-0.35.0, codex/film-ux-0.35, codex/catalog-experience-0.37.0, codex/minimal-home-0.38.0, codex/lan-downloads-0.39.0, release/0.39.0, release/0.40.0, codex/font-rendering-0.40.1, release/0.40.1]
+    branches: [release/0.30.0, codex/cinema-cards-0.30, codex/film-detail-polish-0.31, codex/catalog-filters-0.33, codex/person-cards-0.34, codex/download-reliability-0.35.0, codex/film-ux-0.35, codex/catalog-experience-0.37.0, codex/minimal-home-0.38.0, codex/lan-downloads-0.39.0, release/0.39.0, release/0.40.0, codex/font-rendering-0.40.1, codex/tmdb-backdrops, release/0.40.1]
   pull_request:
   workflow_dispatch:
 permissions:
