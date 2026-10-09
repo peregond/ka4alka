@@ -44,7 +44,7 @@ public partial class MainWindow
         var heroFrame=new Border{Name="CinemaFilm",CornerRadius=new(24),VerticalAlignment=VerticalAlignment.Top};heroFrame.Background=(Brush)FindResource("BannerBase");
         var artwork=new Grid{Name="DetailArtwork"};heroFrame.Child=artwork;
         artwork.SizeChanged+=(_,e)=>{if(e.NewSize.Width<=0||e.NewSize.Height<=0)return;var clip=new RectangleGeometry(new Rect(e.NewSize),24,24);clip.Freeze();artwork.Clip=clip;};
-        var backdropImage=new Image{DataContext=item,Width=0,Height=0,Opacity=0,Tag="FeaturePoster"};backdropImage.Loaded+=SourceCover;backdropImage.DataContextChanged+=SourceCoverChanged;artwork.Children.Add(backdropImage);
+        var backdropImage=new Image{DataContext=item,Width=0,Height=0,Opacity=0,Tag="FeaturePoster"};if(!prefs.LiteMode){backdropImage.Loaded+=SourceCover;backdropImage.DataContextChanged+=SourceCoverChanged;}artwork.Children.Add(backdropImage);
         if(!prefs.LiteMode)
         {
             var picture=new ImageBrush{Stretch=Stretch.UniformToFill,AlignmentX=AlignmentX.Center,AlignmentY=AlignmentY.Top};

@@ -105,7 +105,7 @@ public partial class MainWindow
         var top=new WrapPanel{Name="ReleaseTopRow",Margin=new(0,0,0,6),VerticalAlignment=VerticalAlignment.Center};host.Children.Add(top);
         var seriesRow=new WrapPanel{Margin=new(0,0,0,0)};host.Children.Add(seriesRow);
         var more=new WrapPanel{Visibility=state.More?Visibility.Visible:Visibility.Collapsed,Margin=new(0,4,0,2)};host.Children.Add(more);
-        // Quality, audio and sort selectors stay in the tree (collapsed) because the segments and chips drive them.
+        // Quality and sort selectors stay in the tree (collapsed) because the segments and chips drive them.
         var hidden=new WrapPanel{Visibility=Visibility.Collapsed};host.Children.Add(hidden);
         var filters=new Dictionary<string,ComboBox>();
         void Filter(string label,IEnumerable<string> values,Panel target,bool captioned)
@@ -123,7 +123,7 @@ public partial class MainWindow
         var isSeries=current?.Section=="Сериалы";
         if(isSeries){Filter("Сезон",releases.Select(x=>x.Series).OrderBy(x=>x.Season??int.MaxValue).Select(x=>x.SeasonLabel),seriesRow,true);Filter("Серия",releases.Select(x=>x.Series).OrderBy(x=>x.Episode??int.MaxValue).Select(x=>x.EpisodeLabel),seriesRow,true);}
         Filter("Качество",releases.Select(x=>x.Quality),hidden,false);
-        Filter("Озвучка",releases.Select(ReleaseFreshness.Audio),hidden,false);
+        Filter("Озвучка",releases.Select(ReleaseFreshness.Audio),more,true);
         Filter("Субтитры",releases.Select(x=>x.Subs),more,true);
         Filter("Источник",releases.Select(x=>x.Source),more,true);
         Filter("Тип",releases.Select(x=>x.Type),more,true);
@@ -172,7 +172,7 @@ public partial class MainWindow
 
         void UpdateActions()
         {
-            var additional=new[]{"Источник","Тип","Кодек","HDR","Субтитры"}.Count(x=>filters[x].SelectedItem?.ToString()!="Все");
+            var additional=new[]{"Озвучка","Источник","Тип","Кодек","HDR","Субтитры"}.Count(x=>filters[x].SelectedItem?.ToString()!="Все");
             toggle.Content=ChipContent((state.More?"Скрыть фильтры":"Ещё фильтры")+(additional>0?$" · {additional}":""),true);StyleChip(toggle,additional>0);
             AutomationProperties.SetName(toggle,state.More?"Скрыть дополнительные фильтры раздач":"Показать дополнительные фильтры раздач");
             reset.Visibility=prefs.HidePoorQuality||state.OnlyRussian||filters.Values.Any(x=>x.SelectedItem?.ToString()!="Все")||sort.SelectedIndex!=0?Visibility.Visible:Visibility.Collapsed;

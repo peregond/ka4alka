@@ -39,7 +39,10 @@ public partial class MainWindow
             if(e.NewSize.Width<=0||e.NewSize.Height<=0)return;
             var clip=new RectangleGeometry(new Rect(e.NewSize),22,22);clip.Freeze();grid.Clip=clip;
         };
-        var image=new Image{Width=0,Height=0,Opacity=0,Tag="FeaturePoster"};image.Loaded+=SourceCover;image.DataContextChanged+=SourceCoverChanged;grid.Children.Add(image);
+        var image=new Image{Width=0,Height=0,Opacity=0,Tag="FeaturePoster"};
+        // Lite mode paints no backdrop, so it does not request the large feature poster at all.
+        if(!prefs.LiteMode){image.Loaded+=SourceCover;image.DataContextChanged+=SourceCoverChanged;}
+        grid.Children.Add(image);
         var backdrop=new Border();
         if(!prefs.LiteMode)
         {
@@ -97,6 +100,7 @@ public partial class MainWindow
             if(view.Bound==null)return;ToggleSaved(view.Bound);UpdateFeatureFavorite(view);UpdateSavedCount();
         };
         frame.Unloaded+=(_,_)=>DetachFeatureWatch(view);
+        frame.Loaded+=(_,_)=>{if(view.Watch==null&&view.Bound!=null)ShowFeatureSlide(view,view.Index);};
         ShowFeatureSlide(view,0);
         return frame;
     }
@@ -181,6 +185,8 @@ public partial class MainWindow
         featureCompactText=narrow;
         if(view.Bound!=null)UpdateFeaturePeople(view,view.Bound);
         view.About.Visibility=tiny?Visibility.Collapsed:Visibility.Visible;
+        // The Lite cover sits on the right; below this width the text column would run over it.
+        view.LiteCover.Visibility=prefs.LiteMode&&width>=860?Visibility.Visible:Visibility.Collapsed;
         if(view.Frame.Child is Grid grid&&grid.Children.OfType<StackPanel>().FirstOrDefault(x=>x.Name=="FeatureContent") is {} content)content.Margin=tiny?new(20,24,20,22):narrow?new(24,28,24,26):new(36,32,36,32);
         view.Primary.Padding=new(tiny?16:22,0,tiny?16:22,0);
     }
