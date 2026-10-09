@@ -1,5 +1,6 @@
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -318,7 +319,7 @@ public partial class MainWindow
             {
                 var list=downloadList;var row=list?.ItemContainerGenerator.ContainerFromItem(fixtures[^1]) as ListBoxItem;
                 var labels=row==null?Array.Empty<string>():VisualElements<Button>(row).Select(button=>AutomationProperties.GetName(button)).ToArray();
-                return $"section={section}, current={current?.Id}, count={list?.Items.Count}, generator={list?.ItemContainerGenerator.Status}, row={row?.GetType().Name??"missing"}, rowData={(row?.DataContext as DownloadItem)?.Id}, buttons={string.Join(",",labels)}, restore={navigationRestore?.Status}, pendingOffset={navigationPendingPosition?.Offset}";
+                return $"section={section}, current={current?.Id}, count={list?.Items.Count}, queue={downloads.Items.Count}, paused={fixtures.Count(item=>item.Paused)}/{fixtures.Length}, downloadReturn={downloadReturnItem?.Id}, person={activePerson?.Name}, returnPerson={returnPerson?.Person.Name}, generator={list?.ItemContainerGenerator.Status}, row={row?.GetType().Name??"missing"}, rowData={(row?.DataContext as DownloadItem)?.Id}, buttons={string.Join(",",labels)}, restore={navigationRestore?.Status}, pendingOffset={navigationPendingPosition?.Offset}";
             }
             async Task<Button> DownloadLink(string label)
             {
@@ -330,6 +331,32 @@ public partial class MainWindow
                         FindVisual<Button>(row,b=>AutomationProperties.GetName(b)==label&&ReferenceEquals(b.Tag,fixtures[^1])) is {IsVisible:true,ActualWidth:>0,ActualHeight:>0} link)return link;
                 }while(DateTime.UtcNow<deadline);
                 throw new Exception("Realized download action is missing: "+label+"; "+DownloadUiState());
+            }
+            async Task NativeDownloadClick(Button button,string phase)
+            {
+                var down=0;var up=0;var clicks=0;
+                MouseButtonEventHandler onDown=(_,_)=>down++;MouseButtonEventHandler onUp=(_,_)=>up++;
+                RoutedEventHandler onClick=(_,_)=>clicks++;
+                button.AddHandler(PreviewMouseDownEvent,onDown,true);button.AddHandler(PreviewMouseUpEvent,onUp,true);button.AddHandler(ButtonBase.ClickEvent,onClick,true);
+                try
+                {
+                    SetForegroundWindow(nativeHandle);await SettleDownloads();
+                    var target=button.PointToScreen(new Point(button.ActualWidth/2,button.ActualHeight/2));
+                    var topLeft=button.PointToScreen(new Point());var bottomRight=button.PointToScreen(new Point(button.ActualWidth,button.ActualHeight));
+                    var before=DownloadUiState();var captureBefore=Mouse.Captured?.GetType().Name;
+                    check(SetCursorPos((int)target.X,(int)target.Y),"native mouse can position for "+phase);Mouse.Synchronize();await SettleDownloads();
+                    var gotCursor=GetCursorPos(out var actual);
+                    var pointerReady=gotCursor&&Math.Abs(actual.X-(int)target.X)<=1&&Math.Abs(actual.Y-(int)target.Y)<=1&&
+                        GetForegroundWindow()==nativeHandle&&GetAncestor(WindowFromPoint(actual),2)==nativeHandle&&button.IsMouseOver&&
+                        topLeft.X>=monitorInfo.Work.Left&&bottomRight.X<=monitorInfo.Work.Right&&topLeft.Y>=monitorInfo.Work.Top&&bottomRight.Y<=monitorInfo.Work.Bottom;
+                    var pointer=$"phase={phase}, requested={target}, actual={actual.X},{actual.Y}, bounds={topLeft}..{bottomRight}, foreground={GetForegroundWindow()==nativeHandle}, root={GetAncestor(WindowFromPoint(actual),2)==nativeHandle}, hover={button.IsMouseOver}, captured={captureBefore??"none"}; "+before;
+                    check(pointerReady,"native pointer reaches the physically visible download control: "+pointer);
+                    await ClickWithMouse(button);await SettleDownloads();
+                    var evidence=new{Phase=phase,Button=AutomationProperties.GetName(button),Requested=new{target.X,target.Y},Actual=new{actual.X,actual.Y},Bounds=new{Left=topLeft.X,Top=topLeft.Y,Right=bottomRight.X,Bottom=bottomRight.Y},PointerReady=pointerReady,CaptureBefore=captureBefore,CaptureAfter=Mouse.Captured?.GetType().Name,MouseDown=down,MouseUp=up,Clicks=clicks,Before=before,After=DownloadUiState()};
+                    File.AppendAllText(Path.Combine(output,"native-download-navigation.jsonl"),JsonSerializer.Serialize(evidence)+Environment.NewLine);
+                    check(down==1&&up==1&&clicks==1,"native mouse activates the download control exactly once: "+JsonSerializer.Serialize(evidence));
+                }
+                finally{button.RemoveHandler(PreviewMouseDownEvent,onDown);button.RemoveHandler(PreviewMouseUpEvent,onUp);button.RemoveHandler(ButtonBase.ClickEvent,onClick);}
             }
             foreach(var label in new[]{"Открыть карточку по постеру","Открыть карточку по названию"})
             {
@@ -351,13 +378,49 @@ public partial class MainWindow
                     }
                     finally{SetCursorPos(previous.X,previous.Y);}
                 }
-                await ClickWithMouse(link);await SettleDownloads();
+                await NativeDownloadClick(link,"open "+label);
                 check(current?.Id==linked.Id&&detailTitle?.Text==fixtures[^1].MediaTitle&&section=="Загрузки","download poster/title opens its associated internal card while retaining the queue as the return destination");
                 var back=FindVisual<Button>(PageHeader,b=>AutomationProperties.GetName(b)=="Загрузки")??throw new Exception("Download detail has no return-to-queue action; "+DownloadUiState());
-                await ClickWithMouse(back);await SettleDownloads();
-                check(current==null&&Queue().Items.Count==fixtures.Length&&fixtures.All(x=>x.Paused),"returning from the internal card preserves the queue and its paused transfers");
+                await NativeDownloadClick(back,"return "+label);
+                check(section=="Загрузки"&&current==null&&Queue().Items.Count==fixtures.Length&&fixtures.All(x=>x.Paused),"returning from the internal card preserves the queue and its paused transfers; "+DownloadUiState());
             }
+            // Reuse the cached, identified actor and filmography fixture. An
+            // actor page changes section to its origin's media category; the
+            // queue ancestor must nevertheless remain the final back target.
+            var linkedWithActor=linked with{People=[namesakeOne],Description="Описание сериала из очереди для проверки вложенного возврата."};
+            cardMetadata[linked.Id]=Task.FromResult(linkedWithActor);await catalogIndex.AddAsync([linkedWithActor]);
+            await File.WriteAllTextAsync(ProfessionalCinemaPeople.CachePath(namesakeOne,linkedWithActor),JsonSerializer.Serialize(new ProfessionalPerson(namesakeOne,NamesakeBiography(namesakeOne),namesakePortraitUrl,namesakeOne.ProfileUrl!,"Kino-Teatr.ua",[],[namesakeOne.Name])));
+            async Task<Button> NavigationControl(DependencyObject root,Func<Button,bool> predicate,string description)
+            {
+                var deadline=DateTime.UtcNow.AddSeconds(3);
+                do
+                {
+                    await SettleDownloads();
+                    if(FindVisual<Button>(root,predicate) is {IsVisible:true} button)
+                    {
+                        button.BringIntoView();await SettleDownloads();return button;
+                    }
+                }while(DateTime.UtcNow<deadline);
+                throw new Exception("Nested download navigation control is missing: "+description+"; "+DownloadUiState());
+            }
+            await NativeDownloadClick(await DownloadLink("Открыть карточку по постеру"),"nested origin card");
+            var actor=await NavigationControl(Body,b=>b.Tag is CinemaPerson person&&person==namesakeOne,"cached actor");
+            await NativeDownloadClick(actor,"nested actor");
+            check(activePerson==namesakeOne&&personOrigin?.Id==linked.Id&&DownloadBackLabel()=="Загрузки","download actor retains the queue ancestor after changing to the series section; "+DownloadUiState());
+            var filmography=await NavigationControl(Body,b=>b.Tag is MediaItem film&&film.Id==films[0].Id,"cached filmography film");
+            await NativeDownloadClick(filmography,"nested filmography film");
+            check(current?.Id==films[0].Id&&returnPerson?.Person==namesakeOne&&returnPerson?.Origin?.Id==linked.Id&&DownloadBackLabel()=="Загрузки","download filmography film retains its actor and queue ancestors; "+DownloadUiState());
+            await NativeDownloadClick(await NavigationControl(PageHeader,b=>AutomationProperties.GetName(b)==namesakeOne.Name,"filmography back to actor"),"nested filmography back");
+            check(activePerson==namesakeOne&&personOrigin?.Id==linked.Id&&DownloadBackLabel()=="Загрузки","filmography back restores the download origin actor first; "+DownloadUiState());
+            await NativeDownloadClick(await NavigationControl(PageHeader,b=>AutomationProperties.GetName(b)=="Назад к фильму","actor back to origin"),"nested actor back");
+            check(activePerson==null&&current?.Id==linked.Id&&DownloadBackLabel()=="Загрузки","actor back restores the same download card with a queue return label; "+DownloadUiState());
+            await NativeDownloadClick(await NavigationControl(PageHeader,b=>AutomationProperties.GetName(b)=="Загрузки","origin back to queue"),"nested origin back");
+            check(section=="Загрузки"&&current==null&&downloadReturnItem==null&&Queue().Items.Count==fixtures.Length&&fixtures.All(item=>item.Paused),"nested actor and filmography navigation returns to the unchanged paused queue; "+DownloadUiState());
             searchProvider=(kind,query,token)=>Task.FromResult<IReadOnlyList<MediaItem>>(kind=="Фильмы"?films:series);
+            await NativeDownloadClick(await DownloadLink("Открыть карточку по постеру"),"search origin card");
+            Search.Text="Новый поиск из карточки загрузки";SearchSubmitButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await WaitSearch();
+            check(downloadReturnItem==null&&current==null&&SearchActive,"a new explicit search clears the old download navigation ancestor");
+            ShowDownloads(this,new RoutedEventArgs());await SettleDownloads();
             Search.Text="Поиск из загрузок";FocusCatalogSearch();UpdateLayout();
             check(section=="Загрузки"&&current==null&&SearchBar.IsVisible&&Search.IsKeyboardFocusWithin,"download search stays visible and focuses without leaving the queue");
             ClearSearchButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));UpdateLayout();

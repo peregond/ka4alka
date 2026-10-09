@@ -94,6 +94,10 @@ public partial class MainWindow
     {
         if(returnPerson is {} previous){returnPerson=null;OpenPerson(previous.Person,previous.Origin);return;}
         if(ReturnToSaved())return;
+        if(section=="Загрузки"||DownloadBackLabel()!=null)
+        {
+            section="Загрузки";current=null;activePerson=null;personOrigin=null;personSearchReturn=null;Render();return;
+        }
         if(catalogBrowseContext is {} catalog){RestoreCatalogBrowseContext(catalog);Render();return;}
         current=null;Render();
     }

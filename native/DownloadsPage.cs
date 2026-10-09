@@ -12,6 +12,7 @@ public partial class MainWindow
     {
         if((sender as FrameworkElement)?.Tag is not DownloadItem item)return;
         var card=DownloadMetadata.Card(item);if(card==null)return;
+        activePerson=null;returnPerson=null;personSearchReturn=null;savedReturn=null;
         downloadReturnItem=item;
         current=DownloadMetadata.EnrichMedia(card,new[]{sharedCatalog.Find(card)}.OfType<MediaItem>().Concat(prefs.LiveFavorites).Concat(catalogIndex.Recent(card.Section,200)).Concat(BundledCatalog.Search(card.Section,card.Title)));
         Render();
@@ -19,6 +20,7 @@ public partial class MainWindow
     ListCollectionView? downloadView;
     ListBox? downloadList;
     DownloadItem? downloadReturnItem;
+    string? DownloadBackLabel()=>downloadReturnItem is {} returned&&downloads.Items.Contains(returned)?"Загрузки":null;
     TextBlock? downloadSummary;
     TextBlock? downloadHeading;
     FrameworkElement? downloadHeadingRow,downloadHeadingHost,downloadToolbar;

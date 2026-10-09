@@ -66,6 +66,7 @@ public partial class MainWindow:Window
         if(!ready)return;BeginCatalogNavigationRender();savedScroll=null;personRequest?.Cancel();personRequest?.Dispose();personRequest=null;
         SyncDiscoveryContext();
         if(activePerson!=null&&(section!=personSection||current?.Id!=personOrigin?.Id))activePerson=null;
+        if(current==null&&activePerson==null&&section is not ("Настройки" or "Загрузки"))downloadReturnItem=null;
         if(current==null&&activePerson==null&&section!="Настройки")savedReturn=null;
         if(activePerson==null&&(current==null||section is not ("Фильмы" or "Сериалы")))returnPerson=null;
         if(activePerson!=null||current!=null||section is not ("Фильмы" or "Сериалы"))CancelCatalogQualityCheck();
@@ -108,7 +109,7 @@ public partial class MainWindow:Window
     void Detail(MediaItem item)
     {
         var panel=new StackPanel();Body.Children.Add(new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=panel,VerticalScrollBarVisibility=ScrollBarVisibility.Auto});
-        PageHeader.Children.Add(ActionButton(SavedBackLabel()??section,"IconBack",CinemaBack));
+        PageHeader.Children.Add(ActionButton(SavedBackLabel()??DownloadBackLabel()??section,"IconBack",CinemaBack));
         var intro=new Grid{Margin=new(0,8,0,20)};intro.ColumnDefinitions.Add(new(){Width=new GridLength(180)});intro.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});
         var cover=new Border{Background=item.Cover,CornerRadius=new(18),Height=225,Margin=new(0,0,20,0)};intro.Children.Add(cover);
         var info=new StackPanel();Grid.SetColumn(info,1);intro.Children.Add(info);info.Children.Add(Text(item.Title,28));info.Children.Add(Text(item.Subtitle,12,true));
