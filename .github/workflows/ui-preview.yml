@@ -61,6 +61,7 @@ jobs:
           if($app.ExitCode -ne 0 -or -not(Test-Path (Join-Path $output 'checks.json'))){throw 'Person performance UI evidence missing'}
           Get-Content (Join-Path $output 'checks.json')
       - name: Verify native typography at fractional DPI and unusual interface fonts
+        if: ${{ !cancelled() }}
         shell: pwsh
         run: |
           $output=Join-Path $PWD 'test-output/ui-preview/text-rendering'
