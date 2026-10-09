@@ -211,6 +211,7 @@ public class DownloadItem : INotifyPropertyChanged
     [JsonIgnore] public string StatusSoftKey=>StatusKind switch{DownloadStatusKind.Downloading=>"AccentSoft",DownloadStatusKind.Waiting=>"WarningSoft",DownloadStatusKind.Seeding=>"InfoSoft",DownloadStatusKind.Paused=>"Raised",DownloadStatusKind.Checking=>"Raised",_=>"DangerSoft"};
     [JsonIgnore] public string PercentLabel=>$"{(int)Math.Floor(double.IsFinite(Progress)?Math.Clamp(Progress,0,100):0)}%";
     [JsonIgnore] public string WidgetCaption=>StatusKind==DownloadStatusKind.Downloading&&Remaining.Length>0?Remaining:Status;
+    [JsonIgnore] public bool ShowWaitingHint=>StatusKind==DownloadStatusKind.Waiting&&Hint.Length>0;
     [JsonIgnore] public bool IsActiveDownload=>!Paused&&!Completed&&StatusKind!=DownloadStatusKind.Error;
     public event PropertyChangedEventHandler? PropertyChanged;
     public void Refresh()=>PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(null));

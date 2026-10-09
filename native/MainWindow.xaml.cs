@@ -35,7 +35,7 @@ public partial class MainWindow:Window
         catalogRefreshTimer.Start();
         ContentRendered+=(_,_)=>{_=MaintainCacheAsync();};
         EnableAdaptiveLayout();
-        EnableShortcuts();
+        EnableShortcuts();InitializeDownloadDrop();
         try{downloads=new(null,prefs.MaxDownloadKbps,prefs.MaxUploadKbps);}catch(Exception e){downloads=newEmpty(prefs.MaxDownloadKbps,prefs.MaxUploadKbps);Status.Text="Не удалось прочитать очередь: "+e.Message;}
         InitializeDownloadReliability();
         InitializeLanDevices();

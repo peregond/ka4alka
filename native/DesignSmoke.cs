@@ -310,8 +310,8 @@ public partial class MainWindow
                     var origin=block.TransformToAncestor(Body).Transform(new Point());
                     if(origin.X<-.5||origin.X+block.ActualWidth>Body.ActualWidth+1)throw new Exception($"Download telemetry overflows {width} px window.");
                 }
-                var actions=VisualElements<Button>(Body).Where(x=>x.IsVisible&&x.Tag is DownloadItem&&AutomationProperties.GetName(x) is "Пауза" or "Подробнее" or "Открыть папку" or "Удалить из загрузок" or "Удалить файлы").ToArray();
-                if(actions.Length<5)throw new Exception("Download row actions are missing.");
+                var actions=VisualElements<Button>(Body).Where(x=>x.IsVisible&&x.Tag is DownloadItem&&AutomationProperties.GetName(x) is "Пауза" or "Подробнее" or "Открыть папку" or "Действия загрузки").ToArray();
+                if(actions.Length<4)throw new Exception("Download row actions are missing.");
                 foreach(var action in actions)
                 {
                     var bounds=action.TransformToAncestor(Body).TransformBounds(new Rect(new Point(),action.RenderSize));

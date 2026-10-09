@@ -218,9 +218,9 @@ public partial class MainWindow
             fixtures[^1].ImageUrl=null;fixtures[^1].Refresh();await SettleDownloads();check(poster.Source==null,"clearing a repaired poster removes the stale image from its existing row");
             fixtures[^1].ImageUrl=posterUrl;fixtures[^1].Refresh();await SettleDownloads();check(poster.Source!=null,"existing download row restores its poster after a later metadata update");
             var title=FindVisual<TextBlock>(first,t=>t.Text==fixtures[^1].MediaTitle);check(title!=null&&poster!.TransformToAncestor(first).Transform(new Point()).X<title.TransformToAncestor(first).Transform(new Point()).X,"associated media title follows its poster");
-            var releaseTitle=FindVisual<TextBlock>(first,t=>t.Text==fixtures[^1].Name);check(releaseTitle is{IsVisible:true}&&releaseTitle.FontSize<title!.FontSize&&releaseTitle.TransformToAncestor(first).Transform(new Point()).Y>title.TransformToAncestor(first).Transform(new Point()).Y,"download row displays its raw release name as a smaller secondary line below the Russian media title");
-            var toggle=FindVisual<Button>(first,b=>AutomationProperties.GetName(b)==fixtures[^1].Action);check(toggle!=null&&FindVisual<TextBlock>(toggle,t=>t.Text==fixtures[^1].Action)!=null,"pause or continue action displays a readable text label");
-            foreach(var label in new[]{"Подробнее","Открыть папку","Удалить из загрузок","Удалить файлы"})
+            var releaseTitleButton=FindVisual<Button>(first,b=>AutomationProperties.GetName(b)=="Открыть карточку по названию");check(releaseTitleButton?.ToolTip?.ToString()==fixtures[^1].Name,"download row keeps its raw release name in the title tooltip instead of a second text line");
+            var toggle=FindVisual<Button>(first,b=>AutomationProperties.GetName(b)==fixtures[^1].Action);check(toggle!=null&&VisualElements<System.Windows.Shapes.Path>(toggle).Any()&&toggle.ToolTip?.ToString()==fixtures[^1].Action,"pause or continue action is an icon button whose tooltip and accessible name state its action");
+            foreach(var label in new[]{"Подробнее","Открыть папку","Действия загрузки"})
             {
                 var action=FindVisual<Button>(first,b=>AutomationProperties.GetName(b)==label);check(action!=null&&VisualElements<System.Windows.Shapes.Path>(action).Any(),"download action has an accessible label and recognizable icon: "+label);
             }
@@ -228,18 +228,21 @@ public partial class MainWindow
             var infoPath=VisualElements<System.Windows.Shapes.Path>(infoButton).Single();
             var glyphBox=infoPath.TransformToAncestor(infoButton).TransformBounds(new Rect(infoPath.RenderSize));
             check(glyphBox.Top>=infoButton.BorderThickness.Top+infoButton.Padding.Top-1&&glyphBox.Bottom<=infoButton.ActualHeight-infoButton.BorderThickness.Bottom-infoButton.Padding.Bottom+1,"information icon fits inside its button padding without clipping its lower edge");
-            check(!VisualElements<Button>(first).Any(b=>AutomationProperties.GetName(b)=="Действия загрузки"),"download removal actions are directly available without an ellipsis submenu");
-            var keep=FindVisual<Button>(first,b=>AutomationProperties.GetName(b)=="Удалить из загрузок")!;var delete=FindVisual<Button>(first,b=>AutomationProperties.GetName(b)=="Удалить файлы")!;
+            var more=FindVisual<Button>(first,b=>AutomationProperties.GetName(b)=="Действия загрузки")!;
+            more.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await SettleDownloads();
+            check(more.ContextMenu is{IsOpen:true}&&more.ContextMenu.Items.OfType<MenuItem>().Select(x=>AutomationProperties.GetName(x)).Intersect(new[]{"Подробнее","Почему не скачивается?","Удалить из загрузок","Удалить файлы"}).Count()==4,"the row menu offers details, diagnostics and both removal actions");
+            var keep=more.ContextMenu!.Items.OfType<MenuItem>().Single(x=>AutomationProperties.GetName(x)=="Удалить из загрузок");var delete=more.ContextMenu.Items.OfType<MenuItem>().Single(x=>AutomationProperties.GetName(x)=="Удалить файлы");
+
             check(keep.Foreground is SolidColorBrush neutral&&Math.Abs(neutral.Color.R-neutral.Color.G)<35&&delete.Foreground is SolidColorBrush danger&&danger.Color.R>danger.Color.G+20,"keep-files removal is neutral gray and permanent file removal is red");
-            check(keep.ToolTip?.ToString()?.Contains("файл",StringComparison.OrdinalIgnoreCase)==true&&delete.ToolTip?.ToString()?.Contains("файл",StringComparison.OrdinalIgnoreCase)==true,"both removal actions explain their effect on downloaded files");
+            check(keep.ToolTip?.ToString()?.Contains("файл",StringComparison.OrdinalIgnoreCase)==true&&delete.ToolTip?.ToString()?.Contains("файл",StringComparison.OrdinalIgnoreCase)==true,"both removal actions explain their effect on downloaded files");more.ContextMenu.IsOpen=false;
             var actionItem=(DownloadItem)Queue().Items[0];
             try
             {
                 actionItem.Busy=true;actionItem.Refresh();await SettleDownloads();
-                check(!keep.IsEnabled&&!delete.IsEnabled&&!toggle!.IsEnabled,"direct row actions disable removal and pause controls while their download is busy");
+                check(!more.IsEnabled&&!toggle!.IsEnabled,"row actions disable the pause control and the action menu while their download is busy");
             }
             finally{actionItem.Busy=false;actionItem.Refresh();await SettleDownloads();}
-            check(keep.IsEnabled&&delete.IsEnabled&&toggle!.IsEnabled,"direct row actions re-enable their controls when the download is ready");
+            check(more.IsEnabled&&toggle!.IsEnabled,"row actions re-enable their controls when the download is ready");
             var sort=Toolbar("Сортировка загрузок");sort.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await SettleDownloads();check(sort.ContextMenu is{IsOpen:true,ActualHeight:>0},"download sorting is discoverable through a toolbar menu");
             check(sort.ContextMenu!.Items.OfType<MenuItem>().Select(x=>x.Tag?.ToString()).Order().SequenceEqual(new[]{"newest","name","speed","size","progress"}.Order()),"queue sorting offers addition date, title, speed, size and progress");sort.ContextMenu.IsOpen=false;
             foreach(var order in new[]{("name",DownloadSort.Name),("speed",DownloadSort.Speed),("size",DownloadSort.Size),("progress",DownloadSort.Progress),("newest",DownloadSort.Newest)})

@@ -39,7 +39,7 @@ public partial class MainWindow
                     if(ActualWidth>fit.MaxWidth+1||ActualHeight>fit.MaxHeight+1)throw new Exception("Window overflows scaled work area");
                     if(Body.ActualWidth<90||Body.ActualHeight<20)throw new Exception($"{page}: no usable content at {scale*100}%: body {Body.ActualWidth} x {Body.ActualHeight}, header {PageHeader.ActualHeight}, window {ActualWidth} x {ActualHeight}");
                     CheckSidebarFooter((ok,message)=>{if(!ok)throw new Exception(message);},page+"-DPI-"+pixels.Width+"-"+scale);
-                    foreach(var action in VisualElements<Button>(Body).Where(b=>b.IsVisible&&b.ActualWidth>0&&AutomationProperties.GetName(b) is "Продолжить" or "Удалить файлы" or "Подробнее"))
+                    foreach(var action in VisualElements<Button>(Body).Where(b=>b.IsVisible&&b.ActualWidth>0&&AutomationProperties.GetName(b) is "Продолжить" or "Действия загрузки" or "Подробнее"))
                     {
                         var box=action.TransformToAncestor(Body).TransformBounds(new Rect(new Point(),action.RenderSize));
                         if(box.Left<-.5||box.Right>Body.ActualWidth+1)throw new Exception($"{page}: action clipped at {scale*100}%: "+AutomationProperties.GetName(action));

@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using System.Windows.Input;
 
 namespace Kachalka;
 public partial class MainWindow
@@ -31,17 +32,39 @@ public partial class MainWindow
     string downloadMetadataFingerprint="";
     readonly List<ContextMenu> downloadMenus=[];
     static readonly (string Key,string Label,DownloadSort Sort)[] DownloadSortChoices=[("newest","Сначала новые",DownloadSort.Newest),("name","По названию",DownloadSort.Name),("speed","По скорости",DownloadSort.Speed),("size","По размеру",DownloadSort.Size),("progress","По готовности",DownloadSort.Progress)];
+    // ----- tiles, tabs and summary -----
+    string downloadTab="all";
+    TextBlock? tileDownValue,tileUpValue,tileDiskValue,tileDiskCaption,tileDiskPercent;
+    ProgressBar? tileDiskBar;
+    Grid? downloadTiles;
+    readonly Dictionary<string,TextBlock> downloadTabCounts=[];
+    DateTime diskReadUtc;long diskFree,diskTotal;bool diskReading;
+    bool MatchesDownloadTab(DownloadItem item)=>downloadTab switch
+    {
+        "active"=>!item.Completed&&!item.Paused&&item.StatusKind!=DownloadStatusKind.Error,
+        "seeding"=>item.Completed&&!item.Paused,
+        "errors"=>item.StatusKind==DownloadStatusKind.Error,
+        _=>true
+    };
+    static string Plural(int count,string one,string few,string many)
+    {
+        var tail=count%100;if(tail is >=11 and <=14)return many;
+        return (count%10) switch{1=>one,2 or 3 or 4=>few,_=>many};
+    }
     void RenderDownloads()
     {
-        downloads.Update();downloadMenus.Clear();
+        downloads.Update();downloadMenus.Clear();downloadTabCounts.Clear();
         foreach(var item in downloads.Items){item.MinimumQualityHeight=QualityMinimum;item.Refresh();}
         RepairDownloadMetadata();
         downloadSort=DownloadSortChoices.Any(x=>x.Key==prefs.DownloadSort)?prefs.DownloadSort:"newest";
-        var heading=new DockPanel{Margin=new(0,0,0,6)};downloadHeadingRow=heading;PageHeader.Children.Add(heading);
+        if(downloads.Items.Count==0)downloadTab="all";
+        // Heading: page title and summary on the left, queue actions on the right.
+        var heading=new DockPanel{Margin=new(0,0,0,16)};downloadHeadingRow=heading;PageHeader.Children.Add(heading);
         var toolbar=new WrapPanel{HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Center};downloadToolbar=toolbar;DockPanel.SetDock(toolbar,Dock.Right);heading.Children.Add(toolbar);
-        var title=Text("Очередь",25);downloadHeading=title;downloadHeadingHost=title;title.FontWeight=FontWeights.SemiBold;title.Margin=new(0,0,16,0);title.VerticalAlignment=VerticalAlignment.Center;heading.Children.Add(title);
-        var controls=ActionButton("Управление","IconSettings",()=>{},"QuietButton");downloadControls=controls;controls.Margin=new(0,0,6,0);controls.Padding=new(11,7,11,7);controls.MinHeight=34;controls.ToolTip="Управление загрузками и раздачами";
-        controls.SetResourceReference(Control.BackgroundProperty,"PanelAlt");controls.SetResourceReference(Control.BorderBrushProperty,"EdgeSoft");controls.BorderThickness=new(1);AutomationProperties.SetName(controls,"Управление загрузками");
+        var titles=new StackPanel{VerticalAlignment=VerticalAlignment.Center};downloadHeadingHost=titles;heading.Children.Add(titles);
+        var title=Text("Загрузки",28);downloadHeading=title;title.FontFamily=(FontFamily)FindResource("DisplayFont");title.FontWeight=FontWeights.Bold;title.Margin=new(0,0,16,0);title.VerticalAlignment=VerticalAlignment.Center;titles.Children.Add(title);
+        downloadSummary=Text("",14,true);downloadSummary.TextWrapping=TextWrapping.NoWrap;downloadSummary.TextTrimming=TextTrimming.CharacterEllipsis;downloadSummary.Margin=new(0,4,0,0);titles.Children.Add(downloadSummary);
+        var controls=ActionButton("Управление","IconSettings",()=>{});downloadControls=controls;controls.Margin=new(0,0,10,0);controls.Padding=new(16,0,16,0);controls.Height=48;controls.MinHeight=48;controls.ToolTip="Управление загрузками и раздачами";AutomationProperties.SetName(controls,"Управление загрузками");
         var commands=Menu();controls.ContextMenu=commands;
         foreach(var command in new[]{("Начать загрузки",false,false,"IconPlay"),("Остановить загрузки",false,true,"IconPause"),("Запустить раздачи",true,false,"IconPlay"),("Остановить раздачи",true,true,"IconPause")})
         {
@@ -55,7 +78,38 @@ public partial class MainWindow
             };commands.Items.Add(choice);
         }
         commands.Items.Add(new Separator());var limits=MenuEntry("Лимиты скорости…","IconSettings");limits.Click+=(_,_)=>DownloadLimits();commands.Items.Add(limits);controls.Click+=(_,_)=>OpenDownloadMenu(controls);toolbar.Children.Add(controls);
-        var order=ActionButton(DownloadSortChoices.First(x=>x.Key==downloadSort).Label,"IconFilter",()=>{},"QuietButton");downloadOrder=order;order.Padding=new(11,7,11,7);order.Margin=new(0);order.MinHeight=34;AutomationProperties.SetName(order,"Сортировка загрузок");order.ContextMenu=Menu();
+        var add=ActionButton("Добавить торрент","IconPlus",()=>AddTorrent(this,new RoutedEventArgs()),"PrimaryButton");add.Margin=new(0);add.Height=48;add.MinHeight=48;add.Padding=new(20,0,20,0);AutomationProperties.SetName(add,"Добавить торрент в очередь");downloadAddButton=add;toolbar.Children.Add(add);
+
+        // Tiles: speed in, speed out, free disk space.
+        downloadTiles=new Grid{Name="DownloadTiles",Margin=new(0,0,0,16)};PageHeader.Children.Add(downloadTiles);
+        for(var index=0;index<3;index++)downloadTiles.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});
+        Border Tile(int column,string icon,string caption,string accentKey,out TextBlock value,out TextBlock unit)
+        {
+            var stack=new StackPanel();
+            var head=new StackPanel{Orientation=Orientation.Horizontal,Margin=new(0,0,0,10)};
+            var glyph=new System.Windows.Shapes.Path{Data=(Geometry)FindResource(icon),Width=13,Height=13,Stretch=Stretch.Uniform,StrokeThickness=1.8,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,StrokeLineJoin=PenLineJoin.Round,Margin=new(0,0,7,0),VerticalAlignment=VerticalAlignment.Center};glyph.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty,accentKey);head.Children.Add(glyph);
+            var label=new TextBlock{Text=caption,FontSize=12,VerticalAlignment=VerticalAlignment.Center};label.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");head.Children.Add(label);stack.Children.Add(head);
+            var numbers=new StackPanel{Orientation=Orientation.Horizontal};
+            value=new TextBlock{FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=24,FontWeight=FontWeights.SemiBold,VerticalAlignment=VerticalAlignment.Bottom};value.SetResourceReference(TextBlock.ForegroundProperty,"Text");
+            unit=new TextBlock{FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=14,Margin=new(8,0,0,4),VerticalAlignment=VerticalAlignment.Bottom};unit.SetResourceReference(TextBlock.ForegroundProperty,"Muted");
+            numbers.Children.Add(value);numbers.Children.Add(unit);stack.Children.Add(numbers);
+            var tile=new Border{Child=stack,CornerRadius=new(16),BorderThickness=new(1),Padding=new(18,16,18,16),Margin=new(column==0?0:6,0,column==2?0:6,0)};tile.SetResourceReference(Border.BackgroundProperty,"Panel");tile.SetResourceReference(Border.BorderBrushProperty,"EdgeSoft");Grid.SetColumn(tile,column);downloadTiles.Children.Add(tile);return tile;
+        }
+        var downTile=Tile(0,"IconArrowDown","Скачивание","Accent",out var downValue,out var downUnit);var upTile=Tile(1,"IconArrowUp","Отдача","Info",out var upValue,out var upUnit);
+        tileDownValue=downValue;tileUpValue=upValue;downTile.Tag=downUnit;upTile.Tag=upUnit;
+        var diskTile=Tile(2,"IconFolder","Диск","Muted",out var diskValue,out var diskUnit);tileDiskValue=diskValue;tileDiskCaption=diskUnit;
+        if(diskTile.Child is StackPanel diskStack&&diskStack.Children[0] is StackPanel diskHead&&diskHead.Children[1] is TextBlock diskLabel)
+        {
+            diskLabel.Text="Диск · "+System.IO.Path.GetPathRoot(prefs.Folder)+"  ·  папка Ka4alka";
+            tileDiskPercent=new TextBlock{FontSize=12,HorizontalAlignment=HorizontalAlignment.Right};tileDiskPercent.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");
+            diskStack.Children.Add(tileDiskBar=new ProgressBar{Minimum=0,Maximum=100,Height=4,Margin=new(0,10,0,0),BorderThickness=new(0)});tileDiskBar.SetResourceReference(Control.BackgroundProperty,"Track");tileDiskBar.SetResourceReference(Control.ForegroundProperty,"Subtle");
+        }
+        downTile.Tag=downUnit;upTile.Tag=upUnit;tileDownUnit=downUnit;tileUpUnit=upUnit;
+        UpdateDownloadTiles();
+
+        // Tabs and sort.
+        var tabsRow=new DockPanel{Margin=new(0,0,0,16)};PageHeader.Children.Add(tabsRow);
+        var order=ActionButton(DownloadSortChoices.First(x=>x.Key==downloadSort).Label,"IconFilter",()=>{},"PillButton");downloadOrder=order;order.Margin=new(12,0,0,0);order.Padding=new(14,0,16,0);AutomationProperties.SetName(order,"Сортировка загрузок");order.ContextMenu=Menu();
         foreach(var entry in DownloadSortChoices)
         {
             var choice=MenuEntry(entry.Label);choice.Tag=entry.Key;choice.IsCheckable=true;choice.IsChecked=downloadSort==entry.Key;
@@ -67,23 +121,96 @@ public partial class MainWindow
                 FitDownloadsToolbar();if(downloadView!=null)downloadView.CustomSort=DownloadOrdering.Comparer(entry.Sort);if(downloadView?.Cast<DownloadItem>().FirstOrDefault() is {} first)downloadList?.ScrollIntoView(first);
             };order.ContextMenu.Items.Add(choice);
         }
-        order.Click+=(_,_)=>OpenDownloadMenu(order);toolbar.Children.Add(order);
-        downloadSummary=Text("",12,true);downloadSummary.TextWrapping=TextWrapping.NoWrap;downloadSummary.TextTrimming=TextTrimming.CharacterEllipsis;downloadSummary.Margin=new(0,0,0,14);PageHeader.Children.Add(downloadSummary);UpdateDownloadSummary();FitDownloadsToolbar();
+        order.Click+=(_,_)=>OpenDownloadMenu(order);DockPanel.SetDock(order,Dock.Right);tabsRow.Children.Add(order);
+        var segmentFrame=new Border{CornerRadius=new(12),BorderThickness=new(1),Padding=new(4),HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center};segmentFrame.SetResourceReference(Border.BackgroundProperty,"Panel");segmentFrame.SetResourceReference(Border.BorderBrushProperty,"EdgeSoft");AutomationProperties.SetName(segmentFrame,"Вкладки загрузок");
+        var segmentRow=new StackPanel{Orientation=Orientation.Horizontal};segmentFrame.Child=segmentRow;tabsRow.Children.Add(segmentFrame);
+        foreach(var (key,label) in new[]{("all","Все"),("active","Качаются"),("seeding","Раздаются"),("errors","Ошибки")})
+        {
+            var count=new TextBlock{FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=11,Opacity=.7,Margin=new(6,1,0,0),VerticalAlignment=VerticalAlignment.Center};downloadTabCounts[key]=count;
+            var content=new StackPanel{Orientation=Orientation.Horizontal};content.Children.Add(new TextBlock{Text=label,VerticalAlignment=VerticalAlignment.Center});content.Children.Add(count);
+            var tab=new RadioButton{Style=(Style)FindResource("SegmentButton"),GroupName="DownloadTabs",Content=content,IsChecked=downloadTab==key,Tag=key};AutomationProperties.SetName(tab,"Загрузки: "+label);
+            tab.Checked+=(_,_)=>{downloadTab=key;if(downloadView!=null){downloadView.Refresh();}};
+            segmentRow.Children.Add(tab);
+        }
+        UpdateDownloadSummary();FitDownloadsToolbar();
         if(downloads.Items.Count>0)
         {
-            downloadView=new ListCollectionView(downloads.Items){CustomSort=DownloadOrdering.Comparer(DownloadSortChoices.First(x=>x.Key==downloadSort).Sort)};
-            downloadList=new ListBox{ItemsSource=downloadView,ItemTemplate=(DataTemplate)FindResource("DownloadRow")};AutomationProperties.SetName(downloadList,"Очередь загрузок");
+            downloadView=new ListCollectionView(downloads.Items){CustomSort=DownloadOrdering.Comparer(DownloadSortChoices.First(x=>x.Key==downloadSort).Sort),Filter=x=>x is DownloadItem item&&MatchesDownloadTab(item)};
+            downloadList=new ListBox{ItemsSource=downloadView,ItemTemplate=(DataTemplate)FindResource("DownloadRow"),Margin=new(-6,0,-6,0),Padding=new(6,0,6,0)};AutomationProperties.SetName(downloadList,"Очередь загрузок");
             if(downloadReturnItem is {} returned&&downloads.Items.Contains(returned))
             {
                 var list=downloadList;list.Loaded+=(_,_)=>list.ScrollIntoView(returned);
             }
-            downloadReturnItem=null;Body.Children.Add(downloadList);return;
+            downloadReturnItem=null;
+            Body.RowDefinitions.Add(new(){Height=new GridLength(1,GridUnitType.Star)});Body.RowDefinitions.Add(new(){Height=GridLength.Auto});
+            Body.Children.Add(downloadList);
+            var zone=DropZone();Grid.SetRow(zone,1);Body.Children.Add(zone);downloadDropZone=zone;
+            return;
         }
         var empty=new StackPanel{HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center,MaxWidth=360};
         var illustration=IconLabel("","IconDownload",32);foreach(var path in VisualElements<Path>(illustration)){BindingOperations.ClearBinding(path,Shape.StrokeProperty);path.SetResourceReference(Shape.StrokeProperty,"Muted");}illustration.HorizontalAlignment=HorizontalAlignment.Center;illustration.Margin=new(0,0,0,18);empty.Children.Add(illustration);
-        var caption=Text("Загрузок пока нет",22);caption.TextAlignment=TextAlignment.Center;empty.Children.Add(caption);
+        var caption=Text("Загрузок пока нет",22);caption.TextAlignment=TextAlignment.Center;caption.FontWeight=FontWeights.Bold;empty.Children.Add(caption);
         var hint=Text("Выбери раздачу в карточке фильма или добавь magnet-ссылку либо .torrent-файл.",13,true);hint.TextAlignment=TextAlignment.Center;empty.Children.Add(hint);
-        empty.Children.Add(ActionButton("Добавить торрент","IconPlus",()=>AddTorrent(this,new RoutedEventArgs()),"PrimaryButton"));Body.Children.Add(empty);
+        var emptyAdd=ActionButton("Добавить торрент","IconPlus",()=>AddTorrent(this,new RoutedEventArgs()),"PrimaryButton");emptyAdd.HorizontalAlignment=HorizontalAlignment.Center;empty.Children.Add(emptyAdd);Body.Children.Add(empty);
+    }
+    Button? downloadAddButton;
+    TextBlock? tileDownUnit,tileUpUnit;
+    Border? downloadDropZone;
+    // Dashed drop target for .torrent files and pasted magnet links.
+    Border DropZone()
+    {
+        var zone=new Border{Name="DownloadDropZone",CornerRadius=new(18),Padding=new(28,20,28,20),Margin=new(0,4,0,12),Background=Brushes.Transparent};
+        var dash=new System.Windows.Shapes.Rectangle{RadiusX=18,RadiusY=18,StrokeThickness=1.5,StrokeDashArray=[4,4],IsHitTestVisible=false};dash.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty,"TrackOff");
+        var row=new StackPanel{Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Center};
+        var disc=new Border{Width=44,Height=44,CornerRadius=new(22),Margin=new(0,0,16,0),Child=new System.Windows.Shapes.Path{Data=(Geometry)FindResource("IconMagnet"),Width=20,Height=20,Stretch=Stretch.Uniform,StrokeThickness=1.8,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,StrokeLineJoin=PenLineJoin.Round}};disc.SetResourceReference(Border.BackgroundProperty,"AccentSoft");((System.Windows.Shapes.Path)disc.Child).SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty,"Accent");
+        row.Children.Add(disc);
+        var text=new TextBlock{Text="Перетащите .torrent-файл сюда или вставьте magnet-ссылку",FontSize=14,VerticalAlignment=VerticalAlignment.Center,TextWrapping=TextWrapping.Wrap,MaxWidth=420};text.SetResourceReference(TextBlock.ForegroundProperty,"Muted");row.Children.Add(text);
+        var key=new Border{CornerRadius=new(7),BorderThickness=new(1),Padding=new(7,4,7,4),Margin=new(16,0,0,0),VerticalAlignment=VerticalAlignment.Center,Child=new TextBlock{Text="Ctrl V",FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=11}};key.SetResourceReference(Border.BackgroundProperty,"Raised");key.SetResourceReference(Border.BorderBrushProperty,"Edge");((TextBlock)key.Child).SetResourceReference(TextBlock.ForegroundProperty,"Muted");row.Children.Add(key);
+        var host=new Grid();host.Children.Add(dash);host.Children.Add(row);zone.Child=host;
+        AutomationProperties.SetName(zone,"Перетащите .torrent-файл или вставьте magnet-ссылку");
+        // The window handles the actual drop; the zone only shows the target while the pointer is over it.
+        return zone;
+    }
+    void UpdateDownloadTiles()
+    {
+        if(section!="Загрузки"||tileDownValue==null)return;
+        long down=0,up=0;foreach(var item in downloads.Items){down+=Math.Max(0,item.DownloadRate);up+=Math.Max(0,item.UploadRate);}
+        void Speed(TextBlock value,TextBlock? unit,long rate)
+        {
+            var text=DownloadService.FormatBytes(rate);var cut=text.LastIndexOf(' ');
+            value.Text=cut>0?text[..cut]:text;if(unit!=null)unit.Text=(cut>0?text[(cut+1)..]:"Б")+"/с";
+        }
+        Speed(tileDownValue,tileDownUnit,down);Speed(tileUpValue!,tileUpUnit,up);
+        if(DateTime.UtcNow-diskReadUtc>TimeSpan.FromSeconds(10)&&!diskReading)
+        {
+            diskReading=true;var folder=prefs.Folder;
+            _=ReadDiskAsync(folder);
+        }
+        PaintDiskTile();
+    }
+    async Task ReadDiskAsync(string folder)
+    {
+        (long Free,long Total)? volume=await Task.Run(()=>
+        {
+            try{var root=System.IO.Path.GetPathRoot(System.IO.Path.GetFullPath(folder));if(string.IsNullOrEmpty(root))return ((long Free,long Total)?)null;var drive=new System.IO.DriveInfo(root);return (drive.AvailableFreeSpace,drive.TotalSize);}
+            catch{return ((long Free,long Total)?)null;}
+        });
+        diskReading=false;diskReadUtc=DateTime.UtcNow;
+        if(closed)return;
+        if(volume is {} value){diskFree=value.Free;diskTotal=value.Total;}
+        PaintDiskTile();
+    }
+    void PaintDiskTile()
+    {
+        if(section!="Загрузки"||tileDiskValue==null||tileDiskCaption==null||tileDiskBar==null)return;
+        if(diskTotal<=0){tileDiskValue.Text="—";tileDiskCaption.Text="";tileDiskBar.Value=0;return;}
+        var text=DownloadService.FormatBytes(diskFree);var cut=text.LastIndexOf(' ');
+        tileDiskValue.Text=cut>0?text[..cut]:text;tileDiskCaption.Text=(cut>0?text[(cut+1)..]:"Б")+" свободно";
+        tileDiskBar.Value=Math.Clamp((diskTotal-diskFree)*100d/diskTotal,0,100);
+        // Less than 10 GB free is a warning; less than what active downloads still need is an error.
+        var needed=DownloadSpace.SafetyBytes+downloads.Items.Where(x=>!x.Completed).Sum(x=>x.Files.Sum(f=>Math.Max(0,(long)(f.Size*(1-Math.Clamp(f.Progress,0,100)/100)))));
+        var key=diskFree<needed?"Danger":diskFree<10L*1024*1024*1024?"Warning":"Subtle";
+        tileDiskBar.SetResourceReference(Control.ForegroundProperty,key);tileDiskValue.SetResourceReference(TextBlock.ForegroundProperty,key=="Subtle"?"Text":key);
     }
     void FitDownloadsToolbar()
     {
@@ -91,31 +218,131 @@ public partial class MainWindow
         var tiny=ActualWidth>0&&ActualWidth<560;var shortView=ActualHeight>0&&ActualHeight<560;
         var veryShort=ActualHeight>0&&ActualHeight<360;
         downloadControls.Content=IconLabel(tiny?"":"Управление","IconSettings");
+        if(downloadAddButton!=null)downloadAddButton.Content=IconLabel(tiny?"":"Добавить торрент","IconPlus");
         var label=DownloadSortChoices.FirstOrDefault(x=>x.Key==downloadSort).Label??"Сначала новые";
-        downloadOrder.Content=IconLabel(tiny?"":label,"IconFilter");downloadOrder.ToolTip="Сортировка: "+label;
-        if(downloadHeading!=null)downloadHeading.FontSize=shortView?20:25;
+        downloadOrder.Content=ChipContent(tiny?"":label,false,"IconFilter");downloadOrder.ToolTip="Сортировка: "+label;
+        if(downloadHeading!=null)downloadHeading.FontSize=shortView?22:28;
         if(downloadHeadingHost!=null)downloadHeadingHost.Visibility=veryShort?Visibility.Collapsed:Visibility.Visible;
-        if(downloadHeadingRow!=null)downloadHeadingRow.Margin=new(0,0,0,veryShort?2:6);
+        if(downloadHeadingRow!=null)downloadHeadingRow.Margin=new(0,0,0,veryShort?2:shortView?8:16);
         if(downloadToolbar!=null)downloadToolbar.Margin=new(0);
-        if(downloadSummary!=null)downloadSummary.Margin=new(0,0,0,veryShort?4:shortView?8:14);
+        if(downloadSummary!=null)downloadSummary.Visibility=shortView?Visibility.Collapsed:Visibility.Visible;
+        // Speed and disk tiles need height; on short windows (large Windows scale) they give way to the queue.
+        if(downloadTiles!=null)
+        {
+            var show=ActualHeight>=760;downloadTiles.Visibility=show?Visibility.Visible:Visibility.Collapsed;
+            // Narrow windows stack the tiles into one column instead of squeezing the numbers.
+            var columns=ActualWidth<780?1:3;
+            for(var index=0;index<3;index++)
+            {
+                var tile=downloadTiles.Children[index];Grid.SetColumn(tile,columns==1?0:index);Grid.SetRow(tile,columns==1?index:0);
+                if(tile is FrameworkElement element)element.Margin=columns==1?new(0,0,0,index==2?0:8):new(index==0?0:6,0,index==2?0:6,0);
+            }
+            if(columns==1&&downloadTiles.RowDefinitions.Count<3)for(var index=0;index<3;index++)downloadTiles.RowDefinitions.Add(new(){Height=GridLength.Auto});
+            if(columns==3)downloadTiles.RowDefinitions.Clear();
+        }
+        if(downloadDropZone!=null)downloadDropZone.Visibility=ActualHeight>=700?Visibility.Visible:Visibility.Collapsed;
     }
     void UpdateDownloadSummary()
     {
-        if(downloadSummary==null)return;
-        var active=downloads.Items.Count(x=>!x.Paused&&!x.Completed);var seeding=downloads.Items.Count(x=>!x.Paused&&x.Completed);
-        downloadSummary.Text=$"Всего: {downloads.Items.Count} · Загружается: {active} · Раздаётся: {seeding}";downloadSummary.ToolTip=downloadSummary.Text;
+        var all=downloads.Items;
+        var active=all.Count(x=>MatchesTab("active",x));var seeding=all.Count(x=>MatchesTab("seeding",x));var errors=all.Count(x=>MatchesTab("errors",x));
+        if(downloadSummary!=null)
+        {
+            var parts=new List<string>{$"{all.Count} {Plural(all.Count,"торрент","торрента","торрентов")}"};
+            if(active>0)parts.Add($"{active} в работе");
+            if(seeding>0)parts.Add($"{seeding} {Plural(seeding,"раздаётся","раздаются","раздаются")}");
+            if(errors>0)parts.Add($"{errors} с ошибкой");
+            downloadSummary.Text=string.Join(" · ",parts);downloadSummary.ToolTip=downloadSummary.Text;
+        }
+        foreach(var (key,label) in downloadTabCounts)
+            label.Text=(key switch{"active"=>active,"seeding"=>seeding,"errors"=>errors,_=>all.Count}).ToString();
+        UpdateDownloadTiles();
     }
+    static bool MatchesTab(string tab,DownloadItem item)=>tab switch
+    {
+        "active"=>!item.Completed&&!item.Paused&&item.StatusKind!=DownloadStatusKind.Error,
+        "seeding"=>item.Completed&&!item.Paused,
+        "errors"=>item.StatusKind==DownloadStatusKind.Error,
+        _=>true
+    };
     void RefreshDownloadView()
     {
         UpdateDownloadsWidget();ApplyPosterDownloads();RefreshDetailActions();
         if(section!="Загрузки"||downloadView==null)return;RepairDownloadMetadata();UpdateDownloadSummary();
+        // A status change can move a task between tabs; re-evaluate the filter only when membership changed.
+        if(downloadTab!="all"&&!downloadView.Cast<DownloadItem>().Select(x=>x.Id).OrderBy(x=>x).SequenceEqual(downloads.Items.Where(MatchesDownloadTab).Select(x=>x.Id).OrderBy(x=>x))&&!(downloadList?.IsMouseOver==true))downloadView.Refresh();
         if(downloadSort is not ("speed" or "progress" or "size")&&!(downloadSort=="name"&&downloadMetadataSortPending))return;
         // Keep the row under the pointer stable while the user chooses an action.
         if(downloadList?.IsMouseOver==true||downloadList?.IsKeyboardFocusWithin==true||downloadMenus.Any(menu=>menu.IsOpen))return;
         var order=DownloadSortChoices.First(x=>x.Key==downloadSort).Sort;
-        if(downloadView.Cast<DownloadItem>().Select(x=>x.Id).SequenceEqual(DownloadOrdering.Sort(downloads.Items,order).Select(x=>x.Id))){downloadMetadataSortPending=false;return;}
+        if(downloadView.Cast<DownloadItem>().Select(x=>x.Id).SequenceEqual(DownloadOrdering.Sort(downloads.Items.Where(MatchesDownloadTab),order).Select(x=>x.Id))){downloadMetadataSortPending=false;return;}
         var selected=downloadList?.SelectedItem;downloadView.Refresh();if(downloadList!=null&&selected!=null)downloadList.SelectedItem=selected;
         downloadMetadataSortPending=false;
+    }
+    // ----- row events -----
+    // On narrow windows the action buttons wrap below the information column.
+    void DownloadRowResized(object sender,SizeChangedEventArgs e)
+    {
+        if(sender is not Grid grid||!e.WidthChanged)return;
+        if(grid.Children.OfType<StackPanel>().FirstOrDefault(x=>x.Name=="RowActions") is not {} actions)return;
+        var wrap=e.NewSize.Width<560;
+        if(wrap){Grid.SetColumn(actions,1);Grid.SetRow(actions,1);Grid.SetColumnSpan(actions,2);actions.HorizontalAlignment=HorizontalAlignment.Left;actions.Margin=new(8,10,0,0);}
+        else{Grid.SetColumn(actions,2);Grid.SetRow(actions,0);Grid.SetColumnSpan(actions,1);actions.HorizontalAlignment=HorizontalAlignment.Right;actions.Margin=new(0);}
+    }
+    void WatchDownloadClick(object sender,RoutedEventArgs e){if(sender is FrameworkElement {Tag:DownloadItem item})WatchDownload(item);}
+    void DownloadMoreClick(object sender,RoutedEventArgs e)
+    {
+        if(sender is not Button {Tag:DownloadItem item} button)return;
+        var menu=new ContextMenu{PlacementTarget=button,Placement=System.Windows.Controls.Primitives.PlacementMode.Bottom,HorizontalOffset=0,VerticalOffset=4};downloadMenus.Add(menu);
+        MenuItem Entry(string text,string icon,string name,RoutedEventHandler click,string? tip=null,bool danger=false)
+        {
+            var entry=MenuEntry(text,icon);entry.Tag=item;AutomationProperties.SetName(entry,name);entry.ToolTip=tip;entry.Click+=click;
+            if(danger){entry.SetResourceReference(Control.ForegroundProperty,"Danger");if(entry.Icon is Path glyph){BindingOperations.ClearBinding(glyph,Shape.StrokeProperty);glyph.SetResourceReference(Shape.StrokeProperty,"Danger");}}
+            menu.Items.Add(entry);return entry;
+        }
+        Entry("Сведения о торренте","IconInfo","Подробнее",DownloadDetails,"Файлы, серии и источники");
+        Entry("Почему не скачивается?","IconAlert","Почему не скачивается?",ShowDownloadDiagnostics,"Проверить соединения и свободное место");
+        menu.Items.Add(new Separator());
+        Entry("Убрать из списка","IconQueueRemove","Удалить из загрузок",RemoveDownload,"Удалить из загрузок, сохранив скачанные файлы");
+        Entry("Удалить вместе с файлами","IconTrash","Удалить файлы",DeleteDownloadFiles,"Удалить загрузку вместе со скачанными и частичными файлами",true);
+        button.ContextMenu=menu;menu.IsOpen=true;
+    }
+    // ----- drag and drop / paste -----
+    void InitializeDownloadDrop()
+    {
+        AllowDrop=true;
+        DragOver+=(_,e)=>{e.Effects=DropPayload(e.Data)!=null?DragDropEffects.Copy:DragDropEffects.None;e.Handled=true;};
+        Drop+=async(_,e)=>
+        {
+            var payload=DropPayload(e.Data);if(payload==null)return;e.Handled=true;
+            foreach(var source in payload)await AddDroppedSource(source);
+        };
+        PreviewKeyDown+=async(_,e)=>
+        {
+            if(section!="Загрузки"||e.Key!=Key.V||!Keyboard.Modifiers.HasFlag(ModifierKeys.Control)||Keyboard.FocusedElement is TextBox)return;
+            string text;try{text=Clipboard.ContainsText()?Clipboard.GetText().Trim():"";}catch{return;}
+            if(!text.StartsWith("magnet:",StringComparison.OrdinalIgnoreCase))return;
+            e.Handled=true;await AddDroppedSource(text);
+        };
+    }
+    static List<string>? DropPayload(IDataObject data)
+    {
+        var result=new List<string>();
+        if(data.GetDataPresent(DataFormats.FileDrop)&&data.GetData(DataFormats.FileDrop) is string[] files)result.AddRange(files.Where(x=>x.EndsWith(".torrent",StringComparison.OrdinalIgnoreCase)));
+        if(result.Count==0&&data.GetDataPresent(DataFormats.UnicodeText)&&data.GetData(DataFormats.UnicodeText) is string text&&text.Trim().StartsWith("magnet:",StringComparison.OrdinalIgnoreCase))result.Add(text.Trim());
+        return result.Count==0?null:result;
+    }
+    async Task AddDroppedSource(string source)
+    {
+        if(closing||closed)return;
+        if(!EnsureDownloadFolder()){Status.Text="Папка для загрузок не выбрана. Её можно выбрать в настройках.";return;}
+        try
+        {
+            var added=await downloads.Add(source,prefs.Folder);if(closing||closed)return;
+            section="Загрузки";current=null;activePerson=null;Render();
+            Status.Text=added.LowSpacePaused?added.SpacePauseMessage:"Раздача добавлена. Ищем участников.";
+        }
+        catch(Exception error)when(!closing&&!closed){Status.Text=error.Message;}
     }
     async void RepairDownloadMetadata()
     {
