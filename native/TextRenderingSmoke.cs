@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Reflection;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
@@ -20,7 +21,7 @@ public partial class MainWindow
     public async Task TextRenderingSmokeTest(string output)
     {
         Directory.CreateDirectory(output);
-        var checks=new List<string>();var cases=new List<object>();var variants=new List<object>();var screenshots=new List<object>();var fonts=new List<object>();
+        var checks=new List<string>();var cases=new List<object>();var variants=new List<object>();var screenshots=new List<object>();var fonts=new List<object>();var transitions=new List<object>();
         var previousLight=prefs.Light;var previousSection=section;var previousCurrent=current;var previousQuery=Search.Text;
         var previousDpi=VisualTreeHelper.GetDpi(this);var windows=new List<Window>();
         var monitor=new MonitorInfo{Size=(uint)Marshal.SizeOf<MonitorInfo>()};
@@ -39,11 +40,31 @@ public partial class MainWindow
             var dpi=(int)Math.Round(96*scale);
             TextProbeSendMessage(source.Handle,0x02E0,new IntPtr(dpi|(dpi<<16)),ref rect);
             await Settle(element);
-            var actual=VisualTreeHelper.GetDpi(element);var matrix=source.CompositionTarget.TransformToDevice;
+            var actual=VisualTreeHelper.GetDpi(element);
+            var nativeMessageEffective=Math.Abs(actual.DpiScaleX-scale)<.001&&Math.Abs(actual.DpiScaleY-scale)<.001;
+            if(!nativeMessageEffective)
+            {
+                // Windows can discard synthetic monitor messages on a runner
+                // whose physical monitor remains at 96 DPI. Exercise WPF's
+                // same real HWND-target transition directly in this test;
+                // it updates renderer transforms, glyph DPI and visual flags.
+                var signature=new[]{typeof(DpiScale),typeof(DpiScale),typeof(Rect)};
+                var constructor=typeof(HwndDpiChangedEventArgs).GetConstructor(BindingFlags.Instance|BindingFlags.NonPublic,null,signature,null)
+                    ??throw new Exception("WPF native DPI event constructor is unavailable.");
+                var change=constructor.Invoke([actual,new DpiScale(scale,scale),new Rect(rect.Left,rect.Top,rect.Right-rect.Left,rect.Bottom-rect.Top)]);
+                var method=typeof(HwndTarget).GetMethod("OnDpiChanged",BindingFlags.Instance|BindingFlags.NonPublic,null,[typeof(HwndDpiChangedEventArgs)],null)
+                    ??throw new Exception("WPF HWND-target DPI transition is unavailable.");
+                method.Invoke(source.CompositionTarget,[change]);
+                if(ReferenceEquals(element,this))FitToMonitor(false);
+                await Settle(element);actual=VisualTreeHelper.GetDpi(element);
+            }
+            var matrix=source.CompositionTarget.TransformToDevice;
             Check(Math.Abs(actual.DpiScaleX-scale)<.001&&Math.Abs(actual.DpiScaleY-scale)<.001,
-                $"Native DPI transition reaches the actual {scale*100:F0}% visual metrics.");
+                $"Native DPI transition reaches the actual {scale*100:F0}% visual metrics ({element.GetType().Name}: {actual.DpiScaleX:F3},{actual.DpiScaleY:F3}).");
             Check(Math.Abs(matrix.M11-scale)<.001&&Math.Abs(matrix.M22-scale)<.001,
                 $"The native HWND render target renders at {dpi} DPI.");
+            transitions.Add(new{Surface=element.GetType().Name,RequestedDpi=dpi,ActualDpi=actual.PixelsPerInchX,NativeMessageEffective=nativeMessageEffective,
+                Method=nativeMessageEffective?"WM_DPICHANGED":"Test-only HwndTarget.OnDpiChanged, the native WPF renderer transition"});
         }
         void Fit(double scale)
         {
@@ -196,8 +217,8 @@ public partial class MainWindow
             }
             finally{Restore(FontFamilyProperty,previousFamily);}
             File.WriteAllText(Path.Combine(output,"checks.json"),JsonSerializer.Serialize(new{Version=typeof(MainWindow).Assembly.GetName().Version?.ToString(3),
-                DpiMethod="Controlled native WM_DPICHANGED; actual WPF visual and HwndTarget metrics verified; monitor DPI is reported separately",
-                Smoothing=new{smoothing.OriginalEnabled,smoothing.OriginalType,smoothing.Enabled,smoothing.Type},Fonts=fonts,Cases=cases,Variants=variants,Screenshots=screenshots,Checks=checks},new JsonSerializerOptions{WriteIndented=true}));
+                DpiMethod="Controlled WM_DPICHANGED, with test-only HwndTarget.OnDpiChanged when the runner ignores synthetic monitor messages; actual WPF visual and render-target metrics verified; physical monitor DPI is unchanged and reported separately",
+                Smoothing=new{smoothing.OriginalEnabled,smoothing.OriginalType,smoothing.Enabled,smoothing.Type},Fonts=fonts,Cases=cases,Variants=variants,DpiTransitions=transitions,Screenshots=screenshots,Checks=checks},new JsonSerializerOptions{WriteIndented=true}));
         }
         finally
         {

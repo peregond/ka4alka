@@ -23,6 +23,20 @@ jobs:
       - name: Build native preview
         shell: pwsh
         run: ./build.ps1 -OutputDir dist/ui-preview
+      - name: Verify native typography at fractional DPI and unusual interface fonts
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          $env:KACHALKA_DATA=Join-Path $PWD 'test-output/ui-preview/text-rendering-profile'
+          $folder=Join-Path $env:KACHALKA_DATA 'downloads'
+          New-Item -ItemType Directory -Force $folder | Out-Null
+          @{Folder=$folder;FolderConfigured=$true;AutoResumeDownloads=$false;CheckForUpdates=$false;AutoUpdate=$false} | ConvertTo-Json | Set-Content (Join-Path $env:KACHALKA_DATA 'settings.json') -Encoding utf8NoBOM
+          $output=Join-Path $PWD 'test-output/ui-preview/text-rendering'
+          $app=Start-Process (Join-Path $PWD 'dist/ui-preview/Kachalka.exe') -ArgumentList @('--text-rendering-smoke-test',('"'+$output+'"')) -PassThru
+          if(-not $app.WaitForExit(120000)){$app.Kill($true);throw 'Native typography verification timed out'}
+          if(Test-Path (Join-Path $output 'error.txt')){throw (Get-Content (Join-Path $output 'error.txt') -Raw)}
+          if($app.ExitCode -ne 0 -or -not(Test-Path (Join-Path $output 'checks.json'))){throw 'Native typography evidence missing'}
+          Get-Content (Join-Path $output 'checks.json')
       - name: Render and validate interface
         shell: pwsh
         run: |
@@ -60,16 +74,6 @@ jobs:
           if(Test-Path (Join-Path $output 'error.txt')){throw (Get-Content (Join-Path $output 'error.txt') -Raw)}
           if($app.ExitCode -ne 0 -or -not(Test-Path (Join-Path $output 'checks.json'))){throw 'Person performance UI evidence missing'}
           Get-Content (Join-Path $output 'checks.json')
-      - name: Verify native typography at fractional DPI and unusual interface fonts
-        if: ${{ !cancelled() }}
-        shell: pwsh
-        run: |
-          $output=Join-Path $PWD 'test-output/ui-preview/text-rendering'
-          $app=Start-Process (Join-Path $PWD 'dist/ui-preview/Kachalka.exe') -ArgumentList @('--text-rendering-smoke-test',('"'+$output+'"')) -PassThru
-          if(-not $app.WaitForExit(120000)){$app.Kill($true);throw 'Native typography verification timed out'}
-          if(Test-Path (Join-Path $output 'error.txt')){throw (Get-Content (Join-Path $output 'error.txt') -Raw)}
-          if($app.ExitCode -ne 0 -or -not(Test-Path (Join-Path $output 'checks.json'))){throw 'Native typography evidence missing'}
-          Get-Content (Join-Path $output 'checks.json')
       - name: Verify catalog performance, navigation, source freshness and reporting
         if: ${{ !cancelled() }}
         shell: pwsh
@@ -105,6 +109,7 @@ jobs:
               Fonts=@($report.Fonts | Select-Object Resource,Family,Weight,CyrillicGlyphs,ResolvedFamilies)
               Cases=@($report.Cases | Select-Object Stage,VisualDpi,SearchFont,SearchSize,SearchViewportHeight,CharacterHeight,SearchWidth)
               Variants=@($report.Variants | Select-Object Theme,Font,VisualDpi,SearchHeight,CaretHeight,VisibleTextBlocks,WrappedBlocks,EllipsisBlocks,CyrillicGlyphs,Formatting,Rendering)
+              DpiTransitions=@($report.DpiTransitions | Select-Object Surface,RequestedDpi,ActualDpi,NativeMessageEffective,Method)
               Screenshots=@($report.Screenshots | Select-Object File,Width,Height,VisualDpi,NativeMonitorDpi,Capture,Policy)
               CheckCount=@($report.Checks).Count
             }
