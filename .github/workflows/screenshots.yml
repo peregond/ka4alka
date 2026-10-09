@@ -53,10 +53,17 @@ jobs:
           $output=Join-Path $PWD 'test-output/documentation-0.39'
           New-Item -ItemType Directory -Force $output | Out-Null
           $driver=Join-Path $PWD 'scripts/screenshots/bin/Release/net10.0-windows/CaptureReleaseScreenshot.dll'
-          $process=Start-Process -FilePath 'dotnet' -ArgumentList @(('"'+$driver+'"'),('"'+$env:KACHALKA_SCREENSHOT_RELEASE+'"'),('"'+$output+'"')) -PassThru
+          $stdout=Join-Path $env:RUNNER_TEMP 'kachalka-capture-stdout.txt'
+          $stderr=Join-Path $env:RUNNER_TEMP 'kachalka-capture-stderr.txt'
+          $process=Start-Process -RedirectStandardOutput $stdout -RedirectStandardError $stderr -FilePath 'dotnet' -ArgumentList @(('"'+$driver+'"'),('"'+$env:KACHALKA_SCREENSHOT_RELEASE+'"'),('"'+$output+'"')) -PassThru
           try {
             if(-not $process.WaitForExit(300000)){$process.Kill($true);throw 'Released application screenshot capture exceeded five minutes'}
-            if($process.ExitCode -ne 0){throw ('Released application screenshot capture failed: '+$process.ExitCode)}
+            if($process.ExitCode -ne 0){
+              if(Test-Path -LiteralPath $stdout){Get-Content -LiteralPath $stdout}
+              if(Test-Path -LiteralPath $stderr){Get-Content -LiteralPath $stderr}
+              throw ('Released application screenshot capture failed: '+$process.ExitCode)
+            }
+            Get-Content -LiteralPath $stdout
           } finally { $process.Dispose() }
           $infoPath=Join-Path $output 'capture-info.json'
           if(-not(Test-Path -LiteralPath $infoPath)){throw 'Capture metadata is missing'}
