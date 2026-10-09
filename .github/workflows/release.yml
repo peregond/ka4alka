@@ -36,7 +36,13 @@ jobs:
         run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --probe-affected-films
       - name: Verify public replacement site
         shell: pwsh
-        run: ./tests/PublishedSiteProbe.ps1
+        run: |
+          try { ./tests/PublishedSiteProbe.ps1 }
+          catch {
+            $message=$_.Exception.Message.Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A')
+            Write-Output "::error title=Published site probe::$message"
+            throw
+          }
       - name: Verify published film and series TMDB backdrops
         run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --probe-backdrops
       - name: Install NSIS
