@@ -27,13 +27,13 @@ try{
  if($LASTEXITCODE -ne 0){throw 'Updater tests failed'}
  ./tests/StableUpdateComponents.ps1
  ./build.ps1 -Test -OutputDir ('dist/Kachalka-'+$short)
- foreach($scenario in @('dpi','close','cache','download-reliability','person-performance')){
-   $scenarioDirectory=if($scenario -in @('download-reliability','person-performance')){$scenario}else{$scenario+'-reliability'}
+ foreach($scenario in @('dpi','close','cache','download-reliability','person-performance','cover-viewport','catalog-navigation','release-freshness','interface-polish','bug-report')){
+   $scenarioDirectory=if($scenario -in @('dpi','close','cache')){$scenario+'-reliability'}else{$scenario}
    $scenarioEvidence=Join-Path $root ('test-output/'+$scenarioDirectory)
    $scenarioUi=Start-Process (Join-Path $root ('dist/Kachalka-'+$short+'/Kachalka.exe')) -ArgumentList @('--'+$scenario+'-smoke-test',('"'+$scenarioEvidence+'"')) -PassThru
    if(-not $scenarioUi.WaitForExit(45000)){$scenarioUi.Kill($true);throw ($scenario+' UI smoke timed out')}
    if(Test-Path (Join-Path $scenarioEvidence 'error.txt')){throw (Get-Content (Join-Path $scenarioEvidence 'error.txt') -Raw)}
-   $scenarioFile=if($scenario -eq 'dpi'){'dpi-viewports.json'}elseif($scenario -eq 'cache' -or $scenario -in @('download-reliability','person-performance')){'checks.json'}else{'closed.json'}
+   $scenarioFile=if($scenario -eq 'dpi'){'dpi-viewports.json'}elseif($scenario -eq 'close'){'closed.json'}else{'checks.json'}
    if(-not(Test-Path (Join-Path $scenarioEvidence $scenarioFile))){throw ($scenario+' UI evidence missing')}
    if($scenario -eq 'close'){
      $closeResult=Get-Content (Join-Path $scenarioEvidence $scenarioFile) -Raw | ConvertFrom-Json

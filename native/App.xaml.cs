@@ -45,6 +45,22 @@ public partial class App : Application
         if(e.Args.Length==2&&e.Args[0]=="--cache-smoke-test"){bool running=false;window.ContentRendered+=async(_,_)=>{if(running)return;running=true;try{await window.CacheSmokeTest(e.Args[1]);}catch(Exception error){System.IO.Directory.CreateDirectory(e.Args[1]);System.IO.File.WriteAllText(System.IO.Path.Combine(e.Args[1],"error.txt"),error.ToString());window.Close();}};}
         if(e.Args.Length==2&&e.Args[0]=="--download-reliability-smoke-test"){bool running=false;window.ContentRendered+=async(_,_)=>{if(running)return;running=true;try{await window.DownloadReliabilitySmokeTest(e.Args[1]);}catch(Exception error){System.IO.Directory.CreateDirectory(e.Args[1]);System.IO.File.WriteAllText(System.IO.Path.Combine(e.Args[1],"error.txt"),error.ToString());window.Close();}};}
         if(e.Args.Length==2&&e.Args[0]=="--person-performance-smoke-test"){bool running=false;window.ContentRendered+=async(_,_)=>{if(running)return;running=true;try{await window.PersonPerformanceSmokeTest(e.Args[1]);}catch(Exception error){System.IO.Directory.CreateDirectory(e.Args[1]);System.IO.File.WriteAllText(System.IO.Path.Combine(e.Args[1],"error.txt"),error.ToString());window.Close();}};}
+        void RegisterSmoke(string flag,Func<string,Task> check)
+        {
+            if(e.Args.Length!=2||e.Args[0]!=flag)return;
+            bool running=false;
+            window.ContentRendered+=async(_,_)=>
+            {
+                if(running)return;running=true;
+                try{await check(e.Args[1]);}
+                catch(Exception error){System.IO.Directory.CreateDirectory(e.Args[1]);System.IO.File.WriteAllText(System.IO.Path.Combine(e.Args[1],"error.txt"),error.ToString());window.Close();}
+            };
+        }
+        RegisterSmoke("--cover-viewport-smoke-test",window.CoverViewportSmokeTest);
+        RegisterSmoke("--catalog-navigation-smoke-test",window.CatalogNavigationSmokeTest);
+        RegisterSmoke("--release-freshness-smoke-test",window.ReleaseFreshnessSmokeTest);
+        RegisterSmoke("--interface-polish-smoke-test",window.InterfacePolishSmokeTest);
+        RegisterSmoke("--bug-report-smoke-test",window.BugReportSmokeTest);
         window.Show();
     }
     protected override void OnExit(ExitEventArgs e){installPresence?.Dispose();instance?.Dispose();base.OnExit(e);}

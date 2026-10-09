@@ -79,7 +79,8 @@ public partial class MainWindow
         var failures=view.Sources.Count(x=>x.State is SourceState.TimedOut or SourceState.Unavailable);
         var summary=view.Checking?(liveReleases.GetValueOrDefault(releaseSourceItemId)?.Count>0?"Найденные варианты доступны":""):
             failures>0?$"Не ответили: {failures}"+(view.Saved?" · есть сохранённые":""):view.Saved?"Есть сохранённые варианты":"";
-        releaseSourceSummary.Text=summary;releaseSourceSummary.ToolTip=summary;releaseSourceSummary.Visibility=summary.Length>0?Visibility.Visible:Visibility.Collapsed;
+        if(summary.Length==0&&view.ReceivedUtc.HasValue)summary="Данные: "+ReleaseFreshness.Age(view.ReceivedUtc,DateTime.UtcNow);
+        releaseSourceSummary.Text=summary;releaseSourceSummary.ToolTip=summary+". "+ReleaseFreshness.ConnectionNote;releaseSourceSummary.Visibility=summary.Length>0?Visibility.Visible:Visibility.Collapsed;
         releaseSourceRetry.IsEnabled=!view.Checking;
         releaseSourceToggle.Content=(view.Expanded?"Скрыть источники":"Источники")+(view.Sources.Length>0?$" · {view.Sources.Length}":"");
         AutomationProperties.SetItemStatus(releaseSourceToggle,view.Checking?"Проверяем источники":failures>0?$"Не ответили: {failures}":view.Sources.Length>0?"Проверка завершена":"Источники ещё не проверяли");
@@ -94,12 +95,8 @@ public partial class MainWindow
         {
             var row=new Grid{Margin=new(0,0,0,8)};row.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});row.ColumnDefinitions.Add(new(){Width=new GridLength(1.6,GridUnitType.Star)});
             var name=Text(source.Name,12);name.FontWeight=FontWeights.Medium;name.Margin=new(0,0,12,0);row.Children.Add(name);
-            var state=source.State switch
-            {
-                SourceState.Searching=>"Проверяем…",SourceState.Ready=>$"Найдено вариантов: {source.Count}",SourceState.Empty=>"Подходящих вариантов не найдено",
-                SourceState.TimedOut=>"Не ответил вовремя",SourceState.Unavailable=>"Временно недоступен",SourceState.Indexed=>$"В индексе: {source.Count} · трекер отдельно не проверялся",SourceState.Saved=>$"Сохранено вариантов: {source.Count}",_=>""
-            };
-            var details=Text(state,12,true);details.Margin=new(0);Grid.SetColumn(details,1);row.Children.Add(details);releaseSourceRows.Children.Add(row);
+            var details=Text(ReleaseFreshness.SourceStateText(source,DateTime.UtcNow),12,true);details.Margin=new(0);
+            details.ToolTip=ReleaseFreshness.ConnectionNote;Grid.SetColumn(details,1);row.Children.Add(details);releaseSourceRows.Children.Add(row);
         }
     }
 }

@@ -35,8 +35,10 @@ public static class ReleaseSearch
             SourceEntry[] items=[];SourceCheck check;
             try
             {
-                items=(await provider.Search(deadline.Token).WaitAsync(deadline.Token)).ToArray();
-                var now=DateTime.UtcNow;check=new(provider.Name,items.Length>0?SourceState.Ready:SourceState.Empty,items.Length,now,now);
+                var rows=await provider.Search(deadline.Token).WaitAsync(deadline.Token);
+                var now=DateTime.UtcNow;
+                items=rows.Select(row=>row with{DataReceivedUtc=now,DataProvider=provider.Name}).ToArray();
+                check=new(provider.Name,items.Length>0?SourceState.Ready:SourceState.Empty,items.Length,now,now);
             }
             catch(OperationCanceledException) when(!ct.IsCancellationRequested){check=new(provider.Name,SourceState.TimedOut,CheckedUtc:DateTime.UtcNow);}
             catch(Exception) when(!ct.IsCancellationRequested){check=new(provider.Name,SourceState.Unavailable,CheckedUtc:DateTime.UtcNow);}

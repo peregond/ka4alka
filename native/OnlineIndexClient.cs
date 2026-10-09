@@ -163,6 +163,11 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null)
         var id=IdFor(item)??throw new InvalidDataException("Карточка не связана с онлайн-индексом.");
         using var json=await Get("api/releases?id="+Uri.EscapeDataString(id),ct);
         if(!json.RootElement.TryGetProperty("items",out var items)||items.ValueKind!=JsonValueKind.Array)throw new InvalidDataException("Онлайн-индекс вернул неверные раздачи.");
-        return items.EnumerateArray().Take(300).Where(x=>x.ValueKind==JsonValueKind.Object).Select(x=>Release(x,id)).OfType<SourceEntry>().ToArray();
+        // Catalog quality/availability read this API directly too. Record this
+        // response receipt before any caller merges it with older saved rows.
+        // The index's upstream tracker refresh time is deliberately not inferred.
+        var receivedUtc=DateTime.UtcNow;
+        return items.EnumerateArray().Take(300).Where(x=>x.ValueKind==JsonValueKind.Object).Select(x=>Release(x,id)).OfType<SourceEntry>()
+            .Select(row=>row with{DataReceivedUtc=receivedUtc,DataProvider="Онлайн-индекс"}).ToArray();
     }
 }

@@ -52,9 +52,10 @@ public partial class MainWindow:Window
     void SearchChanged(object sender,TextChangedEventArgs e){if(!ready)return;ClearSearchButton.Visibility=Search.Text.Length>0?Visibility.Visible:Visibility.Collapsed;searchDelay.Stop();}
     void ShowCatalogSection(string name)
     {
+        searchDelay.Stop();if(TryRestoreCatalogContext(name)){Render();return;}
         var restore=SearchActive&&name==lastCatalogSection&&section is not ("Фильмы" or "Сериалы");
         searchDelay.Stop();section=name;lastCatalogSection=name;current=null;activePerson=null;personSearchReturn=null;savedReturn=null;
-        if(!restore){liveRequest?.Cancel();liveLoading=false;genre="Все";livePage=1;favoritesOnly=false;submittedQuery="";searchCategory="";ResetCatalogFilters();Search.Text="";liveKey="";}
+        if(!restore){ResetCatalogNavigationPosition();liveRequest?.Cancel();liveLoading=false;genre="Все";livePage=1;favoritesOnly=false;submittedQuery="";searchCategory="";ResetCatalogFilters();Search.Text="";liveKey="";}
         else Search.Text=submittedQuery;
         Render();
     }
@@ -62,7 +63,7 @@ public partial class MainWindow:Window
     void PosterResized(object sender,SizeChangedEventArgs e){if(sender is Border poster){if(e.WidthChanged&&e.NewSize.Width>0){var height=e.NewSize.Width*1.5;if(double.IsNaN(poster.Height)||Math.Abs(poster.Height-height)>1)poster.Height=height;}ClipPoster(poster);}}
     void Render()
     {
-        if(!ready)return;savedScroll=null;personRequest?.Cancel();personRequest?.Dispose();personRequest=null;
+        if(!ready)return;BeginCatalogNavigationRender();savedScroll=null;personRequest?.Cancel();personRequest?.Dispose();personRequest=null;
         SyncDiscoveryContext();
         if(activePerson!=null&&(section!=personSection||current?.Id!=personOrigin?.Id))activePerson=null;
         if(current==null&&activePerson==null&&section!="Настройки")savedReturn=null;
@@ -96,7 +97,7 @@ public partial class MainWindow:Window
         IEnumerable<MediaItem> result=Catalog.Items.Concat(prefs.LiveFavorites).Where(x=>section=="Избранное"?prefs.Favorites.Contains(x.Id):x.Section==section).Where(x=>x.Title.Contains(Search.Text,StringComparison.CurrentCultureIgnoreCase)).Where(x=>genre=="Все"||x.Genre==genre);
         result=sort=="По году"?result.OrderByDescending(x=>x.Year):sort=="По названию"?result.OrderBy(x=>x.Title):result;
         var cards=result.ToArray();ShowCatalog(cards);if(cards.Length==0)PageHeader.Children.Add(Text("Ничего не найдено. Измени поиск или фильтры.",14,true));
-        }finally{RefreshLoadingIndicator();}
+        }finally{EndCatalogNavigationRender();RefreshLoadingIndicator();}
     }
     void OpenCard(object sender,RoutedEventArgs e)
     {
@@ -151,11 +152,12 @@ public partial class MainWindow:Window
         Application.Current.Resources["Danger"]=new SolidColorBrush((Color)ColorConverter.ConvertFromString(prefs.Light?"#B42335":"#FFB2BB"));
         Application.Current.Resources["RatingInk"]=new SolidColorBrush((Color)ColorConverter.ConvertFromString(prefs.Light?"#805200":"#FFD166"));
         SidePanel.SetResourceReference(Border.BackgroundProperty,"Sidebar");
+        ApplyInterfaceTheme(prefs.Light);
     }
     bool closing;
     async void OnClosing(object? sender,CancelEventArgs e)
     {
-        if(closed)return;e.Cancel=true;if(closing)return;closing=true;
+        if(closed)return;e.Cancel=true;if(closing)return;closing=true;StopCoverViewport();
         DiagnosticLog.Write("closing",new{QueueCount=downloads.Items.Count});Status.Text="Сохраняем загрузки и закрываем приложение…";
         IsEnabled=false;StopDownloadReliability();personRequest?.Cancel();updateCancellation.Cancel();catalogRefreshTimer.Stop();refresh.Stop();searchDelay.Stop();liveRequest?.Cancel();sourceRequest?.Cancel();archiveRequest?.Cancel();broadcastRequest?.Cancel();
         ResetDiscoveryData();CancelDetailMetadata();CancelCatalogQualityCheck();CancelPeopleSearch();foreach(var view in releaseViews.Values)view.Request?.Cancel();

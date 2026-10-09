@@ -210,14 +210,18 @@ public partial class MainWindow
         var diagnostics=Card("Помощь и диагностика","Отчёт поможет разобраться с ошибкой. Пути к личным папкам и ключи доступа скрываются.","IconInfo");
         var diagnosticActions=new WrapPanel();diagnostics.Children.Add(diagnosticActions);
         var diagnosticNotice=Notice(diagnostics);
-        diagnosticActions.Children.Add(ActionButton("Скопировать логи","IconFile",()=>
+        var copyingReport=false;
+        diagnosticActions.Children.Add(ActionButton("Скопировать логи","IconFile",async()=>
         {
-            try{Clipboard.SetText(DiagnosticReport.Create(prefs,downloads));Feedback(diagnosticNotice,"Диагностический отчёт скопирован.");}
+            if(copyingReport)return;copyingReport=true;
+            try{var report=await DiagnosticReport.CreateAsync(prefs,downloads,reliabilityCancellation.Token);if(closing||closed)return;Clipboard.SetText(report);Feedback(diagnosticNotice,"Диагностический отчёт скопирован.");}
+            catch(OperationCanceledException)when(closing||closed){}
             catch(Exception error){Feedback(diagnosticNotice,"Не удалось скопировать логи: "+error.Message,true);}
+            finally{copyingReport=false;}
         }));
         diagnosticActions.Children.Add(ActionButton("Сообщить об ошибке","IconInfo",()=>
         {
-            try{System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(DiagnosticReport.IssueUrl){UseShellExecute=true});}
+            try{ShowBugReport();}
             catch(Exception error){Feedback(diagnosticNotice,"Не удалось открыть форму: "+error.Message,true);}
         }));
         diagnostics.Children.Add(Text("Отчёт отправляется только вручную — приложение само его никуда не отправляет.",11,true));

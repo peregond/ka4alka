@@ -69,6 +69,8 @@ await SharedCatalogTests.Run();
 await UnifiedSearchTests.Run();
 if(args.Contains("--catalog-only"))return;
 await ReleaseSearchTests.Run();
+await ReleaseFreshnessTests.Run(root);
+await BugReportTests.Run(root);
 await MediaMetadataTests.Run();
 await ZonaMovieMetadataTests.Run();
 await CinemaPortraitTests.Run();

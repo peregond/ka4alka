@@ -7,8 +7,10 @@ namespace Kachalka;
 
 public partial class MainWindow
 {
+    bool personProfileLoading;
     void RenderPerson(CinemaPerson person,MediaItem? origin)
     {
+        personProfileLoading=true;
         PageHeader.Children.Add(ActionButton(origin==null?"К результатам поиска":"Назад к фильму","IconBack",()=>
         {
             activePerson=null;
@@ -81,7 +83,7 @@ public partial class MainWindow
             // A provider's queued progress can arrive after its final result or
             // after a retry started. Check again on the UI thread before editing.
             if(!IsCurrent()||attempt!=refreshAttempt||!complete&&attempt==settledAttempt)return;
-            if(complete)settledAttempt=attempt;
+            if(complete){settledAttempt=attempt;personProfileLoading=false;}
             var hasBiography=!string.IsNullOrWhiteSpace(profile.Description);
             if(hasBiography||complete)
             {
@@ -96,24 +98,30 @@ public partial class MainWindow
             status.Text=complete?(films.Length>0?$"Подтверждённые работы: {films.Length}":"Фильмография пока недоступна."):(films.Length>0?$"Подтверждённые работы: {films.Length} · загружаем остальные…":"Загружаем фильмографию…");
             empty.Visibility=complete&&films.Length==0?Visibility.Visible:Visibility.Collapsed;
             retry.Visibility=complete&&(!hasBiography||films.Length<2)?Visibility.Visible:Visibility.Collapsed;
+            if(navigationPendingPosition!=null)ScheduleCatalogPositionRestore();
         }
         async Task Refresh()
         {
             if(!IsCurrent())return;
             var attempt=++refreshAttempt;
+            personProfileLoading=true;
             retry.Visibility=Visibility.Collapsed;status.Text="Загружаем фильмографию…";
             try
             {
                 // Snapshot UI-owned lists first. Providers read disk caches and
                 // parse substantial HTML/JSON even when no network await yields.
                 var known=liveItems.Concat(prefs.LiveFavorites).ToArray();
-                var profile=await LoadPersonInBackground(sourceClient,person,request.Token,origin,known,updated=>Apply(updated,attempt));Apply(profile,attempt,true);
+                var profile=personProfileProvider is {} provider
+                    ?await provider(person,origin,known,request.Token,updated=>Apply(updated,attempt))
+                    :await LoadPersonInBackground(sourceClient,person,request.Token,origin,known,updated=>Apply(updated,attempt));
+                Apply(profile,attempt,true);
             }
             catch(OperationCanceledException)when(request.IsCancellationRequested){}
             catch
             {
-                if(!IsCurrent()||attempt!=refreshAttempt)return;settledAttempt=attempt;status.Text="Не удалось обновить фильмографию.";retry.Visibility=Visibility.Visible;
+                if(!IsCurrent()||attempt!=refreshAttempt)return;settledAttempt=attempt;personProfileLoading=false;status.Text="Не удалось обновить фильмографию.";retry.Visibility=Visibility.Visible;
                 if(biography.Text=="Загружаем биографию…")biography.Text="Биография пока недоступна.";
+                if(navigationPendingPosition!=null)ScheduleCatalogPositionRestore();
             }
         }
         all.Frame.Visibility=top.Frame.Visibility=awards.Frame.Visibility=Visibility.Collapsed;

@@ -35,9 +35,10 @@ public partial class MainWindow
     void FocusCatalogSearch(){if(SearchBar.Visibility!=Visibility.Visible){ShowCatalogSection(lastCatalogSection);Render();}Search.Focus();Search.SelectAll();}
     void EnableShortcuts()
     {
+        InitializeInterfacePolish();
         PreviewKeyDown+=(_,e)=>
         {
-            if(e.Key==Key.K&&Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+            if((e.Key is Key.K or Key.F or Key.L)&&Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
             {
                 FocusCatalogSearch();e.Handled=true;
             }

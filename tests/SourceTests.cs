@@ -203,7 +203,10 @@ public static class SourceTests
             var detailed=await online.Detail(movies[0],CancellationToken.None);
             Check(detailed.Description=="Описание из онлайн-индекса."&&detailed.OriginalTitle=="Moonrise"&&detailed.Kinopoisk=="7,8"&&detailed.Imdb=="8.2"&&detailed.Id==expected.Id,
                 "online detail fills original title, description, and both ratings");
+            var releasesRequestedUtc=DateTime.UtcNow;
             var releases=await online.Releases(detailed,CancellationToken.None);
+            Check(releases.All(x=>x.DataProvider=="Онлайн-индекс"&&x.DataReceivedUtc>=releasesRequestedUtc&&x.DataReceivedUtc<=DateTime.UtcNow),
+                "direct online release reads stamp the actual index receipt for catalog quality and availability caches");
             Check(releases.Count==2&&releases[0].Source=="RuTracker"&&releases[0].Via=="Knaben"&&releases[0].Seeds==37&&releases[0].Size==4294967296&&releases[0].TorrentUrl!.StartsWith("magnet:?xt=urn:btih:",StringComparison.Ordinal),
                 "online RuTracker release keeps source attribution and download metadata");
             Check(releases[1].Source=="Internet Archive"&&releases[1].Id=="Archive_01"&&releases[1].TorrentUrl==null&&releases[1].PageUrl=="https://archive.org/details/Archive_01"&&releases.All(x=>!x.Title.Contains("unsafe")&&!x.Title.Contains("webpage")&&!x.Title.Contains("unavailable")),

@@ -63,7 +63,7 @@ public partial class MainWindow
         var isSeries=current?.Section=="Сериалы";
         if(isSeries){Filter("Сезон",releases.Select(x=>x.Series).OrderBy(x=>x.Season??int.MaxValue).Select(x=>x.SeasonLabel));Filter("Серия",releases.Select(x=>x.Series).OrderBy(x=>x.Episode??int.MaxValue).Select(x=>x.EpisodeLabel));}
         Filter("Качество",releases.Select(x=>x.Quality));
-        Filter("Озвучка",releases.Select(x=>x.Voice));
+        Filter("Озвучка",releases.Select(ReleaseFreshness.Audio));
         Filter("Субтитры",releases.Select(x=>x.Subs));
         Filter("Источник",releases.Select(x=>x.Source),true);
         Filter("Тип",releases.Select(x=>x.Type),true);
@@ -119,25 +119,26 @@ public partial class MainWindow
         {
             var body=new StackPanel();
             var title=Text(entry.Title,14);title.FontWeight=FontWeights.SemiBold;title.Margin=new(0,0,0,8);body.Children.Add(title);
-            var source=Text(entry.Source+(entry.Via==null?"":" · через "+entry.Via),11,true);source.Margin=new(0,0,0,12);body.Children.Add(source);
+            var source=Text(ReleaseFreshness.Caption(entry,DateTime.UtcNow),11,true);source.ToolTip=ReleaseFreshness.Details(entry,DateTime.UtcNow);source.Margin=new(0,0,0,12);body.Children.Add(source);
             var summary=new WrapPanel{Margin=new(0,0,0,8)};
             if(ReleaseQuality.Poor(entry,QualityMinimum))summary.Children.Add(PoorQualityBadge(ReleaseQuality.Label(entry)));
-            void Badge(string value,bool accent=false)
+            void Badge(string value,bool accent=false,string? tooltip=null)
             {
                 var text=new TextBlock{Text=value,FontSize=11,FontWeight=accent?FontWeights.SemiBold:FontWeights.Normal};
                 text.SetResourceReference(TextBlock.ForegroundProperty,accent?"Accent":"Text");
                 var badge=new Border{Child=text,CornerRadius=new(7),Padding=new(8,5,8,5),Margin=new(0,0,6,6)};
-                badge.SetResourceReference(Border.BackgroundProperty,"Selected");summary.Children.Add(badge);
+                badge.SetResourceReference(Border.BackgroundProperty,"Selected");badge.ToolTip=tooltip;summary.Children.Add(badge);
             }
             if(entry.Quality!="Не указано")Badge(entry.Quality,true);
+            if(ReleaseFreshness.Audio(entry)!="Не указано")Badge(ReleaseFreshness.Audio(entry),RussianAudio.Rank(entry)==3,ReleaseFreshness.AudioNote);
             if(isSeries){Badge(entry.Series.SeasonLabel);Badge(entry.Series.EpisodeLabel);}
             Badge(entry.Size.HasValue?DownloadService.FormatBytes(entry.Size.Value):"Размер не указан");
-            Badge(entry.Seeds switch{>0=> $"Отдают: {entry.Seeds.Value}",0=>"Отдают: 0 по данным источника",_=>"Отдают: неизвестно"});
-            if(entry.Leechers.HasValue)Badge($"Скачивают: {entry.Leechers.Value}");
+            Badge(entry.Seeds switch{>0=> $"Отдают: {entry.Seeds.Value}",0=>"Отдают: 0 по данным источника",_=>"Отдают: неизвестно"},tooltip:ReleaseFreshness.ConnectionNote);
+            if(entry.Leechers.HasValue)Badge($"Скачивают: {entry.Leechers.Value}",tooltip:ReleaseFreshness.ConnectionNote);
             body.Children.Add(summary);
             var key=entry.Source+"|"+entry.Id;
             var details=new StackPanel{Visibility=state.Expanded.Contains(key)?Visibility.Visible:Visibility.Collapsed,Margin=new(0,0,0,12)};
-            foreach(var value in new[]{"Видео: "+VideoLabel(entry),"Озвучка: "+entry.Voice,"Субтитры: "+entry.Subs})
+            foreach(var value in new[]{"Видео: "+VideoLabel(entry),"Озвучка: "+ReleaseFreshness.Audio(entry),"Субтитры: "+entry.Subs})
             {
                 var line=Text(value,12,true);line.Margin=new(0,0,0,6);details.Children.Add(line);
             }
@@ -164,13 +165,17 @@ public partial class MainWindow
             {
                 if(!filters.ContainsKey(key))continue;
                 var value=state.Filters[key];if(value=="Все")continue;
-                filtered=key switch{"Источник"=>filtered.Where(x=>x.Source==value),"Сезон"=>filtered.Where(x=>x.Series.SeasonLabel==value),"Серия"=>filtered.Where(x=>x.Series.EpisodeLabel==value),"Качество"=>filtered.Where(x=>x.Quality==value),"Тип"=>filtered.Where(x=>x.Type==value),"Озвучка"=>filtered.Where(x=>x.Voice==value),"Субтитры"=>filtered.Where(x=>x.Subs==value),"Кодек"=>filtered.Where(x=>x.Codec==value),_=>filtered.Where(x=>x.Hdr==value)};
+                filtered=key switch{"Источник"=>filtered.Where(x=>x.Source==value),"Сезон"=>filtered.Where(x=>x.Series.SeasonLabel==value),"Серия"=>filtered.Where(x=>x.Series.EpisodeLabel==value),"Качество"=>filtered.Where(x=>x.Quality==value),"Тип"=>filtered.Where(x=>x.Type==value),"Озвучка"=>filtered.Where(x=>ReleaseFreshness.Audio(x)==value),"Субтитры"=>filtered.Where(x=>x.Subs==value),"Кодек"=>filtered.Where(x=>x.Codec==value),_=>filtered.Where(x=>x.Hdr==value)};
             }
-            filtered=state.Sort switch{"Русская озвучка"=>RussianAudio.Order(filtered),"Русские источники"=>filtered.OrderByDescending(RussianSource).ThenByDescending(SeedRank),"Меньше размер"=>filtered.OrderBy(x=>x.Size??long.MaxValue),"Выше качество"=>filtered.OrderByDescending(QualityRank).ThenByDescending(SeedRank),"По названию"=>filtered.OrderBy(x=>x.Title,StringComparer.CurrentCultureIgnoreCase),"По сезону и серии"=>filtered.OrderBy(x=>x.Series.Season??int.MaxValue).ThenBy(x=>x.Series.Episode??int.MaxValue),"По видео"=>filtered.OrderBy(x=>x.Type=="Не указано").ThenBy(x=>x.Type),"По субтитрам"=>filtered.OrderBy(x=>x.Subs=="Не указано").ThenBy(x=>x.Subs),"По озвучке"=>filtered.OrderBy(x=>x.Voice=="Не указано").ThenBy(x=>x.Voice),_=>filtered.OrderByDescending(SeedRank)};
+            filtered=state.Sort switch{"Русская озвучка"=>RussianAudio.Order(filtered),"Русские источники"=>filtered.OrderByDescending(RussianSource).ThenByDescending(SeedRank),"Меньше размер"=>filtered.OrderBy(x=>x.Size??long.MaxValue),"Выше качество"=>filtered.OrderByDescending(QualityRank).ThenByDescending(SeedRank),"По названию"=>filtered.OrderBy(x=>x.Title,StringComparer.CurrentCultureIgnoreCase),"По сезону и серии"=>filtered.OrderBy(x=>x.Series.Season??int.MaxValue).ThenBy(x=>x.Series.Episode??int.MaxValue),"По видео"=>filtered.OrderBy(x=>x.Type=="Не указано").ThenBy(x=>x.Type),"По субтитрам"=>filtered.OrderBy(x=>x.Subs=="Не указано").ThenBy(x=>x.Subs),"По озвучке"=>filtered.OrderBy(x=>ReleaseFreshness.Audio(x)=="Не указано").ThenBy(ReleaseFreshness.Audio),_=>filtered.OrderByDescending(SeedRank)};
             var visible=filtered.ToArray();var displayed=visible.Take(state.VisibleCount).ToArray();
             var countLabel=displayed.Length<visible.Length?$"Показано {displayed.Length} из {visible.Length}":visible.Length<releases.Count?$"Вариантов: {visible.Length} из {releases.Count}":$"Вариантов: {visible.Length}";
             var count=Text(countLabel,12,true);count.Margin=new(0,0,0,12);results.Children.Add(count);
-            if(visible.Any(x=>x.Seeds==0)){var warning=Text("У некоторых раздач источник показывает: отдают 0 — они могут не скачаться. Сначала попробуй варианты с доступными участниками.",12,true);warning.Margin=new(0,0,0,12);results.Children.Add(warning);}
+            if(visible.Length>0)
+            {
+                var hint=Text(ReleaseFreshness.ConnectionNote,11,true);hint.Margin=new(0,0,0,12);results.Children.Add(hint);
+            }
+            if(visible.Any(x=>x.Seeds==0)){var warning=Text("У некоторых раздач источник показывает: отдают 0. Числа могут устареть — при отсутствии подключения попробуй другой вариант.",12,true);warning.Margin=new(0,0,0,12);results.Children.Add(warning);}
             if(visible.Length==0)
             {
                 var empty=new StackPanel{Margin=new(20)};
@@ -207,10 +212,11 @@ public partial class MainWindow
                 var row=RowGrid();var identity=new StackPanel{Margin=new(10,15,10,15),VerticalAlignment=VerticalAlignment.Center};
                 var title=Text(entry.Title,12);title.FontWeight=FontWeights.Medium;title.Margin=new(0,0,0,4);title.ToolTip=entry.Title;identity.Children.Add(title);
                 if(isSeries){var episode=Text(entry.Series.SeasonLabel+" · "+entry.Series.EpisodeLabel,11,true);episode.Margin=new(0,0,0,4);identity.Children.Add(episode);}
-                var source=Text(entry.Source+(entry.Via==null?"":" · через "+entry.Via),11,true);source.Margin=new(0);identity.Children.Add(source);row.Children.Add(identity);
+                var source=Text(ReleaseFreshness.Caption(entry,DateTime.UtcNow),11,true);source.ToolTip=ReleaseFreshness.Details(entry,DateTime.UtcNow);source.Margin=new(0);identity.Children.Add(source);row.Children.Add(identity);
                 if(ReleaseQuality.Poor(entry,QualityMinimum))identity.Children.Add(PoorQualityBadge(ReleaseQuality.Label(entry)));
-                var participants=Cell((entry.Seeds?.ToString()??"—")+" / "+(entry.Leechers?.ToString()??"—"),1);participants.ToolTip=$"Отдают: {entry.Seeds?.ToString()??"неизвестно"} · Скачивают: {entry.Leechers?.ToString()??"неизвестно"}";row.Children.Add(participants);var quality=Cell(entry.Quality,2);quality.FontWeight=FontWeights.SemiBold;row.Children.Add(quality);
-                row.Children.Add(Cell(VideoLabel(entry),3,true));row.Children.Add(Cell(entry.Subs,4,true));row.Children.Add(Cell(entry.Voice,5));
+                var participants=Cell((entry.Seeds?.ToString()??"—")+" / "+(entry.Leechers?.ToString()??"—"),1);participants.ToolTip=$"Отдают: {entry.Seeds?.ToString()??"неизвестно"} · Скачивают: {entry.Leechers?.ToString()??"неизвестно"}. "+ReleaseFreshness.ConnectionNote;row.Children.Add(participants);var quality=Cell(entry.Quality,2);quality.FontWeight=FontWeights.SemiBold;row.Children.Add(quality);
+                row.Children.Add(Cell(VideoLabel(entry),3,true));row.Children.Add(Cell(entry.Subs,4,true));
+                var audio=Cell(ReleaseFreshness.Audio(entry),5);audio.ToolTip=ReleaseFreshness.AudioNote;if(RussianAudio.Rank(entry)==3)audio.SetResourceReference(TextBlock.ForegroundProperty,"Accent");row.Children.Add(audio);
                 row.Children.Add(Cell(entry.Size.HasValue?DownloadService.FormatBytes(entry.Size.Value):"—",6));
                 var download=DownloadButton(entry);download.Margin=new(0,8,12,8);Grid.SetColumn(download,7);row.Children.Add(download);
                 var rowFrame=new Border{Child=row,BorderThickness=new(0,0,0,1)};rowFrame.SetResourceReference(Border.BorderBrushProperty,"EdgeSoft");table.Children.Add(rowFrame);
