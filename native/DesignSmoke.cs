@@ -296,7 +296,7 @@ public partial class MainWindow
                 var firstSeason=FindVisual<RadioButton>(Body,x=>AutomationProperties.GetName(x)=="Сезон: 1 сезон")!;firstSeason.IsChecked=true;await Settle();
                 var seasonReleases=VisualElements<Button>(Body).Where(x=>x.IsVisible&&x.Tag is SourceEntry&&x.Name!="DetailDownload").Select(x=>(SourceEntry)x.Tag).ToArray();
                 if(seasonReleases.Length!=1||seasonReleases[0].Id!="series-s01"||seasonFilter.SelectedItem?.ToString()!="1 сезон")throw new Exception("Choosing a season in the strip did not filter its releases.");
-                Shot("series-season-strip");
+                await Size(1280,820);firstSeason=FindVisual<RadioButton>(Body,x=>AutomationProperties.GetName(x)=="Сезон: 1 сезон")!;firstSeason.BringIntoView();await Settle();Shot("series-season-strip");
             }
             await Size(1760,950);section="Загрузки";current=null;Render();await Settle();
             if(downloads.Items.Count!=0||downloads.EngineCreated)throw new Exception("Design smoke unexpectedly created a download.");
