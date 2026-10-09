@@ -296,6 +296,21 @@ public partial class MainWindow
         if(wrap){Grid.SetColumn(actions,1);Grid.SetRow(actions,1);Grid.SetColumnSpan(actions,2);actions.HorizontalAlignment=HorizontalAlignment.Left;actions.Margin=new(8,10,0,0);}
         else{Grid.SetColumn(actions,2);Grid.SetRow(actions,0);Grid.SetColumnSpan(actions,1);actions.HorizontalAlignment=HorizontalAlignment.Right;actions.Margin=new(0);}
     }
+    // "Подробнее" opens the queue row in place: files, folder, sources and the added time.
+    void ToggleDownloadDetails(object sender,RoutedEventArgs e)
+    {
+        if(sender is not FrameworkElement {Tag:DownloadItem item})return;
+        item.Expanded=!item.Expanded;item.Refresh();
+    }
+    void DownloadDetailsPanelResized(object sender,SizeChangedEventArgs e)
+    {
+        if(sender is not Grid grid||!e.WidthChanged||grid.Children.Count<2||grid.ColumnDefinitions.Count<2)return;
+        var stacked=e.NewSize.Width<560;var info=grid.Children[1];
+        grid.ColumnDefinitions[1].MinWidth=stacked?0:220;grid.ColumnDefinitions[1].Width=stacked?new GridLength(0):new GridLength(1,GridUnitType.Star);
+        Grid.SetColumn(info,stacked?0:1);Grid.SetRow(info,stacked?1:0);
+        if(info is FrameworkElement element)element.Margin=stacked?new(0,10,0,0):new(0);
+        if(grid.Children[0] is FrameworkElement files)files.Margin=stacked?new(0):new(0,0,24,0);
+    }
     void WatchDownloadClick(object sender,RoutedEventArgs e){if(sender is FrameworkElement {Tag:DownloadItem item})WatchDownload(item);}
     void DownloadMoreClick(object sender,RoutedEventArgs e)
     {
@@ -307,7 +322,7 @@ public partial class MainWindow
             if(danger){entry.SetResourceReference(Control.ForegroundProperty,"Danger");if(entry.Icon is Path glyph){BindingOperations.ClearBinding(glyph,Shape.StrokeProperty);glyph.SetResourceReference(Shape.StrokeProperty,"Danger");}}
             menu.Items.Add(entry);return entry;
         }
-        Entry("Сведения о торренте","IconInfo","Подробнее",DownloadDetails,"Файлы, серии и источники");
+        Entry("Сведения о торренте","IconInfo","Сведения о торренте",DownloadDetails,"Файлы, серии и источники");
         Entry("Почему не скачивается?","IconAlert","Почему не скачивается?",ShowDownloadDiagnostics,"Проверить соединения и свободное место");
         menu.Items.Add(new Separator());
         Entry("Убрать из списка","IconQueueRemove","Удалить из загрузок",RemoveDownload,"Удалить из загрузок, сохранив скачанные файлы");

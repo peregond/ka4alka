@@ -51,7 +51,7 @@ public partial class MainWindow
                 Expect(texts.Any(x=>x.Text==ReleaseFreshness.Caption(indexed,DateTime.UtcNow))||(texts.Any(x=>x.Text==ReleaseFreshness.Age(indexed.DataReceivedUtc,DateTime.UtcNow))&&texts.Any(x=>x.Text==ReleaseFreshness.SourceName(indexed)+" · индекс")),name+": index provenance is missing.");
                 Expect(texts.Any(x=>x.Text.EndsWith("время неизвестно",StringComparison.Ordinal)),name+": legacy cache date was invented.");
                 Expect(texts.Any(x=>x.Text=="Русская · дубляж"||x.Text=="Озвучка: Русская · дубляж"),name+": Russian audio is hidden.");
-                Expect(texts.Any(x=>x.Text==ReleaseFreshness.ConnectionNote),name+": advertised participants are presented as confirmed peers.");
+                Expect(VisualElements<FrameworkElement>(Body).Any(x=>x.ToolTip is string tip&&tip.Contains(ReleaseFreshness.ConnectionNote)),name+": advertised participants are presented as confirmed peers.");
                 Expect(!texts.Any(x=>x.Text.Contains("source-secret")||x.Text.Contains("passkey=")),name+": source URL leaked into displayed status.");
                 if(misses.Count>0)Shot(name+"-initial");Check(misses.Count==0,string.Join(" | ",misses));
                 var toggle=FindVisual<Button>(Body,x=>AutomationProperties.GetName(x)=="Показать состояние источников")!;

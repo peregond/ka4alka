@@ -9,6 +9,13 @@ public partial class MainWindow
     object CheckReleaseToolbar(string stage,bool checking,bool expanded)
     {
         var toolbar=FindVisual<WrapPanel>(Body,x=>x.Name=="ReleaseToolbar")??throw new Exception(stage+": release toolbar is missing.");
+        // Refresh, sources and the poor-quality switch hide behind "Ещё фильтры" until a scan runs or the panel is opened.
+        var reopened=false;
+        if(!toolbar.IsVisible&&current!=null)
+        {
+            reopened=true;ReleaseSelection(current.Id).More=true;Render();UpdateLayout();
+            toolbar=FindVisual<WrapPanel>(Body,x=>x.Name=="ReleaseToolbar")??throw new Exception(stage+": release toolbar is missing after opening more filters.");
+        }
         var toggle=FindVisual<Button>(toolbar,x=>AutomationProperties.GetName(x)=="Показать состояние источников")??throw new Exception(stage+": sources action is outside the toolbar.");
         var retry=FindVisual<Button>(toolbar,x=>AutomationProperties.GetName(x)=="Обновить варианты загрузки")??throw new Exception(stage+": refresh action is outside the toolbar.");
         var minimum=FindVisual<ComboBox>(toolbar,x=>AutomationProperties.GetName(x)=="Качество раздач")??throw new Exception(stage+": minimum quality is outside the toolbar.");
@@ -33,6 +40,8 @@ public partial class MainWindow
                 throw new Exception(stage+": a release toolbar action is clipped.");
         }
         if(toolbar.ActualWidth>1000&&toolbar.ActualHeight>64)throw new Exception(stage+": desktop source actions no longer fit in a compact filter row.");
-        return new{Stage=stage,BodyWidth=Math.Round(Body.ActualWidth),ToolbarHeight=Math.Round(toolbar.ActualHeight),SourceDetailsVisible=expanded,Checking=checking,RefreshEnabled=retry.IsEnabled,InlineSourceActions=true,ReceiptDatesHidden=true};
+        var result=new{Stage=stage,BodyWidth=Math.Round(Body.ActualWidth),ToolbarHeight=Math.Round(toolbar.ActualHeight),SourceDetailsVisible=expanded,Checking=checking,RefreshEnabled=retry.IsEnabled,InlineSourceActions=true,ReceiptDatesHidden=true};
+        if(reopened&&current!=null){ReleaseSelection(current.Id).More=false;Render();UpdateLayout();}
+        return result;
     }
 }

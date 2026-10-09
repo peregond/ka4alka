@@ -121,7 +121,8 @@ public partial class MainWindow
         // How many rows fit depends on the DIP height, which shrinks as the Windows scale grows.
         var height=ActualHeight;var rows=height>=820?3:height>=700?2:height>=620?1:0;
         var onDownloads=section=="Загрузки";
-        var visible=!narrow&&items.Count>0&&(rows>0||onDownloads)&&(!veryShortHeight());
+        // The Downloads page already shows the same speed in its own tiles, so the sidebar summary stays away there.
+        var visible=!narrow&&!onDownloads&&items.Count>0&&rows>0&&(!veryShortHeight());
         if(!visible){DownloadsWidget.Visibility=Visibility.Collapsed;return;}
         BuildDownloadsWidget();
         DownloadsWidget.Visibility=Visibility.Visible;

@@ -51,7 +51,7 @@ public partial class MainWindow
                 owner.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));Check(owner.ContextMenu?.IsOpen==true,label+": keyboard action failed to open.");
                 owner.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));Check(owner.ContextMenu?.IsOpen==false,label+": keyboard action failed to close.");
             }
-            Button About()=>FindVisual<Button>(discoveryHero!,b=>AutomationProperties.GetName(b).StartsWith("О фильме",StringComparison.Ordinal))??throw new Exception("The carousel's film action is not keyboard accessible.");
+            Button About()=>FindVisual<Button>(discoveryHero!,b=>AutomationProperties.GetName(b).StartsWith("Подробнее",StringComparison.Ordinal))??throw new Exception("The carousel's film action is not keyboard accessible.");
             var banner=About();
             var featured=(MediaItem)banner.Tag;
             await ClickWithMouse(banner);

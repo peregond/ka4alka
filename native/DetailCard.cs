@@ -67,16 +67,15 @@ public partial class MainWindow
 
         detailInfo=new StackPanel{Name="DetailIdentity",VerticalAlignment=VerticalAlignment.Bottom};detailInfo.SizeChanged+=(sender,_)=>{if(ReferenceEquals(sender,detailInfo))UpdateDetailLayout();};Grid.SetColumn(detailInfo,1);detailHero.Children.Add(detailInfo);
 
-        // type and year chips
-        var chips=new StackPanel{Orientation=Orientation.Horizontal,Margin=new(0,0,0,12)};
-        Border Chip(string text,string? name=null)
+        // A quiet caption instead of pills: "ФИЛЬМ · 2026", in the same voice as the sidebar section labels.
+        var caption=new StackPanel{Name="DetailCaption",Orientation=Orientation.Horizontal,Margin=new(0,0,0,12)};
+        TextBlock CaptionText(string text,string? name=null)
         {
-            var label=new TextBlock{Text=text,FontSize=12,FontWeight=FontWeights.SemiBold,Foreground=(Brush)FindResource("BannerText"),VerticalAlignment=VerticalAlignment.Center};if(name!=null)label.Name=name;
-            return new Border{Background=(Brush)FindResource("BannerChip"),CornerRadius=new(999),Padding=new(10,4,10,4),Margin=new(0,0,8,0),Child=label};
+            var label=new TextBlock{Text=text,FontSize=12,FontWeight=FontWeights.SemiBold,Foreground=(Brush)FindResource("BannerMuted"),VerticalAlignment=VerticalAlignment.Center};if(name!=null)label.Name=name;return label;
         }
-        chips.Children.Add(Chip(item.Section=="Сериалы"?"Сериал":"Фильм"));
-        if(item.Year>0)chips.Children.Add(Chip(item.Year.ToString(),"DetailYear"));
-        detailInfo.Children.Add(chips);
+        caption.Children.Add(CaptionText(item.Section=="Сериалы"?"СЕРИАЛ":"ФИЛЬМ"));
+        if(item.Year>0){caption.Children.Add(CaptionText("  ·  "));caption.Children.Add(CaptionText(item.Year.ToString(),"DetailYear"));}
+        detailInfo.Children.Add(caption);
 
         var hasOriginal=!string.IsNullOrWhiteSpace(item.OriginalTitle)&&!item.OriginalTitle.Equals(item.Title,StringComparison.OrdinalIgnoreCase);
         detailTitle=new TextBlock{Name="DetailTitle",Text=item.Title,FontSize=56,FontWeight=FontWeights.ExtraBold,LineHeight=58,LineStackingStrategy=LineStackingStrategy.BlockLineHeight,TextWrapping=TextWrapping.Wrap,Foreground=(Brush)FindResource("BannerText"),Margin=new(0,0,0,hasOriginal?4:12),ToolTip=item.Title};
@@ -104,16 +103,24 @@ public partial class MainWindow
             detailMetaRow.Children.Add(new Border{BorderBrush=(Brush)FindResource("BannerBadgeEdge"),BorderThickness=new(1),CornerRadius=new(6),Padding=new(6,2,6,2),Margin=new(0,0,8,4),VerticalAlignment=VerticalAlignment.Center,Child=new TextBlock{Text=quality,FontSize=11,FontWeight=FontWeights.Bold,Foreground=(Brush)FindResource("BannerText")}});
         if(item.OnlyPoorQuality){var poor=PoorQualityBadge(item.PosterQuality);poor.Foreground=(Brush)FindResource("BannerText");detailInfo.Children.Add(poor);}
         // credits, only those already known
-        var directors=item.People.Where(x=>x.Role=="Режиссёры").Select(x=>x.Name).Take(2).ToArray();
-        var cast=item.People.Where(x=>x.Role=="Актёры").Select(x=>x.Name).Take(5).ToArray();
+        var directors=item.People.Where(x=>x.Role=="Режиссёры").Take(2).ToArray();
+        var cast=item.People.Where(x=>x.Role=="Актёры").Take(5).ToArray();
         if(directors.Length+cast.Length>0)
         {
             var credits=new Grid{Name="DetailCredits",Margin=new(0,0,0,12)};credits.ColumnDefinitions.Add(new(){Width=GridLength.Auto});credits.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});
-            void Credit(string label,string[] names)
+            void Credit(string label,CinemaPerson[] people)
             {
-                if(names.Length==0)return;var row=credits.RowDefinitions.Count;credits.RowDefinitions.Add(new(){Height=GridLength.Auto});
+                if(people.Length==0)return;var row=credits.RowDefinitions.Count;credits.RowDefinitions.Add(new(){Height=GridLength.Auto});
                 var caption=new TextBlock{Text=label,FontSize=14,Foreground=(Brush)FindResource("BannerMuted"),Margin=new(0,0,16,4)};credits.Children.Add(caption);Grid.SetRow(caption,row);
-                var value=new TextBlock{Text=string.Join(", ",names),FontSize=14,Foreground=(Brush)FindResource("BannerText"),TextWrapping=TextWrapping.Wrap,Margin=new(0,0,0,4)};Grid.SetColumn(value,1);Grid.SetRow(value,row);credits.Children.Add(value);
+                // Every name opens that person's page, the same as the participant tiles below the banner.
+                var names=new WrapPanel{Margin=new(0,0,0,4)};Grid.SetColumn(names,1);Grid.SetRow(names,row);credits.Children.Add(names);
+                for(var index=0;index<people.Length;index++)
+                {
+                    var person=people[index];
+                    var link=new Button{Name="DetailCreditLink",Style=(Style)FindResource("LinkButton"),Content=person.Name,FontSize=14,Foreground=(Brush)FindResource("BannerText"),Tag=person,ToolTip="Открыть страницу: "+person.Name,VerticalAlignment=VerticalAlignment.Center};
+                    AutomationProperties.SetName(link,"Открыть страницу: "+person.Name+", "+label);link.Click+=(_,_)=>OpenPerson(person,item);names.Children.Add(link);
+                    if(index<people.Length-1)names.Children.Add(new TextBlock{Text=", ",FontSize=14,Foreground=(Brush)FindResource("BannerText"),VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,5,0)});
+                }
             }
             Credit("Режиссёр",directors);Credit("В ролях",cast);detailInfo.Children.Add(credits);
         }

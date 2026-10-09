@@ -103,6 +103,8 @@ public partial class MainWindow
             }
         }
         CheckIdentityOrder();CheckCrewTiles();
+        foreach(var link in VisualElements<Button>(detailInfo!).Where(x=>x.Name=="DetailCreditLink"))
+            if(link.Tag is not CinemaPerson linked||!AutomationProperties.GetName(link).StartsWith("Открыть страницу: "+linked.Name,StringComparison.Ordinal)||!link.IsEnabled)throw new Exception("A director or cast name in the banner must be a working link to that person's page.");
         var filmCard=FindVisual<Border>(Body,x=>x.Name=="CinemaFilm")!;var hero=detailHero!;
                 var ratings=FindVisual<WrapPanel>(filmCard,x=>x.Name=="DetailRatings")!;var year=FindVisual<TextBlock>(filmCard,x=>x.Name=="DetailYear")!;
         if(!ReferenceEquals(ratings.Parent,detailMetaRow)||ratings.Children.OfType<Border>().Any(x=>x.BorderThickness!=new Thickness(0)))throw new Exception("Ratings must share the metadata line without separate outlined boxes.");
