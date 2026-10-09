@@ -77,6 +77,8 @@ public partial class MainWindow
         catch(Exception error){var message=error is HttpRequestException?"Не удалось получить раздачу из источника.":error.Message;Status.Text=message;MessageBox.Show(this,message,"Не удалось начать загрузку",MessageBoxButton.OK,MessageBoxImage.Warning);}finally{if(!closing&&!closed)button.IsEnabled=true;}
     }
     void SourcePage(object sender,RoutedEventArgs e){var item=(SourceEntry)((Button)sender).Tag;if(string.IsNullOrEmpty(item.PageUrl))return;System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(SourceClient.WebUri(item.PageUrl).AbsoluteUri){UseShellExecute=true});}
+    // Posters keep their 280 px decode up to a 150 % Windows scale; higher scales decode a little wider so they stay sharp.
+    int PosterDecodeWidth=>(int)Math.Clamp(Math.Ceiling(280*Math.Max(1,activeScaleX/1.5)),280,420);
     void SourceCover(object sender,RoutedEventArgs e)
     {
         if(closing||closed)return;
@@ -133,7 +135,7 @@ public partial class MainWindow
                 var cachePath=item is MediaItem or DownloadItem?CoverPath(url):null;
                 var (bitmap,downloaded)=await CoverCache.Load(cachePath,1024*1024,
                     ct=>sourceClient.Read(SourceClient.WebUri(url),1024*1024,ct),
-                    bytes=>{using var stream=new MemoryStream(bytes);var result=new BitmapImage();result.BeginInit();result.CacheOption=BitmapCacheOption.OnLoad;result.DecodePixelWidth=item is MediaItem or DownloadItem?280:100;result.StreamSource=stream;result.EndInit();result.Freeze();return result;},token);
+                    bytes=>{using var stream=new MemoryStream(bytes);var result=new BitmapImage();result.BeginInit();result.CacheOption=BitmapCacheOption.OnLoad;result.DecodePixelWidth=item is MediaItem or DownloadItem?PosterDecodeWidth:100;result.StreamSource=stream;result.EndInit();result.Freeze();return result;},token);
                 token.ThrowIfCancellationRequested();
                 if(coverCache.Count>=48)coverCache.Remove(coverCache.Keys.First());coverCache[url]=bitmap;
                 if(!closing&&!closed&&image.IsLoaded&&ReferenceEquals(image.DataContext,item)&&CoverUrl(image.DataContext)==url&&ReferenceEquals(state.Request,request)&&CoverViewportFor(image)?.Measure(image).Near==true)image.Source=bitmap;
