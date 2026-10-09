@@ -13,6 +13,7 @@ public partial class MainWindow
     readonly CancellationTokenSource lanLifetime=new();
     (Guid DeviceId,string ReleaseKey,LanDownloadRequest Request)? pendingLanDownload;
     bool lanSending;
+    long lanLastTransportError;
     string LanDeviceDisplayName=>string.IsNullOrWhiteSpace(prefs.LanDeviceName)?DeviceDisplayName.Default():prefs.LanDeviceName;
 
     void InitializeLanDevices()
@@ -23,7 +24,7 @@ public partial class MainWindow
         {
             if(started||!prefs.LanEnabled)return;started=true;
             try{await SetLanEnabledAsync(true);}
-            catch(Exception error)when(!closing&&!closed){Status.Text="Устройства в сети недоступны: "+error.Message;DiagnosticLog.Write("lan-start-failed",new{Error=error.GetType().Name});}
+            catch(Exception error)when(!closing&&!closed){Status.Text="Устройства в сети недоступны: "+error.Message;ErrorLog.Write(error);DiagnosticLog.Write("lan-start-failed",new{Error=error.GetType().Name});}
             catch(OperationCanceledException)when(closing||closed){}
         };
     }
@@ -31,7 +32,7 @@ public partial class MainWindow
     async Task<LanService> CreateLanServiceAsync()
     {
         var name=LanDeviceDisplayName;
-        var service=await Task.Run(()=>new LanService(new(){StateDirectory=Path.Combine(Preferences.DataDir,"lan"),DeviceName=name}),lanLifetime.Token);
+        var service=await Task.Run(()=>new LanService(new(){StateDirectory=Path.Combine(Preferences.DataDir,"lan"),DeviceName=name,DiagnosticError=ReportLanTransportError}),lanLifetime.Token);
         service.ConfirmPairingAsync=(request,token)=>
         {
             if(closing||closed||Dispatcher.HasShutdownStarted)return Task.FromResult(false);
@@ -42,8 +43,16 @@ public partial class MainWindow
             if(closing||closed||Dispatcher.HasShutdownStarted)return Task.FromResult(new LanDownloadReceipt{RequestId=request.RequestId,Message="Приложение закрывается. Повтори отправку после запуска."});
             return Dispatcher.InvokeAsync(()=>ReceiveLanDownloadAsync(request,token)).Task.Unwrap();
         };
-        try{await service.StartAsync(lanLifetime.Token);lanLifetime.Token.ThrowIfCancellationRequested();return service;}
+        try{if(service.Name!=name)await Task.Run(()=>service.Name=name,lanLifetime.Token);await service.StartAsync(lanLifetime.Token);lanLifetime.Token.ThrowIfCancellationRequested();return service;}
         catch{await service.DisposeAsync();throw;}
+    }
+
+    void ReportLanTransportError(Exception error)
+    {
+        var now=DateTime.UtcNow.Ticks;var previous=Interlocked.Read(ref lanLastTransportError);
+        if(now-previous<TimeSpan.FromSeconds(5).Ticks||Interlocked.CompareExchange(ref lanLastTransportError,now,previous)!=previous)return;
+        ErrorLog.Write(error);
+        DiagnosticLog.Write("lan-transport-error",new{Error=error.GetType().Name,error.HResult,InnerError=error.InnerException?.GetType().Name,InnerHResult=error.InnerException?.HResult});
     }
 
     async Task SetLanEnabledAsync(bool enabled)
@@ -161,7 +170,7 @@ public partial class MainWindow
         }
         catch(OperationCanceledException)when(closing||closed){}
         catch(OperationCanceledException){Status.Text="Компьютер не подтвердил загрузку вовремя. Повтори отправку — одна и та же задача не добавится дважды.";}
-        catch(Exception error)when(!closing&&!closed){Status.Text="Не удалось отправить загрузку: "+error.Message;DiagnosticLog.Write("lan-send-failed",new{Error=error.GetType().Name});}
+        catch(Exception error)when(!closing&&!closed){Status.Text="Не удалось отправить загрузку: "+error.Message;ErrorLog.Write(error);DiagnosticLog.Write("lan-send-failed",new{Error=error.GetType().Name});}
         finally{lanSending=false;if(!closing&&!closed){owner.Content=content;owner.IsEnabled=true;}}
     }
 }

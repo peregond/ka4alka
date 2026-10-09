@@ -238,7 +238,11 @@ public sealed class LanService : IAsyncDisposable
                 var task = Task.Run(async () =>
                 {
                     try { await HandleClientAsync(captured, endpoint.Address, token).ConfigureAwait(false); }
-                    catch (Exception) { /* A failed remote session must never stop accepting other devices. */ }
+                    catch (Exception error)
+                    {
+                        // Failed sessions must not stop the listener. Preserve their cause for opt-in local diagnostics.
+                        if (!token.IsCancellationRequested) ReportDiagnostic(error);
+                    }
                     finally { captured.Dispose(); activeClients.TryRemove(id, out _); clientSlots.Release(); }
                 }, CancellationToken.None);
                 clientTasks[id] = task;
@@ -562,6 +566,11 @@ public sealed class LanService : IAsyncDisposable
     }
     static string? Limit(string? value, int max) => value is null ? null : new string(value.Where(c => !char.IsControl(c) || c is '\n' or '\t').Take(max).ToArray());
     static LanException ConnectionFailure(Exception ex) => ex is AuthenticationException ? new LanException("Сертификат устройства не совпадает с сопряжением. Удалите старое сопряжение и сверьте код заново.", ex) : new LanException("Не удалось связаться с устройством. Проверьте, что оно в той же сети, Качалка запущена и разрешена брандмауэром.", ex);
+    void ReportDiagnostic(Exception error)
+    {
+        try { options.DiagnosticError?.Invoke(error); }
+        catch { /* A diagnostic subscriber must not interrupt network cleanup. */ }
+    }
     void NotifyChanged() { try { Changed?.Invoke(this, EventArgs.Empty); } catch { } }
     static string DownloadDigest(LanDownloadRequest request)
     {

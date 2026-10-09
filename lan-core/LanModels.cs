@@ -9,6 +9,8 @@ public sealed record LanServiceOptions
     public bool AllowLoopbackForTests { get; init; }
     public TimeSpan RequestTimeout { get; init; } = TimeSpan.FromSeconds(20);
     public TimeSpan PairingTimeout { get; init; } = TimeSpan.FromMinutes(2);
+    /// <summary>Optional local diagnostics for failed inbound sessions; no payload or key material is supplied.</summary>
+    public Action<Exception>? DiagnosticError { get; init; }
 }
 
 public sealed record LanDevice

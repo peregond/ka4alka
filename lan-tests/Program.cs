@@ -40,6 +40,7 @@ const string Magnet = "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234
 const string OtherMagnet = "magnet:?xt=urn:btih:89abcdef0123456789abcdef0123456789abcdef&dn=Other";
 var received = new ConcurrentQueue<LanDownloadRequest>();
 var approvals = new ConcurrentQueue<LanPairingRequest>();
+var networkErrors = new ConcurrentQueue<Exception>();
 var allowSender = true;
 var allowReceiver = true;
 var callbackMode = "accept";
@@ -48,7 +49,12 @@ LanServiceOptions Options(string key, string name) => new()
 {
     StateDirectory = Path.Combine(directory, key), DeviceName = name,
     TcpPort = 0, DiscoveryPort = 0, AllowLoopbackForTests = true,
-    RequestTimeout = TimeSpan.FromSeconds(2), PairingTimeout = TimeSpan.FromSeconds(8)
+    RequestTimeout = TimeSpan.FromSeconds(2), PairingTimeout = TimeSpan.FromSeconds(8),
+    DiagnosticError = error =>
+    {
+        networkErrors.Enqueue(new IOException("Incoming LAN session failed on fixture " + key + ".", error));
+        while (networkErrors.Count > 16) networkErrors.TryDequeue(out _);
+    }
 };
 var aOptions = Options("sender", "Ноутбук");
 var bOptions = Options("receiver", "Гостиная");
@@ -335,6 +341,11 @@ catch (Exception error)
 {
     Console.Error.WriteLine(error);
     File.AppendAllText(checkLog, "FAIL: " + error + Environment.NewLine);
+    foreach (var networkError in networkErrors)
+    {
+        Console.Error.WriteLine("Receiver network diagnostic: " + networkError);
+        File.AppendAllText(checkLog, "Receiver network diagnostic: " + networkError + Environment.NewLine);
+    }
     File.WriteAllText(Path.Combine(evidence, "checks.json"), JsonSerializer.Serialize(new
     { Passed = false, Checks = checks, Utc = DateTimeOffset.UtcNow, Error = error.Message }, new JsonSerializerOptions { WriteIndented = true }));
     if (Environment.GetEnvironmentVariable("GITHUB_ACTIONS") == "true")
@@ -356,7 +367,10 @@ static X509Certificate2 CreateCertificate()
     request.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature, true));
     request.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension(new OidCollection
     { new("1.3.6.1.5.5.7.3.1"), new("1.3.6.1.5.5.7.3.2") }, true));
-    return request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
+    using var generated = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
+    var pfx = generated.Export(X509ContentType.Pfx);
+    try { return LanState.LoadCertificate(pfx); }
+    finally { CryptographicOperations.ZeroMemory(pfx); }
 }
 
 static async Task<bool> WaitForCancellation(CancellationToken token)
@@ -369,7 +383,7 @@ static X509Certificate2 LoadIdentity(string stateDirectory)
 {
     var bytes = File.ReadAllBytes(Path.Combine(stateDirectory, "identity.key"));
     var plain = OperatingSystem.IsWindows() ? Dpapi.Unprotect(bytes) : bytes;
-    try { return X509CertificateLoader.LoadPkcs12(plain, null, X509KeyStorageFlags.EphemeralKeySet); }
+    try { return LanState.LoadCertificate(plain); }
     finally { CryptographicOperations.ZeroMemory(plain); }
 }
 

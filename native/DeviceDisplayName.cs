@@ -14,7 +14,8 @@ public static class DeviceDisplayName
         {
             using var key=Registry.LocalMachine.OpenSubKey(@"HARDWARE\DESCRIPTION\System\BIOS");
             var model=key?.GetValue("SystemProductName") as string;
-            if(!Useful(model))model=key?.GetValue("SystemFamily") as string;
+            var family=key?.GetValue("SystemFamily") as string;
+            if(!Useful(model)||Useful(family)&&model!.Trim() is {Length:<=12} code&&code.Any(char.IsDigit)&&code.All(c=>char.IsAsciiDigit(c)||char.IsAsciiLetterUpper(c)))model=family;
             if(Useful(model))
             {
                 model=model!.Trim();

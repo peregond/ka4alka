@@ -41,7 +41,7 @@ internal sealed class LanState : IDisposable
                 var key = File.ReadAllBytes(keyPath);
                 if (key.Length > 128 * 1024) throw new InvalidDataException();
                 var plain = OperatingSystem.IsWindows() ? Dpapi.Unprotect(key) : key;
-                try { Certificate = X509CertificateLoader.LoadPkcs12(plain, null, X509KeyStorageFlags.EphemeralKeySet | X509KeyStorageFlags.Exportable); }
+                try { Certificate = LoadCertificate(plain); }
                 finally { CryptographicOperations.ZeroMemory(plain); }
             }
             else
@@ -52,9 +52,14 @@ internal sealed class LanState : IDisposable
                 request.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature, true));
                 var eku = new OidCollection { new("1.3.6.1.5.5.7.3.1"), new("1.3.6.1.5.5.7.3.2") };
                 request.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension(eku, true));
-                Certificate = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddYears(20));
-                var plain = Certificate.Export(X509ContentType.Pfx);
-                try { WritePrivate(keyPath, OperatingSystem.IsWindows() ? Dpapi.Protect(plain) : plain); }
+                using var generated = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddYears(20));
+                var plain = generated.Export(X509ContentType.Pfx);
+                try
+                {
+                    // Schannel needs a current-user key container, including on the very first launch.
+                    Certificate = LoadCertificate(plain);
+                    WritePrivate(keyPath, OperatingSystem.IsWindows() ? Dpapi.Protect(plain) : plain);
+                }
                 finally { CryptographicOperations.ZeroMemory(plain); }
             }
             if (!Certificate.HasPrivateKey) throw new InvalidDataException();
@@ -62,6 +67,16 @@ internal sealed class LanState : IDisposable
             Save();
         }
         catch (Exception ex) when (ex is not LanException) { throw new LanException("Не удалось прочитать настройки локальной сети. Проверьте доступ к папке приложения.", ex); }
+    }
+
+    internal static X509Certificate2 LoadCertificate(byte[] pfx)
+    {
+        // Do not request PersistKeySet: disposing the certificate also removes its temporary key container.
+        // The only durable identity copy remains the current-user DPAPI blob written by this class.
+        var flags = OperatingSystem.IsWindows()
+            ? X509KeyStorageFlags.UserKeySet | X509KeyStorageFlags.Exportable
+            : X509KeyStorageFlags.EphemeralKeySet | X509KeyStorageFlags.Exportable;
+        return X509CertificateLoader.LoadPkcs12(pfx, null, flags);
     }
 
     public void Save()
