@@ -64,6 +64,7 @@ public partial class MainWindow
             }
             File.WriteAllText(Path.Combine(output,"checks.json"),JsonSerializer.Serialize(checks,new JsonSerializerOptions{WriteIndented=true}));
         }
+        catch(Exception error){File.WriteAllText(Path.Combine(output,"error.txt"),error.ToString());throw;}
         finally{prefs.Light=originalLight;ApplyTheme();Close();}
     }
 }
