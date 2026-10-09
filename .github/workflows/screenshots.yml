@@ -1,0 +1,101 @@
+name: Capture published 0.39 screenshots
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/screenshots-0.39.0]
+    paths: [.github/workflows/screenshots.yml, 'scripts/screenshots/**']
+permissions:
+  contents: write
+concurrency:
+  group: documentation-preview-${{ github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  screenshots:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Download and verify the published application
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference='Stop'
+          $source=Join-Path $env:RUNNER_TEMP 'kachalka-published-0.39'
+          New-Item -ItemType Directory -Force $source | Out-Null
+          gh release download v0.39.0 --repo peregond/ka4alka --pattern Kachalka-win-x64.zip --dir $source
+          if($LASTEXITCODE -ne 0){throw 'Cannot download the published 0.39.0 application'}
+          $archive=Join-Path $source 'Kachalka-win-x64.zip'
+          $expected='368b53704560168bdc17421d18d2a89d70a06e034fdbf427e136b36d91ea6985'
+          if((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne $expected){throw 'Published archive differs from the reviewed 0.39.0 release'}
+          Expand-Archive -LiteralPath $archive -DestinationPath (Join-Path $source 'application')
+          $release=Join-Path $source 'application/Kachalka-0.39'
+          $assembly=Join-Path $release 'Kachalka.dll'
+          if(-not(Test-Path -LiteralPath (Join-Path $release 'Kachalka.exe')) -or -not(Test-Path -LiteralPath $assembly)){throw 'Published application directory is incomplete'}
+          if([System.Reflection.AssemblyName]::GetAssemblyName($assembly).Version.ToString(3) -ne '0.39.0'){throw 'Published assembly has the wrong version'}
+          ('KACHALKA_SCREENSHOT_RELEASE='+$release) >> $env:GITHUB_ENV
+          ('KACHALKA_DATA='+(Join-Path $env:RUNNER_TEMP 'kachalka-screenshot-state')) >> $env:GITHUB_ENV
+      - name: Build the screenshot driver against the published DLL
+        shell: pwsh
+        run: |
+          dotnet build scripts/screenshots/CaptureReleaseScreenshot.csproj -c Release ('-p:ReleaseDirectory='+$env:KACHALKA_SCREENSHOT_RELEASE)
+          if($LASTEXITCODE -ne 0){throw 'Screenshot driver failed to build'}
+      - name: Capture the actual released application
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $output=Join-Path $PWD 'test-output/documentation-0.39'
+          New-Item -ItemType Directory -Force $output | Out-Null
+          $driver=Join-Path $PWD 'scripts/screenshots/bin/Release/net10.0-windows/CaptureReleaseScreenshot.dll'
+          $process=Start-Process -FilePath 'dotnet' -ArgumentList @(('"'+$driver+'"'),('"'+$env:KACHALKA_SCREENSHOT_RELEASE+'"'),('"'+$output+'"')) -PassThru
+          try {
+            if(-not $process.WaitForExit(300000)){$process.Kill($true);throw 'Released application screenshot capture exceeded five minutes'}
+            if($process.ExitCode -ne 0){throw ('Released application screenshot capture failed: '+$process.ExitCode)}
+          } finally { $process.Dispose() }
+          $infoPath=Join-Path $output 'capture-info.json'
+          if(-not(Test-Path -LiteralPath $infoPath)){throw 'Capture metadata is missing'}
+          $info=Get-Content -LiteralPath $infoPath -Raw | ConvertFrom-Json
+          $dllHash=(Get-FileHash -LiteralPath (Join-Path $env:KACHALKA_SCREENSHOT_RELEASE 'Kachalka.dll') -Algorithm SHA256).Hash.ToLowerInvariant()
+          if($info.Version -ne '0.39.0' -or $info.ReleaseDllSha256 -ne $dllHash){throw 'Screenshots were not captured from the verified published DLL'}
+          foreach($name in @('catalog-dark.png','catalog-light.png','series-dark.png','settings-dark.png')){
+            if(-not(Test-Path -LiteralPath (Join-Path $output $name))){throw ('Missing required screenshot: '+$name)}
+          }
+          # Persist only public screenshot metadata, never the isolated profile or keys.
+          $captures=@($info.Captures | ForEach-Object {
+            if($_.File -notmatch '^[a-z0-9][a-z0-9.-]*\.png$'){throw 'Invalid capture filename'}
+            [ordered]@{File=$_.File;LoadedVisiblePosters=$_.LoadedVisiblePosters;PendingVisiblePosters=$_.PendingVisiblePosters;Titles=@($_.Titles)}
+          })
+          [ordered]@{Version='0.39.0';ReleaseArchiveSha256='368b53704560168bdc17421d18d2a89d70a06e034fdbf427e136b36d91ea6985';ReleaseDllSha256=$dllHash;Captures=$captures} | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $infoPath -Encoding utf8NoBOM
+          Get-Content -LiteralPath $infoPath
+      - name: Save screenshots in a temporary documentation draft
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference='Stop'
+          $folder=Join-Path $PWD 'test-output/documentation-0.39'
+          $files=@(Get-ChildItem -LiteralPath $folder -Filter '*.png' -File | Where-Object {$_.Name -match '^[a-z0-9][a-z0-9.-]*\.png$'} | ForEach-Object {$_.FullName})
+          $files+=(Join-Path $folder 'capture-info.json')
+          if($files.Count -lt 5){throw 'Expected four screenshots and sanitized capture metadata'}
+          $tag='docs-preview-${{ github.run_id }}'
+          $existing=gh release view $tag --json isDraft --jq '.isDraft' 2>$null
+          if($LASTEXITCODE -ne 0){
+            gh release create $tag --draft --target '${{ github.sha }}' --title 'Temporary published 0.39 screenshots' --notes 'Documentation review evidence from the verified public 0.39.0 binary; not an application release.'
+            if($LASTEXITCODE -ne 0){throw 'Cannot create the temporary documentation draft'}
+          } elseif($existing -ne 'true'){throw 'Refusing to overwrite a published release'}
+          gh release upload $tag @files --clobber
+          if($LASTEXITCODE -ne 0){throw 'Cannot upload the temporary documentation previews'}
+      - name: Preserve sanitized screenshot evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: published-0.39-documentation-screenshots
+          path: |
+            test-output/documentation-0.39/*.png
+            test-output/documentation-0.39/capture-info.json
