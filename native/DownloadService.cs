@@ -114,7 +114,8 @@ public sealed partial class DownloadService
         if(!manager.HasMetadata)WatchMetadata(item,manager);
         return manager;
     }
-    public async Task<DownloadItem> Add(string source,string folder,MediaItem? media=null,string? imageUrl=null,SourceEntry? release=null)
+    public async Task<DownloadItem> Add(string source,string folder,MediaItem? media=null,string? imageUrl=null,SourceEntry? release=null,
+        string? remoteSenderId=null,string? remoteRequestId=null,string? remoteSenderFingerprint=null,string? remoteContentDigest=null)
     {
         var requestedAfterClose=closeRequested;
         await gate.WaitAsync();
@@ -127,6 +128,15 @@ public sealed partial class DownloadService
                 lifetime.Dispose();lifetime=new();closeRequested=false;
             }
             source=source.Trim();
+            if(remoteSenderId!=null&&remoteRequestId!=null)
+            {
+                var received=Items.FirstOrDefault(x=>x.RemoteSenderId==remoteSenderId&&x.RemoteRequestId==remoteRequestId&&x.RemoteSenderFingerprint==remoteSenderFingerprint);
+                if(received!=null)
+                {
+                    if(remoteContentDigest!=null&&received.RemoteContentDigest!=remoteContentDigest)throw new InvalidOperationException("Этот запрос уже использован для другой раздачи.");
+                    return received;
+                }
+            }
             string name="Получение метаданных…";
             string identity;
             if(source.StartsWith("magnet:",StringComparison.OrdinalIgnoreCase)){MagnetLink magnet;try{magnet=MagnetLink.Parse(source);}catch(Exception e)when(e is ArgumentException or FormatException){throw new FormatException("Некорректная magnet-ссылка. Проверь полный адрес раздачи.",e);}name=string.IsNullOrWhiteSpace(magnet.Name)?name:magnet.Name;identity=HashKey(magnet.InfoHashes);}
@@ -137,11 +147,18 @@ public sealed partial class DownloadService
                 var cached=Path.Combine(folderCache,Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(await File.ReadAllBytesAsync(source)))+".torrent");
                 if(!File.Exists(cached))File.Copy(source,cached);source=cached;
             }
-            if(Items.Any(x=>x.Source==source||identity.Length>0&&string.Equals(ExistingHash(x),identity,StringComparison.OrdinalIgnoreCase)))throw new InvalidOperationException("Эта раздача уже в очереди.");
+            var duplicate=Items.FirstOrDefault(x=>x.Source==source||identity.Length>0&&string.Equals(ExistingHash(x),identity,StringComparison.OrdinalIgnoreCase));
+            if(duplicate!=null)
+            {
+                if(remoteSenderId!=null&&remoteRequestId!=null)return duplicate;
+                throw new InvalidOperationException("Эта раздача уже в очереди.");
+            }
             await Task.Run(()=>Directory.CreateDirectory(folder),CancellationToken.None).WaitAsync(lifetime.Token);
             var item=new DownloadItem
             {
                 Source=source,Folder=folder,Name=name,InfoHash=identity,AddedUtc=DateTime.UtcNow,
+                RemoteSenderId=remoteSenderId,RemoteRequestId=remoteRequestId,RemoteSenderFingerprint=remoteSenderFingerprint,
+                RemoteContentDigest=remoteContentDigest,
                 ImageUrl=!string.IsNullOrWhiteSpace(media?.ImageUrl)?media.ImageUrl:!string.IsNullOrWhiteSpace(imageUrl)?imageUrl:null,
                 MediaTitle=media?.Title,MediaSection=media?.Section,MediaPageUrl=media?.PageUrl,MediaYear=media?.Year??0,
                 ReleaseTitle=release?.Title,ReleaseSource=release?.Source,ReleaseId=release?.Id,ReleasePageUrl=release?.PageUrl,ReleaseUrl=release?.TorrentUrl

@@ -23,12 +23,14 @@ $version=([xml](Get-Content native/Kachalka.csproj)).Project.PropertyGroup.Versi
 $nextVersion=([Version]$version).Major.ToString()+'.'+([Version]$version).Minor+'.'+(([Version]$version).Build+1)
 $short=([Version]$version).ToString(2)
 try{
+ dotnet run --project lan-tests/Kachalka.LanTests.csproj -c Release
+ if($LASTEXITCODE -ne 0){throw 'Local-network pairing and download transfer tests failed'}
  dotnet run --project update-tests/Kachalka.UpdateTests.csproj -c Release
  if($LASTEXITCODE -ne 0){throw 'Updater tests failed'}
  ./tests/StableUpdateComponents.ps1
  ./build.ps1 -Test -OutputDir ('dist/Kachalka-'+$short)
- foreach($scenario in @('dpi','close','cache','download-reliability','person-performance','cover-viewport','catalog-navigation','release-freshness','interface-polish','bug-report')){
-   $scenarioDirectory=if($scenario -in @('dpi','close','cache')){$scenario+'-reliability'}else{$scenario}
+ foreach($scenario in @('dpi','close','cache','download-reliability','person-performance','cover-viewport','catalog-navigation','release-freshness','interface-polish','bug-report','lan')){
+   $scenarioDirectory=if($scenario -in @('dpi','close','cache')){$scenario+'-reliability'}elseif($scenario -eq 'lan'){'lan-ui'}else{$scenario}
    $scenarioEvidence=Join-Path $root ('test-output/'+$scenarioDirectory)
    $scenarioUi=Start-Process (Join-Path $root ('dist/Kachalka-'+$short+'/Kachalka.exe')) -ArgumentList @('--'+$scenario+'-smoke-test',('"'+$scenarioEvidence+'"')) -PassThru
    if(-not $scenarioUi.WaitForExit(45000)){$scenarioUi.Kill($true);throw ($scenario+' UI smoke timed out')}

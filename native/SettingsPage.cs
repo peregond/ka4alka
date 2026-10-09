@@ -195,6 +195,7 @@ public partial class MainWindow
             catch(Exception error){ErrorLog.Write(error);Feedback(firewallNotice,error.Message,true);}
         });
         AutomationProperties.SetName(firewall,"Разрешить Качалку в брандмауэре");firewall.HorizontalAlignment=HorizontalAlignment.Left;system.Children.Add(firewall);
+        RenderLanSettings(Card("Устройства в сети","Отправляй загрузки на другой компьютер с Качалкой.","IconSeries"));
         RenderUpdateSettings(Card("Обновления","Приложение всегда под рукой в актуальной версии.","IconRefresh"));
         var cache=Card("Кэш","Постеры, фотографии и данные каталога: до 1 ГБ. Раз в неделю удаляем данные, не использованные за последние семь дней. При заполнении — самые давно не открывавшиеся.","IconRefresh");
         var cacheSize=Text("Подсчитываем размер…",13);cacheSize.Name="SettingsCacheSize";cache.Children.Add(cacheSize);

@@ -54,6 +54,7 @@ if(args.Contains("--person-profile-only")){await PersonProfileLoadingTests.Run()
 if(args.Contains("--professional-people-only")){await ProfessionalCinemaPeopleTests.Run();return;}
 if(args.Contains("--zona-metadata-only")){await ZonaMovieMetadataTests.Run();return;}
 if(args.Contains("--catalog-regions-only")){await CatalogRegionsTests.Run();return;}
+if(args.Contains("--lan-only")){await DownloadLanTests.Run(root);return;}
 await CacheStorageTests.Run(root);
 if(args.Contains("--cache-only"))return;
 DownloadTests.Run();
@@ -83,6 +84,7 @@ DownloadDiagnosticsTests.Run();
 DownloadSpaceTests.Run(root);
 await DownloadReliabilityTests.Run(root);
 await DownloadDeletionTests.Run(root);
+await DownloadLanTests.Run(root);
 await CoverCachePerformanceTests.Run(root);
 await MagnetDiscoveryTests.Run(root);
 await SourceTests.Run(args.Contains("--live-sources")||args.Contains("--all-live-sources"),args.Contains("--all-live-sources"));
