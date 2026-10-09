@@ -133,7 +133,9 @@ public partial class MainWindow
         AutomationProperties.SetName(homeCountry,"Страна отечественных подборок");catalogue.Children.Add(homeCountry);
         var countryHint=Hint("Учитываем страну производства. Фильмы совместного производства с выбранной страной тоже входят в отечественные подборки.");countryHint.Margin=new(0,8,0,0);catalogue.Children.Add(countryHint);
         var countryNotice=Notice(catalogue);
-        var artworkAttribution=Hint("Широкие фоны — TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.");artworkAttribution.Name="TmdbAttribution";artworkAttribution.Margin=new(0,16,0,0);catalogue.Children.Add(artworkAttribution);
+        var tmdbLogo=new Image{Name="TmdbLogo",Source=new System.Windows.Media.Imaging.BitmapImage(new Uri("pack://application:,,,/Assets/tmdb-logo.png")),Width=128,Height=17,Stretch=Stretch.Uniform,HorizontalAlignment=HorizontalAlignment.Left,Margin=new(0,18,0,8)};
+        AutomationProperties.SetName(tmdbLogo,"The Movie Database — источник широких фонов");catalogue.Children.Add(tmdbLogo);
+        var artworkAttribution=Hint("Широкие фоны — TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.");artworkAttribution.Name="TmdbAttribution";catalogue.Children.Add(artworkAttribution);
         homeCountry.SelectionChanged+=(_,_)=>
         {
             if(homeCountry.SelectedItem is not CatalogChoice choice)return;

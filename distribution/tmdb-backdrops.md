@@ -11,7 +11,7 @@
 5. Для проверки из Codex добавить тот же секрет в подготовленное поле облачной среды. Черновик настроек среды разрешает `api.themoviedb.org`, `image.tmdb.org`, `developer.themoviedb.org`, `www.themoviedb.org`. Сохранение черновика само по себе не применяет настройки: требуется сохранить и опубликовать среду. Это не настраивает секрет опубликованного сайта автоматически.
 6. Опубликовать обновлённый `web-index/`. Проверить `/api/backdrop?id=movies:<существующий-slug>`: ответ содержит исходный `id` и `backdrop` с полями `source`, `tmdbId`, `url` либо `backdrop:null`. `/api/backdrop-image?file=<имя-файла-с-начальным-слешем>` возвращает проверенный JPEG.
 
-В настройках приложения добавлено указание TMDB и обязательная фраза: «This product uses the TMDB API but is not endorsed or certified by TMDB». Перед публичным выпуском подключённой интеграции необходимо также добавить актуальный одобренный логотип из [правил атрибуции TMDB](https://developer.themoviedb.org/docs/attribution), проверить условия использования и доступ к настоящему API.
+В настройках приложения добавлены официальный логотип Primary short (blue) из [Logos & Attribution](https://www.themoviedb.org/about/logos-attribution), указание TMDB и обязательная фраза: «This product uses the TMDB API but is not endorsed or certified by TMDB». Исходный SVG, прозрачный PNG и сведения об источнике находятся в `native/Assets/`. Перед публичным выпуском подключённой интеграции нужно проверить условия использования и доступ к настоящему API.
 
 ## Поиск и скорость
 
