@@ -321,6 +321,8 @@ public partial class MainWindow
             foreach(var block in VisualElements<TextBlock>(Body).Where(x=>x.Text==activeDownload.Name&&AutomationProperties.GetName(x)=="Название раздачи"))
                 if(block.Foreground is not SolidColorBrush ink||ink.Color!=releaseInk)throw new Exception("Secondary release name does not follow dark theme.");
             Shot("downloads-dark");
+            foreach(var posterButton in VisualElements<Button>(Body).Where(x=>x.IsVisible&&AutomationProperties.GetName(x)=="Открыть карточку по постеру"))
+                if(posterButton.ActualWidth<47.5||posterButton.ActualHeight<71.5)throw new Exception($"Download row cover is clipped by its button: {posterButton.ActualWidth:0.#}×{posterButton.ActualHeight:0.#}.");
             foreach(var width in new[]{510d,360d})
             {
                 await Size(width,820);Render();await Settle();Shot("downloads-"+width);

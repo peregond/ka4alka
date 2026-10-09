@@ -94,7 +94,7 @@
    <Border Background="{DynamicResource Panel}" BorderBrush="{DynamicResource EdgeSoft}" BorderThickness="1" CornerRadius="14" Padding="10,10,12,10" Margin="0,0,0,12">
     <StackPanel>
      <Grid SizeChanged="DownloadRowResized"><Grid.ColumnDefinitions><ColumnDefinition Width="48"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-      <Button Style="{StaticResource PosterButton}" Tag="{Binding}" Click="OpenDownloadCard" IsEnabled="{Binding HasMediaCard}" ToolTip="Открыть карточку фильма или сериала" AutomationProperties.Name="Открыть карточку по постеру" VerticalAlignment="Top">
+      <Button Style="{StaticResource PosterButton}" Tag="{Binding}" Click="OpenDownloadCard" IsEnabled="{Binding HasMediaCard}" ToolTip="Открыть карточку фильма или сериала" AutomationProperties.Name="Открыть карточку по постеру" VerticalAlignment="Top" Margin="0">
        <Border Width="48" Height="72" CornerRadius="8" Background="{DynamicResource Raised}" SizeChanged="PosterResized" ClipToBounds="True" VerticalAlignment="Top">
         <Grid><Path Data="{StaticResource IconFilm}" Stroke="{DynamicResource Subtle}" StrokeThickness="1.5" Width="18" Height="18" Stretch="Uniform" Opacity="0.7"/><Image Loaded="SourceCover" DataContextChanged="SourceCoverChanged" Stretch="Uniform"/></Grid>
        </Border>
