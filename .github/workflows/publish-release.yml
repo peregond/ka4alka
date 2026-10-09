@@ -1,0 +1,57 @@
+name: Publish verified release
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version of the verified draft release to publish
+        required: true
+        default: '0.40.0'
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_VERSION: ${{ inputs.version }}
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Publish the draft as the latest release
+        shell: pwsh
+        run: |
+          $tag='v'+$env:RELEASE_VERSION
+          $info=gh release view $tag --json isDraft,assets | ConvertFrom-Json
+          if($LASTEXITCODE -ne 0){throw 'Draft release not found'}
+          if(-not $info.isDraft){throw 'Release is already published'}
+          $names=@($info.assets | ForEach-Object {$_.name})
+          foreach($required in @('Kachalka-Setup-'+$env:RELEASE_VERSION+'.exe','Kachalka-win-x64.zip','latest.json','latest.sig','SHA256SUMS.txt')){
+            if($names -notcontains $required){throw ('Draft is missing '+$required)}
+          }
+          # Review-only previews are removed before the public release.
+          foreach($name in $names | Where-Object {$_ -like 'preview-*'}){gh release delete-asset $tag $name --yes; if($LASTEXITCODE -ne 0){throw ('Cannot remove '+$name)}}
+          gh release edit $tag --draft=false --latest
+          if($LASTEXITCODE -ne 0){throw 'Cannot publish release'}
+      - name: Verify the public release without authentication
+        shell: pwsh
+        env:
+          GH_TOKEN: ''
+        run: |
+          $tag='v'+$env:RELEASE_VERSION
+          $dir=Join-Path $env:RUNNER_TEMP 'public-release'
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          $base='https://github.com/'+$env:GH_REPO+'/releases/download/'+$tag+'/'
+          foreach($file in @('Kachalka-Setup-'+$env:RELEASE_VERSION+'.exe','Kachalka-win-x64.zip','latest.json','latest.sig','SHA256SUMS.txt')){
+            Invoke-WebRequest ($base+$file) -OutFile (Join-Path $dir $file) -MaximumRetryCount 5 -RetryIntervalSec 5
+          }
+          Invoke-WebRequest ('https://github.com/'+$env:GH_REPO+'/releases/latest/download/latest.json') -OutFile (Join-Path $dir 'latest-via-latest.json')
+          if((Get-FileHash (Join-Path $dir 'latest.json')).Hash -ne (Get-FileHash (Join-Path $dir 'latest-via-latest.json')).Hash){throw 'The latest release does not serve this version'}
+          Remove-Item (Join-Path $dir 'latest-via-latest.json')
+          dotnet run --project update-tests/Kachalka.UpdateTests.csproj -c Release -- --verify-release $dir
+          if($LASTEXITCODE -ne 0){throw 'Public package signature or contents invalid'}
+          "Published $tag; public files downloaded without authentication and verified." >> $env:GITHUB_STEP_SUMMARY
