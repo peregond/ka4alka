@@ -75,7 +75,7 @@ public partial class MainWindow
             if(!primary){button.SetResourceReference(Control.BackgroundProperty,"BannerAction");button.SetResourceReference(Control.BorderBrushProperty,"BannerEdge");button.Foreground=(Brush)FindResource("BannerText");}
             button.Content=IconLabel(text,icon,18);AutomationProperties.SetName(button,text);return button;
         }
-        var aboutAction=Action("Подробнее","IconInfo",true);
+        var aboutAction=Action("Подробнее","IconInfo",false);
         var favorite=new Button{Style=(Style)FindResource("IconButton"),Width=52,Height=52,Margin=new(0)};favorite.SetResourceReference(Control.BackgroundProperty,"BannerAction");favorite.SetResourceReference(Control.BorderBrushProperty,"BannerEdge");favorite.Foreground=(Brush)FindResource("BannerText");
         actions.Children.Add(aboutAction);actions.Children.Add(favorite);
 
