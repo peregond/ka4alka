@@ -33,7 +33,7 @@ jobs:
           if($LASTEXITCODE -ne 0){throw 'Draft release not found'}
           if(-not $info.isDraft){throw 'Release is already published'}
           $names=@($info.assets | ForEach-Object {$_.name})
-          foreach($required in @('Kachalka-Setup-'+$env:RELEASE_VERSION+'.exe','Kachalka-win-x64.zip','latest.json','latest.sig','SHA256SUMS.txt')){
+          foreach($required in @(('Kachalka-Setup-'+$env:RELEASE_VERSION+'.exe'),'Kachalka-win-x64.zip','latest.json','latest.sig','SHA256SUMS.txt')){
             if($names -notcontains $required){throw ('Draft is missing '+$required)}
           }
           # Review-only previews are removed before the public release.
@@ -49,7 +49,7 @@ jobs:
           $dir=Join-Path $env:RUNNER_TEMP 'public-release'
           New-Item -ItemType Directory -Force $dir | Out-Null
           $base='https://github.com/'+$env:GH_REPO+'/releases/download/'+$tag+'/'
-          foreach($file in @('Kachalka-Setup-'+$env:RELEASE_VERSION+'.exe','Kachalka-win-x64.zip','latest.json','latest.sig','SHA256SUMS.txt')){
+          foreach($file in @(('Kachalka-Setup-'+$env:RELEASE_VERSION+'.exe'),'Kachalka-win-x64.zip','latest.json','latest.sig','SHA256SUMS.txt')){
             Invoke-WebRequest ($base+$file) -OutFile (Join-Path $dir $file) -MaximumRetryCount 5 -RetryIntervalSec 5
           }
           Invoke-WebRequest ('https://github.com/'+$env:GH_REPO+'/releases/latest/download/latest.json') -OutFile (Join-Path $dir 'latest-via-latest.json')
