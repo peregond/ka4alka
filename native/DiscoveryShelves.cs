@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Media;
 namespace Kachalka;
 
 public partial class MainWindow
@@ -13,6 +14,8 @@ public partial class MainWindow
         MediaItem[] items=[];
         int columns=1;
         public ContentControl Row=>row;
+        public MediaItem[] Items=>items;
+        public Action<MediaItem[]>? Changed {get;init;}
         public void Set(MediaItem[] source,bool loading)
         {
             items=source.DistinctBy(item=>item.Id).Take(40).ToArray();
@@ -30,7 +33,7 @@ public partial class MainWindow
         {
             var next=items.Take(columns).ToArray();
             if(row.Content is CatalogRow prior&&prior.Columns==columns&&prior.Items.SequenceEqual(next))return;
-            row.Content=new CatalogRow(next,columns);
+            row.Content=new CatalogRow(next,columns);Changed?.Invoke(next);
         }
     }
     string DiscoveryShelfTitle(DiscoveryShelfKind kind)=>kind switch
@@ -42,14 +45,19 @@ public partial class MainWindow
     };
     DiscoveryShelfView AddDiscoveryShelf(Panel parent,DiscoveryShelfKind kind)
     {
-        var sectionPanel=new StackPanel{Name="Discovery"+kind+"Section",Margin=new(0,0,0,20)};parent.Children.Add(sectionPanel);
-        var header=new DockPanel{Margin=new(0,0,8,12)};sectionPanel.Children.Add(header);
+        var sectionPanel=new StackPanel{Name="Discovery"+kind+"Section",Margin=new(0,0,0,12)};parent.Children.Add(sectionPanel);
+        var header=new DockPanel{Margin=new(0,0,0,16)};sectionPanel.Children.Add(header);
         var title=DiscoveryShelfTitle(kind);
-        var all=ActionButton("Все","IconChevron",()=>OpenDiscoveryShelf(kind));all.FontSize=12;all.Padding=new(5);all.Margin=new(0);all.MinHeight=26;all.SetResourceReference(Control.ForegroundProperty,"Accent");all.ToolTip="Показать: "+title;AutomationProperties.SetName(all,"Все: "+title);DockPanel.SetDock(all,Dock.Right);header.Children.Add(all);
-        var heading=Text(title,20);heading.Name="Discovery"+kind+"Heading";heading.FontWeight=FontWeights.SemiBold;heading.Margin=new(0);header.Children.Add(heading);
-        var state=Text("Загружаем подборку…",12,true);state.Margin=new(0,4,8,12);sectionPanel.Children.Add(state);
+        var all=new Button{Style=(Style)FindResource(typeof(Button)),MinHeight=36,Height=36,Margin=new(0),Padding=new(14,0,10,0),FontSize=13,FontWeight=FontWeights.SemiBold,ToolTip="Показать: "+title};
+        all.SetResourceReference(Control.BackgroundProperty,"Panel");all.SetResourceReference(Control.BorderBrushProperty,"EdgeSoft");all.SetResourceReference(Control.ForegroundProperty,"TextSoft");
+        var allRow=new StackPanel{Orientation=Orientation.Horizontal};allRow.Children.Add(new TextBlock{Text="Смотреть все",VerticalAlignment=VerticalAlignment.Center});
+        var chevron=new System.Windows.Shapes.Path{Data=(Geometry)FindResource("IconChevron"),Width=14,Height=14,Stretch=Stretch.Uniform,StrokeThickness=1.8,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,StrokeLineJoin=PenLineJoin.Round,Margin=new(6,0,0,0),VerticalAlignment=VerticalAlignment.Center};
+        chevron.SetBinding(System.Windows.Shapes.Shape.StrokeProperty,new System.Windows.Data.Binding("Foreground"){Source=all});allRow.Children.Add(chevron);all.Content=allRow;
+        all.Click+=(_,_)=>OpenDiscoveryShelf(kind);AutomationProperties.SetName(all,"Все: "+title);DockPanel.SetDock(all,Dock.Right);header.Children.Add(all);
+        var heading=Text(title,22);heading.Name="Discovery"+kind+"Heading";heading.FontWeight=FontWeights.Bold;heading.Margin=new(0);heading.VerticalAlignment=VerticalAlignment.Center;header.Children.Add(heading);
+        var state=Text("Загружаем подборку…",13,true);state.Margin=new(0,0,0,16);sectionPanel.Children.Add(state);
         var row=new ContentControl{Name="Discovery"+kind+"Row",ContentTemplate=(DataTemplate)FindResource("MediaRow"),Margin=new(0,0,0,0)};sectionPanel.Children.Add(row);
-        return new(row,state,all);
+        return new(row,state,all){Changed=ApplyPosterDownloads};
     }
     void OpenDiscoveryShelf(DiscoveryShelfKind kind)
     {

@@ -169,7 +169,7 @@ public partial class MainWindow
             }
             if(!VisualElements<Border>(Body).Any(x=>x.Name=="PosterQualityBadge"&&x.IsVisible))throw new Exception("Known quality badge is missing.");
             CheckCatalogFilterLine((ok,message)=>{if(!ok)throw new Exception(message);},"cinematic-desktop");
-            if(ActualWidth<1700||ActualHeight<900||discoveryHero is not {ActualHeight:>180}||discoveryHero.Children.Count!=2||discoveryShelf is not {ActualWidth:>500})throw new Exception($"Cinematic desktop catalog is missing its banners or curated row ({ActualWidth}x{ActualHeight}, hero={discoveryHero?.ActualHeight}, shelf={discoveryShelf?.ActualWidth}).");
+            if(ActualWidth<1700||ActualHeight<900||discoveryHero is not {ActualHeight:>180}||discoveryHero.Children.Count!=1||discoveryShelf is not {ActualWidth:>500})throw new Exception($"Cinematic desktop catalog is missing its banners or curated row ({ActualWidth}x{ActualHeight}, hero={discoveryHero?.ActualHeight}, shelf={discoveryShelf?.ActualWidth}).");
             if(VisualElements<UIElement>(Body).Any(x=>x.Effect!=null))throw new Exception("Cinematic catalog adds an expensive blur or shadow effect.");
             var bannerCornerChecks=CheckBannerCorners(output);
             var featurePosterWidths=VisualElements<Image>(discoveryHero!).Select(x=>(x.Source as BitmapSource)?.PixelWidth??0).ToArray();

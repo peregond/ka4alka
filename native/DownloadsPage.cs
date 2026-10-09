@@ -107,7 +107,7 @@ public partial class MainWindow
     }
     void RefreshDownloadView()
     {
-        UpdateDownloadsWidget();
+        UpdateDownloadsWidget();ApplyPosterDownloads();
         if(section!="Загрузки"||downloadView==null)return;RepairDownloadMetadata();UpdateDownloadSummary();
         if(downloadSort is not ("speed" or "progress" or "size")&&!(downloadSort=="name"&&downloadMetadataSortPending))return;
         // Keep the row under the pointer stable while the user chooses an action.

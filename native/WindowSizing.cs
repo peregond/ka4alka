@@ -129,15 +129,16 @@ public partial class MainWindow
             nav.MinHeight=veryShort?30:shortView?40:44;nav.Margin=new(0,0,0,veryShort?2:4);
         }
         SidebarUpdateButton.MinHeight=veryShort?30:40;
+        var control=tiny?40d:shortView?44d:48d;
         AddTorrentButton.Content=IconLabel(tiny?"":narrow?"Добавить":"Добавить торрент","IconMagnet",18);
-        AddTorrentButton.Padding=new Thickness(tiny?13:18,0,tiny?13:18,0);AddTorrentButton.MinHeight=shortView?44:48;AddTorrentButton.Height=shortView?44:48;
-        BackButton.Width=shortView?44:48;BackButton.Height=shortView?44:48;ThemeButton.Width=shortView?44:48;ThemeButton.Height=shortView?44:48;
+        AddTorrentButton.Padding=new Thickness(tiny?0:narrow?14:18,0,tiny?0:narrow?14:18,0);AddTorrentButton.MinHeight=control;AddTorrentButton.Height=control;AddTorrentButton.MinWidth=tiny?control:0;AddTorrentButton.Margin=new Thickness(0,0,tiny?8:12,0);
+        BackButton.Width=control;BackButton.Height=control;BackButton.Margin=new Thickness(0,0,tiny?8:12,0);ThemeButton.Width=control;ThemeButton.Height=control;
         HeaderArea.Margin=new Thickness(gutter,veryShort?6:shortView?12:20,gutter,veryShort?6:shortView?10:20);
         CenterRegion.Margin=new Thickness(gutter,0,gutter,0);Status.Margin=new Thickness(gutter,6,gutter,8);
-        SearchBar.Margin=new Thickness(0,0,tiny?8:12,0);SearchBar.Height=shortView?44:48;Search.MinHeight=shortView?44:48;
-        Search.Padding=new Thickness(narrowSearch?14:48,0,narrowSearch?84:110,0);
+        SearchBar.Margin=new Thickness(0,0,tiny?8:12,0);SearchBar.Height=control;Search.MinHeight=control;
+        Search.Padding=new Thickness(narrowSearch?12:48,0,narrowSearch?76:110,0);
         SearchMagnifier.Visibility=narrowSearch?Visibility.Collapsed:Visibility.Visible;
-        SearchPlaceholder.Text=narrowSearch?"Поиск":"Найти фильм, сериал или человека";SearchPlaceholder.Margin=new Thickness(narrowSearch?14:48,0,narrowSearch?84:110,0);
+        SearchPlaceholder.Text=narrowSearch?"Поиск":"Найти фильм, сериал или человека";SearchPlaceholder.Margin=new Thickness(narrowSearch?12:48,0,narrowSearch?76:110,0);
         foreach(var subtitle in PageHeader.Children.OfType<TextBlock>().Where(x=>Equals(x.Tag,"CatalogSubtitle")))subtitle.Visibility=shortView?Visibility.Collapsed:Visibility.Visible;
         RenderNavSelection();
         UpdateSavedCount();UpdateDownloadsWidget();
@@ -148,28 +149,28 @@ public partial class MainWindow
     {
         var visible=inlineCatalogFilterScroll!=null&&catalogToolbar!=null&&current==null&&activePerson==null&&section is "Фильмы" or "Сериалы" or "Сохранённое";
         FiltersPanel.Visibility=visible?Visibility.Visible:Visibility.Collapsed;
-        CenterRegion.Margin=new(0);
         if(!visible||inlineCatalogFilters==null)return;
         var width=FiltersPanel.ActualWidth>0?FiltersPanel.ActualWidth:Math.Max(1,ActualWidth-(compactWidth?64:236)-2*contentGutter);
-        var compact=width<1100;
+        var compact=width<1100;var shortChip=compactHeight;
         if(catalogFiltersCompact!=compact)
         {
             catalogFiltersCompact=compact;
             foreach(var (button,caption) in catalogFilterCaptions)
-                button.Content=caption.Icon==null?compact?caption.Compact:caption.Full:IconLabel(compact?caption.Compact:caption.Full,caption.Icon);
+                SetChipText(button,compact?caption.Compact:caption.Full);
         }
-        foreach(var button in inlineCatalogFilters.Children.OfType<Button>())
+        foreach(var button in inlineCatalogFilters.Children.OfType<Button>().Concat(catalogToolbar?.Children.OfType<StackPanel>().SelectMany(x=>x.Children.OfType<Button>())??[]))
         {
-            button.HorizontalContentAlignment=HorizontalAlignment.Center;button.MinHeight=34;button.FontSize=compact?12:13;
-            button.Padding=new(compact?9:12,7,compact?9:12,7);button.Margin=new(0,0,6,0);
+            if(ReferenceEquals(button,catalogRefreshButton))continue;
+            button.HorizontalContentAlignment=HorizontalAlignment.Center;button.MinHeight=shortChip?36:40;button.FontSize=compact?13:14;
+            button.Padding=new(compact?12:16,0,compact?12:16,0);button.Margin=new(0,0,8,8);
         }
-        if(catalogRefreshButton!=null){catalogRefreshButton.Padding=new(9,7,9,7);catalogRefreshButton.Margin=new(0);}
+        if(catalogRefreshButton!=null){catalogRefreshButton.Padding=new(0);catalogRefreshButton.Width=shortChip?36:40;catalogRefreshButton.MinHeight=shortChip?36:40;catalogRefreshButton.Margin=new(8,0,0,8);}
         UpdateCatalogFilterOverflow();UpdateDiscoveryLayout();
     }
     void UpdateCatalogFilterOverflow()
     {
         if(inlineCatalogFilterScroll==null||inlineCatalogFilters==null||catalogToolbar==null||catalogFilterBack==null||catalogFilterForward==null)return;
-        var overflow=catalogToolbar.ActualWidth>0&&inlineCatalogFilters.DesiredSize.Width>catalogToolbar.ActualWidth+1;
+        var overflow=inlineCatalogFilterScroll.ViewportWidth>0&&inlineCatalogFilterScroll.ScrollableWidth>1;
         var visibility=overflow?Visibility.Visible:Visibility.Collapsed;
         catalogFilterBack.Visibility=visibility;catalogFilterForward.Visibility=visibility;
         catalogFilterBack.IsEnabled=inlineCatalogFilterScroll.HorizontalOffset>1;
@@ -195,7 +196,7 @@ public partial class MainWindow
         if(!force&&columns==catalogColumns)return;
         var position=CaptureCatalogReflow();
         catalogColumns=columns;
-        catalogList.ItemsSource=catalogDisplay.Chunk(columns).Select(x=>new CatalogRow(x,columns)).ToArray();
+        catalogList.ItemsSource=catalogDisplay.Chunk(columns).Select(x=>new CatalogRow(x,columns)).ToArray();ApplyPosterDownloads(catalogDisplay);
         UpdateDiscoveryLayout();
         RestoreCatalogReflow(position);
     }

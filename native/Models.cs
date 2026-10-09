@@ -29,6 +29,20 @@ public record MediaItem(int Id, string Title, string Section, string Genre, int 
     [JsonIgnore] public bool KpAvailable => !string.IsNullOrWhiteSpace(liveKp??Kinopoisk)&&(liveKp??Kinopoisk)!="—";
     [JsonIgnore] public bool ImdbAvailable => !string.IsNullOrWhiteSpace(liveImdb??Imdb)&&(liveImdb??Imdb)!="—";
     [JsonIgnore] public string CardRating => KpAvailable?(liveKp??Kinopoisk):ImdbAvailable?(liveImdb??Imdb):"—";
+    [JsonIgnore] public bool HasCardRating => KpAvailable||ImdbAvailable;
+    // Queue state shown on the poster: a thin progress line while downloading, a check once complete.
+    double downloadPercent=-1;bool downloaded;
+    [JsonIgnore] public double DownloadPercent=>Math.Max(0,downloadPercent);
+    [JsonIgnore] public bool HasDownloadProgress=>!downloaded&&downloadPercent>=0;
+    [JsonIgnore] public bool IsDownloaded=>downloaded;
+    public void SetDownloadState(bool complete,double percent)
+    {
+        percent=complete||percent<0?-1:Math.Clamp(percent,0,100);
+        if(complete==downloaded&&Math.Abs(percent-downloadPercent)<.5)return;
+        downloaded=complete;downloadPercent=percent;
+        PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(DownloadPercent)));PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(HasDownloadProgress)));PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(IsDownloaded)));
+    }
+    [JsonIgnore] public string CardMeta=>string.Join(" · ",new[]{Year>0?Year.ToString():"",CardGenre}.Where(x=>x.Length>0));
     [JsonIgnore] public string CardRatingSource => KpAvailable?"Кинопоиск":ImdbAvailable?"IMDb":"Оценка пока недоступна";
     static string InlineMetadata(string? value)=>string.Join(", ",(value??"").Split(',').Select(part=>Regex.Replace(part,@"\s+"," ").Trim()).Where(part=>part.Length>0));
     [JsonIgnore] public string CardGenre {get{var value=InlineMetadata(liveGenre??Genre);return value.Length==0?Section=="Сериалы"?"Сериал":"Фильм":value;}}
@@ -90,6 +104,8 @@ public class Preferences
     public string Folder { get;set; }=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),"Downloads","Ka4alka");
     public bool FolderConfigured {get;set;}
     public bool Light {get;set;}=false;
+    public bool LiteMode {get;set;}
+    public bool LiteModeConfigured {get;set;}
     public bool LanEnabled {get;set;}
     public string LanDeviceName {get;set;}="";
     public string HomeCountry {get;set;}="rossiia";

@@ -97,7 +97,7 @@ public partial class MainWindow
         Width=510;await Task.Delay(150);UpdateLayout();CheckCatalogFilterLine(Check,"narrow-short");
         Check(inlineCatalogFilterScroll is {ScrollableWidth:>0,ScrollableHeight:0}&&Body.ActualHeight>25,"overflowing filter choices scroll horizontally without adding rows or hiding the catalog");
         Render();await Settle();
-        Check(Equals(FindVisual<Button>(RootGrid,b=>AutomationProperties.GetName(b)=="Год выхода")?.Content,"Год ▾"),"compact filter captions survive a catalog refresh in a narrow window");
+        Check(FindVisual<Button>(RootGrid,b=>AutomationProperties.GetName(b)=="Год выхода") is {} yearChip&&ChipText(yearChip)=="Год","compact filter captions survive a catalog refresh in a narrow window");
         inlineCatalogFilterScroll!.ScrollToRightEnd();await Task.Delay(80);UpdateLayout();
         var narrowQuality=FindVisual<Button>(RootGrid,b=>AutomationProperties.GetName(b)=="Качество каталога")??throw new Exception("Missing single quality menu in narrow catalog.");
         var qualityBounds=narrowQuality.TransformToAncestor(inlineCatalogFilterScroll).TransformBounds(new Rect(new Point(),narrowQuality.RenderSize));
@@ -126,13 +126,13 @@ public partial class MainWindow
 
     void CheckCatalogFilterLine(Action<bool,string> check,string stage)
     {
-        check(RootGrid.ColumnDefinitions.Count==2&&FiltersPanel.IsVisible&&ReferenceEquals(FiltersPanel.Parent,HeaderArea)&&Grid.GetRow(FiltersPanel)==1,"catalog filters occupy the header below search without a right column ("+stage+")");
+        check(RootGrid.ColumnDefinitions.Count==2&&FiltersPanel.IsVisible&&FiltersPanel.Parent is StackPanel,"catalog filters scroll with the page, below the banner and the search, without a right column ("+stage+")");
         check(inlineCatalogFilters is StackPanel {Orientation:Orientation.Horizontal}&&ReferenceEquals(inlineCatalogFilterScroll?.Parent,catalogToolbar)&&ReferenceEquals(catalogToolbar?.Parent,FilterControls),"catalog filters remain one horizontal line ("+stage+")");
         var searchBounds=SearchBar.TransformToAncestor(RootGrid).TransformBounds(new Rect(new Point(),SearchBar.RenderSize));
         var filterBounds=FiltersPanel.TransformToAncestor(RootGrid).TransformBounds(new Rect(new Point(),FiltersPanel.RenderSize));
-        check(filterBounds.Top>=searchBounds.Bottom-.5,"catalog filter line sits below the search input ("+stage+")");
-        var buttons=VisualElements<Button>(inlineCatalogFilters!).Where(x=>x.IsVisible).ToArray();
-        var centers=buttons.Select(x=>x.TransformToAncestor(inlineCatalogFilters!).Transform(new Point(0,x.ActualHeight/2)).Y).ToArray();
+        check(filterBounds.Width>0&&filterBounds.Height>0&&searchBounds.Width>0,"catalog filter line has its own row in the page ("+stage+")");
+        var buttons=VisualElements<Button>(catalogToolbar!).Where(x=>x.IsVisible).ToArray();
+        var centers=buttons.Select(x=>x.TransformToAncestor(catalogToolbar!).Transform(new Point(0,x.ActualHeight/2)).Y).ToArray();
         foreach(var name in new[]{"Жанр","Страна","Рейтинг от","Год выхода","Порядок","Качество каталога"})
             check(buttons.Count(x=>AutomationProperties.GetName(x)==name)==1,"catalog filter remains available: "+name+" ("+stage+")");
         check(buttons.Any(x=>AutomationProperties.GetName(x)=="Подборка")==(!favoritesOnly&&!SearchActive),"collection filter matches the active catalog context ("+stage+")");

@@ -162,13 +162,13 @@ public partial class MainWindow
             CancelCatalogQualityCheck();changed();
         }
         var label=prefs.CatalogQualityHeight switch{2160=>"Качество · 4K",1080=>"Качество · FullHD",720=>"Качество · HD Ready",_=>"Качество"};
-        var button=ActionButton(label+" ▾","IconFilter",()=>{},"PillButton");
-        button.SetResourceReference(Control.BackgroundProperty,prefs.CatalogQualityHeight!=0||prefs.HidePoorQuality?"Selected":"Panel");
+        var button=Button("",()=>{});button.Style=(Style)FindResource("PillButton");button.Content=ChipContent(label);
+        StyleChip(button,prefs.CatalogQualityHeight!=0);
         button.ToolTip="Показывать фильмы и сериалы с раздачей выбранного разрешения. Экранки не считаются HD или 4K.";
         AutomationProperties.SetName(button,"Качество каталога");
         AutomationProperties.SetItemStatus(button,(prefs.HidePoorQuality?"Плохое качество скрыто. ":"")+(prefs.CatalogQualityHeight==0?"Любое разрешение":label));
         var menu=new ToggleContextMenu{PlacementTarget=button,Placement=System.Windows.Controls.Primitives.PlacementMode.Bottom};
-        menu.SetResourceReference(Control.BackgroundProperty,"Panel");menu.SetResourceReference(Control.ForegroundProperty,"Text");
+        menu.SetResourceReference(Control.BackgroundProperty,"Raised");menu.SetResourceReference(Control.ForegroundProperty,"Text");
         var hide=new MenuItem{Header="Скрывать плохое качество",Tag="hide-poor",IsCheckable=true,IsChecked=prefs.HidePoorQuality};
         AutomationProperties.SetName(hide,"Скрывать плохое качество");
         hide.Click+=(_,_)=>{menu.IsOpen=false;Save(!prefs.HidePoorQuality,prefs.CatalogQualityHeight);};menu.Items.Add(hide);menu.Items.Add(new Separator());

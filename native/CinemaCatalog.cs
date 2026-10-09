@@ -20,7 +20,7 @@ public partial class MainWindow
     int featuredGeneration;
     bool DiscoveryCatalog=>section is ("Фильмы" or "Сериалы")&&!SearchActive&&!favoritesOnly&&activePerson==null&&current==null&&livePage==1&&CatalogSelection.IsDefault&&catalogRegion.Length==0;
 
-    void AddDiscovery(StackPanel content,MediaItem[] cards)
+    void AddDiscovery(StackPanel content,MediaItem[] cards,UIElement? filterRow=null)
     {
         discoveryShelves.Clear();
         if(!DiscoveryCatalog)return;
@@ -28,13 +28,11 @@ public partial class MainWindow
         var banners=popular.Length>0?popular:cards;
         if(banners.Length>0)
         {
-            discoveryHero=new Grid{Margin=new(0,0,8,24)};
-            discoveryHero.ColumnDefinitions.Add(new(){Width=new GridLength(1.8,GridUnitType.Star)});
-            discoveryHero.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});
-            discoveryHero.Children.Add(FeatureBanner(banners[0],true));
-            if(banners.Length>1){var second=FeatureBanner(banners[1],false);Grid.SetColumn(second,1);second.Margin=new(12,0,0,0);discoveryHero.Children.Add(second);}
+            discoveryHero=new Grid{Margin=new(0,0,0,28)};
+            discoveryHero.Children.Add(BuildFeatureCarousel(banners));
             content.Children.Add(discoveryHero);
         }
+        if(filterRow!=null)content.Children.Add(filterRow);
         var regions=DiscoveryRegionalItems(section,prefs.HomeCountry,cards);
         var order=section=="Фильмы"?new[]{DiscoveryShelfKind.Popular,DiscoveryShelfKind.New,DiscoveryShelfKind.Foreign,DiscoveryShelfKind.Native}:new[]{DiscoveryShelfKind.Popular,DiscoveryShelfKind.Foreign,DiscoveryShelfKind.New,DiscoveryShelfKind.Native};
         foreach(var kind in order)
@@ -48,7 +46,7 @@ public partial class MainWindow
                 case DiscoveryShelfKind.Native:view.Set(regions.Native,regions.Loading);break;
             }
         }
-        var all=Text(section=="Фильмы"?"Все фильмы":"Все сериалы",20);all.Name="CatalogAllHeading";all.FontWeight=FontWeights.SemiBold;all.Margin=new(0,4,8,12);content.Children.Add(all);
+        var all=Text(section=="Фильмы"?"Все фильмы":"Все сериалы",22);all.Name="CatalogAllHeading";all.FontWeight=FontWeights.Bold;all.Margin=new(0,4,0,16);content.Children.Add(all);
         UpdateDiscoveryLayout();
         StartRegionalDiscovery(section,cards);
         if(!catalogPages.ContainsKey(section+"||1")&&!featuredRequests.Contains(section)&&!featuredFallback.Contains(section)){featuredRequests.Add(section);_=LoadFeatured(section);}
@@ -101,46 +99,9 @@ public partial class MainWindow
             request.Dispose();
         }
     }
-    Button FeatureBanner(MediaItem item,bool primary)
-    {
-        var frame=new Border{Name="FeatureFrame",CornerRadius=new(16),BorderThickness=new(1)};
-        frame.SetResourceReference(Border.BackgroundProperty,"PanelAlt");frame.SetResourceReference(Border.BorderBrushProperty,"EdgeSoft");
-        var grid=new Grid{Name="FeatureArtwork"};frame.Child=grid;
-        // Clip the artwork to the inside of the border, keeping its rounded stroke intact.
-        grid.SizeChanged+=(_,e)=>
-        {
-            if(e.NewSize.Width<=0||e.NewSize.Height<=0)return;
-            var clip=new RectangleGeometry(new Rect(e.NewSize),15,15);clip.Freeze();grid.Clip=clip;
-        };
-        var image=new Image{DataContext=item,Width=0,Height=0,Opacity=0,Tag="FeaturePoster"};image.Loaded+=SourceCover;image.DataContextChanged+=SourceCoverChanged;grid.Children.Add(image);
-        var picture=new ImageBrush{Stretch=Stretch.UniformToFill,AlignmentX=AlignmentX.Center,AlignmentY=AlignmentY.Top};
-        BindingOperations.SetBinding(picture,ImageBrush.ImageSourceProperty,new Binding("Source"){Source=image});
-        var backdrop=new Border{Background=picture};grid.Children.Add(backdrop);
-        grid.Children.Add(new Border{Background=new LinearGradientBrush(new GradientStopCollection{new(Color.FromArgb(230,13,20,21),0),new(Color.FromArgb(75,13,20,21),.6),new(Color.FromArgb(20,13,20,21),1)},0)});
-        grid.Children.Add(new Border{Background=new LinearGradientBrush(new GradientStopCollection{new(Color.FromArgb(0,13,20,21),0),new(Color.FromArgb(230,13,20,21),1)},90)});
-        var content=new StackPanel{VerticalAlignment=VerticalAlignment.Bottom,Margin=new(18,16,18,16)};grid.Children.Add(content);
-        var eyebrow=new TextBlock{Text=primary?"В центре внимания":"Стоит посмотреть",FontSize=11,Foreground=new SolidColorBrush(Color.FromRgb(202,218,212)),Margin=new(0,0,0,6)};content.Children.Add(eyebrow);
-        var title=new TextBlock{Text=item.Title,FontSize=primary?25:20,FontWeight=FontWeights.SemiBold,Foreground=Brushes.White,TextWrapping=TextWrapping.Wrap,TextTrimming=TextTrimming.CharacterEllipsis,MaxHeight=62,ToolTip=item.Title,Margin=new(0,0,0,5)};content.Children.Add(title);
-        content.Children.Add(new TextBlock{Text=string.Join(" · ",new[]{item.Year>0?item.Year.ToString():"",item.CardGenre}.Where(x=>x.Length>0)),Foreground=new SolidColorBrush(Color.FromRgb(214,221,219)),FontSize=12,TextTrimming=TextTrimming.CharacterEllipsis,Margin=new(0,0,0,10)});
-        var action=new Border{CornerRadius=new(8),Padding=new(11,7,11,7),HorizontalAlignment=HorizontalAlignment.Left,BorderThickness=new(1)};
-        action.SetResourceReference(Border.BackgroundProperty,primary?"PrimaryFill":"BannerAction");action.SetResourceReference(Border.BorderBrushProperty,primary?"Primary":"Edge");
-        var actionLabel=IconLabel("Подробнее","IconChevron");actionLabel.IsHitTestVisible=false;
-        foreach(var label in VisualElements<TextBlock>(actionLabel))label.Foreground=Brushes.White;
-        foreach(var glyph in VisualElements<System.Windows.Shapes.Path>(actionLabel))glyph.Stroke=Brushes.White;
-        action.Child=actionLabel;content.Children.Add(action);
-        var button=new Button{Content=frame,Tag=item,Style=(Style)FindResource("FeatureBannerButton"),Padding=new(0),Margin=new(0),HorizontalContentAlignment=HorizontalAlignment.Stretch,VerticalContentAlignment=VerticalAlignment.Stretch,ToolTip="Открыть «"+item.Title+"»"};
-        System.Windows.Automation.AutomationProperties.SetName(button,"Открыть "+item.Title);
-        button.Click+=OpenCard;return button;
-    }
     void UpdateDiscoveryLayout()
     {
-        if(discoveryHero!=null)
-        {
-            var wide=Body.ActualWidth>=760;
-            discoveryHero.Height=Body.ActualWidth>=1050?235:wide?220:190;
-            discoveryHero.ColumnDefinitions[1].Width=wide?new GridLength(1,GridUnitType.Star):new GridLength(0);
-            if(discoveryHero.Children.Count>1)discoveryHero.Children[1].Visibility=wide?Visibility.Visible:Visibility.Collapsed;
-        }
+        if(discoveryHero!=null)ArrangeFeatureCarousel(Body.ActualWidth);
         foreach(var shelf in discoveryShelves.Values)shelf.Resize(Math.Max(1,catalogColumns));
     }
     void AddRailPreview(MediaItem[] cards)

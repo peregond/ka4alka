@@ -9,12 +9,12 @@
   <SolidColorBrush x:Key="Accent" Color="#5BE3B5"/><SolidColorBrush x:Key="AccentInk" Color="#06140F"/><SolidColorBrush x:Key="AccentSoft" Color="#245BE3B5"/><SolidColorBrush x:Key="Primary" Color="#5BE3B5"/><SolidColorBrush x:Key="PrimaryInk" Color="#06140F"/><SolidColorBrush x:Key="PrimaryHover" Color="#7BEBC6"/><SolidColorBrush x:Key="PrimaryFill" Color="#5BE3B5"/>
   <SolidColorBrush x:Key="Danger" Color="#FF8A7A"/><SolidColorBrush x:Key="RatingInk" Color="#F2B35B"/><SolidColorBrush x:Key="BannerAction" Color="#14EEF1F4"/>
   <SolidColorBrush x:Key="Raised" Color="#1A1F26"/><SolidColorBrush x:Key="NavSelected" Color="#181C23"/><SolidColorBrush x:Key="Subtle" Color="#7F8995"/><SolidColorBrush x:Key="AccentLine" Color="#595BE3B5"/><SolidColorBrush x:Key="DangerSoft" Color="#24FF8A7A"/>
-  <SolidColorBrush x:Key="Warning" Color="#F2B35B"/><SolidColorBrush x:Key="WarningSoft" Color="#24F2B35B"/><SolidColorBrush x:Key="Info" Color="#7FA9FF"/><SolidColorBrush x:Key="InfoSoft" Color="#247FA9FF"/><SolidColorBrush x:Key="BannerEdge" Color="#29EEF1F4"/>
+  <SolidColorBrush x:Key="Warning" Color="#F2B35B"/><SolidColorBrush x:Key="WarningSoft" Color="#24F2B35B"/><SolidColorBrush x:Key="Info" Color="#7FA9FF"/><SolidColorBrush x:Key="InfoSoft" Color="#247FA9FF"/>
   <SolidColorBrush x:Key="Track" Color="#1F242C"/><SolidColorBrush x:Key="TrackOff" Color="#2A303A"/><SolidColorBrush x:Key="EdgeStrong" Color="#2C333D"/><SolidColorBrush x:Key="EdgeFocus" Color="#3A424E"/><SolidColorBrush x:Key="TextSoft" Color="#C9D0D8"/>
   <!-- Theme-independent brushes: the backdrop scrim and the text drawn on it are always dark/light. Created once and frozen. -->
   <LinearGradientBrush x:Key="ScrimHorizontal" StartPoint="0,0.5" EndPoint="1,0.5" po:Freeze="True"><GradientStop Color="#F00A0C0F" Offset="0"/><GradientStop Color="#B80A0C0F" Offset="0.38"/><GradientStop Color="#0F0A0C0F" Offset="0.78"/></LinearGradientBrush>
   <LinearGradientBrush x:Key="ScrimVertical" StartPoint="0.5,1" EndPoint="0.5,0" po:Freeze="True"><GradientStop Color="#CC0A0C0F" Offset="0"/><GradientStop Color="#000A0C0F" Offset="0.45"/></LinearGradientBrush>
-  <SolidColorBrush x:Key="PosterBadge" Color="#CC0A0C0F" po:Freeze="True"/><SolidColorBrush x:Key="BannerText" Color="#EEF1F4" po:Freeze="True"/><SolidColorBrush x:Key="BannerMuted" Color="#C9D0D8" po:Freeze="True"/><SolidColorBrush x:Key="BannerDot" Color="#59EEF1F4" po:Freeze="True"/><SolidColorBrush x:Key="BannerChip" Color="#1AEEF1F4" po:Freeze="True"/><SolidColorBrush x:Key="BannerBadgeEdge" Color="#47EEF1F4" po:Freeze="True"/><SolidColorBrush x:Key="BannerButtonFill" Color="#990A0C0F" po:Freeze="True"/>
+  <SolidColorBrush x:Key="PosterBadge" Color="#CC0A0C0F" po:Freeze="True"/><SolidColorBrush x:Key="BannerText" Color="#EEF1F4" po:Freeze="True"/><SolidColorBrush x:Key="BannerMuted" Color="#C9D0D8" po:Freeze="True"/><SolidColorBrush x:Key="BannerDot" Color="#59EEF1F4" po:Freeze="True"/><SolidColorBrush x:Key="BannerChip" Color="#1AEEF1F4" po:Freeze="True"/><SolidColorBrush x:Key="BannerBadgeEdge" Color="#47EEF1F4" po:Freeze="True"/><SolidColorBrush x:Key="BannerEdge" Color="#29EEF1F4" po:Freeze="True"/><SolidColorBrush x:Key="BannerButtonFill" Color="#990A0C0F" po:Freeze="True"/>
   <Style TargetType="Window">
    <Setter Property="Background" Value="{DynamicResource Bg}"/><Setter Property="Foreground" Value="{DynamicResource Text}"/><Setter Property="FontFamily" Value="{StaticResource InterfaceFont}"/><Setter Property="FontSize" Value="14"/><Setter Property="UseLayoutRounding" Value="True"/><Setter Property="TextOptions.TextFormattingMode" Value="Ideal"/><Setter Property="TextOptions.TextRenderingMode" Value="Grayscale"/>
   </Style>
@@ -78,6 +78,22 @@
   <!-- Square icon button: 40x40 by default; set Width/Height for 44/48 header buttons. -->
   <Style x:Key="IconButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
    <Setter Property="Width" Value="40"/><Setter Property="Height" Value="40"/><Setter Property="MinHeight" Value="0"/><Setter Property="Padding" Value="0"/><Setter Property="Margin" Value="0"/>
+  </Style>
+  <!-- Round 40x40 control used on top of artwork (carousel arrows). -->
+  <Style x:Key="RoundIconButton" TargetType="Button" BasedOn="{StaticResource IconButton}">
+   <Setter Property="Background" Value="{StaticResource BannerButtonFill}"/><Setter Property="BorderBrush" Value="{StaticResource BannerEdge}"/>
+   <Setter Property="Template"><Setter.Value>
+    <ControlTemplate TargetType="Button">
+     <Grid>
+      <Border x:Name="Frame" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="20"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" TextElement.Foreground="{TemplateBinding Foreground}"/></Border>
+      <Border x:Name="FocusRing" CornerRadius="20" BorderBrush="{DynamicResource Text}" BorderThickness="2" Visibility="Collapsed" IsHitTestVisible="False"/>
+     </Grid>
+     <ControlTemplate.Triggers>
+      <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Frame" Property="Background" Value="#CC0A0C0F"/></Trigger>
+      <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="FocusRing" Property="Visibility" Value="Visible"/></Trigger>
+     </ControlTemplate.Triggers>
+    </ControlTemplate>
+   </Setter.Value></Setter>
   </Style>
   <Style x:Key="PosterButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
    <Setter Property="Background" Value="Transparent"/><Setter Property="BorderBrush" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="Padding" Value="0"/><Setter Property="MinHeight" Value="0"/><Setter Property="HorizontalContentAlignment" Value="Stretch"/>

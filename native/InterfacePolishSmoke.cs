@@ -62,8 +62,11 @@ public partial class MainWindow
             Check(GetMonitorInfo(MonitorFromWindow(handle,MonitorDefaultNearest),ref monitorInfo),"Native input monitor exposes its physical work area.");
             var dpi=VisualTreeHelper.GetDpi(this);
             var nativeFit=WindowSizing.FitPixels(monitorInfo.Work.Width,monitorInfo.Work.Height,dpi.DpiScaleX,dpi.DpiScaleY);
+            // The submit action replaces the shortcut hint once a query exists.
+            Search.Text="Проверка";searchDelay.Stop();await Settle();
             var wideTopLeft=SearchSubmitButton.PointToScreen(new Point());
             var wideBottomRight=SearchSubmitButton.PointToScreen(new Point(SearchSubmitButton.ActualWidth,SearchSubmitButton.ActualHeight));
+            Search.Clear();searchDelay.Stop();await Settle();
             File.WriteAllText(Path.Combine(output,"native-pointer-layout.json"),JsonSerializer.Serialize(new
             {
                 RequestedViewport=new{Width,Height},PhysicalWorkArea=monitorInfo.Work,
@@ -78,13 +81,14 @@ public partial class MainWindow
             try{await Task.Delay(70);}finally{keybd_event(0x4B,0,2,0);keybd_event(0x11,0,2,0);}
             await Settle();
             Check(Search.IsKeyboardFocused,"Native Ctrl+K focuses the persistent search field.");
-            var focus=Search.Template.FindName("FocusRing",Search) as Border;
-            Check(focus is {IsVisible:true}&&SearchShortcutHint.Visibility==Visibility.Collapsed,"Keyboard search exposes its focus ring and removes the shortcut hint.");
+            var focus=Search.Template.FindName("TextFrame",Search) as Border;
+            Check(focus!=null&&ReferenceEquals(focus.BorderBrush,FindResource("EdgeFocus"))&&SearchShortcutHint.Visibility==Visibility.Collapsed,"Keyboard search lights its border (EdgeFocus) and removes the shortcut hint.");
             Shot("interface-search-focus");
             Search.Text="Проверка";searchDelay.Stop();await Settle();
             Check(ClearSearchButton.IsVisible&&!SearchShortcutHint.IsVisible,"Clear action is available without overlapping a typed query.");
             keybd_event(0x1B,0,0,0);try{await Task.Delay(70);}finally{keybd_event(0x1B,0,2,0);}await Settle();
             Check(Search.Text.Length==0&&!ClearSearchButton.IsVisible,"Native Escape clears the current search query.");
+            Search.Text="Проверка";searchDelay.Stop();await Settle();
             var hoverPoint=SearchSubmitButton.PointToScreen(new Point(SearchSubmitButton.ActualWidth/2,SearchSubmitButton.ActualHeight/2));
             Check(SetCursorPos((int)hoverPoint.X,(int)hoverPoint.Y),"Native pointer can reach the primary search action.");Mouse.Synchronize();await Settle();
             var frame=SearchSubmitButton.Template.FindName("Frame",SearchSubmitButton) as Border;
@@ -106,7 +110,7 @@ public partial class MainWindow
             Check(pointerEvidence.ForegroundIsApp&&pointerEvidence.PointerRootIsApp&&buttonTopLeft.X>=monitorInfo.Work.Left&&buttonBottomRight.X<=monitorInfo.Work.Right&&buttonTopLeft.Y>=monitorInfo.Work.Top&&buttonBottomRight.Y<=monitorInfo.Work.Bottom,"Primary action is physically visible and receives native input in the foreground app. "+pointerJson);
             Check(SearchSubmitButton.IsMouseOver&&frame!=null&&pointerEvidence.BrushIsShared,"Native pointer activates the primary button hover state. "+pointerJson);
             SearchSubmitButton.IsEnabled=false;await Settle();
-            Check(!SearchSubmitButton.IsEnabled&&frame is {Opacity:.55},"Disabled action remains legible and cannot be activated.");SearchSubmitButton.IsEnabled=true;
+            Check(!SearchSubmitButton.IsEnabled&&frame is {Opacity:.55},"Disabled action remains legible and cannot be activated.");SearchSubmitButton.IsEnabled=true;Search.Clear();searchDelay.Stop();
             peopleSearchProvider=(_,_)=>Task.FromResult<IReadOnlyList<CinemaPerson>>([]);
             Search.Text="Интерстеллар";searchDelay.Stop();submittedQuery=Search.Text;searchCategory="";
             catalogGenre=catalogGenres.FirstOrDefault()?.Key??"drama";catalogYear=2026;prefs.CatalogQualityHeight=1080;
@@ -124,13 +128,13 @@ public partial class MainWindow
             prefs.Light=true;ApplyTheme();Render();await Settle();Shot("interface-narrow-light");
             foreach(var width in new[]{360d,510d,720d})
             {
-                await Size(width,580);Render();await Settle();
+                await Size(width,580);Render();await Settle();Search.Text="Проверка";searchDelay.Stop();await Settle();
                 foreach(var action in new Control[]{Search,SearchSubmitButton,AddTorrentButton,ThemeButton})
                 {
                     var bounds=action.TransformToAncestor(RootGrid).TransformBounds(new Rect(new Point(),action.RenderSize));
                     Check(action.IsVisible&&action.ActualWidth>0&&bounds.Left>=-1&&bounds.Right<=RootGrid.ActualWidth+1,"Header action stays inside "+width+" DIP viewport: "+AutomationProperties.GetName(action));
                 }
-                Check(!SearchShortcutHint.IsVisible&&SearchPlaceholder.Margin.Right==40,"Compact search hides its keyboard hint and returns text space: "+width);
+                Check(!SearchShortcutHint.IsVisible&&SearchPlaceholder.Margin.Right==14,"Compact search hides its keyboard hint and returns text space: "+width);Search.Clear();searchDelay.Stop();
             }
             await Size(360,360);
             Search.Text="Интерстеллар";searchDelay.Stop();submittedQuery=Search.Text;searchCategory="";

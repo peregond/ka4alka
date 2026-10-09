@@ -269,7 +269,7 @@ public partial class MainWindow
             foreach(var light in new[]{true,false})
             {
                 prefs.Light=light;ApplyTheme();UpdateLayout();
-                double Brightness(string key){var c=((SolidColorBrush)FindResource(key)).Color;double Linear(byte v){var s=v/255d;return s<=.04045?s/12.92:Math.Pow((s+.055)/1.055,2.4);}return .2126*Linear(c.R)+.7152*Linear(c.G)+.0722*Linear(c.B);}
+                double Brightness(string key){var c=((SolidColorBrush)FindResource(key)).Color;if(c.A<255){var under=((SolidColorBrush)FindResource("Panel")).Color;var a=c.A/255d;c=Color.FromRgb((byte)Math.Round(c.R*a+under.R*(1-a)),(byte)Math.Round(c.G*a+under.G*(1-a)),(byte)Math.Round(c.B*a+under.B*(1-a)));}double Linear(byte v){var s=v/255d;return s<=.04045?s/12.92:Math.Pow((s+.055)/1.055,2.4);}return .2126*Linear(c.R)+.7152*Linear(c.G)+.0722*Linear(c.B);}
                 double Ratio(string foreground,string background){var a=Brightness(foreground);var b=Brightness(background);return (Math.Max(a,b)+.05)/(Math.Min(a,b)+.05);}
                 check(new[]{"Bg","Panel","Sidebar","Selected","Hover"}.All(surface=>Ratio("Text",surface)>=7&&Ratio("Muted",surface)>=4.5),$"{(light?"light":"dark")} theme keeps primary and secondary text legible on every main surface");
                 check(Ratio("Accent","AccentSoft")>=4.5&&Ratio("PrimaryInk","Primary")>=4.5,$"{(light?"light":"dark")} theme keeps accent actions and primary buttons readable");

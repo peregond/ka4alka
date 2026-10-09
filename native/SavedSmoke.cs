@@ -11,10 +11,10 @@ public partial class MainWindow
 {
     void CheckSidebarFooter(Action<bool,string> check,string stage)
     {
-        var controls=new[]{SavedButton,DownloadsButton,SettingsButton,SidebarUpdateButton}.Where(button=>button.IsVisible).ToArray();
+        var controls=new[]{DownloadsButton,SettingsButton,SidebarUpdateButton}.Where(button=>button.IsVisible).ToArray();
         var bounds=controls.Select(button=>button.TransformToAncestor(SidebarContent).TransformBounds(new Rect(new Point(),button.RenderSize))).ToArray();
-        check(bounds.Length>=3&&bounds.All(box=>box.Width>0&&box.Height>0&&box.Left>=-.5&&box.Right<=SidebarContent.ActualWidth+.5&&box.Top>=-.5&&box.Bottom<=SidebarContent.ActualHeight+.5),"sidebar actions fit the visible panel ("+stage+")");
-        check(bounds.Zip(bounds.Skip(1),(previous,next)=>previous.Bottom<=next.Top+.5).All(ok=>ok),"Saved, Downloads, Settings and Update have separate ordered rows ("+stage+")");
+        check(bounds.Length>=2&&SavedButton.IsVisible&&bounds.All(box=>box.Width>0&&box.Height>0&&box.Left>=-.5&&box.Right<=SidebarContent.ActualWidth+.5&&box.Top>=-.5&&box.Bottom<=SidebarContent.ActualHeight+.5),"sidebar actions fit the visible panel ("+stage+")");
+        check(bounds.Zip(bounds.Skip(1),(previous,next)=>previous.Bottom<=next.Top+.5).All(ok=>ok),"Downloads, Settings and Update have separate ordered rows ("+stage+")");
         var library=SidebarLibrary.TransformToAncestor(SidebarContent).TransformBounds(new Rect(new Point(),SidebarLibrary.RenderSize));
         var footerTop=SidebarFooter.TransformToAncestor(SidebarContent).Transform(new Point()).Y;
         check(library.Bottom<=footerTop+.5&&SidebarLibrary.ClipToBounds,"library scrolling stays above the sidebar footer ("+stage+")");
