@@ -303,7 +303,7 @@ public partial class MainWindow
     {
         if(detailSynopsis==null||descriptionToggle==null||detailSynopsis.ActualWidth<=0)return;
         descriptionToggle.Content=descriptionExpanded?"Свернуть описание":"Читать дальше";
-        var formatted=new FormattedText(detailSynopsis.Text,System.Globalization.CultureInfo.CurrentCulture,detailSynopsis.FlowDirection,new Typeface(detailSynopsis.FontFamily,detailSynopsis.FontStyle,detailSynopsis.FontWeight,detailSynopsis.FontStretch),detailSynopsis.FontSize,detailSynopsis.Foreground,VisualTreeHelper.GetDpi(detailSynopsis).PixelsPerDip){MaxTextWidth=detailSynopsis.ActualWidth,LineHeight=detailSynopsis.LineHeight};
+        var formatted=new FormattedText(detailSynopsis.Text,System.Globalization.CultureInfo.CurrentCulture,detailSynopsis.FlowDirection,new Typeface(detailSynopsis.FontFamily,detailSynopsis.FontStyle,detailSynopsis.FontWeight,detailSynopsis.FontStretch),detailSynopsis.FontSize,detailSynopsis.Foreground,null,TextOptions.GetTextFormattingMode(detailSynopsis),VisualTreeHelper.GetDpi(detailSynopsis).PixelsPerDip){MaxTextWidth=detailSynopsis.ActualWidth,LineHeight=detailSynopsis.LineHeight};
         descriptionToggle.Visibility=descriptionExpanded||formatted.Height>detailSynopsis.LineHeight*3+.5?Visibility.Visible:Visibility.Collapsed;
     }
 }

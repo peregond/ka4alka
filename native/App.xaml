@@ -16,12 +16,13 @@
   <LinearGradientBrush x:Key="ScrimHorizontal" StartPoint="0,0.5" EndPoint="1,0.5" po:Freeze="True"><GradientStop Color="#F00A0C0F" Offset="0"/><GradientStop Color="#B80A0C0F" Offset="0.38"/><GradientStop Color="#0F0A0C0F" Offset="0.78"/></LinearGradientBrush>
   <LinearGradientBrush x:Key="ScrimVertical" StartPoint="0.5,1" EndPoint="0.5,0" po:Freeze="True"><GradientStop Color="#CC0A0C0F" Offset="0"/><GradientStop Color="#000A0C0F" Offset="0.45"/></LinearGradientBrush>
   <SolidColorBrush x:Key="PosterBadge" Color="#CC0A0C0F" po:Freeze="True"/><SolidColorBrush x:Key="BannerText" Color="#EEF1F4" po:Freeze="True"/><SolidColorBrush x:Key="BannerMuted" Color="#C9D0D8" po:Freeze="True"/><SolidColorBrush x:Key="BannerDot" Color="#59EEF1F4" po:Freeze="True"/><SolidColorBrush x:Key="BannerChip" Color="#1AEEF1F4" po:Freeze="True"/><SolidColorBrush x:Key="BannerBadgeEdge" Color="#47EEF1F4" po:Freeze="True"/><SolidColorBrush x:Key="BannerEdge" Color="#29EEF1F4" po:Freeze="True"/><SolidColorBrush x:Key="BannerButtonFill" Color="#990A0C0F" po:Freeze="True"/>
+  <!-- Use native screen metrics and honor Windows antialiasing at fractional monitor DPI. -->
   <Style TargetType="Window">
-   <Setter Property="Background" Value="{DynamicResource Bg}"/><Setter Property="Foreground" Value="{DynamicResource Text}"/><Setter Property="FontFamily" Value="{StaticResource InterfaceFont}"/><Setter Property="FontSize" Value="14"/><Setter Property="UseLayoutRounding" Value="True"/><Setter Property="TextOptions.TextFormattingMode" Value="Ideal"/><Setter Property="TextOptions.TextRenderingMode" Value="Grayscale"/>
+   <Setter Property="Background" Value="{DynamicResource Bg}"/><Setter Property="Foreground" Value="{DynamicResource Text}"/><Setter Property="FontFamily" Value="{StaticResource InterfaceFont}"/><Setter Property="FontSize" Value="14"/><Setter Property="UseLayoutRounding" Value="True"/><Setter Property="TextOptions.TextFormattingMode" Value="Display"/><Setter Property="TextOptions.TextRenderingMode" Value="Auto"/>
   </Style>
 
   <Style TargetType="ContextMenu">
-   <Setter Property="FontFamily" Value="{StaticResource InterfaceFont}"/><Setter Property="TextOptions.TextFormattingMode" Value="Ideal"/><Setter Property="TextOptions.TextRenderingMode" Value="Grayscale"/>
+   <Setter Property="FontFamily" Value="{StaticResource InterfaceFont}"/><Setter Property="TextOptions.TextFormattingMode" Value="Display"/><Setter Property="TextOptions.TextRenderingMode" Value="Auto"/>
    <Setter Property="Background" Value="{DynamicResource Raised}"/><Setter Property="Foreground" Value="{DynamicResource Text}"/><Setter Property="BorderBrush" Value="{DynamicResource EdgeStrong}"/><Setter Property="Padding" Value="6"/><Setter Property="MaxHeight" Value="450"/><Setter Property="MinWidth" Value="200"/>
    <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ContextMenu"><Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="14" Padding="{TemplateBinding Padding}"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" CanContentScroll="True"><StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle"/></ScrollViewer></Border></ControlTemplate></Setter.Value></Setter>
   </Style>
@@ -317,7 +318,7 @@
    <Style.Triggers><Trigger Property="Orientation" Value="Horizontal"><Setter Property="Width" Value="Auto"/><Setter Property="Height" Value="12"/></Trigger></Style.Triggers>
   </Style>
   <Style TargetType="ToolTip">
-   <Setter Property="FontFamily" Value="{StaticResource InterfaceFont}"/><Setter Property="TextOptions.TextFormattingMode" Value="Ideal"/><Setter Property="TextOptions.TextRenderingMode" Value="Grayscale"/>
+   <Setter Property="FontFamily" Value="{StaticResource InterfaceFont}"/><Setter Property="TextOptions.TextFormattingMode" Value="Display"/><Setter Property="TextOptions.TextRenderingMode" Value="Auto"/>
    <Setter Property="Background" Value="{DynamicResource Raised}"/><Setter Property="Foreground" Value="{DynamicResource Text}"/><Setter Property="BorderBrush" Value="{DynamicResource Edge}"/><Setter Property="Padding" Value="11,7"/><Setter Property="FontSize" Value="12"/><Setter Property="MaxWidth" Value="360"/>
    <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ToolTip"><Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="{TemplateBinding Padding}"><ContentPresenter TextElement.Foreground="{TemplateBinding Foreground}"/></Border></ControlTemplate></Setter.Value></Setter>
   </Style>

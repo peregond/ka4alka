@@ -1,7 +1,7 @@
 name: Native UI preview
 on:
   push:
-    branches: [codex/download-reliability-0.35.0, codex/film-ux-0.35, codex/catalog-experience-0.37.0, codex/minimal-home-0.38.0, codex/lan-downloads-0.39.0, release/0.39.0, release/0.40.0]
+    branches: [codex/download-reliability-0.35.0, codex/film-ux-0.35, codex/catalog-experience-0.37.0, codex/minimal-home-0.38.0, codex/lan-downloads-0.39.0, release/0.39.0, release/0.40.0, codex/font-rendering-0.40.1]
     paths: ['native/**', 'lan-core/**', 'lan-tests/**', 'tests/**', '.github/workflows/ui-preview.yml']
   workflow_dispatch:
 permissions:
@@ -59,6 +59,15 @@ jobs:
           if(-not $app.WaitForExit(45000)){$app.Kill($true);throw 'Person performance UI timed out'}
           if(Test-Path (Join-Path $output 'error.txt')){throw (Get-Content (Join-Path $output 'error.txt') -Raw)}
           if($app.ExitCode -ne 0 -or -not(Test-Path (Join-Path $output 'checks.json'))){throw 'Person performance UI evidence missing'}
+          Get-Content (Join-Path $output 'checks.json')
+      - name: Verify native typography at fractional DPI and unusual interface fonts
+        shell: pwsh
+        run: |
+          $output=Join-Path $PWD 'test-output/ui-preview/text-rendering'
+          $app=Start-Process (Join-Path $PWD 'dist/ui-preview/Kachalka.exe') -ArgumentList @('--text-rendering-smoke-test',('"'+$output+'"')) -PassThru
+          if(-not $app.WaitForExit(120000)){$app.Kill($true);throw 'Native typography verification timed out'}
+          if(Test-Path (Join-Path $output 'error.txt')){throw (Get-Content (Join-Path $output 'error.txt') -Raw)}
+          if($app.ExitCode -ne 0 -or -not(Test-Path (Join-Path $output 'checks.json'))){throw 'Native typography evidence missing'}
           Get-Content (Join-Path $output 'checks.json')
       - name: Verify catalog performance, navigation, source freshness and reporting
         if: ${{ !cancelled() }}
