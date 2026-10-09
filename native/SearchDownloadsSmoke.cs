@@ -222,7 +222,7 @@ public partial class MainWindow
             var toggle=FindVisual<Button>(first,b=>AutomationProperties.GetName(b)==fixtures[^1].Action);check(toggle!=null&&VisualElements<System.Windows.Shapes.Path>(toggle).Any()&&toggle.ToolTip?.ToString()==fixtures[^1].Action,"pause or continue action is an icon button whose tooltip and accessible name state its action");
             foreach(var label in new[]{"Подробнее","Открыть папку","Действия загрузки"})
             {
-                var action=FindVisual<Button>(first,b=>AutomationProperties.GetName(b)==label);check(action!=null&&VisualElements<System.Windows.Shapes.Path>(action).Any(),"download action has an accessible label and recognizable icon: "+label);
+                var action=VisualElements<Button>(first).FirstOrDefault(b=>b.IsVisible&&AutomationProperties.GetName(b)==label);check(action!=null&&VisualElements<System.Windows.Shapes.Path>(action).Any(),"download action has an accessible label and recognizable icon: "+label);
             }
             var infoButton=FindVisual<Button>(first,b=>AutomationProperties.GetName(b)=="Подробнее")!;
             var infoPath=VisualElements<System.Windows.Shapes.Path>(infoButton).Single();
