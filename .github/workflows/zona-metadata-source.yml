@@ -1,0 +1,21 @@
+name: Inspect public Zona metadata sources
+on:
+  push:
+    branches: [codex/person-cards-0.34]
+    paths: [scripts/probe-zona-metadata-sources.py, .github/workflows/zona-metadata-source.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  metadata:
+    runs-on: windows-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read public film metadata and source attributions
+        run: python -X utf8 scripts/probe-zona-metadata-sources.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zona-metadata-source
+          path: test-output/zona-metadata-source/evidence.json

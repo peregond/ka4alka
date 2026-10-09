@@ -9,7 +9,7 @@ public readonly record struct SeriesReleaseInfo(int? Season,int? Episode,bool Mu
 
     public static SeriesReleaseInfo Parse(string title)
     {
-        var season=Regex.Match(title,@"(?i)\bS(?<first>\d{1,2})\s*[-–]\s*S?(?<last>\d{1,2})\b");
+        var season=Regex.Match(title,@"(?i)(?:\bS|\b[cс]езоны?\s*)(?<first>\d{1,2})\s*[-–]\s*S?(?<last>\d{1,2})\b");
         var multipleSeasons=season.Success||Regex.IsMatch(title,@"(?i)(все\s+сезоны|complete\s+series|all\s+seasons)");
         var seasonNumber=season.Success?int.Parse(season.Groups["first"].Value):Number(title,@"(?i)\bS(?<n>\d{1,2})(?:\s*E\d{1,3})?\b")
             ??Number(title,@"(?i)(?:\bсезон\s*(?<n>\d{1,2})\b|\b(?<n>\d{1,2})\s*(?:-й\s*)?сезон\b)");

@@ -7,9 +7,20 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>Kachalka</AssemblyName>
     <Product>Качалка</Product>
-    <Version>0.18.0</Version>
+    <Version>0.40.4</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets/app.ico</ApplicationIcon>
     <ServerGarbageCollection>false</ServerGarbageCollection>
   </PropertyGroup>
   <ItemGroup><PackageReference Include="MonoTorrent" Version="3.0.2" /><PackageReference Include="HtmlAgilityPack" Version="1.13.0" /></ItemGroup>
+  <ItemGroup><ProjectReference Include="../update-core/Kachalka.UpdateCore.csproj" /></ItemGroup>
+  <ItemGroup><ProjectReference Include="../lan-core/Kachalka.Lan.csproj" /></ItemGroup>
+  <ItemGroup><EmbeddedResource Include="../web-index/app/data/seed.json" LogicalName="Kachalka.catalog-seed.json" /></ItemGroup>
+  <ItemGroup><Resource Include="Fonts/*.ttf" /></ItemGroup>
+  <ItemGroup><Resource Include="Assets/logo.png" /><Resource Include="Assets/app.ico" /></ItemGroup>
+  <ItemGroup>
+    <None Update="Fonts/Onest-OFL.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" TargetPath="licenses/Onest-OFL.txt" />
+    <None Update="Fonts/Unbounded-OFL.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" TargetPath="licenses/Unbounded-OFL.txt" />
+    <None Update="Fonts/JetBrainsMono-OFL.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" TargetPath="licenses/JetBrainsMono-OFL.txt" />
+  </ItemGroup>
 </Project>

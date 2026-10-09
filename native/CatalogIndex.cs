@@ -17,6 +17,7 @@ public sealed class CatalogIndex
     readonly SemaphoreSlim writer=new(1,1);
     readonly string path;
     const int Limit=3000;
+    public long Revision {get;private set;}
 
     public CatalogIndex(string dataDir)
     {
@@ -24,7 +25,7 @@ public sealed class CatalogIndex
         try
         {
             if(new FileInfo(path).Length>12*1024*1024)return;
-            var saved=JsonSerializer.Deserialize<Entry[]>(File.ReadAllText(path));
+            var saved=JsonSerializer.Deserialize<Entry[]>(CacheFiles.ReadAllText(path));
             if(saved==null)return;
             foreach(var row in saved.Take(Limit))if(Valid(row.Item))entries[Key(row.Item)]=row;
         }
@@ -40,7 +41,7 @@ public sealed class CatalogIndex
 
     public IReadOnlyList<MediaItem> Search(string section,string query,int limit=80)
     {
-        var term=Normalize(query);if(term.Length==0)return Recent(section,limit);
+        CacheFiles.Touch(path);var term=Normalize(query);if(term.Length==0)return Recent(section,limit);
         var tokens=term.Split(' ',StringSplitOptions.RemoveEmptyEntries);
         return entries.Values.Where(x=>x.Item.Section==section)
             .Select(x=>(x.Item,x.SeenUtc,Score:Score(x.Item,term,tokens)))
@@ -48,9 +49,16 @@ public sealed class CatalogIndex
             .Take(Math.Clamp(limit,1,200)).Select(x=>x.Item).ToArray();
     }
 
-    public IReadOnlyList<MediaItem> Recent(string section,int limit=40)=>entries.Values
+    public IReadOnlyList<MediaItem> Recent(string section,int limit=40)
+    {
+        CacheFiles.Touch(path);return entries.Values
         .Where(x=>x.Item.Section==section).OrderByDescending(x=>x.SeenUtc)
         .Take(Math.Clamp(limit,1,200)).Select(x=>x.Item).ToArray();
+    }
+    public async Task ClearMemoryAsync()
+    {
+        await writer.WaitAsync();try{entries.Clear();Revision++;}finally{writer.Release();}
+    }
 
     public IReadOnlyList<SourceEntry> CachedReleases(MediaItem item)=>CachedReleaseSnapshot(item)?.Items??[];
     public ReleaseCache? CachedReleaseSnapshot(MediaItem item)
@@ -60,22 +68,22 @@ public sealed class CatalogIndex
         {
             var file=ReleasePath(item);
             if(new FileInfo(file).Length>3*1024*1024)return null;
-            var saved=JsonSerializer.Deserialize<ReleaseCache>(File.ReadAllText(file));
+            var saved=JsonSerializer.Deserialize<ReleaseCache>(CacheFiles.ReadAllText(file));
             return saved is {Items:not null}&&saved.SavedUtc>DateTime.UtcNow.AddDays(-7)&&saved.SavedUtc<=DateTime.UtcNow.AddMinutes(5)?saved:null;
         }
         catch(IOException){return null;}catch(JsonException){return null;}catch(UnauthorizedAccessException){return null;}
     }
 
-    public async Task CacheReleasesAsync(MediaItem item,IReadOnlyList<SourceEntry> releases,IReadOnlyList<SourceCheck>? sources=null)
+    public async Task CacheReleasesAsync(MediaItem item,IReadOnlyList<SourceEntry> releases,IReadOnlyList<SourceCheck>? sources=null,CancellationToken ct=default)
     {
-        if(!Valid(item)||releases.Count==0)return;
-        await writer.WaitAsync();
+        if(!Valid(item)||releases.Count==0&&!ReleaseAvailability.ConfirmedEmpty(releases,sources))return;
+        await writer.WaitAsync(ct);
         try
         {
+            ct.ThrowIfCancellationRequested();
             var file=ReleasePath(item);Directory.CreateDirectory(Path.GetDirectoryName(file)!);
-            var temp=file+".tmp";
-            await File.WriteAllTextAsync(temp,JsonSerializer.Serialize(new ReleaseCache(DateTime.UtcNow,releases.Take(300).ToArray(),sources?.ToArray()),new JsonSerializerOptions{IgnoreReadOnlyProperties=true}));
-            File.Move(temp,file,true);
+            await CacheFiles.WriteAllTextAsync(file,JsonSerializer.Serialize(new ReleaseCache(DateTime.UtcNow,releases.Take(300).ToArray(),sources?.ToArray()),new JsonSerializerOptions{IgnoreReadOnlyProperties=true}),ct);
+            Revision++;
         }
         finally{writer.Release();}
     }
@@ -111,6 +119,9 @@ public sealed class CatalogIndex
                     {
                         OriginalTitle=item.OriginalTitle??old.OriginalTitle,
                         Description=item.Description??old.Description,
+                        People=item.People.Length>0?item.People:old.People,
+                        Awards=item.Awards.Length>0?item.Awards:old.Awards,
+                        Collections=item.Collections.Length>0?item.Collections:old.Collections,
                         Kinopoisk=item.Kinopoisk=="—"?old.Kinopoisk:item.Kinopoisk,
                         Imdb=item.Imdb=="—"?old.Imdb:item.Imdb,
                         OnlineId=item.OnlineId??old.OnlineId,
@@ -122,9 +133,8 @@ public sealed class CatalogIndex
             if(entries.Count>Limit)
                 foreach(var key in entries.OrderBy(x=>x.Value.SeenUtc).Take(entries.Count-Limit).Select(x=>x.Key).ToArray())entries.Remove(key);
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            var temp=path+".tmp";
-            await File.WriteAllTextAsync(temp,JsonSerializer.Serialize(entries.Values.ToArray()),Encoding.UTF8,ct);
-            File.Move(temp,path,true);
+            await CacheFiles.WriteAllTextAsync(path,JsonSerializer.Serialize(entries.Values.ToArray()),ct);
+            Revision++;
         }
         finally{writer.Release();}
     }

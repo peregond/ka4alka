@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.IO;
+using System.Text.RegularExpressions;
 using System.Windows.Media;
 namespace Kachalka;
 public record MediaItem(int Id, string Title, string Section, string Genre, int Year, string Kinopoisk, string Imdb, string Color) : INotifyPropertyChanged
@@ -12,17 +13,66 @@ public record MediaItem(int Id, string Title, string Section, string Genre, int 
     public string? ImageUrl {get;init;}
     public string? Description {get;init;}
     public string? OriginalTitle {get;init;}
+    public CinemaPerson[] People {get;init;}=[];
+    public CinemaAward[] Awards {get;init;}=[];
+    public CinemaCollection[] Collections {get;init;}=[];
+    public string? ImdbId {get;init;}
+    public string[] GenreKeys {get;init;}=[];
+    public string[] CountryKeys {get;init;}=[];
+    public bool CountryKeysComplete {get;init;}=true;
+    public string Country {get;init;}="";
     [JsonIgnore] public bool IsLive => PageUrl!=null;
     [JsonIgnore] public bool Cinema => Section is "Фильмы" or "Сериалы";
-    string? liveScores,liveKp,liveImdb;
+    string? liveScores,liveKp,liveImdb,liveGenre;
     [JsonIgnore] public string KpDisplay => "КП  "+(liveKp??Kinopoisk);
     [JsonIgnore] public string ImdbDisplay => "IMDb  "+(liveImdb??Imdb);
     [JsonIgnore] public bool KpAvailable => !string.IsNullOrWhiteSpace(liveKp??Kinopoisk)&&(liveKp??Kinopoisk)!="—";
     [JsonIgnore] public bool ImdbAvailable => !string.IsNullOrWhiteSpace(liveImdb??Imdb)&&(liveImdb??Imdb)!="—";
+    [JsonIgnore] public string CardRating => KpAvailable?(liveKp??Kinopoisk):ImdbAvailable?(liveImdb??Imdb):"—";
+    [JsonIgnore] public bool HasCardRating => KpAvailable||ImdbAvailable;
+    // Queue state shown on the poster: a thin progress line while downloading, a check once complete.
+    double downloadPercent=-1;bool downloaded;
+    [JsonIgnore] public double DownloadPercent=>Math.Max(0,downloadPercent);
+    [JsonIgnore] public bool HasDownloadProgress=>!downloaded&&downloadPercent>=0;
+    [JsonIgnore] public bool IsDownloaded=>downloaded;
+    public void SetDownloadState(bool complete,double percent)
+    {
+        percent=complete||percent<0?-1:Math.Clamp(percent,0,100);
+        if(complete==downloaded&&Math.Abs(percent-downloadPercent)<.5)return;
+        downloaded=complete;downloadPercent=percent;
+        PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(DownloadPercent)));PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(HasDownloadProgress)));PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(IsDownloaded)));
+    }
+    [JsonIgnore] public string CardMeta=>string.Join(" · ",new[]{Year>0?Year.ToString():"",CardGenre}.Where(x=>x.Length>0));
+    [JsonIgnore] public string CardRatingSource => KpAvailable?"Кинопоиск":ImdbAvailable?"IMDb":"Оценка пока недоступна";
+    static string InlineMetadata(string? value)=>string.Join(", ",(value??"").Split(',').Select(part=>Regex.Replace(part,@"\s+"," ").Trim()).Where(part=>part.Length>0));
+    [JsonIgnore] public string CardGenre {get{var value=InlineMetadata(liveGenre??Genre);return value.Length==0?Section=="Сериалы"?"Сериал":"Фильм":value;}}
+    string bestQuality="";
+    [JsonIgnore] public string BestQuality=>bestQuality;
+    [JsonIgnore] public bool HasQuality=>bestQuality.Length>0;
+    string posterQuality="";
+    [JsonIgnore] public string PosterQuality=>posterQuality;
+    [JsonIgnore] public bool HasPosterQuality=>posterQuality.Length>0;
     [JsonIgnore] public string Scores => liveScores ?? (Cinema ? $"КП {Kinopoisk}   IMDb {Imdb}" : Section);
     public event PropertyChangedEventHandler? PropertyChanged;
-    public void SetScores(string kp,string imdb){liveKp=kp;liveImdb=imdb;liveScores=$"КП {kp}   IMDb {imdb}";PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(null));}
-    [JsonIgnore] public string Subtitle => Cinema ? string.Join(" · ",new[]{Year>0?Year.ToString():null,Genre}.Where(x=>!string.IsNullOrWhiteSpace(x))) : "Демонстрационный каталог";
+    [JsonIgnore] public bool OnlyPoorQuality {get;private set;}
+    HashSet<int> releaseResolutions=[];
+    [JsonIgnore] public IReadOnlySet<int> ReleaseResolutions=>releaseResolutions;
+    public bool HasReleaseResolution(int height)=>releaseResolutions.Contains(ReleaseQuality.CatalogHeight(height));
+    public void SetReleaseQuality(IEnumerable<SourceEntry> entries,int minimum=720)
+    {
+        var rows=entries.ToArray();
+        var value=ReleaseQuality.OnlyPoor(rows,minimum);
+        var available=rows.Where(ReleaseQuality.Downloadable).ToArray();
+        releaseResolutions=available.Where(x=>!ReleaseQuality.IsScreen(x)).Select(x=>ReleaseQuality.CatalogHeight(ReleaseQuality.Height(x)??0)).Where(x=>x!=0).ToHashSet();
+        var height=available.Where(x=>!ReleaseQuality.Poor(x,720)).Select(x=>ReleaseQuality.Height(x)??0).DefaultIfEmpty(0).Max();
+        var quality=height>=2160?"4K":height>=1080?"Full HD":height>=720?"HD Ready":"";
+        var label=quality.Length>0?quality:available.Length>0&&available.All(ReleaseQuality.IsScreen)?"Экранка":value?"SD":"";
+        if(label!=posterQuality){posterQuality=label;PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(PosterQuality)));PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(HasPosterQuality)));}
+        if(value!=OnlyPoorQuality){OnlyPoorQuality=value;PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(OnlyPoorQuality)));}
+        if(quality!=bestQuality){bestQuality=quality;PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(BestQuality)));PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(HasQuality)));}
+    }
+    public void SetScores(string kp,string imdb,string? genre=null){if(!string.IsNullOrWhiteSpace(genre))liveGenre=genre;liveKp=kp;liveImdb=imdb;liveScores=$"КП {kp}   IMDb {imdb}";PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(null));}
+    [JsonIgnore] public string Subtitle => Cinema ? string.Join(" · ",new[]{Section=="Сериалы"?"Сериал":"Фильм",Year>0?Year.ToString():null,InlineMetadata(Genre)}.Where(x=>!string.IsNullOrWhiteSpace(x))) : "Демонстрационный каталог";
     [JsonIgnore] public Brush Cover { get { var b = new LinearGradientBrush((Color)ColorConverter.ConvertFromString(Color), (Color)ColorConverter.ConvertFromString("#20262E"), 75); b.Freeze(); return b; } }
 }
 public record CatalogRow(MediaItem[] Items,int Columns);
@@ -51,26 +101,87 @@ public static class Catalog
 }
 public class Preferences
 {
-    public string Folder { get;set; }=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),"Downloads","Качалка");
+    public string Folder { get;set; }=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),"Downloads","Ka4alka");
     public bool FolderConfigured {get;set;}
-    public bool Light {get;set;}=true;
+    public bool Light {get;set;}=false;
+    public bool LiteMode {get;set;}
+    public bool LiteModeConfigured {get;set;}
+    public bool LanEnabled {get;set;}
+    public string LanDeviceName {get;set;}="";
+    public string HomeCountry {get;set;}="rossiia";
+    public int MaxDownloadKbps {get;set;}
+    public int MaxUploadKbps {get;set;}
+    public string DownloadSort {get;set;}="newest";
     public bool Economy {get;set;}=true;
     public bool AutoResumeDownloads {get;set;}=true;
+    public bool AutoRecoverDownloads {get;set;}=true;
+    public bool NotifyDownloads {get;set;}=true;
+    public bool CheckForUpdates {get;set;}=true;
+    public bool AutoUpdate {get;set;}=true;
+    public bool HidePoorQuality {get;set;}=true;
+    public bool QualityFilterConfigured {get;set;}
+    public int MinimumReleaseHeight {get;set;}=720;
+    public int CatalogQualityHeight {get;set;}
     public HashSet<int> Favorites {get;set;}=[];
     public List<MediaItem> LiveFavorites {get;set;}=[];
     public static string DataDir=>Environment.GetEnvironmentVariable("KACHALKA_DATA") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"Kachalka");
-    public static Preferences Load(){try{return JsonSerializer.Deserialize<Preferences>(File.ReadAllText(Path.Combine(DataDir,"settings.json")))??new();}catch{return new();}}
-    public void Save(){Directory.CreateDirectory(DataDir);var p=Path.Combine(DataDir,"settings.json");File.WriteAllText(p+".tmp",JsonSerializer.Serialize(this));File.Move(p+".tmp",p,true);}
+    public static Preferences Load()
+    {
+        try
+        {
+            var prefs=JsonSerializer.Deserialize<Preferences>(File.ReadAllText(Path.Combine(DataDir,"settings.json")))??new();
+            if(!prefs.QualityFilterConfigured){prefs.HidePoorQuality=true;prefs.QualityFilterConfigured=true;}
+            prefs.CatalogQualityHeight=ReleaseQuality.CatalogHeight(prefs.CatalogQualityHeight);
+            prefs.HomeCountry=CatalogRegions.HomeCountry(prefs.HomeCountry);
+            return prefs;
+        }
+        catch{return new(){QualityFilterConfigured=true};}
+    }
+    public void Save(){QualityFilterConfigured=true;Directory.CreateDirectory(DataDir);var p=Path.Combine(DataDir,"settings.json");File.WriteAllText(p+".tmp",JsonSerializer.Serialize(this));File.Move(p+".tmp",p,true);}
 }
+public record DownloadFile(string Name,string FullPath,string IncompletePath,long Size,double Progress)
+{
+    [JsonIgnore] public string Summary=>$"{Math.Clamp(Progress,0,100):F1}% · {DownloadService.FormatBytes(Size)}";
+}
+public sealed record DownloadFilePreview(string Name,string SizeText,double Progress,string Tip);
+public enum DownloadStatusKind{Downloading,Waiting,Seeding,Paused,Checking,Error}
 public class DownloadItem : INotifyPropertyChanged
 {
     public string Id {get;set;}=Guid.NewGuid().ToString("N");
     public string Source {get;set;}="";
     public string? InfoHash {get;set;}
+    public string? RemoteSenderId {get;set;}
+    public string? RemoteRequestId {get;set;}
+    public string? RemoteSenderFingerprint {get;set;}
+    public string? RemoteContentDigest {get;set;}
     public string Folder {get;set;}="";
     public string Name {get;set;}="Получение метаданных…";
+    public DateTime AddedUtc {get;set;}
+    public string? ImageUrl {get;set;}
+    public string? MediaTitle {get;set;}
+    public string? MediaSection {get;set;}
+    public string? MediaPageUrl {get;set;}
+    public int MediaYear {get;set;}
+    public string? ReleaseTitle {get;set;}
+    public string? ReleaseSource {get;set;}
+    public string? ReleaseId {get;set;}
+    public string? ReleasePageUrl {get;set;}
+    public string? ReleaseUrl {get;set;}
+    [JsonIgnore] public string DisplayName=>string.IsNullOrWhiteSpace(MediaTitle)?Name:MediaTitle;
+    [JsonIgnore] public bool HasMediaCard=>DownloadMetadata.Card(this)!=null;
+    [JsonIgnore] public int MinimumQualityHeight {get;set;}=720;
+    [JsonIgnore] public string PosterQuality=>ReleaseQuality.Label(new SourceEntry("",string.IsNullOrWhiteSpace(ReleaseTitle)?Name:ReleaseTitle,"","",null,null));
+    [JsonIgnore] public bool HasPosterQuality=>PosterQuality.Length>0;
+    [JsonIgnore] public bool PoorQuality=>ReleaseQuality.Poor(new SourceEntry("",string.IsNullOrWhiteSpace(ReleaseTitle)?Name:ReleaseTitle,"","",null,null),MinimumQualityHeight);
+    [JsonIgnore] public long DownloadRate {get;set;}
+    [JsonIgnore] public long UploadRate {get;set;}
+    [JsonIgnore] public long? TotalBytes {get;set;}
+    [JsonIgnore] public string RateSummary=>$"↓ {DownloadService.FormatBytes(Math.Max(0,DownloadRate))}/с · ↑ {DownloadService.FormatBytes(Math.Max(0,UploadRate))}/с";
+    [JsonIgnore] public string SizeSummary=>TotalBytes.HasValue&&TotalBytes.Value>=0?DownloadService.FormatBytes(TotalBytes.Value):"Размер уточняется";
+    [JsonIgnore] public string CompletionLabel=>$"{(double.IsFinite(Progress)?Math.Clamp(Progress,0,100):0):F1}%";
     public string Status {get;set;}="На паузе";
     public double Progress {get;set;}
+    public List<DownloadFile> Files {get;set;}=[];
     public string Stats {get;set;}="";
     public string Hint {get;set;}="";
     [JsonIgnore] public string PeersText {get;set;}="";
@@ -79,7 +190,42 @@ public class DownloadItem : INotifyPropertyChanged
     public DateTime LastStartedUtc {get;set;}
     public bool Busy {get;set;}
     public bool Paused {get;set;}=true;
+    public bool LowSpacePaused {get;set;}
+    public string SpacePauseMessage {get;set;}="";
+    public bool SpaceCheckFailed {get;set;}
+    [JsonIgnore] public bool Completed=>Progress>=100;
     public string Action => Paused?"Продолжить":"Пауза";
+    // Presentation helpers for the status pill, widget and queue rows. They only read state the engine already reports.
+    [JsonIgnore] public DownloadStatusKind StatusKind
+    {
+        get
+        {
+            if(Status.StartsWith("Ошибка",StringComparison.Ordinal)||Status.StartsWith("Не удалось",StringComparison.Ordinal)||Status.StartsWith("Недостаточно места",StringComparison.Ordinal)||Status.StartsWith("Папка недоступна",StringComparison.Ordinal)||LowSpacePaused)return DownloadStatusKind.Error;
+            if(Paused)return DownloadStatusKind.Paused;
+            if(Completed)return DownloadStatusKind.Seeding;
+            if(Status.StartsWith("Проверка файлов",StringComparison.Ordinal)||Status.StartsWith("Получение метаданных",StringComparison.Ordinal))return DownloadStatusKind.Checking;
+            if(Status=="Скачивание")return DownloadStatusKind.Downloading;
+            return DownloadStatusKind.Waiting;
+        }
+    }
+    [JsonIgnore] public string StatusBrushKey=>StatusKind switch{DownloadStatusKind.Downloading=>"Accent",DownloadStatusKind.Waiting=>"Warning",DownloadStatusKind.Seeding=>"Info",DownloadStatusKind.Paused=>"Subtle",DownloadStatusKind.Checking=>"Muted",_=>"Danger"};
+    [JsonIgnore] public string StatusSoftKey=>StatusKind switch{DownloadStatusKind.Downloading=>"AccentSoft",DownloadStatusKind.Waiting=>"WarningSoft",DownloadStatusKind.Seeding=>"InfoSoft",DownloadStatusKind.Paused=>"Raised",DownloadStatusKind.Checking=>"Raised",_=>"DangerSoft"};
+    // Inline "Подробнее" panel of the queue row: only the first few files, built while the row is open.
+    [JsonIgnore] public bool Expanded {get;set;}
+    [JsonIgnore] public DownloadFilePreview[] PreviewFiles=>Expanded?Files.Take(6).Select(file=>
+    {
+        var path=file.Name.Replace('\\','/');var progress=double.IsFinite(file.Progress)?Math.Clamp(file.Progress,0,100):0;
+        return new DownloadFilePreview(path[(path.LastIndexOf('/')+1)..],DownloadService.FormatBytes(Math.Max(0,file.Size)),progress,path);
+    }).ToArray():[];
+    [JsonIgnore] public string FilesHeader=>"ФАЙЛЫ · "+Files.Count;
+    [JsonIgnore] public bool HasMoreFiles=>Files.Count>6;
+    [JsonIgnore] public string MoreFilesText=>HasMoreFiles?$"Ещё {Files.Count-6} · все файлы и поиск":"";
+    [JsonIgnore] public string SourcesText=>string.IsNullOrWhiteSpace(PeersText)?"Появятся после подключения":PeersText;
+    [JsonIgnore] public string AddedText=>AddedUtc==default?"—":AddedUtc.ToLocalTime().ToString("d MMMM, HH:mm",System.Globalization.CultureInfo.GetCultureInfo("ru-RU"));
+    [JsonIgnore] public string PercentLabel=>$"{(int)Math.Floor(double.IsFinite(Progress)?Math.Clamp(Progress,0,100):0)}%";
+    [JsonIgnore] public string WidgetCaption=>StatusKind==DownloadStatusKind.Downloading&&Remaining.Length>0?Remaining:Status;
+    [JsonIgnore] public bool ShowWaitingHint=>StatusKind==DownloadStatusKind.Waiting&&Hint.Length>0;
+    [JsonIgnore] public bool IsActiveDownload=>!Paused&&!Completed&&StatusKind!=DownloadStatusKind.Error;
     public event PropertyChangedEventHandler? PropertyChanged;
     public void Refresh()=>PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(null));
 }

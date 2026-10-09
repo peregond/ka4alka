@@ -1,0 +1,21 @@
+name: Inspect public Zona catalog countries
+on:
+  push:
+    branches: [codex/film-ux-0.35]
+    paths: [scripts/probe-zona-catalog-regions.py, .github/workflows/zona-catalog-regions.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  countries:
+    runs-on: windows-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read public catalog country metadata
+        run: python -X utf8 scripts/probe-zona-catalog-regions.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zona-catalog-regions
+          path: test-output/zona-catalog-regions/evidence.json

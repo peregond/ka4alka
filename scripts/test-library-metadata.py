@@ -9,6 +9,7 @@ class MetadataTests(unittest.TestCase):
         self.assertEqual(data['originalTitle'], "L'objet du délit")
         self.assertNotIn('kinopoisk', data)
         self.assertEqual(data['imdb'], '6.9')
+        self.assertEqual(parse_detail('<meta itemprop="alternativeHeadline" content="L\'objet du délit">')['originalTitle'], "L'objet du délit")
 
     def test_identity_rejects_remake_and_ambiguous_titles(self):
         item = dict(section='movies', year=2026, originalTitle='The Weight')

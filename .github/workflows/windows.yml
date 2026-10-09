@@ -1,0 +1,98 @@
+name: Windows release validation
+on:
+  push:
+    branches: [release/0.30.0, codex/cinema-cards-0.30, codex/film-detail-polish-0.31, codex/catalog-filters-0.33, codex/person-cards-0.34, codex/download-reliability-0.35.0, codex/film-ux-0.35, codex/catalog-experience-0.37.0, codex/minimal-home-0.38.0, codex/lan-downloads-0.39.0, release/0.39.0, release/0.40.0, codex/font-rendering-0.40.1, release/0.40.1]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: windows-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  cinema-diagnostics:
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Diagnose current cinema HTTP source paths
+        run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --diagnose-cinema-source
+      - name: Verify current film participant navigation
+        run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --verify-cinema-source
+      - name: Preserve fresh cinema source diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cinema-source-diagnostics
+          path: |
+            test-output/cinema-source-diagnostics/*
+            test-output/cinema-source/*
+  portraits:
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Verify live participant photographs
+        run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --probe-portraits
+      - name: Upload portrait-source evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: participant-photo-evidence
+          path: test-output/transfer-*/portrait-source/*
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Install NSIS
+        run: ./scripts/install-nsis.ps1
+      - name: Validate installer and signed update on Windows
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          try { ./tests/WindowsUpdateSmoke.ps1 }
+          catch {
+            $message=$_.Exception.Message.Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A')
+            Write-Output "::error title=Windows update smoke::$message"
+            throw
+          }
+      - name: Upload smoke-test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-update-evidence
+          path: |
+            test-output/transfer-*/portrait-source/*
+            test-output/cache-reliability/*
+            test-output/download-reliability/*
+            test-output/person-performance/*
+            test-output/cover-viewport/*
+            test-output/catalog-navigation/*
+            test-output/release-freshness/*
+            test-output/interface-polish/*
+            test-output/bug-report/*
+            test-output/lan-*/checks.json
+            test-output/lan-*/checks.txt
+            test-output/lan-*/error.txt
+            test-output/lan-*/*.png
+            test-output/cinema-ui/*
+            test-output/windows-update/checks.txt
+            test-output/dpi-reliability/*
+            test-output/close-reliability/*.json
+            test-output/close-reliability/error.txt
+            test-output/catalog-paging/*
+            test-output/design-modern/*
+            test-output/search-downloads/*
+            test-output/download-end-to-end/*.json
+            test-output/download-end-to-end/error.txt
+            test-output/windows-update/data/updates/*/result.txt

@@ -40,11 +40,11 @@ public partial class MainWindow
             Search.Clear();Search.Focus();
             foreach(var letter in query)
             {
-                liveKey=section+"|"+Search.Text+letter+"|1";
+                liveKey=section+"|"+Search.Text+letter+"|1|"+CatalogSelection.Filter+"|"+CatalogSelection.Collection;
                 Search.SelectedText=letter.ToString();Search.CaretIndex=Search.Text.Length;
                 await Task.Delay(15);
             }
-            await Task.Delay(450);await Settle();
+            submittedQuery=Search.Text.Trim();searchCategory="";liveKey=CurrentCatalogKey;Render();await Task.Delay(450);await Settle();
             Check(Search.CaretIndex==query.Length,"Updating results moved the search caret.");
         }
         try
@@ -54,10 +54,18 @@ public partial class MainWindow
             Render();await Settle();CheckText("Интерстеллар","refresh-results");
             prefs.Light=false;ApplyTheme();Render();await Settle();CheckText("Интерстеллар","typing-dark");Shot("search-dark");
             Width=510;Height=520;await Settle();CheckText("Интерстеллар","small-short-window");Shot("search-small");
-            Width=360;await Settle();CheckText("Интерстеллар","minimum-width");Shot("search-minimum");Width=510;await Settle();
+            Width=360;await Settle();CheckText("Интерстеллар","minimum-width");Shot("search-minimum");
+            foreach(var kind in new[]{"Фильмы","Сериалы","Загрузки"})
+            {
+                section=kind;current=kind=="Загрузки"?null:new MediaItem(-88000-(kind=="Сериалы"?1:0),"Поиск в карточке",kind,"",2026,"—","—","#526B69");
+                Render();await Settle();FocusCatalogSearch();await Settle();
+                Check(SearchBar.IsVisible&&section==kind&&(kind=="Загрузки"||current!=null),"Focusing persistent search changed the current page.");
+                CheckText("Интерстеллар","minimum-width-"+kind);Shot("search-minimum-"+kind);
+            }
+            section="Фильмы";lastCatalogSection="Фильмы";current=null;Render();Width=510;await Settle();
             var windowCount=Application.Current.Windows.Count;
             Search.Text="Интерстелла";Search.Text="Интерстеллар";
-            SettingsButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await Task.Delay(450);await Settle();
+            SettingsButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));submittedQuery=Search.Text.Trim();searchCategory="";liveKey=CurrentCatalogKey;Render();await Task.Delay(450);await Settle();
             Check(section=="Настройки"&&SearchBar.Visibility==Visibility.Collapsed,"Settings did not open as a page.");
             Check(Application.Current.Windows.Count==windowCount,"Settings opened another window.");
             Check(Search.Text=="Интерстеллар","Opening settings discarded the query.");
@@ -68,7 +76,8 @@ public partial class MainWindow
             resume.IsChecked=!initialResume;resume.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
             Check(Preferences.Load().AutoResumeDownloads==!initialResume,"Resume preference did not persist.");
             var folder=Path.Combine(output,"configured-folder");Directory.CreateDirectory(folder);SetDownloadFolder(folder);Render();await Settle();
-            Check(FindVisual<TextBlock>(Body,t=>t.Name=="SettingsFolder")?.Text==folder&&Preferences.Load().Folder==folder,"Settings did not show saved download folder.");
+            var actualFolder=Path.Combine(folder,"Ka4alka");
+            Check(Directory.Exists(actualFolder)&&FindVisual<TextBlock>(Body,t=>t.Name=="SettingsFolder")?.Text==actualFolder&&Preferences.Load().Folder==actualFolder,"Settings did not create and show saved Ka4alka download folder.");
             Width=Math.Min(1220,MaxWidth-24);Height=Math.Min(900,MaxHeight-24);await Settle();Shot("settings-light");
             var dark=FindVisual<Button>(Body,b=>AutomationProperties.GetName(b)=="Тёмная тема")??throw new Exception("Dark theme action missing.");
             dark.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await Settle();Shot("settings-dark");
@@ -84,18 +93,24 @@ public partial class MainWindow
                 var origin=block.TransformToAncestor(Body).Transform(new Point());
                 Check(origin.X>=-.5&&origin.X+block.ActualWidth<=Body.ActualWidth+1,"Settings content overflows minimum window width.");
             }
+            var copy=FindVisual<Button>(Body,b=>AutomationProperties.GetName(b)=="Скопировать логи")??throw new Exception("Diagnostics copy button missing.");
+            Clipboard.Clear();
+            copy.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            for(var attempt=0;attempt<100&&(!Clipboard.ContainsText()||!Clipboard.GetText().Contains("Диагностика Качалки"));attempt++)await Task.Delay(25);
+            Check(Clipboard.ContainsText()&&Clipboard.GetText().Contains("Диагностика Качалки"),"Settings copies a diagnostic report to the real Windows clipboard.");
+            Check(FindVisual<Button>(Body,b=>AutomationProperties.GetName(b)=="Сообщить об ошибке")!=null,"Bug report action is available in settings.");
             Width=510;await Settle();
-            var back=FindVisual<Button>(PageHeader,b=>AutomationProperties.GetName(b)=="Вернуться")??throw new Exception("Settings back action missing.");
+            var back=FindVisual<Button>(HeaderArea,b=>AutomationProperties.GetName(b)=="Вернуться")??throw new Exception("Settings back action missing.");
             back.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await Settle();
             Check(section=="Фильмы"&&Search.Text=="Интерстеллар","Returning from settings lost catalog context.");
             var selectedMovie=liveItems.First();current=selectedMovie;Render();SettingsButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
-            var detailBack=FindVisual<Button>(PageHeader,b=>AutomationProperties.GetName(b)=="Вернуться")??throw new Exception("Settings return to detail missing.");
+            var detailBack=FindVisual<Button>(HeaderArea,b=>AutomationProperties.GetName(b)=="Вернуться")??throw new Exception("Settings return to detail missing.");
             detailBack.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));Check(current?.Id==selectedMovie.Id&&Search.Text=="Интерстеллар","Settings did not return to the opened movie.");current=null;Render();
-            ShowDownloads(this,new RoutedEventArgs());liveKey="Фильмы|Интерстеллар|1";ShowCatalogSection("Фильмы");await Settle();CheckText("Интерстеллар","return-from-downloads");
+            ShowDownloads(this,new RoutedEventArgs());liveKey=CurrentCatalogKey;ShowCatalogSection("Фильмы");await Settle();CheckText("Интерстеллар","return-from-downloads");
             liveKey="Сериалы||1";ShowCatalogSection("Сериалы");await Type("Severance");CheckText("Severance","latin-series-query");
-            liveKey="Фильмы|Интерстеллар|1";ShowCatalogSection("Фильмы");await Settle();Check(Search.Text=="Интерстеллар","Film query not remembered separately.");
-            liveKey="Сериалы|Severance|1";ShowCatalogSection("Сериалы");SettingsButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));FocusCatalogSearch();await Settle();
-            Check(section=="Сериалы"&&Search.Text=="Severance"&&Search.SelectionLength==Search.Text.Length,"Search shortcut did not restore the previous catalog and query.");
+            liveKey="Фильмы|Интерстеллар|1";ShowCatalogSection("Фильмы");await Settle();Check(Search.Text=="","Navigation to another catalog did not reset search.");
+            liveKey="Сериалы|Severance|1";ShowCatalogSection("Сериалы");await Type("Severance");SettingsButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));FocusCatalogSearch();await Settle();
+            Check(section=="Сериалы"&&lastCatalogSection=="Сериалы"&&Search.Text=="Severance"&&Search.IsKeyboardFocusWithin&&Search.SelectionLength==Search.Text.Length,"Search shortcut did not restore the previous series catalog, submitted query and focus.");
             ClearSearchButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));searchDelay.Stop();
             Check(Search.Text==""&&ClearSearchButton.Visibility==Visibility.Collapsed,"Clear search action did not clear query.");
             return new{Checks=checks,SettingsIsPage=true,ThemePersisted=true,ResumePersisted=true,FolderPersisted=true,QueriesRetainedAcrossNavigation=true,SearchShortcutRestoresContext=true,SettingsFitsNarrowWindow=true,PendingSearchDoesNotChangeSettingsPage=true,SettingsReturnsToOpenedMovie=true};
@@ -103,8 +118,8 @@ public partial class MainWindow
         finally
         {
             prefs.Light=initialLight;prefs.AutoResumeDownloads=initialResume;prefs.Folder=initialFolder;prefs.FolderConfigured=initialConfigured;prefs.Save();ApplyTheme();
-            section="Фильмы";current=null;Search.Clear();searchDelay.Stop();catalogQueries.Clear();lastCatalogSection="Фильмы";
-            Width=Math.Min(1760,MaxWidth-24);Height=Math.Min(950,MaxHeight-24);liveKey="Фильмы||1";Render();await Settle();
+            section="Фильмы";current=null;Search.Clear();searchDelay.Stop();submittedQuery="";searchCategory="";lastCatalogSection="Фильмы";Status.Text="";
+            Width=Math.Min(1760,MaxWidth-24);Height=Math.Min(950,MaxHeight-24);liveKey="";Render();await Settle();
         }
     }
 }

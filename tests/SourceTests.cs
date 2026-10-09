@@ -11,6 +11,16 @@ public static class SourceTests
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken ct)=>Task.FromException<HttpResponseMessage>(new HttpRequestException("offline"));
     }
+    sealed class RutorMirrorHandler:HttpMessageHandler
+    {
+        public List<string> Hosts {get;}=[];
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken ct)
+        {
+            Hosts.Add(request.RequestUri!.Host);
+            if(Hosts.Count==1)return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.ServiceUnavailable));
+            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK){Content=new StringContent("<div id='index'><table><tr><td><a href='/torrent/1/test'>Film (2026)</a><a href='magnet:?xt=urn:btih:0123456789012345678901234567890123456789'>magnet</a></td><td>1 GB</td><td><span class='green'>5</span></td></tr></table></div>")});
+        }
+    }
     sealed class OnlineFixtureHandler:HttpMessageHandler
     {
         public List<Uri> Requests {get;}=[];
@@ -32,6 +42,61 @@ public static class SourceTests
     public static async Task Run(bool live,bool allSections=false)
     {
         static void Check(bool value,string name){if(!value)throw new Exception(name);Console.WriteLine("PASS: "+name);}
+        Check(CinemaPeople.PhotoUrl("https://upload.wikimedia.org/wikipedia/commons/person.jpg")!=null&&CinemaPeople.PhotoUrl("https://upload.wikimedia.org.evil.test/person.jpg")==null&&CinemaPeople.PhotoUrl("http://upload.wikimedia.org/person.jpg")==null,"portraits accept only HTTPS Wikimedia image addresses");
+        var portraitPerson=new CinemaPerson("Фото "+Guid.NewGuid(),"Актёры","");
+        var portraitFixture=JsonSerializer.SerializeToUtf8Bytes(new{query=new{pages=new Dictionary<string,object>{{"123",new{title=portraitPerson.Name,extract="Российский актёр",thumbnail=new{source="https://upload.wikimedia.org/wikipedia/commons/person.jpg"}}}}}});
+        using(var fixture=new SourceClient(new FixtureHandler(portraitFixture)))
+            Check(await new CinemaPeople(fixture).Portrait(portraitPerson,CancellationToken.None)=="https://upload.wikimedia.org/wikipedia/commons/person.jpg","person photograph is resolved from the confirmed biography");
+        using(var offlinePortrait=new SourceClient(new OfflineHandler()))
+            Check(await new CinemaPeople(offlinePortrait).Portrait(portraitPerson,CancellationToken.None)!=null,"person photograph metadata remains available offline");
+        var ambiguousFixture=Encoding.UTF8.GetBytes("""{"query":{"pages":{"123":{"title":"Участник","extract":"Актёр","pageprops":{"disambiguation":""},"thumbnail":{"source":"https://upload.wikimedia.org/wikipedia/commons/wrong.jpg"}}}}}""");
+        using(var fixture=new SourceClient(new FixtureHandler(ambiguousFixture)))
+            Check(await new CinemaPeople(fixture).Portrait(portraitPerson with{Name=Guid.NewGuid().ToString()},CancellationToken.None)==null,"ambiguous biographies never supply another person's photograph");
+        var seriesFixture=new MediaItem(-58291,"Сериал","Сериалы","",2025,"—","—","#526B69"){PageUrl="https://w6.zona.plus/tvseries/metadata-layout-fixture"};
+        using(var seriesClient=new SourceClient(new FixtureHandler(Encoding.UTF8.GetBytes("<a itemprop='genre'>\n  боевик\n</a><a itemprop='genre'>\r\n криминал &nbsp;\n</a><a href='/tvseries/filter/country-rossiia'>\n Россия\n</a>"))))
+        {
+            var genreDetail=await new LiveCatalog(seriesClient).Detail(seriesFixture,CancellationToken.None);
+            Check(genreDetail.Genre=="боевик, криминал"&&genreDetail.Country=="Россия","source HTML indentation cannot become multiline series genres or country names");
+            using var offlineSeries=new SourceClient(new OfflineHandler());
+            var cachedDetail=await new LiveCatalog(offlineSeries).Detail(seriesFixture,CancellationToken.None);
+            Check(cachedDetail.Genre==genreDetail.Genre,"normalized series metadata remains usable from the offline cache");
+        }
+        var mirrorHandler=new RutorMirrorHandler();using(var mirrorClient=new SourceClient(mirrorHandler))
+        {
+            var mirrored=await new LiveCatalog(mirrorClient).Releases("Film",CancellationToken.None);
+            Check(mirrorHandler.Hosts.SequenceEqual(new[]{"rutor.info","rutor.is"})&&mirrored.Count==1&&mirrored[0].Seeds==5,"RuTor recovers actual releases through its second public mirror when the primary fails");
+        }
+        var cinemaFixture=Encoding.UTF8.GetBytes("""
+            <div itemprop='actor'><a href='/persons/test-actor'><span itemprop='name'>Тест &amp; актёр</span></a></div>
+            <div itemprop='actor'><a href='/persons/test-actor'>Тест &amp; актёр</a></div>
+            <div itemprop='director'><a href='/persons/test-actor'>Тест &amp; актёр</a></div>
+            <div><span class='entity-desc-label'>Оператор</span><a href='/persons/test-camera'>Оператор</a></div>
+            <div itemprop='actor'><a href='https://other.test/persons/fake'>Чужой</a></div>
+            <div itemprop='isPartOf'><a href='/franchise/test-series'>Серия фильмов</a></div>
+            <a href='/collections/unrelated'>Навигация</a>
+            <div itemprop='description'>Биография участника</div>
+            <li class='results-item-wrap'><a itemprop='url' href='/movies/first'><span itemprop='name'>Первый фильм</span></a><span class='results-item-year'>2020</span><span class='results-item-rating'>8,5</span></li>
+            <li class='results-item-wrap'><a itemprop='url' href='/movies/second'><span itemprop='name'>Второй фильм</span></a><span class='results-item-year'>2022</span><span class='results-item-rating'>9.1</span></li>
+            <li class='results-item-wrap'><a itemprop='url' href='/movies/unknown'><span itemprop='name'>Без рейтинга</span></a></li>
+            """);
+        var people=CinemaMetadata.People(cinemaFixture);
+        Check(people.Length==3&&people.Count(x=>x.Name=="Тест & актёр")==2&&people.Any(x=>x.Role=="Операторы"),"credits preserve multiple roles, decode names, reject foreign links and deduplicate");
+        Check(CinemaMetadata.CatalogUrl("//other.test/persons/test","/persons/")==null&&CinemaMetadata.CatalogUrl("/persons/test?q=1","/persons/")==null,"person links stay on trusted catalog routes");
+        Check(CinemaMetadata.Collections(cinemaFixture).Single().Kind=="Франшиза","collections use explicit membership rather than unrelated navigation");
+        var plainCredits=CinemaMetadata.People(Encoding.UTF8.GetBytes("<span itemprop='director'><span itemprop='name'>Джеймс Кэмерон</span></span><span itemprop='actor'><span itemprop='name'>Арнольд Шварценеггер</span>,</span>"));
+        Check(plainCredits.Length==2&&plainCredits.All(x=>x.PageUrl=="")&&plainCredits[1].Name=="Арнольд Шварценеггер","current Zona unlinked person spans become local person cards");
+        var wikiWorks=CinemaPeople.Works("<table class='wikitable'><tr><th>Год</th><th>Название фильма</th><th>Роль</th></tr><tr><td rowspan='2'>1984</td><td><a href='/wiki/Терминатор'>Терминатор</a></td><td>Главная роль</td></tr><tr><td><a href='/wiki/Другой_фильм'>Другой фильм</a></td><td>Камео</td></tr></table>");
+        Check(wikiWorks.Length==2&&wikiWorks.All(x=>x.Year==1984)&&wikiWorks[0].Title=="Терминатор","filmography handles year rowspans without reading roles as titles");
+        var personProfile=CinemaMetadata.Person(cinemaFixture,people[0]);
+        Check(personProfile.Description=="Биография участника"&&personProfile.Filmography.Length==3&&CinemaMetadata.Top(personProfile.Filmography).Select(x=>x.Title).SequenceEqual(new[]{"Второй фильм","Первый фильм"}),"person filmography keeps card ratings and excludes unknown scores from top");
+        using(var fixture=new SourceClient(new FixtureHandler(cinemaFixture)))
+        {
+            var catalog=new LiveCatalog(fixture);await catalog.Person(people[0],CancellationToken.None);
+            var cinemaMovie=personProfile.Filmography[0];await catalog.Detail(cinemaMovie,CancellationToken.None);
+            using var offline=new SourceClient(new OfflineHandler());var cachedCatalog=new LiveCatalog(offline);
+            var cachedPerson=await cachedCatalog.Person(people[0],CancellationToken.None);var cachedDetail=await cachedCatalog.Detail(cinemaMovie,CancellationToken.None);
+            Check(cachedPerson.Filmography.Length==3&&cachedDetail.People.Length==3&&cachedDetail.Collections.Length==1,"person filmography and film connections survive offline restart");
+        }
         var coverPath=Path.GetFullPath(Path.Combine("test-output","cover-recovery-"+Guid.NewGuid().ToString("N")+".img"));
         Directory.CreateDirectory(Path.GetDirectoryName(coverPath)!);
         static string DecodeCover(byte[] bytes)=>Encoding.ASCII.GetString(bytes)=="valid-image"?"decoded":throw new InvalidDataException("Invalid image");
@@ -55,6 +120,8 @@ public static class SourceTests
         var parsed=SourceClient.ParseTorznab(Encoding.UTF8.GetBytes(sample),"Test");Check(parsed.Count==1&&parsed[0].Seeds==7&&parsed[0].Size==42,"Torznab result parsing");
         var movie=new MediaItem(-1,"Мангуст","Фильмы","",2026,"—","—","#526B69");
         SourceEntry Result(string title)=>new(title,title,"RuTor","https://rutor.info/torrent/1","magnet:?xt=urn:btih:0123456789012345678901234567890123456789",null);
+        Check(Result("Film 720p").Quality=="HD Ready"&&Result("Film 1080p").Quality=="Full HD"&&Result("Film 2160p").Quality=="4K"&&Result("Film Full HD").Quality=="Full HD","release quality uses HD Ready, Full HD and 4K labels");
+        Check(Result("Film HDTV").Quality=="Не указано","HDTV alone does not invent a resolution");
         Check(LiveCatalog.Matches(movie,Result("Мангуст / Mongoose (2026) WEB-DL 1080p"))&&!LiveCatalog.Matches(movie,Result("Владимир Малыгин - Прыжок Мангуста (2026) MP3"))&&!LiveCatalog.Matches(movie,Result("Мангуст [01-12] (2003) DVDRip"))&&!LiveCatalog.Matches(movie,Result("Мангуст 2 (2026)")),"movie releases match title and year");
         const string knabenHash="0123456789abcdef0123456789abcdef01234567";
         var knabenHits=new{
@@ -83,6 +150,8 @@ public static class SourceTests
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
         var nnmBytes=Encoding.GetEncoding(1251).GetBytes(nnmHtml);
         var nnmMovie=NnmClubSource.Parse(nnmBytes,movie);
+        var screenBytes=Encoding.GetEncoding(1251).GetBytes("<table>"+NnmRow("Экранки","До последнего грамма / The Weight (2026) Screener [H.264/1080p]","viewtopic.php?t=1888983","download.php?id=1431328","5695089292","136")+"</table>");
+        Check(NnmClubSource.Parse(screenBytes,new MediaItem(-9,"До последнего грамма","Фильмы","",2026,"—","—","#526B69"){OriginalTitle="The Weight"}).Count==1,"NNM-Club accepts the real Screener release in the Экранки category while preserving title/year matching");
         Check(nnmMovie.Count==1&&nnmMovie[0].Source=="NNM-Club"&&nnmMovie[0].Id=="NNM-Club:456"&&
               nnmMovie[0].PageUrl=="https://nnmclub.to/forum/viewtopic.php?t=123"&&
               nnmMovie[0].TorrentUrl=="https://nnmclub.to/forum/download.php?id=456"&&
@@ -134,7 +203,10 @@ public static class SourceTests
             var detailed=await online.Detail(movies[0],CancellationToken.None);
             Check(detailed.Description=="Описание из онлайн-индекса."&&detailed.OriginalTitle=="Moonrise"&&detailed.Kinopoisk=="7,8"&&detailed.Imdb=="8.2"&&detailed.Id==expected.Id,
                 "online detail fills original title, description, and both ratings");
+            var releasesRequestedUtc=DateTime.UtcNow;
             var releases=await online.Releases(detailed,CancellationToken.None);
+            Check(releases.All(x=>x.DataProvider=="Онлайн-индекс"&&x.DataReceivedUtc>=releasesRequestedUtc&&x.DataReceivedUtc<=DateTime.UtcNow),
+                "direct online release reads stamp the actual index receipt for catalog quality and availability caches");
             Check(releases.Count==2&&releases[0].Source=="RuTracker"&&releases[0].Via=="Knaben"&&releases[0].Seeds==37&&releases[0].Size==4294967296&&releases[0].TorrentUrl!.StartsWith("magnet:?xt=urn:btih:",StringComparison.Ordinal),
                 "online RuTracker release keeps source attribution and download metadata");
             Check(releases[1].Source=="Internet Archive"&&releases[1].Id=="Archive_01"&&releases[1].TorrentUrl==null&&releases[1].PageUrl=="https://archive.org/details/Archive_01"&&releases.All(x=>!x.Title.Contains("unsafe")&&!x.Title.Contains("webpage")&&!x.Title.Contains("unavailable")),
@@ -181,7 +253,7 @@ public static class SourceTests
         Check(new CatalogIndex(indexDir).CachedReleases(indexedSeries).Single().Series.Episode==10,"release index survives restart");
         var wide=WindowSizing.Fit(1920,1040);var scaled=WindowSizing.Fit(683,350);
         Check(wide.Width==1760&&wide.Height==950&&scaled.Width<=scaled.MaxWidth&&scaled.Height<=scaled.MaxHeight&&scaled.MinWidth<=scaled.Width&&scaled.MinHeight<=scaled.Height,"window fits available desktop at normal and 200% scale");
-        Check(WindowSizing.PosterColumns(1200)==7&&WindowSizing.PosterColumns(1060)==6&&WindowSizing.PosterColumns(980)==6&&WindowSizing.PosterColumns(450)==2,"poster columns follow available width");
+        Check(WindowSizing.PosterColumns(1200)==7&&WindowSizing.PosterColumns(1060)==6&&WindowSizing.PosterColumns(980)==6&&WindowSizing.PosterColumns(450)==2&&WindowSizing.PosterColumns(2600)==10&&WindowSizing.PosterColumns(100)==1,"poster columns follow available width");
         var saved=new Preferences();
         Check(!saved.FolderConfigured,"new settings require one-time download folder choice");
         saved.Save();

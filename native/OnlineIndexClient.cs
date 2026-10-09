@@ -12,7 +12,7 @@ namespace Kachalka;
 // A short cooldown keeps an unavailable or private Site from slowing every card.
 public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null)
 {
-    public static readonly Uri PublishedSite=new("https://kachalka-index-2026.peregon.chatgpt.site/");
+    public static readonly Uri PublishedSite=new("https://ka4alka-online-new.peregon.chatgpt.site/");
     readonly Uri site=baseUri??PublishedSite;
     long retryAfterTicks;
 
@@ -47,7 +47,7 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null)
     static int Integer(JsonElement row,string key)=>row.TryGetProperty(key,out var value)&&value.ValueKind==JsonValueKind.Number&&value.TryGetInt32(out var number)?number:0;
     static long? Long(JsonElement row,string key)=>row.TryGetProperty(key,out var value)&&value.ValueKind==JsonValueKind.Number&&value.TryGetInt64(out var number)&&number>0?number:null;
     static int? Count(JsonElement row,string key)=>row.TryGetProperty(key,out var value)&&value.ValueKind==JsonValueKind.Number&&value.TryGetInt32(out var number)&&number>=0?number:null;
-    static string Score(string? value)=>value!=null&&Regex.IsMatch(value,@"^\d{1,2}([.,]\d)?$")?value:"—";
+    static string Score(string? value)=>value!=null&&Regex.IsMatch(value,@"^\d{1,2}([.,]\d)?$")&&double.TryParse(value.Replace(',','.'),System.Globalization.NumberStyles.Float,System.Globalization.CultureInfo.InvariantCulture,out var score)&&score is >0 and <=10?value:"—";
     static string? Https(string? value)=>Uri.TryCreate(value,UriKind.Absolute,out var uri)&&uri.Scheme=="https"&&string.IsNullOrEmpty(uri.UserInfo)?uri.AbsoluteUri:null;
     static string? SectionKey(string section)=>section switch{"Фильмы"=>"movies","Сериалы"=>"series",_=>null};
     static string? PathPart(string section)=>section switch{"Фильмы"=>"/movies/","Сериалы"=>"/tvseries/",_=>null};
@@ -63,7 +63,14 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null)
         return Slug(slug)?section+":"+slug:null;
     }
 
-    static MediaItem? Media(JsonElement row,string section)
+    static T[] MetadataArray<T>(JsonElement row,string name)
+    {
+        if(!row.TryGetProperty(name,out var value)||value.ValueKind!=JsonValueKind.Array)return [];
+        try{return JsonSerializer.Deserialize<T[]>(value.GetRawText(),new JsonSerializerOptions{PropertyNameCaseInsensitive=true})?.Where(x=>x!=null).Take(100).ToArray()??[];}
+        catch(JsonException){return [];}
+    }
+
+    internal static MediaItem? Media(JsonElement row,string section)
     {
         if(String(row,"section")!=SectionKey(section))return null;
         var title=String(row,"title")?.Trim();var onlineId=String(row,"id");var pageText=String(row,"pageUrl");var path=PathPart(section);
@@ -75,17 +82,32 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null)
         return new MediaItem(id,title,section,"",Integer(row,"year"),Score(String(row,"kinopoisk")),Score(String(row,"imdb")),"#526B69")
         {
             OnlineId=onlineId,PageUrl=url,ImageUrl=Https(String(row,"poster")),
-            OriginalTitle=String(row,"originalTitle"),Description=String(row,"description")
+            OriginalTitle=String(row,"originalTitle"),ImdbId=String(row,"imdbId"),Description=String(row,"description"),
+            Country=String(row,"country")??"",CountryKeys=CatalogRegions.CountryKeys(MetadataArray<string>(row,"countryKeys")),
+            CountryKeysComplete=!row.TryGetProperty("countryKeysComplete",out var completeCountries)||completeCountries.ValueKind!=JsonValueKind.False,
+            People=MetadataArray<CinemaPerson>(row,"people").Where(x=>!string.IsNullOrWhiteSpace(x.Name)&&!string.IsNullOrWhiteSpace(x.Role)&&(x.PageUrl==""||CinemaMetadata.CatalogUrl(x.PageUrl,"/persons/","/person/","/people/")!=null)).ToArray(),
+            Awards=MetadataArray<CinemaAward>(row,"awards").Where(x=>!string.IsNullOrWhiteSpace(x.Name)&&!string.IsNullOrWhiteSpace(x.Category)&&x.Year>0).ToArray(),
+            Collections=MetadataArray<CinemaCollection>(row,"collections").Where(x=>!string.IsNullOrWhiteSpace(x.Name)&&CinemaMetadata.CatalogUrl(x.PageUrl,"/collections/","/franchise/")!=null).ToArray()
         };
     }
 
     public async Task<IReadOnlyList<MediaItem>> Browse(string section,string query,int page,CancellationToken ct)
     {
         var key=SectionKey(section)??throw new ArgumentOutOfRangeException(nameof(section));
-        var path="api/catalog?section="+key+"&q="+Uri.EscapeDataString(query.Trim())+"&page="+Math.Clamp(page,1,40);
+        var path="api/catalog?section="+key+"&q="+Uri.EscapeDataString(query.Trim())+"&page="+Math.Clamp(page,1,CatalogPaging.Limit);
         using var json=await Get(path,ct);
         if(!json.RootElement.TryGetProperty("items",out var items)||items.ValueKind!=JsonValueKind.Array)throw new InvalidDataException("Онлайн-индекс вернул неверный каталог.");
         return items.EnumerateArray().Take(80).Where(x=>x.ValueKind==JsonValueKind.Object).Select(x=>Media(x,section)).OfType<MediaItem>().DistinctBy(x=>x.Id).ToArray();
+    }
+
+    public async Task<CatalogPage> BrowsePage(string section,int page,CancellationToken ct)
+    {
+        var key=SectionKey(section)??throw new ArgumentOutOfRangeException(nameof(section));
+        using var json=await Get("api/catalog?section="+key+"&page="+Math.Clamp(page,1,CatalogPaging.Limit),ct);
+        if(!json.RootElement.TryGetProperty("items",out var rows)||rows.ValueKind!=JsonValueKind.Array)throw new InvalidDataException("Онлайн-индекс вернул неверный каталог.");
+        var items=rows.EnumerateArray().Take(CatalogPaging.Size).Where(x=>x.ValueKind==JsonValueKind.Object).Select(x=>Media(x,section)).OfType<MediaItem>().DistinctBy(x=>x.Id).ToArray();
+        var hasNext=json.RootElement.TryGetProperty("hasMore",out var next)&&next.ValueKind is JsonValueKind.True or JsonValueKind.False?next.GetBoolean():items.Length==CatalogPaging.Size;
+        return new(items,hasNext&&page<CatalogPaging.Limit,[],[]);
     }
 
     public async Task<MediaItem> Detail(MediaItem item,CancellationToken ct)
@@ -99,7 +121,11 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null)
         {
             OnlineId=fresh.OnlineId,Title=fresh.Title,Year=fresh.Year>0?fresh.Year:item.Year,
             ImageUrl=fresh.ImageUrl??item.ImageUrl,OriginalTitle=fresh.OriginalTitle??item.OriginalTitle,
+            ImdbId=fresh.ImdbId??item.ImdbId,
             Description=fresh.Description??item.Description,
+            Country=fresh.Country.Length>0?fresh.Country:item.Country,CountryKeys=fresh.CountryKeys.Length>0?fresh.CountryKeys:item.CountryKeys,
+            CountryKeysComplete=fresh.CountryKeys.Length>0?fresh.CountryKeysComplete:item.CountryKeysComplete,
+            People=fresh.People.Length>0?fresh.People:item.People,Awards=fresh.Awards.Length>0?fresh.Awards:item.Awards,Collections=fresh.Collections.Length>0?fresh.Collections:item.Collections,
             Kinopoisk=fresh.Kinopoisk=="—"?item.Kinopoisk:fresh.Kinopoisk,
             Imdb=fresh.Imdb=="—"?item.Imdb:fresh.Imdb
         };
@@ -129,7 +155,7 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null)
             id=Uri.UnescapeDataString(archive.AbsolutePath["/details/".Length..].TrimEnd('/'));
             if(id.Length==0||id.Contains('/'))return null;
         }
-        return new SourceEntry(id,title,source,page,torrent,null,Long(row,"size"),Count(row,"seeds")){Via=String(row,"via")};
+        return new SourceEntry(id,title,source,page,torrent,null,Long(row,"size"),Count(row,"seeds")){Via=String(row,"via"),Leechers=Count(row,"leechers")};
     }
 
     public async Task<IReadOnlyList<SourceEntry>> Releases(MediaItem item,CancellationToken ct)
@@ -137,6 +163,11 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null)
         var id=IdFor(item)??throw new InvalidDataException("Карточка не связана с онлайн-индексом.");
         using var json=await Get("api/releases?id="+Uri.EscapeDataString(id),ct);
         if(!json.RootElement.TryGetProperty("items",out var items)||items.ValueKind!=JsonValueKind.Array)throw new InvalidDataException("Онлайн-индекс вернул неверные раздачи.");
-        return items.EnumerateArray().Take(300).Where(x=>x.ValueKind==JsonValueKind.Object).Select(x=>Release(x,id)).OfType<SourceEntry>().ToArray();
+        // Catalog quality/availability read this API directly too. Record this
+        // response receipt before any caller merges it with older saved rows.
+        // The index's upstream tracker refresh time is deliberately not inferred.
+        var receivedUtc=DateTime.UtcNow;
+        return items.EnumerateArray().Take(300).Where(x=>x.ValueKind==JsonValueKind.Object).Select(x=>Release(x,id)).OfType<SourceEntry>()
+            .Select(row=>row with{DataReceivedUtc=receivedUtc,DataProvider="Онлайн-индекс"}).ToArray();
     }
 }

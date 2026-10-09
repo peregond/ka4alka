@@ -1,5 +1,7 @@
 "use client";
 
+import { mergeCatalogPage } from "@/lib/catalog-view";
+
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { ArrowUpRight, Clapperboard, Film, PanelLeft, Search, Tv } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -8,7 +10,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { ReleaseList } from "@/components/release-list";
 import { normalize, type Media, type Section } from "@/lib/catalog-source";
 import type { Release } from "@/lib/index-store";
-import seed from "./data/seed.json";
+import seed from "./data/starter.json";
 
 const initial = seed as Media[];
 const savedPosters = new Map(initial.filter(item=>item.poster?.startsWith("/posters/")).map(item=>[item.id,item.poster!]));
@@ -34,7 +36,7 @@ export default function Home() {
   const [section,setSection] = useState<Section>("movies");
   const [query,setQuery] = useState("");
   const [selected,setSelected] = useState<Media|null>(null);
-  const [pool,setPool] = useState<Media[]>(initial);
+  const [pool,setPool] = useState<Media[]>(initial.filter(x=>x.section==="movies").slice(0,40));
   const [page,setPage] = useState(1);
   const [hasMore,setHasMore] = useState(true);
   const [catalogBusy,setCatalogBusy] = useState(false);
@@ -54,11 +56,11 @@ export default function Home() {
       try {
         const response=await fetch(`/api/catalog?section=${section}&q=${encodeURIComponent(query)}&page=${page}`,{signal:controller.signal});
         if(!response.ok)throw new Error("Индекс временно недоступен");
-        const data=await response.json() as {items:Media[];sourceStatus:string};
+        const data=await response.json() as {items:Media[];sourceStatus:string;hasMore:boolean};
         if(!controller.signal.aborted){
           const incoming=Array.isArray(data.items)?data.items:[];
-          setPool(previous=>{const merged=new Map(previous.map(item=>[item.id,item]));for(const item of incoming)merged.set(item.id,{...merged.get(item.id),...item});return [...merged.values()]});
-          setHasMore(incoming.length>=40);
+          setPool(previous=>mergeCatalogPage(previous,incoming,section,page,query));
+          setHasMore(data.hasMore);
           setCatalogState(data.sourceStatus==="updated"?"Каталог обновлён":"Сохранённая подборка");
         }
       } catch {if(!controller.signal.aborted)setCatalogState("Сохранённая подборка");}
@@ -97,7 +99,7 @@ export default function Home() {
       <header className="topbar"><button type="button" className="mobile-menu" aria-label="Открыть разделы" aria-expanded={mobileNavOpen} aria-controls="mobile-navigation" onClick={()=>setMobileNavOpen(true)}><PanelLeft size={21}/></button><div className="topbar-name">Каталог <span>/</span> {section==="movies"?"Фильмы":"Сериалы"}</div><div className="topbar-state">{catalogBusy?"Обновляем каталог…":catalogState}</div></header>
       <div className="workspace"><div className="workspace-head"><div><p className="eyebrow">КИНОТЕКА</p><h1>{section==="movies"?"Фильмы":"Сериалы"}</h1><p className="lead">Найди, что посмотреть сегодня</p></div><div className="result-count">{countLabel(items.length,section)}</div></div>
         <div className="search-wrap"><Search size={20} aria-hidden="true"/><Input value={query} onChange={event=>{setQuery(event.target.value);setPage(1)}} placeholder={section==="movies"?"Название фильма, год…":"Название сериала, год…"} aria-label="Поиск по каталогу"/></div>
-        <div className="content-label"><span>{query?"Результаты поиска":"Недавно добавлены"}</span><span className="hairline"/></div>
+        <div className="content-label"><span>{query?"Результаты поиска":section==="movies"?"Новые фильмы":"Новые сериалы"}</span><span className="hairline"/></div>
         {items.length?<div className="poster-grid">{items.map(item=><button type="button" className="poster-card" key={item.id} onClick={()=>openMedia(item)} aria-label={`Открыть ${item.title}`}><PosterImage key={item.poster??item.id} item={item} className="poster-frame" lazy rating/><span className="poster-title">{item.title}</span><span className="poster-meta">{item.year||"Год неизвестен"}</span></button>)}</div>:<div className="empty-state"><Search size={28}/><h2>Ничего не нашлось</h2><p>Попробуй другое название или убери год из запроса.</p></div>}
         {!query&&hasMore&&<button className="more-button catalog-more" onClick={()=>setPage(value=>value+1)} disabled={catalogBusy}>Показать ещё</button>}
       </div>

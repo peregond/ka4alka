@@ -1,0 +1,26 @@
+name: Verify cinema people source
+on:
+  push:
+    branches: [release/0.30.0]
+    paths: ['native/**', 'tests/**', .github/workflows/cinema-source.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  cinema:
+    runs-on: windows-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Verify film credits, biography and confirmed filmography
+        run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --verify-cinema-source
+      - name: Preserve source verification
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cinema-source-verification
+          path: test-output/cinema-source/
+          retention-days: 7

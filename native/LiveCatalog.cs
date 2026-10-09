@@ -1,16 +1,60 @@
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Globalization;
+using System.IO;
 using System.Text.Json;
 using HtmlAgilityPack;
 namespace Kachalka;
 public sealed class LiveCatalog(SourceClient client)
 {
-    record DetailSnapshot(string Kinopoisk,string Imdb,string Description,string? OriginalTitle=null);
+    record DetailSnapshot(string Kinopoisk,string Imdb,string Description,string? OriginalTitle=null,string Genre="",string Country="",string[]? GenreKeys=null,string[]? CountryKeys=null,CinemaPerson[]? People=null,CinemaCollection[]? Collections=null,bool CountryKeysComplete=true);
     public const string Base="https://w6.zona.plus";
     static HtmlDocument Html(byte[] b){var h=new HtmlDocument();h.LoadHtml(Encoding.UTF8.GetString(b));return h;}
     static string Text(HtmlNode? n)=>HtmlEntity.DeEntitize(n?.InnerText??"").Trim();
     static string Class(string value)=>"contains(concat(' ',normalize-space(@class),' '),' "+value+" ')";
+    public static CatalogPage ParsePage(byte[] bytes,string section,int page,CatalogSelection? selection=null)
+    {
+        var html=Html(bytes);
+        CatalogChoice[] Choices(string prefix)=> (html.DocumentNode.SelectNodes("//option[starts-with(@value,'"+prefix+"-')]")??new HtmlNodeCollection(null))
+            .Select(n=>new CatalogChoice(n.GetAttributeValue("value","")[(prefix.Length+1)..],Text(n))).DistinctBy(x=>x.Key).ToArray();
+        var hasNext=(html.DocumentNode.SelectNodes("//a[@href] | //link[@href and @rel='next']")??new HtmlNodeCollection(null)).Any(n=>Regex.IsMatch(HtmlEntity.DeEntitize(n.GetAttributeValue("href","")),@"[?&]page="+(page+1)+@"(?:&|$)"));
+        var rows=Parse(bytes,section).DistinctBy(x=>x.Id).ToArray();
+        // A confirmed selected country filter proves membership, but does not
+        // prove the absence of another coproducing country.
+        if(selection?.Region=="native")
+        {
+            var home=CatalogRegions.HomeCountry(selection.HomeCountry);
+            var selected=html.DocumentNode.SelectSingleNode("//option[@selected and @value='country-"+home+"']");
+            if(selected!=null&&(selection.Country.Length==0||selection.Country==home))
+                rows=rows.Select(item=>item.CountryKeys.Length>0?item:item with{CountryKeys=[home],Country=Text(selected),CountryKeysComplete=false}).ToArray();
+        }
+        return new(rows,hasNext&&page<CatalogPaging.Limit,Choices("genre"),Choices("country"));
+    }
+    public async Task<CatalogPage> BrowsePage(string section,int page,CatalogSelection selection,CancellationToken ct,bool forceRefresh=false)
+    {
+        var path=section=="Сериалы"?"/tvseries":"/movies";
+        var filter=selection.Filter;
+        async Task<CatalogPage> SourcePage(int sourcePage)
+        {
+            var url=Base+path+(filter.Length>0?"/filter/"+filter:"")+"?page="+sourcePage;
+            var cache=System.IO.Path.Combine(Preferences.DataDir,"catalog",Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(url)))+".html");
+            if(!forceRefresh&&System.IO.File.Exists(cache)&&DateTime.UtcNow-System.IO.File.GetLastWriteTimeUtc(cache)<TimeSpan.FromMinutes(15))
+                return ParsePage(await CacheFiles.ReadAllBytesAsync(cache,ct),section,sourcePage,selection);
+            try
+            {
+                var bytes=await client.Read(new Uri(url),4*1024*1024,ct);var parsed=ParsePage(bytes,section,sourcePage,selection);
+                if(parsed.Items.Length==0&&parsed.Genres.Length==0)throw new System.IO.InvalidDataException("Источник вернул страницу без каталога.");
+                System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(cache)!);await CacheFiles.WriteAllBytesAsync(cache,bytes,ct);return parsed;
+            }
+            catch(Exception) when(!ct.IsCancellationRequested&&System.IO.File.Exists(cache)){return ParsePage(await CacheFiles.ReadAllBytesAsync(cache,ct),section,sourcePage,selection);}
+        }
+        var window=CatalogPaging.SourceWindow(page);
+        var first=await SourcePage(window.Page);
+        var rows=first.Items.Skip(window.Offset).ToList();
+        var tail=first;
+        if(rows.Count<CatalogPaging.Size&&first.HasNext){tail=await SourcePage(window.Page+1);rows.AddRange(tail.Items);}
+        return new(rows.Take(CatalogPaging.Size).ToArray(),page<CatalogPaging.Limit&&(rows.Count>CatalogPaging.Size||tail.HasNext),first.Genres,first.Countries);
+    }
     public static IReadOnlyList<MediaItem> Parse(byte[] bytes,string section)
     {
         var h=Html(bytes);var cards=h.DocumentNode.SelectNodes("//li["+Class("results-item-wrap")+"]");if(cards==null)return [];
@@ -19,38 +63,121 @@ public sealed class LiveCatalog(SourceClient client)
             var url=new Uri(new Uri(Base),path).AbsoluteUri;var hash=System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(url));var id=-(BitConverter.ToInt32(hash,0)&int.MaxValue);
             int.TryParse(Text(n.SelectSingleNode(".//*["+Class("results-item-year")+"]")),out int year);
             return new MediaItem(id,title,section,"",year,"—","—","#526B69"){PageUrl=url,ImageUrl=n.SelectSingleNode(".//meta[@itemprop='image']")?.GetAttributeValue("content","")};
-        }).Where(x=>x!=null).Cast<MediaItem>().Take(40).ToArray();
+        }).Where(x=>x!=null).Cast<MediaItem>().Take(CatalogPaging.SourceSize).ToArray();
     }
     public async Task<IReadOnlyList<MediaItem>> Browse(string section,string query,int page,CancellationToken ct)
     {
         var path=section=="Сериалы"?"/tvseries":"/movies";
         var url=string.IsNullOrWhiteSpace(query)?Base+path+"/filter/sort-date?page="+page:Base+"/search-form?query="+Uri.EscapeDataString(query);
         var cache=System.IO.Path.Combine(Preferences.DataDir,"catalog",Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(url)))+".html");
-        try{var bytes=await client.Read(new Uri(url),4*1024*1024,ct);var parsed=Parse(bytes,section);if(parsed.Count>0){System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(cache)!);await System.IO.File.WriteAllBytesAsync(cache,bytes,ct);}return parsed;}
-        catch(Exception) when(!ct.IsCancellationRequested&&System.IO.File.Exists(cache)){return Parse(await System.IO.File.ReadAllBytesAsync(cache,ct),section);}
+        try{var bytes=await client.Read(new Uri(url),4*1024*1024,ct);var parsed=Parse(bytes,section);if(parsed.Count>0){System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(cache)!);await CacheFiles.WriteAllBytesAsync(cache,bytes,ct);}return parsed;}
+        catch(Exception) when(!ct.IsCancellationRequested&&System.IO.File.Exists(cache)){return Parse(await CacheFiles.ReadAllBytesAsync(cache,ct),section);}
     }
     public async Task<MediaItem> Detail(MediaItem item,CancellationToken ct)
     {
         var key=Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(item.PageUrl!)));
         var cache=System.IO.Path.Combine(Preferences.DataDir,"details",key+".json");
+        static string ValidScore(string value)=>Regex.IsMatch(value,@"^\d{1,2}([.,]\d)?$")&&double.TryParse(value.Replace(',','.'),NumberStyles.Float,CultureInfo.InvariantCulture,out var score)&&score is >0 and <=10?value:"—";
+        MediaItem? saved=null;
         try
         {
-            var h=Html(await client.Read(SourceClient.WebUri(item.PageUrl!),4*1024*1024,ct));
-            string Score(string name){var v=Text(h.DocumentNode.SelectSingleNode("//*["+Class(name)+"]"));return Regex.IsMatch(v,@"^\d{1,2}([.,]\d)?$")?v:"—";}
-            var original=HtmlEntity.DeEntitize(h.DocumentNode.SelectSingleNode("//meta[@itemprop='alternativeHeadline']")?.GetAttributeValue("content","")??"").Trim();
-            var result=item with{Kinopoisk=Score("entity-rating-kp"),Imdb=Score("entity-rating-imdb"),Description=Text(h.DocumentNode.SelectSingleNode("//*[@itemprop='description' and not(self::meta)]")),OriginalTitle=original.Length==0?null:original};
-            try{System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(cache)!);await System.IO.File.WriteAllTextAsync(cache,JsonSerializer.Serialize(new DetailSnapshot(result.Kinopoisk,result.Imdb,result.Description??"",result.OriginalTitle)),ct);}catch(System.IO.IOException){}
+            if(new FileInfo(cache).Length<=4*1024*1024)
+            {
+                var snapshot=JsonSerializer.Deserialize<DetailSnapshot>(await CacheFiles.ReadAllTextAsync(cache,ct));
+                if(snapshot!=null)
+                {
+                    var restored=item with{Kinopoisk=ValidScore(snapshot.Kinopoisk),Imdb=ValidScore(snapshot.Imdb),Description=snapshot.Description,OriginalTitle=snapshot.OriginalTitle,Genre=snapshot.Genre,Country=snapshot.Country,GenreKeys=snapshot.GenreKeys??[],CountryKeys=snapshot.CountryKeys??[],CountryKeysComplete=snapshot.CountryKeysComplete,People=snapshot.People??[],Collections=snapshot.Collections??[]};
+                    if(MediaMetadata.Useful(restored))saved=MediaMetadata.Merge(item,restored);
+                }
+            }
+        }
+        catch(Exception error) when(error is IOException or UnauthorizedAccessException or JsonException or ArgumentException){}
+        // Complete recent pages can be opened immediately, including offline.
+        // Partial older snapshots are retained as fallback while missing fields
+        // are retried against the source.
+        if(saved!=null&&MediaMetadata.HasFullDetails(saved)&&DateTime.UtcNow-File.GetLastWriteTimeUtc(cache)<TimeSpan.FromHours(6))return saved;
+        try
+        {
+            using var sourceDeadline=CancellationTokenSource.CreateLinkedTokenSource(ct);
+            sourceDeadline.CancelAfter(TimeSpan.FromSeconds(12));
+            var uri=SourceClient.WebUri(item.PageUrl!);
+            byte[] bytes;
+            try{bytes=await client.ReadCinemaDetail(uri,4*1024*1024,sourceDeadline.Token);}
+            catch(Exception error)when((error is System.Net.Http.HttpRequestException or InvalidDataException)&&!ct.IsCancellationRequested&&!sourceDeadline.IsCancellationRequested)
+            {bytes=await client.Read(uri,4*1024*1024,sourceDeadline.Token);}
+            var result=ZonaMovieMetadata.Parse(bytes,item);
+            if(result==null)result=ParseHtml(bytes);
+            else if(!MediaMetadata.HasFullDetails(result))
+            {
+                try
+                {
+                    var html=ParseHtml(await client.Read(uri,4*1024*1024,sourceDeadline.Token));
+                    var primary=result;result=MediaMetadata.Merge(html,primary) with{People=ZonaMovieMetadata.MergePeople(html.People,primary.People)};
+                }
+                catch(Exception)when(!ct.IsCancellationRequested&&MediaMetadata.Useful(result)){}
+            }
+            if(!MediaMetadata.Useful(result))throw new InvalidDataException("Источник вернул страницу без сведений о фильме.");
+            var prior=saved??item;
+            result=MediaMetadata.Merge(prior,result) with{People=ZonaMovieMetadata.MergePeople(prior.People,result.People)};
+            try{System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(cache)!);await CacheFiles.WriteAllTextAsync(cache,JsonSerializer.Serialize(new DetailSnapshot(result.Kinopoisk,result.Imdb,result.Description??"",result.OriginalTitle,result.Genre,result.Country,result.GenreKeys,result.CountryKeys,result.People,result.Collections,result.CountryKeysComplete)),ct);}catch(System.IO.IOException){}
+            return result;
+            MediaItem ParseHtml(byte[] body)
+            {
+                var h=Html(body);
+                string Score(string name)=>ValidScore(Text(h.DocumentNode.SelectSingleNode("//*["+Class(name)+"]")));
+                var original=HtmlEntity.DeEntitize(h.DocumentNode.SelectSingleNode("//meta[@itemprop='alternativeHeadline']")?.GetAttributeValue("content","")??"").Trim();
+                string InlineText(HtmlNode node)=>Regex.Replace(Text(node),@"\s+"," ").Trim();
+                var genres=(h.DocumentNode.SelectNodes("//*[@itemprop='genre']")??new HtmlNodeCollection(null)).Select(InlineText).Where(x=>x.Length>0).Distinct().ToArray();
+                HtmlNode[] Links(string prefix)=>(h.DocumentNode.SelectNodes("//a[contains(@href,'/filter/"+prefix+"-')]")??new HtmlNodeCollection(null)).ToArray();
+                string[] Keys(string prefix)=>Links(prefix).Select(n=>n.GetAttributeValue("href","").Split("/filter/"+prefix+"-")[1]).Distinct().ToArray();
+                return item with{Kinopoisk=Score("entity-rating-kp"),Imdb=Score("entity-rating-imdb"),Description=Text(h.DocumentNode.SelectSingleNode("//*[@itemprop='description' and not(self::meta)]")),OriginalTitle=original.Length==0?null:original,Genre=string.Join(", ",genres),Country=string.Join(", ",Links("country").Select(InlineText).Where(x=>x.Length>0).Distinct()),GenreKeys=Keys("genre"),CountryKeys=Keys("country"),CountryKeysComplete=true,People=CinemaMetadata.People(body),Collections=CinemaMetadata.Collections(body)};
+            }
+        }
+        catch(Exception) when(!ct.IsCancellationRequested&&saved!=null)
+        {
+            return saved;
+        }
+    }
+    public async Task<PersonProfile> Person(CinemaPerson person,CancellationToken ct,MediaItem? origin=null,IEnumerable<MediaItem>? known=null,Action<PersonProfile>? progress=null)
+    {
+        if(person.PageUrl.Length==0)return await new CinemaPeople(client).Load(person,origin,known??[],ct,progress);
+        var url=CinemaMetadata.CatalogUrl(person.PageUrl,"/persons/","/person/","/people/")??throw new ArgumentException("Неверная карточка человека.");
+        var key=Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(url)));
+        var cache=System.IO.Path.Combine(Preferences.DataDir,"people",key+".html");
+        PersonProfile? saved=null;
+        try
+        {
+            if(new FileInfo(cache).Length<=4*1024*1024)
+            {saved=CinemaMetadata.Person(await CacheFiles.ReadAllBytesAsync(cache,ct),person) with{SourceUrl=url};if(!ct.IsCancellationRequested)progress?.Invoke(saved);}
+        }
+        catch(Exception error)when(error is IOException or UnauthorizedAccessException or ArgumentException){}
+        try
+        {
+            var bytes=await client.Read(new Uri(url),4*1024*1024,ct);
+            var result=CinemaMetadata.Person(bytes,person) with{SourceUrl=url};
+            if(result.Description.Length==0&&result.Filmography.Length==0)throw new System.IO.InvalidDataException("Источник не вернул сведения о человеке.");
+            ct.ThrowIfCancellationRequested();progress?.Invoke(result);
+            try{System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(cache)!);await CacheFiles.WriteAllBytesAsync(cache,bytes,ct);}catch(System.IO.IOException){}
             return result;
         }
-        catch(Exception) when(!ct.IsCancellationRequested&&System.IO.File.Exists(cache))
-        {
-            var saved=JsonSerializer.Deserialize<DetailSnapshot>(await System.IO.File.ReadAllTextAsync(cache,ct))!;
-            return item with{Kinopoisk=saved.Kinopoisk,Imdb=saved.Imdb,Description=saved.Description,OriginalTitle=saved.OriginalTitle};
-        }
+        catch(Exception) when(!ct.IsCancellationRequested&&saved!=null){return saved;}
     }
     public async Task<IReadOnlyList<SourceEntry>> Releases(string title,CancellationToken ct)
     {
-        var bytes=await client.Read(new Uri("https://rutor.info/search/0/0/000/0/"+Uri.EscapeDataString(title)),4*1024*1024,ct);return ParseRutor(bytes);
+        Exception? failure=null;
+        foreach(var host in new[]{"rutor.info","rutor.is"})
+        {
+            try
+            {
+                using var timeout=CancellationTokenSource.CreateLinkedTokenSource(ct);timeout.CancelAfter(TimeSpan.FromSeconds(7));
+                var bytes=await client.Read(new Uri("https://"+host+"/search/0/0/000/0/"+Uri.EscapeDataString(title)),4*1024*1024,timeout.Token);
+                var rows=ParseRutor(bytes);if(rows.Count>0)return rows;
+                if(Html(bytes).DocumentNode.SelectSingleNode("//div[@id='index']")==null)throw new InvalidDataException("RuTor returned no search index.");
+                return rows;
+            }
+            catch(Exception error)when(!ct.IsCancellationRequested){failure=error;}
+        }
+        ct.ThrowIfCancellationRequested();throw failure??new InvalidDataException("RuTor unavailable.");
     }
     public static bool Matches(MediaItem item,SourceEntry entry)
     {

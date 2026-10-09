@@ -1,0 +1,170 @@
+name: Prepare signed Windows release
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version matching native/Kachalka.csproj
+        required: true
+        default: '0.40.4'
+  push:
+    branches: [release/0.37.0, release/0.38.0, release/0.39.0, release/0.40.0, release/0.40.1, release/0.40.2, release/0.40.3, release/0.40.4]
+    paths: [.github/workflows/release.yml, 'native/**', 'lan-core/**', 'lan-tests/**', 'update-core/**', 'updater/**', 'update-tests/**', 'tests/**', 'installer/**', build-release.ps1, package-release.ps1]
+permissions:
+  contents: write
+concurrency:
+  group: kachalka-release-0.40.4
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    env:
+      RELEASE_VERSION: ${{ inputs.version || '0.40.4' }}
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Verify direct Zona and fallback participant photographs
+        run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --probe-portraits
+      - name: Diagnose current cinema source paths
+        run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --diagnose-cinema-source
+      - name: Verify live cinema navigation
+        run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --verify-cinema-source
+      - name: Verify metadata and actual release for affected new films
+        run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --probe-affected-films
+      - name: Verify public replacement site
+        shell: pwsh
+        run: ./tests/PublishedSiteProbe.ps1
+      - name: Install NSIS
+        run: ./scripts/install-nsis.ps1
+      - name: Validate redesigned catalog, saved navigation, themes and Windows update
+        shell: pwsh
+        run: |
+          try { ./tests/WindowsUpdateSmoke.ps1 }
+          catch {
+            $message=$_.Exception.Message.Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A')
+            Write-Output "::error title=Windows update smoke::$message"
+            throw
+          }
+      - name: Build production package with release-signing key
+        shell: pwsh
+        env:
+          RELEASE_SIGNING_KEY: ${{ secrets.KACHALKA_UPDATE_SIGNING_KEY_PEM }}
+        run: |
+          if([string]::IsNullOrWhiteSpace($env:RELEASE_SIGNING_KEY)){throw 'Missing KACHALKA_UPDATE_SIGNING_KEY_PEM repository secret'}
+          $key=Join-Path $env:RUNNER_TEMP 'kachalka-release-key.pem'
+          try {
+            [System.IO.File]::WriteAllText($key,$env:RELEASE_SIGNING_KEY)
+            ./build-release.ps1 -Version $env:RELEASE_VERSION -SigningKeyPath $key -MakeNsis 'C:/Program Files (x86)/NSIS/makensis.exe'
+          } finally { Remove-Item $key -ErrorAction SilentlyContinue }
+      - name: Verify equal film cards, person galleries and navigation at three window sizes
+        shell: pwsh
+        run: |
+          $env:KACHALKA_DATA=Join-Path $env:RUNNER_TEMP 'kachalka-cinema-smoke'
+          $output=Join-Path $pwd 'test-output/cinema-ui'
+          $process=Start-Process dist/Kachalka-0.40/Kachalka.exe -ArgumentList @('--cinema-smoke-test',$output) -PassThru
+          if(-not $process.WaitForExit(60000)){$process.Kill();throw 'Person card UI smoke timed out'}
+          if($process.ExitCode -ne 0 -or (Test-Path "$output/error.txt") -or -not (Test-Path "$output/checks.json")){throw 'Person card UI smoke failed'}
+      - name: Verify upgrade from previously published 0.40.3
+        shell: pwsh
+        run: ./tests/WindowsPublishedUpgrade.ps1 -FromVersion 0.40.3 -ReleaseDirectory ('dist/release-'+$env:RELEASE_VERSION)
+      - name: Upload verified files to draft GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version=$env:RELEASE_VERSION
+          $tag='v'+$version
+          $notes='distribution/RELEASE-NOTES-'+$version+'.md'
+          if(-not (Test-Path $notes)){$notes='distribution/RELEASE-NOTES-'+([Version]$version).ToString(2)+'.md'}
+          $existing=gh release view $tag --json isDraft --jq '.isDraft' 2>$null
+          if($LASTEXITCODE -ne 0){
+            gh release create $tag --draft --target $env:GITHUB_SHA --title ('Качалка '+$version) --notes-file $notes
+            if($LASTEXITCODE -ne 0){throw 'Cannot create draft release'}
+          } elseif($existing -ne 'true'){throw 'Refusing to overwrite a published release'}
+          gh release edit $tag --draft --target $env:GITHUB_SHA --notes-file $notes
+          if($LASTEXITCODE -ne 0){throw 'Cannot update draft release'}
+          $files=@(Get-ChildItem -LiteralPath ('dist/release-'+$version) -File | ForEach-Object {$_.FullName})
+          gh release upload $tag @files --clobber
+          if($LASTEXITCODE -ne 0){throw 'Cannot upload release assets'}
+          # Read back exact uploaded bytes and compare to the signed package.
+          $download=Join-Path $env:RUNNER_TEMP 'verified-release'
+          New-Item -ItemType Directory -Force $download | Out-Null
+          gh release download $tag --dir $download
+          if($LASTEXITCODE -ne 0){throw 'Cannot read back release assets'}
+          foreach($file in $files){
+            if((Get-FileHash $file -Algorithm SHA256).Hash -ne (Get-FileHash (Join-Path $download ([System.IO.Path]::GetFileName($file))) -Algorithm SHA256).Hash){throw 'Uploaded file checksum mismatch'}
+          }
+          dotnet run --project update-tests/Kachalka.UpdateTests.csproj -c Release -- --verify-release $download
+          if($LASTEXITCODE -ne 0){throw 'Uploaded package signature or contents invalid'}
+          'Windows validation passed; uploaded assets read back with matching SHA256 and valid publisher signature.' >> $env:GITHUB_STEP_SUMMARY
+      - name: Attach temporary rendered UI previews to the draft release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $names=@('catalog-dark','catalog-light','detail-wide-dark','detail-wide-light','settings-dark','settings-light','downloads-dark','downloads-light','installer-finish')
+          $previews=@()
+          foreach($name in $names){
+            $source=Join-Path 'test-output/design-modern' ($name+'.png')
+            if(-not(Test-Path $source)){throw ('Missing rendered preview: '+$name)}
+            $target=Join-Path $env:RUNNER_TEMP ('preview-'+$name+'.png')
+            Copy-Item $source $target
+            $previews+=$target
+          }
+          foreach($name in @('diagnostics-wide-dark','diagnostics-wide-light','diagnostics-narrow-dark','diagnostics-narrow-light','notification-settings-dark','notification-settings-light')){
+            $source=Join-Path 'test-output/download-reliability' ($name+'.png')
+            if(-not(Test-Path $source)){throw ('Missing download reliability preview: '+$name)}
+            $target=Join-Path $env:RUNNER_TEMP ('preview-'+$name+'.png')
+            Copy-Item $source $target
+            $previews+=$target
+          }
+          foreach($scenario in @('release-freshness','interface-polish','bug-report','lan-ui')){
+            $screens=@(Get-ChildItem (Join-Path 'test-output' $scenario) -Filter '*.png')
+            if($screens.Count -eq 0){throw ('Missing '+$scenario+' rendered review evidence')}
+            foreach($screen in $screens){
+              $target=Join-Path $env:RUNNER_TEMP ('preview-'+$screen.Name)
+              Copy-Item $screen.FullName $target
+              $previews+=$target
+            }
+          }
+          # Review-only assets; removed before the public release is published.
+          gh release upload ('v'+$env:RELEASE_VERSION) @previews --clobber
+          if($LASTEXITCODE -ne 0){throw 'Cannot attach rendered review previews'}
+      - name: Upload smoke-test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-windows-update-evidence
+          path: |
+            test-output/transfer-*/portrait-source/*
+            test-output/cache-reliability/*
+            test-output/download-reliability/*
+            test-output/person-performance/*
+            test-output/cover-viewport/*
+            test-output/catalog-navigation/*
+            test-output/release-freshness/*
+            test-output/interface-polish/*
+            test-output/bug-report/*
+            test-output/lan-*/checks.json
+            test-output/lan-*/checks.txt
+            test-output/lan-*/error.txt
+            test-output/lan-*/*.png
+            test-output/cinema-ui/*
+            test-output/cinema-source/*
+            test-output/cinema-source-diagnostics/*
+            test-output/windows-update/checks.txt
+            test-output/dpi-reliability/*
+            test-output/close-reliability/*.json
+            test-output/close-reliability/error.txt
+            test-output/catalog-paging/*
+            test-output/design-modern/*
+            test-output/search-downloads/*
+            test-output/download-end-to-end/*.json
+            test-output/download-end-to-end/error.txt
+            test-output/published-site/checks.json
+            test-output/published-upgrade/checks.txt
+            test-output/published-upgrade/data/updates/*/result.txt
+            test-output/windows-update/data/updates/*/result.txt

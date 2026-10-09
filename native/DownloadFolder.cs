@@ -4,6 +4,20 @@ using Microsoft.Win32;
 
 namespace Kachalka;
 
+public static class DownloadFolders
+{
+    public static string Prepare(string path)
+    {
+        if(string.IsNullOrWhiteSpace(path)||!Path.IsPathFullyQualified(path))
+            throw new ArgumentException("Укажите полный путь к папке загрузок.",nameof(path));
+        var parent=Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
+        if(!Directory.Exists(parent))throw new DirectoryNotFoundException("Выбранная папка больше недоступна: "+parent);
+        var folder=string.Equals(Path.GetFileName(parent),"Ka4alka",StringComparison.OrdinalIgnoreCase)?parent:Path.Combine(parent,"Ka4alka");
+        Directory.CreateDirectory(folder);
+        return folder;
+    }
+}
+
 public partial class MainWindow
 {
     public bool EnsureDownloadFolder()
@@ -18,7 +32,7 @@ public partial class MainWindow
                 : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         var picker=new OpenFolderDialog
         {
-            Title="Выберите папку для загрузок — позже её можно изменить в настройках",
+            Title="Выберите папку — внутри будет создана Ka4alka для загрузок",
             InitialDirectory=initialDirectory
         };
         if(picker.ShowDialog(this)!=true)return false;
@@ -37,11 +51,7 @@ public partial class MainWindow
 
     public void SetDownloadFolder(string path)
     {
-        if(string.IsNullOrWhiteSpace(path)||!Path.IsPathFullyQualified(path))
-            throw new ArgumentException("Укажите полный путь к папке загрузок.",nameof(path));
-
-        var folder=Path.GetFullPath(path);
-        if(!Directory.Exists(folder))throw new DirectoryNotFoundException("Выбранная папка больше недоступна: "+folder);
+        var folder=DownloadFolders.Prepare(path);
 
         var previousFolder=prefs.Folder;
         var previouslyConfigured=prefs.FolderConfigured;

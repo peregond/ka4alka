@@ -1,0 +1,134 @@
+name: Native UI preview
+on:
+  push:
+    branches: [codex/download-reliability-0.35.0, codex/film-ux-0.35, codex/catalog-experience-0.37.0, codex/minimal-home-0.38.0, codex/lan-downloads-0.39.0, release/0.39.0, release/0.40.0, codex/font-rendering-0.40.1]
+    paths: ['native/**', 'lan-core/**', 'lan-tests/**', 'tests/**', '.github/workflows/ui-preview.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: ui-preview-${{ github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  preview:
+    runs-on: windows-latest
+    timeout-minutes: 8
+    env:
+      KACHALKA_DATA: ${{ github.workspace }}/test-output/ui-preview/data
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build native preview
+        shell: pwsh
+        run: ./build.ps1 -OutputDir dist/ui-preview
+      - name: Verify native typography at fractional DPI and unusual interface fonts
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          $env:KACHALKA_DATA=Join-Path $PWD 'test-output/ui-preview/text-rendering-profile'
+          $folder=Join-Path $env:KACHALKA_DATA 'downloads'
+          New-Item -ItemType Directory -Force $folder | Out-Null
+          @{Folder=$folder;FolderConfigured=$true;AutoResumeDownloads=$false;CheckForUpdates=$false;AutoUpdate=$false} | ConvertTo-Json | Set-Content (Join-Path $env:KACHALKA_DATA 'settings.json') -Encoding utf8NoBOM
+          $output=Join-Path $PWD 'test-output/ui-preview/text-rendering'
+          $app=Start-Process (Join-Path $PWD 'dist/ui-preview/Kachalka.exe') -ArgumentList @('--text-rendering-smoke-test',('"'+$output+'"')) -PassThru
+          if(-not $app.WaitForExit(120000)){$app.Kill($true);throw 'Native typography verification timed out'}
+          if(Test-Path (Join-Path $output 'error.txt')){
+            $errorText=Get-Content (Join-Path $output 'error.txt') -Raw
+            $message=($errorText -split "`r?`n")[0].Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A')
+            Write-Output "::error title=Native typography::$message"
+            throw $errorText
+          }
+          if($app.ExitCode -ne 0 -or -not(Test-Path (Join-Path $output 'checks.json'))){throw 'Native typography evidence missing'}
+          Get-Content (Join-Path $output 'checks.json')
+      - name: Render and validate interface
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $env:KACHALKA_DATA=Join-Path $PWD 'test-output/ui-preview/data'
+          $folder=Join-Path $env:KACHALKA_DATA 'downloads'
+          New-Item -ItemType Directory -Force $folder | Out-Null
+          @{Folder=$folder;FolderConfigured=$true;AutoResumeDownloads=$false;CheckForUpdates=$false;AutoUpdate=$false} | ConvertTo-Json | Set-Content (Join-Path $env:KACHALKA_DATA 'settings.json') -Encoding utf8NoBOM
+          ./tests/CacheDesignPosters.ps1
+          $output=Join-Path $PWD 'test-output/ui-preview/render'
+          $app=Start-Process (Join-Path $PWD 'dist/ui-preview/Kachalka.exe') -ArgumentList @('--design-smoke-test',('"'+$output+'"')) -PassThru
+          if(-not $app.WaitForExit(120000)){$app.Kill($true);throw 'Native UI preview timed out'}
+          if(Test-Path (Join-Path $output 'error.txt')){throw (Get-Content (Join-Path $output 'error.txt') -Raw)}
+          if(-not(Test-Path (Join-Path $output 'design.json'))){
+            if(Test-Path (Join-Path $env:KACHALKA_DATA 'error.log')){Get-Content (Join-Path $env:KACHALKA_DATA 'error.log')}
+            throw ('Native UI preview evidence missing; exit code '+$app.ExitCode)
+          }
+          Get-Content (Join-Path $output 'design.json')
+      - name: Render and validate download diagnostics and notification settings
+        shell: pwsh
+        run: |
+          $output=Join-Path $PWD 'test-output/ui-preview/render'
+          $app=Start-Process (Join-Path $PWD 'dist/ui-preview/Kachalka.exe') -ArgumentList @('--download-reliability-smoke-test',('"'+$output+'"')) -PassThru
+          if(-not $app.WaitForExit(45000)){$app.Kill($true);throw 'Download reliability UI timed out'}
+          if(Test-Path (Join-Path $output 'error.txt')){throw (Get-Content (Join-Path $output 'error.txt') -Raw)}
+          if($app.ExitCode -ne 0 -or -not(Test-Path (Join-Path $output 'checks.json'))){throw 'Download reliability UI evidence missing'}
+          Get-Content (Join-Path $output 'checks.json')
+          Get-Content (Join-Path $output 'download-diagnostics-checks.json')
+      - name: Verify UI input during actor photo and biography loading
+        shell: pwsh
+        run: |
+          $output=Join-Path $PWD 'test-output/ui-preview/person-performance'
+          $app=Start-Process (Join-Path $PWD 'dist/ui-preview/Kachalka.exe') -ArgumentList @('--person-performance-smoke-test',('"'+$output+'"')) -PassThru
+          if(-not $app.WaitForExit(45000)){$app.Kill($true);throw 'Person performance UI timed out'}
+          if(Test-Path (Join-Path $output 'error.txt')){throw (Get-Content (Join-Path $output 'error.txt') -Raw)}
+          if($app.ExitCode -ne 0 -or -not(Test-Path (Join-Path $output 'checks.json'))){throw 'Person performance UI evidence missing'}
+          Get-Content (Join-Path $output 'checks.json')
+      - name: Verify catalog performance, navigation, source freshness and reporting
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          $failures=@()
+          foreach($scenario in @('cover-viewport','catalog-navigation','release-freshness','interface-polish','bug-report','lan')){
+            try {
+              $output=Join-Path $PWD ('test-output/ui-preview/'+$scenario)
+              $app=Start-Process (Join-Path $PWD 'dist/ui-preview/Kachalka.exe') -ArgumentList @('--'+$scenario+'-smoke-test',('"'+$output+'"')) -PassThru
+              if(-not $app.WaitForExit(60000)){$app.Kill($true);throw ($scenario+' UI timed out')}
+              if(Test-Path (Join-Path $output 'error.txt')){throw (Get-Content (Join-Path $output 'error.txt') -Raw)}
+              if($app.ExitCode -ne 0 -or -not(Test-Path (Join-Path $output 'checks.json'))){throw ($scenario+' UI evidence missing')}
+              Get-Content (Join-Path $output 'checks.json')
+            } catch { $failures+=($scenario+': '+$_.Exception.Message); Write-Output ('FAILED '+$failures[-1]) }
+          }
+          if($failures.Count -gt 0){throw ($failures -join "`n")}
+      - name: Save rendered previews in a temporary draft
+        if: always()
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Keep review asset names portable across GitHub upload clients.
+          $files=@(Get-ChildItem 'test-output/ui-preview' -Recurse -Filter '*.png' -ErrorAction SilentlyContinue | Where-Object {$_.Name -match '^[a-z0-9.-]+$'} | ForEach-Object {$_.FullName})
+          # Only typography metrics are added as JSON. Raw check messages can
+          # mention the setup dialog's download directory; omit them and never
+          # traverse profile, queue, network trust or diagnostics JSON files.
+          $typography=Join-Path $PWD 'test-output/ui-preview/text-rendering/checks.json'
+          if(Test-Path -LiteralPath $typography){
+            $report=Get-Content -LiteralPath $typography -Raw | ConvertFrom-Json
+            $sanitized=[ordered]@{
+              Version=$report.Version;DpiMethod=$report.DpiMethod;Smoothing=$report.Smoothing
+              Fonts=@($report.Fonts | Select-Object Resource,Family,Weight,CyrillicGlyphs,ResolvedFamilies)
+              Cases=@($report.Cases | Select-Object Stage,VisualDpi,SearchFont,SearchSize,SearchViewportHeight,CharacterHeight,SearchWidth)
+              Variants=@($report.Variants | Select-Object Theme,Font,VisualDpi,SearchHeight,CaretHeight,VisibleTextBlocks,WrappedBlocks,EllipsisBlocks,CyrillicGlyphs,Formatting,Rendering)
+              DpiTransitions=@($report.DpiTransitions | Select-Object Surface,RequestedDpi,ActualDpi,NativeMessageEffective,Method)
+              Screenshots=@($report.Screenshots | Select-Object File,Width,Height,VisualDpi,NativeMonitorDpi,Capture,Policy)
+              CheckCount=@($report.Checks).Count
+            }
+            $metadata=Join-Path $env:RUNNER_TEMP 'text-rendering-checks.json'
+            $sanitized | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $metadata -Encoding utf8NoBOM
+            $files+=$metadata
+          }
+          if($files.Count -gt 0){
+            $tag='ui-preview-${{ github.run_id }}'
+            $existing=gh release view $tag --json isDraft --jq '.isDraft' 2>$null
+            if($LASTEXITCODE -ne 0){
+              gh release create $tag --draft --target '${{ github.sha }}' --title 'Temporary native UI preview' --notes 'Rendered UI evidence for review; not an application release.'
+              if($LASTEXITCODE -ne 0){throw 'Could not save UI preview draft'}
+            } elseif($existing -ne 'true'){throw 'Refusing to overwrite a published preview'}
+            gh release upload $tag @files --clobber
+            if($LASTEXITCODE -ne 0){throw 'Could not upload UI preview images'}
+          }

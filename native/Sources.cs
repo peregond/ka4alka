@@ -9,8 +9,12 @@ public record SourceConfig(string Name,string Endpoint,string ApiKey="");
 public record SourceEntry(string Id,string Title,string Source,string PageUrl,string? TorrentUrl,string? ImageUrl,long? Size=null,int? Seeds=null)
 {
     public string? Via {get;init;}
+    public int? Leechers {get;init;}
+    // Receipt of this row, not proof that a peer or its advertised audio is available.
+    public DateTime? DataReceivedUtc {get;init;}
+    public string? DataProvider {get;init;}
     public SeriesReleaseInfo Series => SeriesReleaseInfo.Parse(Title);
-    public string Quality => System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(2160|4K|UHD)")?"2160p":System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(1080|FullHD)")?"1080p":System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(720|HDTV)")?"720p":"Не указано";
+    public string Quality => System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(2160[pi]?\b|\b4[ .-]?K\b|\bUHD\b)")?"4K":System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(1080[pi]?\b|\bFull[ .-]?HD\b)")?"Full HD":System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(720p?\b|HD[ .-]?Ready\b)")?"HD Ready":"Не указано";
     public string Type => System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(Blu.?Ray|BDRip|BDRemux)")?"BluRay":System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(WEB.?DL|WEBRip)")?"WEB-DL":"Не указано";
     public string Voice => System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(дубляж|дублирован|DUB)")?"Дубляж":System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(многоголос|MVO)")?"Многоголосая":System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(оригинал|Original|ENG)")?"Оригинал":"Не указано";
     public string Subs => System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(субтитр|subs|subbed)")?"Есть":"Не указано";
@@ -25,6 +29,19 @@ public sealed partial class SourceClient : IDisposable
     public async Task<byte[]> Read(Uri uri,int max,CancellationToken ct)
     {
         using var response=await http.GetAsync(uri,HttpCompletionOption.ResponseHeadersRead,ct);response.EnsureSuccessStatusCode();
+        return await ReadBody(response,max,ct);
+    }
+    public async Task<byte[]> ReadCinemaDetail(Uri uri,int max,CancellationToken ct)
+    {
+        if(CinemaMetadata.CatalogUrl(uri.AbsoluteUri,"/movies/","/tvseries/")==null)return await Read(uri,max,ct);
+        using var request=new HttpRequestMessage(HttpMethod.Get,uri);
+        request.Headers.TryAddWithoutValidation("Accept","application/json, text/javascript, */*; q=0.01");
+        request.Headers.Add("X-Requested-With","XMLHttpRequest");
+        using var response=await http.SendAsync(request,HttpCompletionOption.ResponseHeadersRead,ct);response.EnsureSuccessStatusCode();
+        return await ReadBody(response,max,ct);
+    }
+    static async Task<byte[]> ReadBody(HttpResponseMessage response,int max,CancellationToken ct)
+    {
         if(response.Content.Headers.ContentLength>max)throw new InvalidDataException("Ответ источника превышает допустимый размер.");
         await using var input=await response.Content.ReadAsStreamAsync(ct);using var output=new MemoryStream();var buffer=new byte[16384];int count;
         while((count=await input.ReadAsync(buffer,ct))!=0){if(output.Length+count>max)throw new InvalidDataException("Ответ источника превышает допустимый размер.");output.Write(buffer,0,count);}return output.ToArray();

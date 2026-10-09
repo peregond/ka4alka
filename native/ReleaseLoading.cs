@@ -1,11 +1,41 @@
 using System.IO;
+using System.Windows;
+using System.Windows.Automation;
+using System.Windows.Controls;
 
 namespace Kachalka;
 
 public partial class MainWindow
 {
+    Border? releaseLoadingIndicator;
+    int releaseLoadingItemId;
+
+    void RenderReleaseLoading(WrapPanel target,MediaItem item)
+    {
+        releaseLoadingItemId=item.Id;
+        var content=new StackPanel();
+        var label=Text("Ищем раздачи…",11);label.Margin=new(0,0,0,4);
+        label.SetResourceReference(TextBlock.ForegroundProperty,"Accent");content.Children.Add(label);
+        var progress=new ProgressBar{IsIndeterminate=true,Height=3,BorderThickness=new(0)};
+        progress.SetResourceReference(Control.ForegroundProperty,"Accent");progress.SetResourceReference(Control.BackgroundProperty,"Edge");
+        AutomationProperties.SetName(progress,"Поиск раздач: прогресс");content.Children.Add(progress);
+        releaseLoadingIndicator=new Border{Child=content,Width=108,Margin=new(10,5,0,5),VerticalAlignment=VerticalAlignment.Center,Visibility=Visibility.Collapsed};
+        AutomationProperties.SetName(releaseLoadingIndicator,"Поиск раздач");target.Children.Add(releaseLoadingIndicator);
+        RefreshReleaseLoadingIndicator();
+    }
+    void RefreshReleaseLoadingIndicator()
+    {
+        if(releaseLoadingIndicator==null)return;
+        var checking=current?.IsLive==true&&current.Id==releaseLoadingItemId&&releaseViews.TryGetValue(current.Id,out var view)&&view.Checking;
+        releaseLoadingIndicator.Visibility=checking?Visibility.Visible:Visibility.Collapsed;
+        RefreshReleaseSourceStatus();
+    }
+
     async Task FetchDetails(MediaItem item)
     {
+        // Movie information has its own request and lifetime; source retries or
+        // cancellation must not discard a completed description and credits.
+        var detailTask=FetchDetailMetadata(item);
         if(!releaseViews.TryGetValue(item.Id,out var view))releaseViews[item.Id]=view=new();
         view.Request?.Cancel();view.Request?.Dispose();var request=view.Request=new CancellationTokenSource();var token=request.Token;
         var prior=view.Sources.GroupBy(x=>x.Name).ToDictionary(x=>x.Key,x=>x.Last().LastSuccessUtc);
@@ -20,97 +50,52 @@ public partial class MainWindow
             var keys=fresh.Select(ReleaseSearch.Identity).ToHashSet();
             view.Saved=saved.Any(x=>!keys.Contains(ReleaseSearch.Identity(x)));
             if(view.Saved)cachedReleaseViews.Add(item.Id);else cachedReleaseViews.Remove(item.Id);
-            liveReleases[item.Id]=ReleaseSearch.WithSaved(fresh,saved);view.Sources=checks.Values.ToArray();RefreshDetail(item.Id);
+            liveReleases[item.Id]=ReleaseSearch.WithSaved(fresh,saved);view.Sources=checks.Values.ToArray();
+            qualitySnapshots.Remove(item.Id);ApplyKnownQuality(item);if(current?.Id==item.Id)ApplyKnownQuality(current);
+            foreach(var card in liveItems.Concat(prefs.LiveFavorites).Concat(catalogDisplay).Where(x=>x.Id==item.Id))ApplyKnownQuality(card);
+            RefreshDetail(item.Id);
+            if(!view.Checking&&(prefs.HidePoorQuality||prefs.CatalogQualityHeight!=0)&&current==null&&(section is "Фильмы" or "Сериалы")&&liveItems.Concat(prefs.LiveFavorites).Any(x=>x.Id==item.Id))RenderCatalogKeepingPosition();
         }
         void IndexRows(IEnumerable<SourceEntry> rows,SourceState state)
         {
-            foreach(var group in rows.GroupBy(x=>x.Source+(x.Via==null?"":" · через "+x.Via)))checks[group.Key]=Remember(new(group.Key,state,group.Count()));
+            foreach(var group in rows.GroupBy(ReleaseFreshness.SourceName))
+            {
+                // A reply from the online index does not mean that the named
+                // tracker answered our request. Preserve each provider's own state.
+                if(checks.TryGetValue(group.Key,out var checkedSource)&&checkedSource.State!=SourceState.Saved)continue;
+                var rowState=state==SourceState.Ready&&group.All(x=>x.DataProvider!=group.Key)?SourceState.Indexed:state;
+                checks[group.Key]=Remember(new(group.Key,rowState,group.Count()));
+            }
         }
         IndexRows(saved,SourceState.Saved);checks["Онлайн-индекс"]=Remember(new("Онлайн-индекс",SourceState.Searching));view.Sources=checks.Values.ToArray();
         await Task.Yield();if(!IsCurrent())return;
-        async Task<MediaItem> Resolve()
-        {
-            try
-            {
-                var detail=await Metadata(item);
-                if(IsCurrent())
-                {
-                    item.SetScores(detail.Kinopoisk,detail.Imdb);detail.SetScores(detail.Kinopoisk,detail.Imdb);
-                    liveItems=liveItems.Select(x=>x.Id==detail.Id?detail:x).ToArray();if(current?.Id==item.Id)current=detail;
-                    try{await catalogIndex.AddAsync([detail],token);}catch(IOException){}catch(UnauthorizedAccessException){}
-                    RefreshDetail(item.Id);
-                }
-                return detail;
-            }
-            catch{return item;}
-        }
-        var detailTask=Resolve();var entered=false;
+        var entered=false;
         try
         {
             await releaseSlots.WaitAsync(token);entered=true;
-            var indexSettled=false;
-            var indexProgress=new Progress<ReleaseSearchUpdate>(update=>
+            async Task<MediaItem> Resolved(CancellationToken ct)
             {
-                if(!IsCurrent()||indexSettled)return;
-                foreach(var source in update.Sources)checks[source.Name]=Remember(source);
-                if(update.Complete){fresh.Clear();fresh.AddRange(update.Items);if(update.Items.Length>0)view.ReceivedUtc=DateTime.UtcNow;IndexRows(update.Items,SourceState.Indexed);}
-                Publish();
-            });
-            var indexed=await ReleaseSearch.RunAsync([new("Онлайн-индекс",ct=>onlineIndex.Releases(item,ct))],indexProgress,token);
-            indexSettled=true;
-            if(!IsCurrent())return;
-            // Apply final results here as well: Progress callbacks are posted to the UI queue.
-            foreach(var source in indexed.Sources)checks[source.Name]=Remember(source);
-            fresh.Clear();fresh.AddRange(indexed.Items);if(indexed.Items.Length>0)view.ReceivedUtc=DateTime.UtcNow;IndexRows(indexed.Items,SourceState.Indexed);
-            if(indexed.Items.Length==0||indexed.Items.All(x=>x.TorrentUrl==null))
-            {
-                MediaItem resolved;
-                try{resolved=await detailTask.WaitAsync(TimeSpan.FromSeconds(3),token);}catch(TimeoutException){resolved=item;}
-                var api=new LiveCatalog(sourceClient);
-                var aliases=new[]{resolved.Title,resolved.OriginalTitle}.Where(x=>!string.IsNullOrWhiteSpace(x)).Cast<string>().Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-                async Task<IReadOnlyList<SourceEntry>> Aliases(Func<string,CancellationToken,Task<IReadOnlyList<SourceEntry>>> search,CancellationToken ct)
-                {
-                    var groups=await Task.WhenAll(aliases.Select(async title=>
-                    {
-                        try{return (Items:await search(title,ct),Error:(Exception?)null);}
-                        catch(Exception error) when(!ct.IsCancellationRequested){return (Items:(IReadOnlyList<SourceEntry>)[],Error:error);}
-                    }));
-                    if(groups.All(x=>x.Error!=null))throw groups.First().Error!;
-                    return groups.SelectMany(x=>x.Items).Where(x=>LiveCatalog.Matches(resolved,x)).ToArray();
-                }
-                var providers=new List<ReleaseSource>
-                {
-                    new("RuTor",ct=>Aliases(api.Releases,ct)),
-                    new("Internet Archive",ct=>Aliases((title,t)=>sourceClient.SearchArchive(title,"Фильмы",1,t),ct)),
-                    new("RuTracker · через Knaben",ct=>KnabenSource.Search(resolved,ct)),
-                    new("NNM-Club",ct=>new NnmClubSource(sourceClient).Search(resolved,ct)),
-                    new("MegaPeer",ct=>new MegaPeerSource(sourceClient).Search(resolved,ct))
-                };
-                var searchName=resolved.OriginalTitle??resolved.Title;
-                if(item.Section=="Сериалы"&&!searchName.Any(c=>c is >= '\u0400' and <= '\u04FF'))
-                {
-                    providers.Add(new("Nyaa",async ct=>(await sourceClient.SearchNyaa(searchName,ct)).Where(x=>LiveCatalog.Matches(resolved,x)).ToArray()));
-                    providers.Add(new("EZTV",async ct=>{var identity=await sourceClient.FindSeriesIdentity(searchName,item.Year,ct);return identity==null?[]:await sourceClient.SearchEztv(identity,ct);}));
-                }
-                var fallbackSettled=false;
-                var fallbackProgress=new Progress<ReleaseSearchUpdate>(update=>
-                {
-                    if(!IsCurrent()||fallbackSettled)return;
-                    fresh.Clear();fresh.AddRange(indexed.Items);fresh.AddRange(update.Items);
-                    foreach(var source in update.Sources)checks[source.Name]=Remember(source);
-                    if(update.Items.Length>0)view.ReceivedUtc=DateTime.UtcNow;Publish();
-                });
-                var direct=await ReleaseSearch.RunAsync(providers,fallbackProgress,token);
-                fallbackSettled=true;
-                if(!IsCurrent())return;
-                fresh.Clear();fresh.AddRange(indexed.Items);fresh.AddRange(direct.Items);
-                foreach(var source in direct.Sources)checks[source.Name]=Remember(source);
-                if(direct.Items.Length>0)view.ReceivedUtc=DateTime.UtcNow;
+                try{return await detailTask.WaitAsync(TimeSpan.FromSeconds(8),ct);}
+                catch(TimeoutException){return item;}
             }
+            // Supplement cached/indexed rows concurrently: a single screen copy must not suppress better sources.
+            var providers=new[]{new ReleaseSource("Онлайн-индекс",ct=>onlineIndex.Releases(item,ct))}
+                .Concat(NativeReleaseSources.Create(sourceClient,Resolved,item.Section=="Сериалы"));
+            var settled=false;
+            void Apply(ReleaseSearchUpdate update)
+            {
+                fresh.Clear();fresh.AddRange(update.Items);
+                foreach(var source in update.Sources)checks[source.Name]=Remember(source);
+                if(update.Items.Length>0)view.ReceivedUtc=update.Items.Select(x=>x.DataReceivedUtc).Max();
+                IndexRows(update.Items,SourceState.Ready);Publish();
+            }
+            var progress=new Progress<ReleaseSearchUpdate>(update=>{if(IsCurrent()&&!settled)Apply(update);});
+            var result=await ReleaseSearch.RunAsync(providers,progress,token);
+            settled=true;if(!IsCurrent())return;Apply(result);
             if(!IsCurrent())return;
             view.Checking=false;Publish();
             // Do not change the cache timestamp when every provider fails. Partial success keeps saved alternatives.
-            if(fresh.Count>0)try{await catalogIndex.CacheReleasesAsync(item,ReleaseSearch.WithSaved(fresh,saved),view.Sources);}catch(IOException){}catch(UnauthorizedAccessException){}
+            if(fresh.Count>0||ReleaseAvailability.ConfirmedEmpty(fresh,result.Sources))try{await catalogIndex.CacheReleasesAsync(item,fresh.Count==0?[]:ReleaseSearch.WithSaved(fresh,saved),result.Sources,token);}catch(IOException){}catch(UnauthorizedAccessException){}
         }
         catch(OperationCanceledException) when(token.IsCancellationRequested){}
         catch(Exception) when(!token.IsCancellationRequested){checks["Поиск источников"]=new("Поиск источников",SourceState.Unavailable,CheckedUtc:DateTime.UtcNow);}
