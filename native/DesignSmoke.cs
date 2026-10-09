@@ -294,8 +294,11 @@ public partial class MainWindow
             prefs.Light=true;ApplyTheme();Render();await Settle();Shot("downloads-light");
             prefs.Light=false;ApplyTheme();Render();await Settle();
             var expectedInk=((SolidColorBrush)FindResource("Text")).Color;
-            foreach(var block in VisualElements<TextBlock>(Body).Where(x=>x.Text==activeDownload.DisplayName||x.Text==activeDownload.Status))
+            foreach(var block in VisualElements<TextBlock>(Body).Where(x=>x.Text==activeDownload.DisplayName))
                 if(block.Foreground is not SolidColorBrush ink||ink.Color!=expectedInk)throw new Exception("Download text does not follow dark theme.");
+            var statusInk=((SolidColorBrush)FindResource(activeDownload.StatusBrushKey)).Color;
+            foreach(var block in VisualElements<TextBlock>(Body).Where(x=>x.Text==activeDownload.Status))
+                if(block.Foreground is not SolidColorBrush ink||ink.Color!=statusInk)throw new Exception("Download status does not follow dark theme.");
             var releaseInk=((SolidColorBrush)FindResource("Muted")).Color;
             foreach(var block in VisualElements<TextBlock>(Body).Where(x=>x.Text==activeDownload.Name&&AutomationProperties.GetName(x)=="Название раздачи"))
                 if(block.Foreground is not SolidColorBrush ink||ink.Color!=releaseInk)throw new Exception("Secondary release name does not follow dark theme.");
