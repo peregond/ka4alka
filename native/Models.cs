@@ -221,7 +221,7 @@ public class DownloadItem : INotifyPropertyChanged
     [JsonIgnore] public bool HasMoreFiles=>Files.Count>6;
     [JsonIgnore] public string MoreFilesText=>HasMoreFiles?$"Ещё {Files.Count-6} · все файлы и поиск":"";
     [JsonIgnore] public string SourcesText=>string.IsNullOrWhiteSpace(PeersText)?"Появятся после подключения":PeersText;
-    [JsonIgnore] public string AddedText=>AddedUtc==default?"—":AddedUtc.ToLocalTime().ToString("d MMMM, HH:mm",System.Globalization.CultureInfo.CurrentCulture);
+    [JsonIgnore] public string AddedText=>AddedUtc==default?"—":AddedUtc.ToLocalTime().ToString("d MMMM, HH:mm",System.Globalization.CultureInfo.GetCultureInfo("ru-RU"));
     [JsonIgnore] public string PercentLabel=>$"{(int)Math.Floor(double.IsFinite(Progress)?Math.Clamp(Progress,0,100):0)}%";
     [JsonIgnore] public string WidgetCaption=>StatusKind==DownloadStatusKind.Downloading&&Remaining.Length>0?Remaining:Status;
     [JsonIgnore] public bool ShowWaitingHint=>StatusKind==DownloadStatusKind.Waiting&&Hint.Length>0;
