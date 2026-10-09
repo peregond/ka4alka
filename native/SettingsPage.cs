@@ -105,7 +105,7 @@ public partial class MainWindow
         var catalogue=Card("Каталог","Выбери страну для отечественных подборок фильмов и сериалов.","IconMovies");
         var countryLabel=Text("Отечественное кино",12,true);countryLabel.Margin=new(0,0,0,7);catalogue.Children.Add(countryLabel);
         var homeCountries=CatalogChoices.Countries.OrderBy(choice=>choice.Label).ToArray();
-        var homeCountry=new ComboBox{Name="SettingsHomeCountry",ItemsSource=homeCountries,SelectedItem=homeCountries.First(choice=>choice.Key==CatalogRegions.HomeCountry(prefs.HomeCountry)),MaxWidth=320,HorizontalAlignment=HorizontalAlignment.Left,MinWidth=0};
+        var homeCountry=new ComboBox{Name="SettingsHomeCountry",ItemsSource=homeCountries,SelectedItem=homeCountries.First(choice=>choice.Key==CatalogRegions.HomeCountry(prefs.HomeCountry)),MaxWidth=320,HorizontalAlignment=HorizontalAlignment.Left,MinWidth=0,Margin=new(0,4,0,10)};
         homeCountry.SetBinding(FrameworkElement.WidthProperty,new System.Windows.Data.Binding(nameof(FrameworkElement.ActualWidth)){Source=catalogue});
         AutomationProperties.SetName(homeCountry,"Страна отечественных подборок");catalogue.Children.Add(homeCountry);
         var countryHint=Text("Учитываем страну производства. Фильмы совместного производства с выбранной страной тоже входят в отечественные подборки.",12,true);countryHint.Margin=new(0,8,0,0);catalogue.Children.Add(countryHint);
