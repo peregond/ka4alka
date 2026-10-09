@@ -82,6 +82,7 @@ await WindowsNotificationTests.Run();
 DownloadDiagnosticsTests.Run();
 DownloadSpaceTests.Run(root);
 await DownloadReliabilityTests.Run(root);
+await DownloadDeletionTests.Run(root);
 await CoverCachePerformanceTests.Run(root);
 await MagnetDiscoveryTests.Run(root);
 await SourceTests.Run(args.Contains("--live-sources")||args.Contains("--all-live-sources"),args.Contains("--all-live-sources"));

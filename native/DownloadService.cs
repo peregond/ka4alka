@@ -189,26 +189,45 @@ public sealed partial class DownloadService
     }
     public async Task Remove(DownloadItem item,bool deleteFiles=false)
     {
-        if(item.Busy)return;item.Busy=true;item.Refresh();await gate.WaitAsync();
+        if(item.Busy){DiagnosticLog.Write("download-remove-busy",new{item.Id,DeleteFiles=deleteFiles});return;}
+        item.Busy=true;item.Refresh();await gate.WaitAsync();
+        var phase="queue";
         try
         {
+            // A stale button must not delete files after the task has already
+            // been removed (or after another operation changes the queue).
+            if(!Items.Contains(item))return;
+            DiagnosticLog.Write("download-remove-started",new{item.Id,DeleteFiles=deleteFiles,Files=item.Files.Count,ManagerAvailable=managers.ContainsKey(item.Id)});
             pendingResume.Remove(item.Id);
             CancelMetadataWatch(item.Id);
+            phase="stop";
             if(managers.TryGetValue(item.Id,out var manager)){await StopManager(manager);item.Paused=true;SnapshotFiles(item,manager);item.DownloadRate=0;item.UploadRate=0;item.Remaining="";item.PeersText="";item.Indeterminate=false;item.Status="На паузе";await Engine.RemoveAsync(manager);managers.Remove(item.Id);meters.Remove(item.Id);}
             if(deleteFiles)
             {
-                var paths=item.Files.SelectMany(f=>new[]{f.FullPath,f.IncompletePath}).Where(p=>p.Length>0).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+                phase="files";
+                var paths=item.Files.SelectMany(f=>new[]{f.FullPath,f.IncompletePath}).Where(p=>!string.IsNullOrWhiteSpace(p)).Select(Path.GetFullPath).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+                var shared=Items.Where(x=>x!=item).SelectMany(x=>x.Files).SelectMany(f=>new[]{f.FullPath,f.IncompletePath}).Where(p=>!string.IsNullOrWhiteSpace(p)).Select(Path.GetFullPath).ToHashSet(StringComparer.OrdinalIgnoreCase);
                 foreach(var path in paths)
                 {
-                    DownloadFiles.ValidatePath(item.Folder,path);
-                    if(Items.Where(x=>x!=item).SelectMany(x=>x.Files).Any(f=>string.Equals(f.FullPath,path,StringComparison.OrdinalIgnoreCase)||string.Equals(f.IncompletePath,path,StringComparison.OrdinalIgnoreCase)))throw new IOException("Файл используется другой задачей. Сначала убери её из очереди.");
+                    if(shared.Contains(path))throw new IOException("Файл используется другой задачей. Сначала убери её из очереди.");
                 }
-                foreach(var path in paths)File.Delete(path);
-                foreach(var path in paths)DownloadFiles.RemoveEmptyParents(item.Folder,path);
+                await DownloadFiles.DeleteAsync(item.Folder,paths,lifetime.Token);
             }
+            phase="save";
             Items.Remove(item);diagnosticStates.Remove(item.Id);spaceChecks.Remove(item.Id);lastSpaceChecks.Remove(item.Id);completionNotified.Remove(item.Id);errorNotified.Remove(item.Id);Save();await ReleaseIdleEngine();
+            DiagnosticLog.Write("download-remove-completed",new{item.Id,DeleteFiles=deleteFiles,Files=item.Files.Count});
         }
-        catch{Save();await ReleaseIdleEngine();throw;}
+        catch(Exception error)
+        {
+            var deleted=error is DownloadFileDeletionException deletion?deletion.DeletedFiles:0;
+            DiagnosticLog.Write("download-remove-failed",new{item.Id,DeleteFiles=deleteFiles,Phase=phase,ErrorType=error.GetType().Name,HResult=error.InnerException?.HResult??error.HResult,DeletedFiles=deleted,Files=item.Files.Count});
+            if(Items.Contains(item))
+            {
+                item.Status=deleteFiles?"Не удалось удалить файлы":"Не удалось удалить загрузку";
+                item.Hint=(deleted>0?"Удалена часть файлов. ":"")+error.Message;
+            }
+            Save();await ReleaseIdleEngine();throw;
+        }
         finally{item.Busy=false;item.Refresh();gate.Release();}
     }
     public void Update()
