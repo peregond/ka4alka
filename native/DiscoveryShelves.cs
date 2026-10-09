@@ -42,11 +42,11 @@ public partial class MainWindow
     };
     DiscoveryShelfView AddDiscoveryShelf(Panel parent,DiscoveryShelfKind kind)
     {
-        var sectionPanel=new StackPanel{Name="Discovery"+kind+"Section",Margin=new(0,0,0,18)};parent.Children.Add(sectionPanel);
+        var sectionPanel=new StackPanel{Name="Discovery"+kind+"Section",Margin=new(0,0,0,20)};parent.Children.Add(sectionPanel);
         var header=new DockPanel{Margin=new(0,0,8,12)};sectionPanel.Children.Add(header);
         var title=DiscoveryShelfTitle(kind);
-        var all=ActionButton("Все","IconChevron",()=>OpenDiscoveryShelf(kind));all.FontSize=11;all.Padding=new(5);all.Margin=new(0);all.MinHeight=26;all.SetResourceReference(Control.ForegroundProperty,"Accent");all.ToolTip="Показать: "+title;AutomationProperties.SetName(all,"Все: "+title);DockPanel.SetDock(all,Dock.Right);header.Children.Add(all);
-        var heading=Text(title,22);heading.Name="Discovery"+kind+"Heading";heading.FontWeight=FontWeights.SemiBold;heading.Margin=new(0);header.Children.Add(heading);
+        var all=ActionButton("Все","IconChevron",()=>OpenDiscoveryShelf(kind));all.FontSize=12;all.Padding=new(5);all.Margin=new(0);all.MinHeight=26;all.SetResourceReference(Control.ForegroundProperty,"Accent");all.ToolTip="Показать: "+title;AutomationProperties.SetName(all,"Все: "+title);DockPanel.SetDock(all,Dock.Right);header.Children.Add(all);
+        var heading=Text(title,20);heading.Name="Discovery"+kind+"Heading";heading.FontWeight=FontWeights.SemiBold;heading.Margin=new(0);header.Children.Add(heading);
         var state=Text("Загружаем подборку…",12,true);state.Margin=new(0,4,8,12);sectionPanel.Children.Add(state);
         var row=new ContentControl{Name="Discovery"+kind+"Row",ContentTemplate=(DataTemplate)FindResource("MediaRow"),Margin=new(0,0,0,0)};sectionPanel.Children.Add(row);
         return new(row,state,all);
