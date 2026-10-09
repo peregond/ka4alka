@@ -110,8 +110,8 @@ public partial class MainWindow
             CheckQualityInk();
             var filter=QualityFilter();
             if(filter.SelectedItem?.ToString()!="Full HD")throw new Exception(stage+": selected Full HD filter was lost.");
-            if(!filter.IsVisible||filter.ActualWidth<=0)throw new Exception(stage+": quality filter is not visible.");
-            var buttons=VisualElements<Button>(Body).Where(x=>x.Tag is SourceEntry).ToArray();
+            if(FindVisual<RadioButton>(Body,x=>x.IsChecked==true&&Equals(x.Tag,"Full HD")&&x.IsVisible&&x.ActualWidth>0)==null)throw new Exception(stage+": the Full HD quality segment is not visible and selected.");
+            var buttons=VisualElements<Button>(Body).Where(x=>x.Tag is SourceEntry&&x.Name!="DetailDownload").ToArray();
             if(buttons.Length!=1||buttons[0].Tag is not SourceEntry entry||entry.Quality!="Full HD")throw new Exception(stage+": quality filter did not leave exactly the Full HD release.");
             if(!buttons[0].IsVisible||buttons[0].ActualWidth<=0)throw new Exception(stage+": download action is not visible.");
         }
@@ -129,7 +129,7 @@ public partial class MainWindow
         }
         async Task RevealDownload(string name)
         {
-            var button=FindVisual<Button>(Body,x=>x.Tag is SourceEntry)??throw new Exception("Download button is missing.");
+            var button=FindVisual<Button>(Body,x=>x.Tag is SourceEntry&&x.Name!="DetailDownload")??throw new Exception("Download button is missing.");
             button.BringIntoView();await Settle();
             var origin=button.TransformToAncestor(Body).Transform(new Point());
             if(origin.X<-.5||origin.X+button.ActualWidth>Body.ActualWidth+1||origin.Y+button.ActualHeight<0||origin.Y>Body.ActualHeight)
@@ -268,7 +268,7 @@ public partial class MainWindow
             section="Сериалы";current=show;Render();await Settle();
             var seasonFilter=FindVisual<ComboBox>(Body,x=>AutomationProperties.GetName(x)=="Раздачи: Сезон")??throw new Exception("Series season filter is missing.");
             seasonFilter.SelectedItem="2 сезон";await Settle();
-            var shownReleases=VisualElements<Button>(Body).Where(x=>x.IsVisible&&x.Tag is SourceEntry).Select(x=>(SourceEntry)x.Tag).ToArray();
+            var shownReleases=VisualElements<Button>(Body).Where(x=>x.IsVisible&&x.Tag is SourceEntry&&x.Name!="DetailDownload").Select(x=>(SourceEntry)x.Tag).ToArray();
             if(shownReleases.Length!=1||shownReleases[0].Id!="series-s02")throw new Exception("Series season filter selected the wrong episode.");
             FindVisual<ScrollViewer>(Body,_=>true)?.ScrollToTop();await Settle();Shot("series-season-filter");
             await Size(1760,950);section="Загрузки";current=null;Render();await Settle();
