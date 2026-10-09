@@ -58,9 +58,9 @@ public partial class MainWindow
             var selected=items[1];liveReleases[selected.Id]=[Row("a","HDCAM 1080p"),Row("b","720p"),Row("c","1080p"),Row("d","WEBRip"),Row("e","2160p")];
             current=selected;Render();UpdateLayout();
             check(!FiltersPanel.IsVisible&&prefs.CatalogQualityHeight==1080,"opening a film hides catalog filters while retaining the selected resolution");
-            check(VisualElements<Button>(Body).Select(x=>x.Tag).OfType<SourceEntry>().Count()==3,"film detail retains its separate minimum and shows Full HD, 4K and unknown releases");
+            check(VisualElements<Button>(Body).Where(x=>x.Name!="DetailDownload").Select(x=>x.Tag).OfType<SourceEntry>().Count()==3,"film detail retains its separate minimum and shows Full HD, 4K and unknown releases");
             FindVisual<CheckBox>(Body,x=>AutomationProperties.GetName(x)=="Скрыть плохое качество")!.IsChecked=false;UpdateLayout();
-            check(VisualElements<Button>(Body).Select(x=>x.Tag).OfType<SourceEntry>().Count()==5&&VisualElements<TextBlock>(Body).Any(x=>x.Text=="Экранка"&&x.ToolTip is string tooltip&&tooltip.Contains("плохое качество")),"disabling the filter restores all releases with poor-quality tooltips");
+            check(VisualElements<Button>(Body).Where(x=>x.Name!="DetailDownload").Select(x=>x.Tag).OfType<SourceEntry>().Count()==5&&VisualElements<TextBlock>(Body).Any(x=>x.Text=="Экранка"&&x.ToolTip is string tooltip&&tooltip.Contains("плохое качество")),"disabling the filter restores all releases with poor-quality tooltips");
             prefs.HidePoorQuality=true;prefs.Save();downloads.Items.Add(queued);current=null;section="Загрузки";Render();UpdateLayout();
             check(downloadList?.Items.Contains(queued)==true&&VisualElements<Border>(Body).Any(x=>x.IsVisible&&AutomationProperties.GetName(x)=="Качество загрузки"&&Equals(x.ToolTip,"Экранка")),"existing poor-quality downloads stay in the queue and carry a visible badge");
             foreach(var width in new[]{360d,510d,1280d})

@@ -115,7 +115,7 @@ public partial class MainWindow
         qualitySort.SelectedItem="Выше качество";UpdateLayout();
         Check(VisualElements<Button>(Body).Where(x=>x.Name!="DetailDownload").Select(x=>x.Tag).OfType<SourceEntry>().Select(x=>x.Quality).SequenceEqual(["4K","Full HD","HD Ready"]),"friendly quality names still sort by actual resolution");
         qualityBox.SelectedItem="Full HD";UpdateLayout();
-        Check(VisualElements<Button>(Body).Select(x=>x.Tag).OfType<SourceEntry>().Select(x=>x.Quality).SequenceEqual(["Full HD"]),"Full HD filter keeps only matching releases");
+        Check(VisualElements<Button>(Body).Where(x=>x.Name!="DetailDownload").Select(x=>x.Tag).OfType<SourceEntry>().Select(x=>x.Quality).SequenceEqual(["Full HD"]),"Full HD filter keeps only matching releases");
         var savedFilm=FindVisual<Button>(RootGrid,x=>AutomationProperties.GetName(x)=="Сохранено")??FindVisual<Button>(Body,x=>AutomationProperties.GetName(x)=="Сохранено");
         Check(savedFilm!=null&&VisualElements<System.Windows.Shapes.Path>(savedFilm).Any(x=>x.Fill!=null),"saved movie detail heart is filled too");
         await QualitySmoke(Check);

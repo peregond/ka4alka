@@ -141,6 +141,15 @@ public partial class MainWindow
         updateStatusLabel = Text(updateStatus,13);updateStatusLabel.Margin=new(0,3,0,0);updateStatusLabel.SetResourceReference(TextBlock.ForegroundProperty,"Accent");info.Children.Add(updateStatusLabel);
         updateActionButton=new Button {Name="SettingsUpdateAction",Height=48,MinHeight=48,Margin=new(16,0,0,0),VerticalAlignment=VerticalAlignment.Center};Grid.SetColumn(updateActionButton,2);head.Children.Add(updateActionButton);
         updateActionButton.Click+=async(_,_)=>await UpdateActionAsync();
+        // On a narrow card the action drops below the version and status instead of squeezing them.
+        head.SizeChanged+=(_,e)=>
+        {
+            if(!e.WidthChanged)return;var narrowHead=e.NewSize.Width<420;
+            if(narrowHead&&head.RowDefinitions.Count==0){head.RowDefinitions.Add(new());head.RowDefinitions.Add(new());}
+            if(!narrowHead)head.RowDefinitions.Clear();
+            Grid.SetRow(updateActionButton,narrowHead?1:0);Grid.SetColumn(updateActionButton,narrowHead?0:2);Grid.SetColumnSpan(updateActionButton,narrowHead?3:1);
+            updateActionButton.Margin=narrowHead?new(0,14,0,0):new(16,0,0,0);updateActionButton.HorizontalAlignment=narrowHead?HorizontalAlignment.Left:HorizontalAlignment.Stretch;
+        };
         panel.Children.Add(head);
         Toggle("Проверять обновления при запуске", prefs.CheckForUpdates, v => prefs.CheckForUpdates = v);
         Toggle("Автоматически скачивать и устанавливать при выходе", prefs.AutoUpdate, v => prefs.AutoUpdate = v);

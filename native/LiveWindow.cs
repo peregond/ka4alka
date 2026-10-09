@@ -211,7 +211,7 @@ public partial class MainWindow
     void ReturnFiltersPanel()
     {
         if(ReferenceEquals(FiltersPanel.Parent,HeaderArea))return;
-        (FiltersPanel.Parent as Panel)?.Children.Remove(FiltersPanel);HeaderArea.Children.Add(FiltersPanel);FiltersPanel.Margin=new(0,12,0,0);
+        (FiltersPanel.Parent as Panel)?.Children.Remove(FiltersPanel);HeaderArea.Children.Add(FiltersPanel);FiltersPanel.Margin=new(0,compactHeight?6:12,0,0);
     }
     void AddCatalogFilters(Panel target,Panel? sortTarget=null)
     {

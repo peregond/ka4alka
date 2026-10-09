@@ -113,8 +113,8 @@ public partial class MainWindow
         }
         Divider(appearance);
         // Lite mode drops decorative backdrops; posters, catalog and every function stay.
-        var liteTitle=new StackPanel{Orientation=Orientation.Horizontal};liteTitle.Children.Add(SwitchTitle("Лёгкий режим"));
-        var litePill=new Border{CornerRadius=new(999),Padding=new(9,2,9,2),Margin=new(10,0,0,0),VerticalAlignment=VerticalAlignment.Center,Child=new TextBlock{Text="Для слабых ноутбуков",FontSize=11,FontWeight=FontWeights.SemiBold}};litePill.SetResourceReference(Border.BackgroundProperty,"Raised");((TextBlock)litePill.Child).SetResourceReference(TextBlock.ForegroundProperty,"Muted");liteTitle.Children.Add(litePill);
+        var liteTitle=new WrapPanel();liteTitle.Children.Add(SwitchTitle("Лёгкий режим"));
+        var litePill=new Border{CornerRadius=new(999),Padding=new(9,2,9,2),Margin=new(10,2,0,2),VerticalAlignment=VerticalAlignment.Center,Child=new TextBlock{Text="Для слабых ноутбуков",FontSize=11,FontWeight=FontWeights.SemiBold}};litePill.SetResourceReference(Border.BackgroundProperty,"Raised");((TextBlock)litePill.Child).SetResourceReference(TextBlock.ForegroundProperty,"Muted");liteTitle.Children.Add(litePill);
         var liteContent=new StackPanel();liteContent.Children.Add(liteTitle);var liteHint=Hint("Без фоновых обложек и лишних эффектов. Постеры и каталог остаются на месте.");liteHint.Margin=new(0,4,0,0);liteContent.Children.Add(liteHint);
         var lite=new CheckBox{Name="SettingsLiteMode",Style=(Style)FindResource("SettingsSwitch"),Content=liteContent,IsChecked=prefs.LiteMode,VerticalContentAlignment=VerticalAlignment.Center};
         AutomationProperties.SetName(lite,"Лёгкий режим");appearance.Children.Add(lite);
@@ -147,6 +147,15 @@ public partial class MainWindow
         var folderGlyph=new System.Windows.Shapes.Path{Data=(Geometry)FindResource("IconFolder"),Width=18,Height=18,Stretch=Stretch.Uniform,StrokeThickness=1.8,StrokeLineJoin=PenLineJoin.Round,Margin=new(0,0,12,0),VerticalAlignment=VerticalAlignment.Center};folderGlyph.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty,"Subtle");
         var folderBox=new DockPanel();DockPanel.SetDock(folderGlyph,Dock.Left);folderBox.Children.Add(folderGlyph);folderBox.Children.Add(folder);
         var folderFrame=new Border{Child=folderBox,CornerRadius=new(12),Padding=new(14,0,14,0),Height=48,Margin=new(0,0,10,0),BorderThickness=new(1)};folderFrame.SetResourceReference(Border.BackgroundProperty,"PanelAlt");folderFrame.SetResourceReference(Border.BorderBrushProperty,"EdgeSoft");folderRow.Children.Add(folderFrame);
+        folderRow.SizeChanged+=(_,e)=>
+        {
+            if(!e.WidthChanged)return;var narrowRow=e.NewSize.Width<440;
+            if(narrowRow&&folderRow.RowDefinitions.Count==0){folderRow.RowDefinitions.Add(new());folderRow.RowDefinitions.Add(new());}
+            if(!narrowRow)folderRow.RowDefinitions.Clear();
+            Grid.SetColumnSpan(folderFrame,narrowRow?3:1);folderFrame.Margin=narrowRow?new(0,0,0,10):new(0,0,10,0);
+            foreach(var child in folderRow.Children.OfType<Button>()){Grid.SetRow(child,narrowRow?1:0);}
+            if(folderRow.Children.OfType<Button>().ToArray() is [var change,var open]){Grid.SetColumn(change,narrowRow?0:1);Grid.SetColumn(open,narrowRow?1:2);}
+        };
         files.Children.Add(Hint("Качалка создаёт в выбранном месте папку Ka4alka — все загрузки попадают туда. Уже добавленные загрузки сохраняют прежнюю папку."));
         var folderNotice=Notice(files);
         var changeFolder=Button("Изменить",()=>
