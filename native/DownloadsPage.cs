@@ -171,6 +171,8 @@ public partial class MainWindow
         var text=new TextBlock{Text="Перетащите .torrent-файл сюда или вставьте magnet-ссылку",FontSize=14,VerticalAlignment=VerticalAlignment.Center,TextWrapping=TextWrapping.Wrap,MaxWidth=420};text.SetResourceReference(TextBlock.ForegroundProperty,"Muted");Grid.SetColumn(text,1);row.Children.Add(text);
         var key=new Border{CornerRadius=new(7),BorderThickness=new(1),Padding=new(7,4,7,4),Margin=new(16,0,0,0),VerticalAlignment=VerticalAlignment.Center,Child=new TextBlock{Text="Ctrl V",FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=11}};key.SetResourceReference(Border.BackgroundProperty,"Raised");key.SetResourceReference(Border.BorderBrushProperty,"Edge");((TextBlock)key.Child).SetResourceReference(TextBlock.ForegroundProperty,"Muted");Grid.SetColumn(key,2);row.Children.Add(key);
         var host=new Grid();host.Children.Add(dash);host.Children.Add(row);zone.Child=host;
+        // On very narrow windows the shortcut hint goes away so the sentence keeps enough room.
+        zone.SizeChanged+=(_,e)=>{var small=e.NewSize.Width<340;key.Visibility=small?Visibility.Collapsed:Visibility.Visible;zone.Padding=small?new(14,14,14,14):new(28,20,28,20);disc.Margin=small?new(0,0,10,0):new(0,0,16,0);};
         AutomationProperties.SetName(zone,"Перетащите .torrent-файл или вставьте magnet-ссылку");
         // The window handles the actual drop; the zone only shows the target while the pointer is over it.
         return zone;
