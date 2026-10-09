@@ -55,11 +55,12 @@ internal sealed class CoverViewport(Window owner):IDisposable
     internal Position Measure(Image image)=>entries.TryGetValue(image,out var entry)?Measure(entry):default;
     static FrameworkElement? Anchor(Image image)
     {
-        // An Image with no Source can arrange to 0 × 0 even inside a sized
-        // poster. Measuring that empty bitmap would prevent the very request
-        // which gives it dimensions. Use the visible poster container until
-        // the bitmap exists, and always do so for hidden banner brush images.
-        if(image.Tag?.ToString()!="FeaturePoster"&&image.ActualWidth>0&&image.ActualHeight>0)return image;
+        // An empty Image can arrange to 0 × 0. Its allocated layout slot is
+        // expressed in the immediate parent's coordinates, and retains its
+        // own position even when that parent is a much larger scrolling Canvas.
+        if(image.Tag?.ToString()!="FeaturePoster")
+            return image.ActualWidth>0&&image.ActualHeight>0?image:VisualTreeHelper.GetParent(image) as FrameworkElement;
+        // Hidden banner brush images deliberately have no useful layout slot.
         for(DependencyObject? parent=VisualTreeHelper.GetParent(image);parent!=null;parent=VisualTreeHelper.GetParent(parent))
             if(parent is FrameworkElement element&&element.ActualWidth>0&&element.ActualHeight>0)return element;
         return null;
@@ -75,15 +76,18 @@ internal sealed class CoverViewport(Window owner):IDisposable
             var updated=Anchor(entry.Image);
             if(updated!=anchor){if(anchor!=null&&anchor!=entry.Image)anchor.SizeChanged-=Resized;entry.Anchor=anchor=updated;if(anchor!=null&&anchor!=entry.Image)anchor.SizeChanged+=Resized;}
         }
-        if(anchor==null||!anchor.IsVisible||anchor.ActualWidth<=0||anchor.ActualHeight<=0)return default;
+        if(anchor==null||!anchor.IsVisible)return default;
+        var localBounds=anchor==entry.Image||entry.Image.Tag?.ToString()=="FeaturePoster"
+            ?new Rect(new Point(),anchor.RenderSize):LayoutInformation.GetLayoutSlot(entry.Image);
+        if(localBounds.IsEmpty||localBounds.Width<=0||localBounds.Height<=0)return default;
         var visible=true;var near=true;double distance=0;
-        var margin=Math.Min(360,anchor.ActualHeight+16);
+        var margin=Math.Min(360,localBounds.Height+16);
         try
         {
             void Clip(Visual visual,double width,double height)
             {
                 if(width<=0||height<=0){visible=false;near=false;return;}
-                var bounds=anchor.TransformToAncestor(visual).TransformBounds(new Rect(new Point(),anchor.RenderSize));
+                var bounds=anchor.TransformToAncestor(visual).TransformBounds(localBounds);
                 visible&=bounds.IntersectsWith(new Rect(0,0,width,height));
                 near&=bounds.IntersectsWith(new Rect(0,-margin,width,height+2*margin));
                 distance=Math.Max(distance,Math.Max(0,Math.Max(-bounds.Bottom,bounds.Top-height)));

@@ -15,6 +15,9 @@ namespace Kachalka;
 public partial class MainWindow
 {
     [DllImport("user32.dll")] static extern void keybd_event(byte key,byte scan,uint flags,nuint extra);
+    [DllImport("user32.dll")] static extern nint GetForegroundWindow();
+    [DllImport("user32.dll")] static extern nint WindowFromPoint(DownloadSmokePoint point);
+    [DllImport("user32.dll")] static extern nint GetAncestor(nint window,uint flags);
 
     public async Task InterfacePolishSmokeTest(string output)
     {
@@ -49,6 +52,25 @@ public partial class MainWindow
                 Check(InterfacePalette.For(light).All(pair=>pair.Value.IsFrozen&&ReferenceEquals(FindResource(pair.Key),pair.Value)),"Theme reuses its frozen palette: "+(light?"light":"dark"));
                 CheckCards(light?"light":"dark");Shot("interface-"+(light?"light":"dark"));
             }
+            // A RenderTargetBitmap can capture a viewport larger than the actual
+            // GitHub runner desktop. Native input cannot reach that viewport:
+            // SetCursorPos succeeds while Windows clamps off-screen coordinates.
+            // Keep the wide captures, then fit real input to the physical monitor.
+            var handle=new WindowInteropHelper(this).Handle;
+            var monitorInfo=new MonitorInfo{Size=(uint)Marshal.SizeOf<MonitorInfo>()};
+            Check(GetMonitorInfo(MonitorFromWindow(handle,MonitorDefaultNearest),ref monitorInfo),"Native input monitor exposes its physical work area.");
+            var dpi=VisualTreeHelper.GetDpi(this);
+            var nativeFit=WindowSizing.FitPixels(monitorInfo.Work.Width,monitorInfo.Work.Height,dpi.DpiScaleX,dpi.DpiScaleY);
+            var wideTopLeft=SearchSubmitButton.PointToScreen(new Point());
+            var wideBottomRight=SearchSubmitButton.PointToScreen(new Point(SearchSubmitButton.ActualWidth,SearchSubmitButton.ActualHeight));
+            File.WriteAllText(Path.Combine(output,"native-pointer-layout.json"),JsonSerializer.Serialize(new
+            {
+                RequestedViewport=new{Width,Height},PhysicalWorkArea=monitorInfo.Work,
+                WideButtonBounds=new{Left=wideTopLeft.X,Top=wideTopLeft.Y,Right=wideBottomRight.X,Bottom=wideBottomRight.Y},
+                InputViewport=new{Width=Math.Min(1500,nativeFit.Width),Height=Math.Min(920,nativeFit.Height)}
+            },new JsonSerializerOptions{WriteIndented=true,IncludeFields=true}));
+            await Size(Math.Min(1500,nativeFit.Width),Math.Min(920,nativeFit.Height));
+            PlaceWithinWorkArea(handle,monitorInfo.Work,true);await Settle();
             prefs.Light=false;ApplyTheme();Render();await Settle();
             SetForegroundWindow(new WindowInteropHelper(this).Handle);await ClickWithMouse(Search);SearchSubmitButton.Focus();await Settle();
             keybd_event(0x11,0,0,0);keybd_event(0x4B,0,0,0);
@@ -65,7 +87,23 @@ public partial class MainWindow
             var hoverPoint=SearchSubmitButton.PointToScreen(new Point(SearchSubmitButton.ActualWidth/2,SearchSubmitButton.ActualHeight/2));
             Check(SetCursorPos((int)hoverPoint.X,(int)hoverPoint.Y),"Native pointer can reach the primary search action.");Mouse.Synchronize();await Settle();
             var frame=SearchSubmitButton.Template.FindName("Frame",SearchSubmitButton) as Border;
-            Check(SearchSubmitButton.IsMouseOver&&frame!=null&&ReferenceEquals(frame.Background,FindResource("PrimaryHover")),"Native pointer activates the primary button hover state.");
+            var gotCursor=GetCursorPos(out var actualCursor);
+            var buttonTopLeft=SearchSubmitButton.PointToScreen(new Point());
+            var buttonBottomRight=SearchSubmitButton.PointToScreen(new Point(SearchSubmitButton.ActualWidth,SearchSubmitButton.ActualHeight));
+            var pointerEvidence=new
+            {
+                Requested=new{X=(int)hoverPoint.X,Y=(int)hoverPoint.Y},Actual=new{actualCursor.X,actualCursor.Y},GotCursor=gotCursor,
+                PhysicalWorkArea=monitorInfo.Work,ButtonBounds=new{Left=buttonTopLeft.X,Top=buttonTopLeft.Y,Right=buttonBottomRight.X,Bottom=buttonBottomRight.Y},
+                ForegroundIsApp=GetForegroundWindow()==handle,PointerRootIsApp=GetAncestor(WindowFromPoint(actualCursor),2)==handle,
+                SearchSubmitButton.IsMouseOver,MouseTarget=Mouse.DirectlyOver?.GetType().Name,
+                FrameBrush=frame?.Background?.ToString(),ExpectedBrush=((Brush)FindResource("PrimaryHover")).ToString(),
+                BrushIsShared=frame!=null&&ReferenceEquals(frame.Background,FindResource("PrimaryHover"))
+            };
+            var pointerJson=JsonSerializer.Serialize(pointerEvidence,new JsonSerializerOptions{WriteIndented=true,IncludeFields=true});
+            File.WriteAllText(Path.Combine(output,"native-pointer.json"),pointerJson);
+            Check(gotCursor&&Math.Abs(actualCursor.X-(int)hoverPoint.X)<=1&&Math.Abs(actualCursor.Y-(int)hoverPoint.Y)<=1,"Native cursor reaches the actual requested button center. "+pointerJson);
+            Check(pointerEvidence.ForegroundIsApp&&pointerEvidence.PointerRootIsApp&&buttonTopLeft.X>=monitorInfo.Work.Left&&buttonBottomRight.X<=monitorInfo.Work.Right&&buttonTopLeft.Y>=monitorInfo.Work.Top&&buttonBottomRight.Y<=monitorInfo.Work.Bottom,"Primary action is physically visible and receives native input in the foreground app. "+pointerJson);
+            Check(SearchSubmitButton.IsMouseOver&&frame!=null&&pointerEvidence.BrushIsShared,"Native pointer activates the primary button hover state. "+pointerJson);
             SearchSubmitButton.IsEnabled=false;await Settle();
             Check(!SearchSubmitButton.IsEnabled&&frame is {Opacity:.55},"Disabled action remains legible and cannot be activated.");SearchSubmitButton.IsEnabled=true;
             peopleSearchProvider=(_,_)=>Task.FromResult<IReadOnlyList<CinemaPerson>>([]);
@@ -120,7 +158,7 @@ public partial class MainWindow
             Search.Clear();searchDelay.Stop();submittedQuery="";searchCategory="";CancelPeopleSearch();liveKey=CurrentCatalogKey;
             await Size(1500,920);prefs.Light=false;ApplyTheme();Render();await Settle();
             foreach(var scale in new[]{1.2,1.25,1.5,2})Shot("interface-dark-"+(int)(scale*100),scale);
-            File.WriteAllText(Path.Combine(output,"checks.json"),JsonSerializer.Serialize(new{Checks=checks,NativeKeyboard=true,NativeHover=true,FrozenSharedPalette=true,TitleLines=2,NoEffects=true,Viewports=new[]{360,510,720,1500}},new JsonSerializerOptions{WriteIndented=true}));
+            File.WriteAllText(Path.Combine(output,"checks.json"),JsonSerializer.Serialize(new{Checks=checks,NativeKeyboard=true,NativeHover=true,NativePointer=pointerEvidence,FrozenSharedPalette=true,TitleLines=2,NoEffects=true,Viewports=new[]{360,510,720,1500}},new JsonSerializerOptions{WriteIndented=true,IncludeFields=true}));
         }
         catch(Exception error){File.WriteAllText(Path.Combine(output,"error.txt"),error.ToString());throw;}
         finally

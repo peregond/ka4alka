@@ -236,8 +236,9 @@ public partial class MainWindow
     }
     void RenderCatalogKeepingPosition()
     {
-        var offset=FindVisual<ScrollViewer>(Body,_=>true)?.VerticalOffset??0;
-        Render();UpdateLayout();FindVisual<ScrollViewer>(Body,_=>true)?.ScrollToVerticalOffset(offset);
+        // Render retains the visible title through CatalogNavigation. Replaying
+        // the old pixel offset would undo its anchor when a row is inserted.
+        Render();
     }
     async Task FetchCatalog(string key,string category,string query,int page)
     {

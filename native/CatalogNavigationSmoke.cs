@@ -41,7 +41,8 @@ public partial class MainWindow
             var button=VisualElements<Button>(viewer).FirstOrDefault(button=>button.Tag is MediaItem item&&item.Id==id&&CatalogAnchorScope(button,viewer)==expected.Scope)??throw new Exception(message+": anchor disappeared.");
             var top=button.TransformToAncestor(viewer).Transform(new Point()).Y;
             var expectedTop=Math.Clamp(expected.Top,-Math.Max(0,button.ActualHeight-24),Math.Max(0,viewer.ViewportHeight-24));
-            Check(Math.Abs(top-expectedTop)<2,message+" (title "+id+", delta "+Math.Round(top-expectedTop,2)+")");
+            Check(Math.Abs(top-expectedTop)<2,message+" (title "+id+", delta "+Math.Round(top-expectedTop,2)+
+                $", offset {viewer.VerticalOffset:F1}, saved offset {expected.Offset:F1}, extent {viewer.ExtentHeight:F1}, pending {navigationPendingPosition?.ItemId})");
         }
         void Shot(string name)
         {
@@ -127,7 +128,7 @@ public partial class MainWindow
         liveLoading=false;liveItems=previousItems;Render();await Settle();Position(beforeRefresh,"asynchronous search results restore the title after the interim empty list");
         var beforeInsertionOffset=Scroll().VerticalOffset;var inserted=Enumerable.Range(1,catalogColumns).Select(index=>films[0] with{Id=-939900-index,Title="Новая история после фонового обновления "+index}).ToArray();
         foreach(var additional in inserted)cardMetadata[additional.Id]=Task.FromResult(additional);
-        liveItems=films.Take(40).Concat(inserted).Concat(films.Skip(40).Take(40-inserted.Length)).ToArray();Render();await Settle();
+        liveItems=films.Take(40).Concat(inserted).Concat(films.Skip(40).Take(40-inserted.Length)).ToArray();RenderCatalogKeepingPosition();await Settle();
         Position(beforeRefresh,"a background catalog refresh inserting a title preserves the current title anchor");
         Check(Scroll().VerticalOffset>beforeInsertionOffset+100,"the refresh inserts a complete poster row and really moves the restored pixel offset");
 

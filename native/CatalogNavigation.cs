@@ -39,7 +39,7 @@ public partial class MainWindow
     {
         RememberCatalogPosition();
         navigationRestore?.Abort();navigationRestore=null;
-        if(navigationScroll!=null)navigationScroll.ScrollChanged-=CatalogNavigationScrolled;
+        if(navigationScroll!=null){navigationScroll.ScrollChanged-=CatalogNavigationScrolled;navigationScroll.Loaded-=CatalogNavigationLoaded;}
         navigationScroll=null;navigationPendingPosition=null;
     }
 
@@ -58,6 +58,7 @@ public partial class MainWindow
         navigationScroll=FindVisual<ScrollViewer>(Body,scroll=>scroll.VerticalScrollBarVisibility!=ScrollBarVisibility.Disabled);
         if(navigationScroll==null)return;
         navigationScroll.ScrollChanged+=CatalogNavigationScrolled;
+        navigationScroll.Loaded+=CatalogNavigationLoaded;
         if(catalogPositions.TryGetValue(next,out var saved))navigationPendingPosition=saved;
         ScheduleCatalogPositionRestore();
     }
@@ -83,6 +84,7 @@ public partial class MainWindow
         if(saved==null||navigationScroll==null)return;
         navigationPendingPosition=saved;ScheduleCatalogPositionRestore();
     }
+    void CatalogNavigationLoaded(object sender,RoutedEventArgs args)=>ScheduleCatalogPositionRestore();
 
     void CatalogNavigationScrolled(object sender,ScrollChangedEventArgs args)
     {
@@ -136,30 +138,44 @@ public partial class MainWindow
             navigationRestore=null;
             if(closed||!ReferenceEquals(navigationScroll,scroll)||navigationRoute!=route||!scroll.IsLoaded)return;
             if(navigationPendingPosition is not {} saved){RememberCatalogPosition();return;}
-            // Keep a previous page's anchor while an asynchronous catalog fetch
-            // temporarily renders an empty list. Its result will render again.
-            if(saved.Offset>0&&scroll.ScrollableHeight<.5&&liveLoading&&route.StartsWith("catalog|",StringComparison.Ordinal))return;
-            var target=saved.Offset;
-            if(saved.ItemId is {} id)
-            {
-                var anchor=VisualElements<Button>(scroll).FirstOrDefault(button=>button.Tag is MediaItem item&&item.Id==id&&
-                    button.IsVisible&&button.ActualHeight>0&&CatalogAnchorScope(button,scroll)==saved.Scope);
-                if(anchor==null&&liveLoading&&route.StartsWith("catalog|",StringComparison.Ordinal))return;
-                if(anchor==null&&route.StartsWith("person|",StringComparison.Ordinal)&&personProfileLoading)return;
-                if(anchor!=null)
-                {
-                    var top=anchor.TransformToAncestor(scroll).Transform(new Point()).Y;
-                    var visibleTop=Math.Clamp(saved.Top,-Math.Max(0,anchor.ActualHeight-24),Math.Max(0,scroll.ViewportHeight-24));
-                    target=scroll.VerticalOffset+top-visibleTop;
-                }
-            }
+            if(!TryCatalogRestoreTarget(scroll,route,saved,out var target))return;
             navigationApplying=true;
-            try{scroll.ScrollToVerticalOffset(Math.Clamp(target,0,scroll.ScrollableHeight));}
-            finally{navigationApplying=false;navigationPendingPosition=null;}
-            // ScrollToVerticalOffset is applied during the following layout;
-            // recording immediately would replace the anchor with the old top.
-            Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle,new Action(()=>
-            {if(ReferenceEquals(navigationScroll,scroll)&&navigationRoute==route)RememberCatalogPosition();}));
+            try{scroll.ScrollToVerticalOffset(target);}
+            finally{navigationApplying=false;}
+            // WPF applies the scroll command on a following layout. Keep the
+            // title anchor until that command and the new extent have settled;
+            // an early zero extent must not replace it with the page's top.
+            navigationRestore=Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle,new Action(()=>
+            {
+                navigationRestore=null;
+                if(closed||!ReferenceEquals(navigationScroll,scroll)||navigationRoute!=route||!ReferenceEquals(navigationPendingPosition,saved))return;
+                if(!TryCatalogRestoreTarget(scroll,route,saved,out var settledTarget))return;
+                if(Math.Abs(scroll.VerticalOffset-settledTarget)>.5){ScheduleCatalogPositionRestore();return;}
+                navigationPendingPosition=null;RememberCatalogPosition();
+            }));
         }));
+    }
+
+    bool TryCatalogRestoreTarget(ScrollViewer scroll,string route,CatalogScrollPosition saved,out double target)
+    {
+        target=saved.Offset;
+        if(!scroll.IsLoaded||!scroll.IsMeasureValid||!scroll.IsArrangeValid||scroll.ViewportHeight<=0)return false;
+        // Keep a previous page's anchor while an asynchronous catalog fetch
+        // temporarily renders an empty list. Its result will render again.
+        if(saved.Offset>0&&scroll.ScrollableHeight<.5&&liveLoading&&route.StartsWith("catalog|",StringComparison.Ordinal))return false;
+        if(saved.ItemId is {} id)
+        {
+            var anchor=VisualElements<Button>(scroll).FirstOrDefault(button=>button.Tag is MediaItem item&&item.Id==id&&
+                button.IsVisible&&button.ActualHeight>0&&CatalogAnchorScope(button,scroll)==saved.Scope);
+            if(anchor==null&&liveLoading&&route.StartsWith("catalog|",StringComparison.Ordinal))return false;
+            if(anchor==null&&route.StartsWith("person|",StringComparison.Ordinal)&&personProfileLoading)return false;
+            if(anchor!=null)
+            {
+                var top=anchor.TransformToAncestor(scroll).Transform(new Point()).Y;
+                var visibleTop=Math.Clamp(saved.Top,-Math.Max(0,anchor.ActualHeight-24),Math.Max(0,scroll.ViewportHeight-24));
+                target=scroll.VerticalOffset+top-visibleTop;
+            }
+        }
+        target=Math.Clamp(target,0,scroll.ScrollableHeight);return true;
     }
 }
