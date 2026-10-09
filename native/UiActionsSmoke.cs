@@ -51,13 +51,14 @@ public partial class MainWindow
                 owner.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));Check(owner.ContextMenu?.IsOpen==true,label+": keyboard action failed to open.");
                 owner.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));Check(owner.ContextMenu?.IsOpen==false,label+": keyboard action failed to close.");
             }
-            var banner=discoveryHero?.Children.OfType<Button>().First()??throw new Exception("Feature banner is not keyboard accessible.");
+            Button About()=>FindVisual<Button>(discoveryHero!,b=>AutomationProperties.GetName(b).StartsWith("О фильме",StringComparison.Ordinal))??throw new Exception("The carousel's film action is not keyboard accessible.");
+            var banner=About();
             var featured=(MediaItem)banner.Tag;
-            await ClickWithMouse(banner,.8,.15);
-            Check(current?.Id==featured.Id&&SearchBar.IsVisible,"Clicking the banner backdrop did not open its internal media card with search retained.");
+            await ClickWithMouse(banner);
+            Check(current?.Id==featured.Id&&SearchBar.IsVisible,"Clicking the carousel's film action did not open its internal media card with search retained.");
             current=null;Render();UpdateLayout();
-            banner=discoveryHero!.Children.OfType<Button>().First();banner.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
-            Check(current?.Id==featured.Id,"Keyboard banner activation did not open the same media card.");
+            banner=About();banner.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            Check(current?.Id==featured.Id,"Keyboard activation of the carousel action did not open the same media card.");
             section="Настройки";current=null;Render();UpdateLayout();
             checkingUpdate=false;updateOffer=null;preparedUpdateJob=null;UpdateStatus("Проверка ещё не выполнялась.");
             Check(updateActionButton is {IsEnabled:true}&&Equals(updateActionButton.Content,"Проверить обновления"),"Initial update action is not Check.");
