@@ -144,7 +144,7 @@ public partial class MainWindow
             var compactReset=FindVisual<Button>(chipsScroll,button=>button.Name=="ResetActiveCatalogFilters")??throw new Exception("Compact filter reset is missing.");
             var resetBounds=compactReset.TransformToAncestor(chipsScroll).TransformBounds(new Rect(new Point(),compactReset.RenderSize));
             Check(compactReset.IsVisible&&resetBounds.Top>=-1&&resetBounds.Bottom<=chipsScroll.ActualHeight+1,"Reset is visible at the start of the compact selected-filter viewport.");
-            Check(chipsScroll.MaxHeight==68&&chipsScroll.ActualHeight<=69&&Body.ActualHeight>40,"Many selected filters preserve catalog space at 360×360 DIP.");
+            Check(chipsScroll.MaxHeight==68&&chipsScroll.ActualHeight<=69&&Body.ActualHeight>40,$"Many selected filters preserve catalog space at 360×360 DIP (max {chipsScroll.MaxHeight}, chips {chipsScroll.ActualHeight}, body {Body.ActualHeight}, header {HeaderArea.ActualHeight}, page header {PageHeader.ActualHeight}, window {ActualWidth}x{ActualHeight}).");
             Check(chipsScroll.ScrollableHeight>0,"Many selected filters expose a real compact scrolling range.");
             var compactChips=VisualElements<Button>(chipsScroll).Where(button=>button.Name.StartsWith("ActiveFilter_",StringComparison.Ordinal)).ToArray();
             Check(compactChips.Length>=7,"Compact fixture exercises every selected filter.");

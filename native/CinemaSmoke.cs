@@ -20,7 +20,7 @@ public partial class MainWindow
         var original=new MediaItem(-70001,"Первый проверочный фильм","Фильмы","Драма",2020,"8.2","7.8","#526B69")
         {
             PageUrl=LiveCatalog.Base+"/movies/cinema-smoke-first",Description="Описание фильма",OriginalTitle="First verification film: a story to remember",
-            People=[new("Проверочный режиссёр","Режиссёры",""),person,..Enumerable.Range(2,12).Select(x=>new CinemaPerson("Участник "+x,"Актёры",""))]
+            People=[new("Проверочный режиссёр","Режиссёры",""),person,..Enumerable.Range(2,70).Select(x=>new CinemaPerson("Участник "+x,"Актёры",""))]
         };
         var next=original with{Id=-70002,Title="Второй проверочный фильм",OriginalTitle="Second verification film",PageUrl=LiveCatalog.Base+"/movies/cinema-smoke-second",Year=2022,Kinopoisk="9.1"};
         var biography="Биография участника для проверки интерфейса. "+new string('а',400);

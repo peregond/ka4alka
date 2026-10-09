@@ -109,6 +109,7 @@ public partial class MainWindow
         // threshold is expressed in those units: 200 % on a 1080p laptop leaves roughly 960 x 520.
         var gutter=narrow?(tiny?16d:24d):ActualWidth<1180?24d:32d;
         FitDownloadsToolbar();
+        ThemeButton.Visibility=ActualWidth>0&&ActualWidth<480?Visibility.Collapsed:Visibility.Visible;
         if(activeCatalogFilterScroll!=null)activeCatalogFilterScroll.MaxHeight=shortView?68:double.PositiveInfinity;
         if(layoutInitialized&&narrow==compactWidth&&tiny==tinyWidth&&shortView==compactHeight&&veryShort==veryCompactHeight&&narrowSearch==compactSearch&&gutter==contentGutter){UpdateFilterRail();UpdateDownloadsWidget();return;}
         layoutInitialized=true;compactWidth=narrow;tinyWidth=tiny;compactHeight=shortView;veryCompactHeight=veryShort;compactSearch=narrowSearch;contentGutter=gutter;
@@ -132,7 +133,7 @@ public partial class MainWindow
         var control=tiny?40d:shortView?44d:48d;
         AddTorrentButton.Content=IconLabel(tiny?"":narrow?"Добавить":"Добавить торрент","IconMagnet",18);
         AddTorrentButton.Padding=new Thickness(tiny?0:narrow?14:18,0,tiny?0:narrow?14:18,0);AddTorrentButton.MinHeight=control;AddTorrentButton.Height=control;AddTorrentButton.MinWidth=tiny?control:0;AddTorrentButton.Margin=new Thickness(0,0,tiny?8:12,0);
-        BackButton.Width=control;BackButton.Height=control;BackButton.Margin=new Thickness(0,0,tiny?8:12,0);ThemeButton.Width=control;ThemeButton.Height=control;ThemeButton.Visibility=ActualWidth>0&&ActualWidth<480?Visibility.Collapsed:Visibility.Visible;
+        BackButton.Width=control;BackButton.Height=control;BackButton.Margin=new Thickness(0,0,tiny?8:12,0);ThemeButton.Width=control;ThemeButton.Height=control;
         HeaderArea.Margin=new Thickness(gutter,veryShort?6:shortView?12:20,gutter,veryShort?6:shortView?10:20);
         CenterRegion.Margin=new Thickness(gutter,0,gutter,0);Status.Margin=new Thickness(gutter,6,gutter,8);
         SearchBar.Margin=new Thickness(0,0,tiny?8:12,0);SearchBar.Height=control;Search.MinHeight=control;
