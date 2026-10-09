@@ -20,8 +20,8 @@ public partial class MainWindow
         public required TextBlock Eyebrow,Title,People;
         public required WrapPanel Meta;
         public required StackPanel Dots;
-        public required Button Primary,About,Favorite,Previous,Next;
-        public required Border LiteCover;
+        public required Button About,Favorite,Previous,Next;
+        public required Border LiteCover,PosterHost;
         public MediaItem? Bound;
         public PropertyChangedEventHandler? Watch;
     }
@@ -39,7 +39,10 @@ public partial class MainWindow
             if(e.NewSize.Width<=0||e.NewSize.Height<=0)return;
             var clip=new RectangleGeometry(new Rect(e.NewSize),22,22);clip.Freeze();grid.Clip=clip;
         };
-        var image=new Image{Width=0,Height=0,Opacity=0,Tag="FeaturePoster"};image.Loaded+=SourceCover;image.DataContextChanged+=SourceCoverChanged;grid.Children.Add(image);
+        var image=new Image{Width=0,Height=0,Opacity=0,Tag="FeaturePoster"};
+        // Lite mode paints no backdrop, so it does not request the large feature poster at all.
+        if(!prefs.LiteMode){image.Loaded+=SourceCover;image.DataContextChanged+=SourceCoverChanged;}
+        grid.Children.Add(image);
         var backdrop=new Border();
         if(!prefs.LiteMode)
         {
@@ -61,7 +64,7 @@ public partial class MainWindow
             var fallback=new Style(typeof(Border));fallback.Setters.Add(new Setter(UIElement.VisibilityProperty,Visibility.Collapsed));
             var missing=new DataTrigger{Binding=new Binding("Source"){Source=image},Value=null};missing.Setters.Add(new Setter(UIElement.VisibilityProperty,Visibility.Visible));fallback.Triggers.Add(missing);liteCover.Style=fallback;liteCover.ClearValue(UIElement.VisibilityProperty);
         }
-        grid.Children.Add(liteCover);
+        var posterHost=new Border{Child=liteCover};grid.Children.Add(posterHost);
 
         var content=new StackPanel{Name="FeatureContent",VerticalAlignment=VerticalAlignment.Bottom,HorizontalAlignment=HorizontalAlignment.Left,MaxWidth=660,Margin=new(36,32,36,32)};grid.Children.Add(content);
         var eyebrowRow=new StackPanel{Orientation=Orientation.Horizontal,Margin=new(0,0,0,14)};
@@ -77,9 +80,9 @@ public partial class MainWindow
             if(!primary){button.SetResourceReference(Control.BackgroundProperty,"BannerAction");button.SetResourceReference(Control.BorderBrushProperty,"BannerEdge");button.Foreground=(Brush)FindResource("BannerText");}
             button.Content=IconLabel(text,icon,18);AutomationProperties.SetName(button,text);return button;
         }
-        var primaryAction=Action("Выбрать раздачу","IconDownload",true);var aboutAction=Action("О фильме","IconInfo",false);
+        var aboutAction=Action("Подробнее","IconInfo",false);
         var favorite=new Button{Style=(Style)FindResource("IconButton"),Width=52,Height=52,Margin=new(0)};favorite.SetResourceReference(Control.BackgroundProperty,"BannerAction");favorite.SetResourceReference(Control.BorderBrushProperty,"BannerEdge");favorite.Foreground=(Brush)FindResource("BannerText");
-        actions.Children.Add(primaryAction);actions.Children.Add(aboutAction);actions.Children.Add(favorite);
+        actions.Children.Add(aboutAction);actions.Children.Add(favorite);
 
         var controls=new StackPanel{Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Top,Margin=new(0,20,20,0)};grid.Children.Add(controls);
         var dots=new StackPanel{Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,14,0)};controls.Children.Add(dots);
@@ -91,17 +94,17 @@ public partial class MainWindow
         var previous=Arrow("IconChevronLeft","Предыдущий фильм");var next=Arrow("IconChevron","Следующий фильм");controls.Children.Add(previous);controls.Children.Add(next);
         if(slides.Length<2){dots.Visibility=Visibility.Collapsed;previous.Visibility=Visibility.Collapsed;next.Visibility=Visibility.Collapsed;}
 
-        var view=new FeatureCarouselView{Slides=slides,Frame=frame,Poster=image,Eyebrow=eyebrow,Title=title,People=people,Meta=meta,Dots=dots,Primary=primaryAction,About=aboutAction,Favorite=favorite,Previous=previous,Next=next,LiteCover=liteCover};
+        var view=new FeatureCarouselView{Slides=slides,Frame=frame,Poster=image,Eyebrow=eyebrow,Title=title,People=people,Meta=meta,Dots=dots,About=aboutAction,Favorite=favorite,Previous=previous,Next=next,LiteCover=liteCover,PosterHost=posterHost};
         carousel=view;
         previous.Click+=(_,_)=>ShowFeatureSlide(view,(view.Index+view.Slides.Length-1)%view.Slides.Length);
         next.Click+=(_,_)=>ShowFeatureSlide(view,(view.Index+1)%view.Slides.Length);
-        primaryAction.Click+=(_,_)=>{scrollToReleasesAfterOpen=true;OpenCard(primaryAction,new RoutedEventArgs());};
         aboutAction.Click+=OpenCard;
         favorite.Click+=(_,_)=>
         {
             if(view.Bound==null)return;ToggleSaved(view.Bound);UpdateFeatureFavorite(view);UpdateSavedCount();
         };
         frame.Unloaded+=(_,_)=>DetachFeatureWatch(view);
+        frame.Loaded+=(_,_)=>{if(view.Watch==null&&view.Bound!=null)ShowFeatureSlide(view,view.Index);};
         ShowFeatureSlide(view,0);
         return frame;
     }
@@ -118,8 +121,8 @@ public partial class MainWindow
         view.Poster.DataContext=item;if(view.LiteCover.Tag is Image lite)lite.DataContext=item;
         view.Eyebrow.Text=index==0?"В центре внимания":"Стоит посмотреть";
         view.Title.Text=item.Title;view.Title.ToolTip=item.Title;
-        view.Primary.Tag=item;view.About.Tag=item;view.Frame.Tag=item;
-        AutomationProperties.SetName(view.Primary,"Выбрать раздачу: "+item.Title);AutomationProperties.SetName(view.About,"О фильме: "+item.Title);
+        view.About.Tag=item;view.Frame.Tag=item;
+        AutomationProperties.SetName(view.About,"Подробнее: "+item.Title);
         RebuildFeatureMeta(view,item);UpdateFeaturePeople(view,item);UpdateFeatureFavorite(view);UpdateFeatureDots(view);
         view.Watch=(_,e)=>{if(e.PropertyName is null or nameof(MediaItem.PosterQuality)or nameof(MediaItem.CardRating)or nameof(MediaItem.CardGenre)){RebuildFeatureMeta(view,item);}};
         item.PropertyChanged+=view.Watch;
@@ -185,9 +188,10 @@ public partial class MainWindow
         view.Title.FontSize=tiny?28:narrow?36:52;view.Title.LineHeight=tiny?30:narrow?38:54;view.Title.MaxHeight=view.Title.LineHeight*2;
         featureCompactText=narrow;
         if(view.Bound!=null)UpdateFeaturePeople(view,view.Bound);
-        view.LiteCover.Width=width<900?0:96;view.LiteCover.Height=width<900?0:144;
-        view.About.Visibility=tiny?Visibility.Collapsed:Visibility.Visible;
+        // Hide the whole poster container in narrow layouts; Source still controls
+        // the inner fallback independently when a landscape finishes loading.
+        view.PosterHost.Visibility=width>=860?Visibility.Visible:Visibility.Collapsed;
         if(view.Frame.Child is Grid grid&&grid.Children.OfType<StackPanel>().FirstOrDefault(x=>x.Name=="FeatureContent") is {} content)content.Margin=tiny?new(20,24,20,22):narrow?new(24,28,24,26):new(36,32,36,32);
-        view.Primary.Padding=new(tiny?16:22,0,tiny?16:22,0);
+        view.About.Padding=new(tiny?16:22,0,tiny?16:22,0);
     }
 }

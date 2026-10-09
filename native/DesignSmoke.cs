@@ -160,6 +160,12 @@ public partial class MainWindow
             Shot("catalog-light-125",1.25);
             var catalogColumnsLight=catalogColumns;
             prefs.Light=false;ApplyTheme();Render();await Settle();Shot("catalog-dark");
+            {
+                // The focus ring of a poster extends beyond the poster; it must not lose its top edge.
+                var posterStyle=(Style)FindResource("PosterButton");
+                var firstPoster=VisualElements<Button>(Body).FirstOrDefault(x=>ReferenceEquals(x.Style,posterStyle)&&x.Tag is MediaItem&&x.IsVisible&&x.ActualHeight>100);
+                if(firstPoster!=null){System.Windows.Input.Keyboard.Focus(firstPoster);await Settle();Shot("catalog-poster-focus");System.Windows.Input.Keyboard.ClearFocus();await Settle();}
+            }
             var backgroundDark=CheckBackgroundTheme();
             CheckDiscoveryShelves((ok,message)=>{if(!ok)throw new Exception(message);},"dark-movie-shelves");
             foreach(var scale in new[]{1.2,1.25,1.5})Shot("catalog-dark-"+(int)(scale*100),scale);
@@ -206,6 +212,18 @@ public partial class MainWindow
             QualityFilter().SelectedItem="Full HD";await Settle();CheckFilter("selected");
             Render();await Settle();CheckFilter("rendered");
             releaseToolbarChecks.Add(CheckReleaseToolbar("collapsed-desktop",false,false));
+            {
+                // Column headers sort the list; pressing the active column again flips its direction.
+                var selection=ReleaseSelection(movie.Id);
+                Button SizeHeader()=>FindVisual<Button>(Body,x=>AutomationProperties.GetName(x)=="Сортировать раздачи: Меньше размер")??throw new Exception("Sortable release column headers are missing.");
+                SizeHeader().RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Settle();
+                if(selection.Sort!="Меньше размер"||selection.Reverse||!SizeHeader().Content.ToString()!.EndsWith("↑"))throw new Exception("Clicking a release column header did not select that order.");
+                SizeHeader().RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Settle();
+                if(selection.Sort!="Меньше размер"||!selection.Reverse||!SizeHeader().Content.ToString()!.EndsWith("↓"))throw new Exception("Clicking the active release column header did not reverse its direction.");
+                Shot("release-sort-reversed");
+                (FindVisual<ComboBox>(Body,x=>AutomationProperties.GetName(x)=="Сортировка раздач")??throw new Exception("Release sort selector is missing.")).SelectedIndex=0;await Settle();
+                if(selection.Reverse)throw new Exception("Choosing another release order must restore its natural direction.");
+            }
             var moreReleaseFilters=FindVisual<Button>(Body,x=>AutomationProperties.GetName(x)=="Показать дополнительные фильтры раздач")??throw new Exception("Additional release filters are missing.");
             moreReleaseFilters.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Settle();
             var sourceFilter=FindVisual<ComboBox>(Body,x=>AutomationProperties.GetName(x)=="Раздачи: Источник")??throw new Exception("Per-tracker release filter is missing.");

@@ -14,7 +14,7 @@ namespace Kachalka;
 public partial class MainWindow
 {
     ScrollViewer? detailScroll;
-    StackPanel? detailActions;
+    Panel? detailActions;
     TextBlock? releaseCountLabel;
     StackPanel? releaseControlsHost;
     string detailActionState="";
@@ -44,7 +44,7 @@ public partial class MainWindow
         var heroFrame=new Border{Name="CinemaFilm",CornerRadius=new(24),VerticalAlignment=VerticalAlignment.Top};heroFrame.Background=(Brush)FindResource("BannerBase");
         var artwork=new Grid{Name="DetailArtwork"};heroFrame.Child=artwork;
         artwork.SizeChanged+=(_,e)=>{if(e.NewSize.Width<=0||e.NewSize.Height<=0)return;var clip=new RectangleGeometry(new Rect(e.NewSize),24,24);clip.Freeze();artwork.Clip=clip;};
-        var backdropImage=new Image{DataContext=item,Width=0,Height=0,Opacity=0,Tag="FeaturePoster"};backdropImage.Loaded+=SourceCover;backdropImage.DataContextChanged+=SourceCoverChanged;artwork.Children.Add(backdropImage);
+        var backdropImage=new Image{DataContext=item,Width=0,Height=0,Opacity=0,Tag="FeaturePoster"};if(!prefs.LiteMode){backdropImage.Loaded+=SourceCover;backdropImage.DataContextChanged+=SourceCoverChanged;}artwork.Children.Add(backdropImage);
         if(!prefs.LiteMode)
         {
             var picture=new ImageBrush{Stretch=Stretch.UniformToFill,AlignmentX=AlignmentX.Center,AlignmentY=AlignmentY.Top};
@@ -61,22 +61,21 @@ public partial class MainWindow
         var posterGrid=new Grid();
         posterGrid.Children.Add(new TextBlock{Text="Постер\nнедоступен",Foreground=(Brush)FindResource("BannerMuted"),Opacity=.75,TextAlignment=TextAlignment.Center,VerticalAlignment=VerticalAlignment.Center,FontSize=11});
         var image=new Image{DataContext=item,Stretch=Stretch.UniformToFill};image.Loaded+=SourceCover;image.DataContextChanged+=SourceCoverChanged;posterGrid.Children.Add(image);
-        detailPoster=new Border{Width=168,Height=252,CornerRadius=new(14),ClipToBounds=true,Background=item.Cover,BorderBrush=(Brush)FindResource("BannerChip"),BorderThickness=new(1),HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Bottom,Margin=new(0,0,28,0),Child=posterGrid};
+        detailPoster=new Border{Width=168,Height=252,CornerRadius=new(14),ClipToBounds=true,Background=item.Cover,BorderBrush=(Brush)FindResource("BannerChip"),BorderThickness=new(1),HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Top,Margin=new(0,0,28,0),Child=posterGrid};
         detailPoster.SizeChanged+=(sender,_)=>ClipPoster((Border)sender);
         detailHero.Children.Add(detailPoster);
 
         detailInfo=new StackPanel{Name="DetailIdentity",VerticalAlignment=VerticalAlignment.Bottom};detailInfo.SizeChanged+=(sender,_)=>{if(ReferenceEquals(sender,detailInfo))UpdateDetailLayout();};Grid.SetColumn(detailInfo,1);detailHero.Children.Add(detailInfo);
 
-        // type and year chips
-        var chips=new StackPanel{Orientation=Orientation.Horizontal,Margin=new(0,0,0,12)};
-        Border Chip(string text,string? name=null)
+        // A quiet caption instead of pills: "ФИЛЬМ · 2026", in the same voice as the sidebar section labels.
+        var caption=new StackPanel{Name="DetailCaption",Orientation=Orientation.Horizontal,Margin=new(0,0,0,12)};
+        TextBlock CaptionText(string text,string? name=null)
         {
-            var label=new TextBlock{Text=text,FontSize=12,FontWeight=FontWeights.SemiBold,Foreground=(Brush)FindResource("BannerText"),VerticalAlignment=VerticalAlignment.Center};if(name!=null)label.Name=name;
-            return new Border{Background=(Brush)FindResource("BannerChip"),CornerRadius=new(999),Padding=new(10,4,10,4),Margin=new(0,0,8,0),Child=label};
+            var label=new TextBlock{Text=text,FontSize=12,FontWeight=FontWeights.SemiBold,Foreground=(Brush)FindResource("BannerMuted"),VerticalAlignment=VerticalAlignment.Center};if(name!=null)label.Name=name;return label;
         }
-        chips.Children.Add(Chip(item.Section=="Сериалы"?"Сериал":"Фильм"));
-        if(item.Year>0)chips.Children.Add(Chip(item.Year.ToString(),"DetailYear"));
-        detailInfo.Children.Add(chips);
+        caption.Children.Add(CaptionText(item.Section=="Сериалы"?"СЕРИАЛ":"ФИЛЬМ"));
+        if(item.Year>0){caption.Children.Add(CaptionText("  ·  "));caption.Children.Add(CaptionText(item.Year.ToString(),"DetailYear"));}
+        detailInfo.Children.Add(caption);
 
         var hasOriginal=!string.IsNullOrWhiteSpace(item.OriginalTitle)&&!item.OriginalTitle.Equals(item.Title,StringComparison.OrdinalIgnoreCase);
         detailTitle=new TextBlock{Name="DetailTitle",Text=item.Title,FontSize=56,FontWeight=FontWeights.ExtraBold,LineHeight=58,LineStackingStrategy=LineStackingStrategy.BlockLineHeight,TextWrapping=TextWrapping.Wrap,Foreground=(Brush)FindResource("BannerText"),Margin=new(0,0,0,hasOriginal?4:12),ToolTip=item.Title};
@@ -104,16 +103,24 @@ public partial class MainWindow
             detailMetaRow.Children.Add(new Border{BorderBrush=(Brush)FindResource("BannerBadgeEdge"),BorderThickness=new(1),CornerRadius=new(6),Padding=new(6,2,6,2),Margin=new(0,0,8,4),VerticalAlignment=VerticalAlignment.Center,Child=new TextBlock{Text=quality,FontSize=11,FontWeight=FontWeights.Bold,Foreground=(Brush)FindResource("BannerText")}});
         if(item.OnlyPoorQuality){var poor=PoorQualityBadge(item.PosterQuality);poor.Foreground=(Brush)FindResource("BannerText");detailInfo.Children.Add(poor);}
         // credits, only those already known
-        var directors=item.People.Where(x=>x.Role=="Режиссёры").Select(x=>x.Name).Take(2).ToArray();
-        var cast=item.People.Where(x=>x.Role=="Актёры").Select(x=>x.Name).Take(5).ToArray();
+        var directors=item.People.Where(x=>x.Role=="Режиссёры").Take(2).ToArray();
+        var cast=item.People.Where(x=>x.Role=="Актёры").Take(5).ToArray();
         if(directors.Length+cast.Length>0)
         {
             var credits=new Grid{Name="DetailCredits",Margin=new(0,0,0,12)};credits.ColumnDefinitions.Add(new(){Width=GridLength.Auto});credits.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});
-            void Credit(string label,string[] names)
+            void Credit(string label,CinemaPerson[] people)
             {
-                if(names.Length==0)return;var row=credits.RowDefinitions.Count;credits.RowDefinitions.Add(new(){Height=GridLength.Auto});
+                if(people.Length==0)return;var row=credits.RowDefinitions.Count;credits.RowDefinitions.Add(new(){Height=GridLength.Auto});
                 var caption=new TextBlock{Text=label,FontSize=14,Foreground=(Brush)FindResource("BannerMuted"),Margin=new(0,0,16,4)};credits.Children.Add(caption);Grid.SetRow(caption,row);
-                var value=new TextBlock{Text=string.Join(", ",names),FontSize=14,Foreground=(Brush)FindResource("BannerText"),TextWrapping=TextWrapping.Wrap,Margin=new(0,0,0,4)};Grid.SetColumn(value,1);Grid.SetRow(value,row);credits.Children.Add(value);
+                // Every name opens that person's page, the same as the participant tiles below the banner.
+                var names=new WrapPanel{Margin=new(0,0,0,4)};Grid.SetColumn(names,1);Grid.SetRow(names,row);credits.Children.Add(names);
+                for(var index=0;index<people.Length;index++)
+                {
+                    var person=people[index];
+                    var link=new Button{Name="DetailCreditLink",Style=(Style)FindResource("LinkButton"),Content=person.Name,FontSize=14,Foreground=(Brush)FindResource("BannerText"),Tag=person,ToolTip="Открыть страницу: "+person.Name,VerticalAlignment=VerticalAlignment.Center};
+                    AutomationProperties.SetName(link,"Открыть страницу: "+person.Name+", "+label);link.Click+=(_,_)=>OpenPerson(person,item);names.Children.Add(link);
+                    if(index<people.Length-1)names.Children.Add(new TextBlock{Text=", ",FontSize=14,Foreground=(Brush)FindResource("BannerText"),VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,5,0)});
+                }
             }
             Credit("Режиссёр",directors);Credit("В ролях",cast);detailInfo.Children.Add(credits);
         }
@@ -129,7 +136,7 @@ public partial class MainWindow
         if(DetailMetadataNeedsRetry(item.Id)&&!MediaMetadata.HasDescription(item)){var retry=ActionButton("Повторить загрузку карточки","IconRefresh",()=>RetryDetailMetadata(item));retry.Name="DetailMetadataRetry";retry.HorizontalAlignment=HorizontalAlignment.Left;retry.Margin=new(0,8,0,0);detailDescription.Children.Add(retry);}
         detailSynopsis.SizeChanged+=(sender,_)=>{if(ReferenceEquals(sender,detailSynopsis))UpdateDescriptionToggle();};
         // actions follow the state of the title
-        detailActions=new StackPanel{Name="DetailActions",Orientation=Orientation.Horizontal};detailInfo.Children.Add(detailActions);
+        detailActions=new WrapPanel{Name="DetailActions",Margin=new(0,0,0,-8)};detailInfo.Children.Add(detailActions);
         liveReleases.TryGetValue(item.Id,out var known);
         BuildDetailActions(item,known??[]);
 
@@ -201,10 +208,10 @@ public partial class MainWindow
         if(detailActions==null)return;
         detailActions.Children.Clear();detailActionState=DetailActionState(item,releases);
         var owned=DownloadsOf(item);var done=owned.FirstOrDefault(x=>x.Completed);var active=owned.FirstOrDefault(x=>!x.Completed);
-        FrameworkElement Spaced(FrameworkElement element){element.Margin=new(0,0,10,0);return element;}
+        FrameworkElement Spaced(FrameworkElement element){element.Margin=new(0,0,10,8);return element;}
         Button Action(string text,string icon,bool primary,Action click)
         {
-            var button=new Button{Style=(Style)FindResource(primary?"PrimaryButton":typeof(Button)),Height=52,MinHeight=52,Padding=new(22,0,22,0),FontSize=15,Margin=new(0,0,10,0)};
+            var button=new Button{Style=(Style)FindResource(primary?"PrimaryButton":typeof(Button)),Height=52,MinHeight=52,Padding=new(22,0,22,0),FontSize=15,Margin=new(0,0,10,8)};
             if(!primary){button.SetResourceReference(Control.BackgroundProperty,"BannerAction");button.SetResourceReference(Control.BorderBrushProperty,"BannerEdge");button.Foreground=(Brush)FindResource("BannerText");}
             button.Content=IconLabel(text,icon,18);AutomationProperties.SetName(button,text);button.Click+=(_,_)=>click();return button;
         }
@@ -219,7 +226,7 @@ public partial class MainWindow
         }
         else if(ReleaseRecommendation.Pick(releases,QualityMinimum) is {} pick)
         {
-            var button=new Button{Name="DetailDownload",Style=(Style)FindResource("PrimaryButton"),Tag=pick.Entry,Height=52,MinHeight=52,Padding=new(22,0,22,0),FontSize=15,Margin=new(0,0,10,0),ToolTip="Скачать рекомендованную раздачу: "+pick.Entry.Title};
+            var button=new Button{Name="DetailDownload",Style=(Style)FindResource("PrimaryButton"),Tag=pick.Entry,Height=52,MinHeight=52,Padding=new(22,0,22,0),FontSize=15,Margin=new(0,0,10,8),ToolTip="Скачать рекомендованную раздачу: "+pick.Entry.Title};
             var row=new StackPanel{Orientation=Orientation.Horizontal};
             row.Children.Add(IconLabel("Скачать","IconDownload",18));
             var detail=string.Join(" · ",new[]{(ReleaseQuality.Height(pick.Entry) is int h?h+"p":pick.Entry.Quality),pick.Entry.Size.HasValue?DownloadService.FormatBytes(pick.Entry.Size.Value):""}.Where(x=>x.Length>0));
@@ -230,14 +237,9 @@ public partial class MainWindow
         {
             detailActions.Children.Add(Action("Выбрать раздачу","IconDownload",true,()=>ScrollToReleases()));
         }
-        if(releases.Count>0&&done==null)
-        {
-            var all=Action("Все раздачи","IconFilter",false,()=>ScrollToReleases());
-            if(all.Content is Panel allRow)allRow.Children.Add(new TextBlock{Text=releases.Count.ToString(),FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=13,Opacity=.7,Margin=new(8,0,0,0),VerticalAlignment=VerticalAlignment.Center});
-            AutomationProperties.SetName(all,"Все раздачи");detailActions.Children.Add(all);
-        }
+        // No separate "all releases" button: the list sits right below the banner on this page.
         var saved=IsSaved(item);
-        Button favorite=null!;favorite=new Button{Name="DetailFavorite",Style=(Style)FindResource("IconButton"),Width=52,Height=52,Margin=new(0,0,10,0)};
+        Button favorite=null!;favorite=new Button{Name="DetailFavorite",Style=(Style)FindResource("IconButton"),Width=52,Height=52,Margin=new(0,0,10,8)};
         favorite.SetResourceReference(Control.BackgroundProperty,"BannerAction");favorite.SetResourceReference(Control.BorderBrushProperty,"BannerEdge");favorite.Foreground=(Brush)FindResource("BannerText");
         void Paint(){var now=IsSaved(item);favorite.Content=IconLabel("",now?"IconHeartFilled":"IconHeart",20);favorite.ToolTip=now?"Сохранено":"Сохранить";AutomationProperties.SetName(favorite,now?"Сохранено":"Сохранить");}
         Paint();favorite.Click+=(_,_)=>{ToggleSaved(item);Paint();UpdateSavedCount();};
@@ -245,7 +247,7 @@ public partial class MainWindow
     }
     FrameworkElement DownloadProgressButton(DownloadItem item)
     {
-        var frame=new Border{Name="DetailProgress",Height=52,MinWidth=300,CornerRadius=new(12),BorderThickness=new(1),Cursor=System.Windows.Input.Cursors.Hand,DataContext=item,ToolTip="Открыть загрузки",Background=Brushes.Transparent};
+        var frame=new Border{Name="DetailProgress",Height=52,MinWidth=200,CornerRadius=new(12),BorderThickness=new(1),Cursor=System.Windows.Input.Cursors.Hand,DataContext=item,ToolTip="Открыть загрузки",Background=Brushes.Transparent};
         frame.SetResourceReference(Border.BorderBrushProperty,"AccentLine");
         var inner=new Grid();frame.Child=inner;
         inner.SizeChanged+=(_,e)=>{if(e.NewSize.Width<=0||e.NewSize.Height<=0)return;var clip=new RectangleGeometry(new Rect(e.NewSize),11,11);clip.Freeze();inner.Clip=clip;};

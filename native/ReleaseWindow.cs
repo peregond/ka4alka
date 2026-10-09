@@ -15,6 +15,7 @@ public partial class MainWindow
         public HashSet<string> Expanded {get;}=[];
         public int VisibleCount {get;set;}=60;
         public bool OnlyRussian {get;set;}
+        public bool Reverse {get;set;}
     }
     readonly Dictionary<int,ReleasePickerState> releasePickerStates=[];
 
@@ -105,7 +106,7 @@ public partial class MainWindow
         var top=new WrapPanel{Name="ReleaseTopRow",Margin=new(0,0,0,6),VerticalAlignment=VerticalAlignment.Center};host.Children.Add(top);
         var seriesRow=new WrapPanel{Margin=new(0,0,0,0)};host.Children.Add(seriesRow);
         var more=new WrapPanel{Visibility=state.More?Visibility.Visible:Visibility.Collapsed,Margin=new(0,4,0,2)};host.Children.Add(more);
-        // Quality, audio and sort selectors stay in the tree (collapsed) because the segments and chips drive them.
+        // Quality and sort selectors stay in the tree (collapsed) because the segments and chips drive them.
         var hidden=new WrapPanel{Visibility=Visibility.Collapsed};host.Children.Add(hidden);
         var filters=new Dictionary<string,ComboBox>();
         void Filter(string label,IEnumerable<string> values,Panel target,bool captioned)
@@ -123,7 +124,7 @@ public partial class MainWindow
         var isSeries=current?.Section=="Сериалы";
         if(isSeries){Filter("Сезон",releases.Select(x=>x.Series).OrderBy(x=>x.Season??int.MaxValue).Select(x=>x.SeasonLabel),seriesRow,true);Filter("Серия",releases.Select(x=>x.Series).OrderBy(x=>x.Episode??int.MaxValue).Select(x=>x.EpisodeLabel),seriesRow,true);}
         Filter("Качество",releases.Select(x=>x.Quality),hidden,false);
-        Filter("Озвучка",releases.Select(ReleaseFreshness.Audio),hidden,false);
+        Filter("Озвучка",releases.Select(ReleaseFreshness.Audio),more,true);
         Filter("Субтитры",releases.Select(x=>x.Subs),more,true);
         Filter("Источник",releases.Select(x=>x.Source),more,true);
         Filter("Тип",releases.Select(x=>x.Type),more,true);
@@ -147,8 +148,10 @@ public partial class MainWindow
             radio.Checked+=(_,_)=>{if(syncing)return;filters["Качество"].SelectedItem=value;};
             segments[value]=radio;segmentRow.Children.Add(radio);
         }
-        Segment("Все","Все",releases.Count);
-        foreach(var group in releases.Where(x=>x.Quality!="Не указано").GroupBy(x=>x.Quality).OrderByDescending(x=>QualityRank(x.First())).ThenByDescending(x=>x.Count()))Segment(group.Key,group.Key,group.Count());
+        // Segment counts follow the same pool as the list, so "Все" matches the number next to the section title.
+        var pool=prefs.HidePoorQuality?releases.Where(x=>!ReleaseQuality.Poor(x,QualityMinimum)).ToArray():releases.ToArray();
+        Segment("Все","Все",pool.Length);
+        foreach(var group in pool.Where(x=>x.Quality!="Не указано").GroupBy(x=>x.Quality).OrderByDescending(x=>QualityRank(x.First())).ThenByDescending(x=>x.Count()))Segment(group.Key,group.Key,group.Count());
 
         // ---- Russian-audio switch ----
         var voice=new Button{Style=(Style)FindResource("PillButton"),Margin=new(0,0,10,10),Padding=new(14,0,16,0),ToolTip="Показывать только раздачи с профессиональной русской озвучкой"};
@@ -170,9 +173,18 @@ public partial class MainWindow
         var recommended=ReleaseRecommendation.Pick(releases,QualityMinimum);
         bool compact=Body.ActualWidth<1000,changingFilters=false;
 
+        // Refresh, sources and the poor-quality switch stay out of the way until "Ещё фильтры" is opened
+        // (or a source scan is running, so progress is never hidden).
+        var toolbarRow=FindVisual<WrapPanel>(panel,x=>x.Name=="ReleaseToolbar");
+        void ApplyMore()
+        {
+            more.Visibility=state.More?Visibility.Visible:Visibility.Collapsed;
+            if(toolbarRow!=null)toolbarRow.Visibility=state.More||(releaseViews.TryGetValue(filmId,out var scan)&&scan.Checking)?Visibility.Visible:Visibility.Collapsed;
+        }
+        ApplyMore();
         void UpdateActions()
         {
-            var additional=new[]{"Источник","Тип","Кодек","HDR","Субтитры"}.Count(x=>filters[x].SelectedItem?.ToString()!="Все");
+            var additional=new[]{"Озвучка","Источник","Тип","Кодек","HDR","Субтитры"}.Count(x=>filters[x].SelectedItem?.ToString()!="Все");
             toggle.Content=ChipContent((state.More?"Скрыть фильтры":"Ещё фильтры")+(additional>0?$" · {additional}":""),true);StyleChip(toggle,additional>0);
             AutomationProperties.SetName(toggle,state.More?"Скрыть дополнительные фильтры раздач":"Показать дополнительные фильтры раздач");
             reset.Visibility=prefs.HidePoorQuality||state.OnlyRussian||filters.Values.Any(x=>x.SelectedItem?.ToString()!="Все")||sort.SelectedIndex!=0?Visibility.Visible:Visibility.Collapsed;
@@ -264,15 +276,11 @@ public partial class MainWindow
             }
             if(state.OnlyRussian)filtered=filtered.Where(x=>RussianAudio.Rank(x)==3);
             filtered=state.Sort switch{"Русская озвучка"=>RussianAudio.Order(filtered),"Русские источники"=>filtered.OrderByDescending(RussianSource).ThenByDescending(SeedRank),"Меньше размер"=>filtered.OrderBy(x=>x.Size??long.MaxValue),"Выше качество"=>filtered.OrderByDescending(QualityRank).ThenByDescending(SeedRank),"По названию"=>filtered.OrderBy(x=>x.Title,StringComparer.CurrentCultureIgnoreCase),"По сезону и серии"=>filtered.OrderBy(x=>x.Series.Season??int.MaxValue).ThenBy(x=>x.Series.Episode??int.MaxValue),"По видео"=>filtered.OrderBy(x=>x.Type=="Не указано").ThenBy(x=>x.Type),"По субтитрам"=>filtered.OrderBy(x=>x.Subs=="Не указано").ThenBy(x=>x.Subs),"По озвучке"=>filtered.OrderByDescending(x=>RussianAudio.Rank(x)).ThenBy(x=>ReleaseFreshness.Audio(x)),_=>filtered.OrderByDescending(SeedRank)};
+            if(state.Reverse)filtered=filtered.Reverse();
             var visible=filtered.ToArray();var displayed=visible.Take(state.VisibleCount).ToArray();
             if(releaseCountLabel!=null)releaseCountLabel.Text=visible.Length.ToString();
-            var countLabel=displayed.Length<visible.Length?$"Показано {displayed.Length} из {visible.Length}":visible.Length<releases.Count?$"Вариантов: {visible.Length} из {releases.Count}":"";
-            if(countLabel.Length>0){var count=Text(countLabel,12,true);count.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");count.Margin=new(0,0,0,12);results.Children.Add(count);}
-            if(visible.Length>0)
-            {
-                var hint=Text(ReleaseFreshness.ConnectionNote,12,true);hint.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");hint.Margin=new(0,0,0,10);results.Children.Add(hint);
-            }
-            if(visible.Any(x=>x.Seeds==0)){var warning=Text("У некоторых раздач источник показывает: отдают 0. Числа могут устареть — при отсутствии подключения попробуй другой вариант.",12,true);warning.Margin=new(0,0,0,12);results.Children.Add(warning);}
+            // The count already sits next to the section title and the list ends with "Показать ещё", so no extra notes here;
+            // the seed disclaimer stays in the row tooltips.
             if(visible.Length==0)
             {
                 var empty=new StackPanel{Margin=new(20)};
@@ -298,10 +306,11 @@ public partial class MainWindow
                     var plain=new TextBlock{Text=label,FontSize=11,FontWeight=FontWeights.SemiBold,VerticalAlignment=VerticalAlignment.Center};plain.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");Grid.SetColumn(plain,column);header.Children.Add(plain);return;
                 }
                 var active=state.Sort==mode;
-                var direction=mode is "Больше отдающих" or "Выше качество"?" ↓":" ↑";
-                var button=Button("",()=>sort.SelectedItem=mode);
-                button.Content=new TextBlock{Text=label+(active?direction:""),FontSize=11,FontWeight=FontWeights.SemiBold,TextWrapping=TextWrapping.NoWrap};
-                button.Style=(Style)FindResource("QuietButton");button.BorderThickness=new(0);button.Padding=new(0,6,3,6);button.Margin=new(0);button.MinHeight=0;button.HorizontalContentAlignment=HorizontalAlignment.Left;
+                var descendingByDefault=mode is "Больше отдающих" or "Выше качество";
+                var direction=descendingByDefault^(active&&state.Reverse)?" ↓":" ↑";
+                var button=new Button{Style=(Style)FindResource("LinkButton"),Content=label+(active?direction:""),FontSize=11,FontWeight=FontWeights.SemiBold,Padding=new(0,6,0,6),HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center,ToolTip=active?"Нажми ещё раз, чтобы поменять порядок":"Сортировать по этому столбцу"};
+                // Clicking the active column flips its direction; any other column makes itself the order.
+                button.Click+=(_,_)=>{if(sort.SelectedItem?.ToString()==mode){state.Reverse=!state.Reverse;state.VisibleCount=60;Show();}else sort.SelectedItem=mode;};
                 button.SetResourceReference(Control.ForegroundProperty,active?"Accent":"Subtle");AutomationProperties.SetName(button,"Сортировать раздачи: "+mode);
                 Grid.SetColumn(button,column);header.Children.Add(button);
             }
@@ -341,10 +350,10 @@ public partial class MainWindow
             MoreResults();
         }
         foreach(var box in filters.Values)box.SelectionChanged+=(_,_)=>{if(!changingFilters){state.VisibleCount=60;Show();}};
-        sort.SelectionChanged+=(_,_)=>{if(!changingFilters){state.VisibleCount=60;Show();}};
+        sort.SelectionChanged+=(_,_)=>{if(!changingFilters){state.Reverse=false;state.VisibleCount=60;Show();}};
         voice.Click+=(_,_)=>{state.OnlyRussian=!state.OnlyRussian;state.VisibleCount=60;Show();};
-        toggle.Click+=(_,_)=>{state.More=!state.More;more.Visibility=state.More?Visibility.Visible:Visibility.Collapsed;UpdateActions();};
-        reset.Click+=(_,_)=>{changingFilters=true;foreach(var box in filters.Values)box.SelectedIndex=0;sort.SelectedIndex=0;state.OnlyRussian=false;changingFilters=false;state.VisibleCount=60;prefs.HidePoorQuality=false;prefs.Save();SaveSelection();Render();};
+        toggle.Click+=(_,_)=>{state.More=!state.More;ApplyMore();UpdateActions();};
+        reset.Click+=(_,_)=>{changingFilters=true;foreach(var box in filters.Values)box.SelectedIndex=0;sort.SelectedIndex=0;state.OnlyRussian=false;state.Reverse=false;changingFilters=false;state.VisibleCount=60;prefs.HidePoorQuality=false;prefs.Save();SaveSelection();Render();};
         panel.SizeChanged+=(_,_)=>{var next=Body.ActualWidth<1000;if(next==compact)return;compact=next;Show();};
         Show();
     }

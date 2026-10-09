@@ -16,7 +16,7 @@ public partial class MainWindow
 {
     void DownloadDetails(object sender,RoutedEventArgs e)
     {
-        var item=(DownloadItem)((Button)sender).Tag;
+        var item=(DownloadItem)((FrameworkElement)sender).Tag;
         downloads.Update();
         var window=new Window
         {

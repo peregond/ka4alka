@@ -13,16 +13,18 @@ namespace Kachalka;
 public partial class MainWindow
 {
     readonly Dictionary<string,BitmapImage> portraitCache=[];
-    Border PersonPortrait(CinemaPerson person,double width,double height,MediaItem? origin=null)
+    Border PersonPortrait(CinemaPerson person,double width,double height,MediaItem? origin=null,bool round=false)
     {
         var grid=new Grid();var fallback=new StackPanel{HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center,IsHitTestVisible=false};
         var silhouette=new System.Windows.Shapes.Path{Data=Geometry.Parse("M12,3 A4,4 0 1 1 11.99,3 M4,21 L4,19 C4,13 20,13 20,19 L20,21"),Width=34,Height=34,Stretch=Stretch.Uniform,StrokeThickness=1.5,Opacity=.45};
         silhouette.SetResourceReference(Shape.StrokeProperty,"Muted");fallback.Children.Add(silhouette);
         var absent=Text("Нет фото",10,true);absent.HorizontalAlignment=HorizontalAlignment.Center;absent.Margin=new(0,9,0,0);absent.Opacity=.7;fallback.Children.Add(absent);grid.Children.Add(fallback);
         AutomationProperties.SetName(fallback,"Нет фотографии: "+person.Name);
-        var image=new Image{Stretch=Stretch.UniformToFill};AutomationProperties.SetName(image,"Фотография: "+person.Name);grid.Children.Add(image);
+        var image=new Image{Stretch=Stretch.UniformToFill};
+        // Round avatars keep the upper part of a 4:5 photograph, where faces are, instead of its centre.
+        if(round){image.Width=width;image.Height=width*1.25;image.VerticalAlignment=VerticalAlignment.Top;}AutomationProperties.SetName(image,"Фотография: "+person.Name);grid.Children.Add(image);
         var progress=Text("Фото…",9,true);progress.HorizontalAlignment=HorizontalAlignment.Center;progress.VerticalAlignment=VerticalAlignment.Bottom;progress.Margin=new(0,0,0,7);progress.Visibility=Visibility.Collapsed;progress.IsHitTestVisible=false;grid.Children.Add(progress);
-        var frame=new Border{Width=width,Height=height,CornerRadius=new(11),ClipToBounds=true,Child=grid,Margin=new(0,0,0,8),BorderThickness=new(1)};
+        var frame=new Border{Width=width,Height=round?width:height,CornerRadius=new(round?width/2:11),ClipToBounds=true,Child=grid,Margin=new(0,0,0,8),BorderThickness=new(1)};
         frame.SetResourceReference(Border.BackgroundProperty,"PanelAlt");frame.SetResourceReference(Border.BorderBrushProperty,"EdgeSoft");frame.SizeChanged+=(_,_)=>ClipPoster(frame);
         CancellationTokenSource? request=null;bool attempted=false;string? portraitPath=null;
         Button? portraitOwner=null;bool cancelledByUnload=false;

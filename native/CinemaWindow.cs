@@ -31,10 +31,10 @@ public partial class MainWindow
             row.SizeChanged+=(_,_)=>{var columns=Math.Clamp((int)Math.Floor(row.ActualWidth/124),1,8);if(row.Columns!=columns)row.Columns=columns;};
             foreach(var person in item.People)
             {
-                var button=Button(person.Name,()=>OpenPerson(person,item));button.Name="CinemaPersonTile";button.Tag=person;button.Style=(Style)FindResource("PosterButton");
-                var tile=new StackPanel();var portrait=PersonPortrait(person,96,120,item);portrait.Name="CinemaPersonPortrait";portrait.BorderThickness=new(0);portrait.HorizontalAlignment=HorizontalAlignment.Center;tile.Children.Add(portrait);var name=Text(person.Name,12);name.TextAlignment=TextAlignment.Center;name.MinHeight=28;name.MaxHeight=32;name.TextTrimming=TextTrimming.CharacterEllipsis;name.Margin=new(0);tile.Children.Add(name);
+                var button=Button(person.Name,()=>OpenPerson(person,item));button.Name="CinemaPersonTile";button.Tag=person;button.Style=(Style)FindResource("PersonTileButton");
+                var tile=new StackPanel();var portrait=PersonPortrait(person,88,88,item,round:true);portrait.Name="CinemaPersonPortrait";portrait.BorderThickness=new(0);portrait.HorizontalAlignment=HorizontalAlignment.Center;tile.Children.Add(portrait);var name=Text(person.Name,12);name.TextAlignment=TextAlignment.Center;name.MinHeight=28;name.MaxHeight=32;name.TextTrimming=TextTrimming.CharacterEllipsis;name.Margin=new(0);tile.Children.Add(name);
                 var role=Text(person.Role switch{"Актёры"=>"В ролях","Режиссёры"=>"Режиссёр","Операторы"=>"Оператор",_=>person.Role},10,true);role.TextAlignment=TextAlignment.Center;role.TextWrapping=TextWrapping.NoWrap;role.TextTrimming=TextTrimming.CharacterEllipsis;role.Margin=new(0,3,0,0);tile.Children.Add(role);button.Content=tile;
-                button.Padding=new(4);button.Margin=new(0,0,12,12);button.BorderThickness=new(0);button.MinHeight=0;button.HorizontalContentAlignment=HorizontalAlignment.Stretch;button.VerticalContentAlignment=VerticalAlignment.Top;button.ToolTip=person.Name+" · "+person.Role;
+                button.Margin=new(0,0,8,8);button.BorderThickness=new(0);button.MinHeight=0;button.HorizontalContentAlignment=HorizontalAlignment.Stretch;button.VerticalContentAlignment=VerticalAlignment.Top;button.ToolTip=person.Name+" · "+person.Role;
                 AutomationProperties.SetName(button,"Открыть карточку: "+person.Name+", "+person.Role);row.Children.Add(button);
             }
         }

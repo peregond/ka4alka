@@ -85,7 +85,7 @@ public partial class MainWindow
             var heading=FindVisual<TextBlock>(identity,x=>x.Name=="DetailTitle")!;
             var originalTitle=FindVisual<TextBlock>(identity,x=>x.Name=="DetailOriginalTitle")??throw new Exception("Original movie title is missing.");
             var save=FindVisual<Button>(identity,x=>x.Name=="DetailFavorite")!;
-            var actions=FindVisual<StackPanel>(identity,x=>x.Name=="DetailActions")??throw new Exception("Movie actions row is missing.");
+            var actions=FindVisual<Panel>(identity,x=>x.Name=="DetailActions")??throw new Exception("Movie actions row is missing.");
             if(identity.Children.IndexOf(originalTitle)!=identity.Children.IndexOf(heading)+1||!identity.Children.Contains(actions)||identity.Children.IndexOf(actions)<=identity.Children.IndexOf(originalTitle)||!actions.Children.Contains(save))throw new Exception("Movie identity must be title, original title, details and then the actions row with Save.");
             if(originalTitle.TransformToAncestor(identity).Transform(new Point()).Y<heading.TransformToAncestor(identity).Transform(new Point()).Y+heading.ActualHeight-.5||save.TransformToAncestor(identity).Transform(new Point()).Y<originalTitle.TransformToAncestor(identity).Transform(new Point()).Y+originalTitle.ActualHeight-.5)throw new Exception("Movie title, original title and the actions overlap.");
         }
@@ -103,6 +103,8 @@ public partial class MainWindow
             }
         }
         CheckIdentityOrder();CheckCrewTiles();
+        foreach(var link in VisualElements<Button>(detailInfo!).Where(x=>x.Name=="DetailCreditLink"))
+            if(link.Tag is not CinemaPerson linked||!AutomationProperties.GetName(link).StartsWith("Открыть страницу: "+linked.Name,StringComparison.Ordinal)||!link.IsEnabled)throw new Exception("A director or cast name in the banner must be a working link to that person's page.");
         var filmCard=FindVisual<Border>(Body,x=>x.Name=="CinemaFilm")!;var hero=detailHero!;
                 var ratings=FindVisual<WrapPanel>(filmCard,x=>x.Name=="DetailRatings")!;var year=FindVisual<TextBlock>(filmCard,x=>x.Name=="DetailYear")!;
         if(!ReferenceEquals(ratings.Parent,detailMetaRow)||ratings.Children.OfType<Border>().Any(x=>x.BorderThickness!=new Thickness(0)))throw new Exception("Ratings must share the metadata line without separate outlined boxes.");

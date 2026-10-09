@@ -188,7 +188,7 @@ public partial class MainWindow
         hide.SetResourceReference(Control.ForegroundProperty,"Text");
         AutomationProperties.SetName(hide,"Скрыть плохое качество");controls.Children.Add(hide);
         var caption=Text("Качество",11,true);caption.VerticalAlignment=VerticalAlignment.Center;caption.Margin=new(0,0,6,0);controls.Children.Add(caption);
-        var minimum=new ComboBox{ItemsSource=new[]{"HD Ready","Full HD"},SelectedIndex=QualityMinimum==1080?1:0,Width=112,MinWidth=0,Margin=new(0,0,8,0),ToolTip="HD Ready — от 720p, Full HD — от 1080p. Экранки считаются плохими при любом разрешении."};
+        var minimum=new ComboBox{ItemsSource=new[]{"HD Ready","Full HD"},SelectedIndex=QualityMinimum==1080?1:0,Width=140,MinWidth=0,Margin=new(0,0,8,0),ToolTip="HD Ready — от 720p, Full HD — от 1080p. Экранки считаются плохими при любом разрешении."};
         AutomationProperties.SetName(minimum,"Качество раздач");controls.Children.Add(minimum);
         void Save()
         {

@@ -143,6 +143,7 @@ public record DownloadFile(string Name,string FullPath,string IncompletePath,lon
 {
     [JsonIgnore] public string Summary=>$"{Math.Clamp(Progress,0,100):F1}% · {DownloadService.FormatBytes(Size)}";
 }
+public sealed record DownloadFilePreview(string Name,string SizeText,double Progress,string Tip);
 public enum DownloadStatusKind{Downloading,Waiting,Seeding,Paused,Checking,Error}
 public class DownloadItem : INotifyPropertyChanged
 {
@@ -209,6 +210,18 @@ public class DownloadItem : INotifyPropertyChanged
     }
     [JsonIgnore] public string StatusBrushKey=>StatusKind switch{DownloadStatusKind.Downloading=>"Accent",DownloadStatusKind.Waiting=>"Warning",DownloadStatusKind.Seeding=>"Info",DownloadStatusKind.Paused=>"Subtle",DownloadStatusKind.Checking=>"Muted",_=>"Danger"};
     [JsonIgnore] public string StatusSoftKey=>StatusKind switch{DownloadStatusKind.Downloading=>"AccentSoft",DownloadStatusKind.Waiting=>"WarningSoft",DownloadStatusKind.Seeding=>"InfoSoft",DownloadStatusKind.Paused=>"Raised",DownloadStatusKind.Checking=>"Raised",_=>"DangerSoft"};
+    // Inline "Подробнее" panel of the queue row: only the first few files, built while the row is open.
+    [JsonIgnore] public bool Expanded {get;set;}
+    [JsonIgnore] public DownloadFilePreview[] PreviewFiles=>Expanded?Files.Take(6).Select(file=>
+    {
+        var path=file.Name.Replace('\\','/');var progress=double.IsFinite(file.Progress)?Math.Clamp(file.Progress,0,100):0;
+        return new DownloadFilePreview(path[(path.LastIndexOf('/')+1)..],DownloadService.FormatBytes(Math.Max(0,file.Size)),progress,path);
+    }).ToArray():[];
+    [JsonIgnore] public string FilesHeader=>"ФАЙЛЫ · "+Files.Count;
+    [JsonIgnore] public bool HasMoreFiles=>Files.Count>6;
+    [JsonIgnore] public string MoreFilesText=>HasMoreFiles?$"Ещё {Files.Count-6} · все файлы и поиск":"";
+    [JsonIgnore] public string SourcesText=>string.IsNullOrWhiteSpace(PeersText)?"Появятся после подключения":PeersText;
+    [JsonIgnore] public string AddedText=>AddedUtc==default?"—":AddedUtc.ToLocalTime().ToString("d MMMM, HH:mm",System.Globalization.CultureInfo.GetCultureInfo("ru-RU"));
     [JsonIgnore] public string PercentLabel=>$"{(int)Math.Floor(double.IsFinite(Progress)?Math.Clamp(Progress,0,100):0)}%";
     [JsonIgnore] public string WidgetCaption=>StatusKind==DownloadStatusKind.Downloading&&Remaining.Length>0?Remaining:Status;
     [JsonIgnore] public bool ShowWaitingHint=>StatusKind==DownloadStatusKind.Waiting&&Hint.Length>0;

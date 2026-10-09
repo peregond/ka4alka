@@ -5,10 +5,10 @@ on:
       version:
         description: Version of the verified draft release to publish
         required: true
-        default: '0.40.0'
+        default: '0.40.3'
   push:
     branches: [claude/cool-turing-p412ok]
-    paths: ['.github/publish-trigger/0.40.0']
+    paths: ['.github/publish-trigger/0.40.3']
 permissions:
   contents: write
 jobs:
@@ -18,7 +18,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
-      RELEASE_VERSION: ${{ inputs.version || '0.40.0' }}
+      RELEASE_VERSION: ${{ inputs.version || '0.40.3' }}
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
     steps:
       - uses: actions/checkout@v4
@@ -33,7 +33,7 @@ jobs:
           if($LASTEXITCODE -ne 0){throw 'Draft release not found'}
           if(-not $info.isDraft){Write-Output 'Release is already published; verifying only.';exit 0}
           $names=@($info.assets | ForEach-Object {$_.name})
-          foreach($required in @(('Kachalka-Setup-'+$env:RELEASE_VERSION+'.exe'),'Kachalka-win-x64.zip','latest.json','latest.sig','SHA256SUMS.txt')){
+          foreach($required in @(('Kachalka-Setup-'+$env:RELEASE_VERSION+'.exe'),'Kachalka-win-x64.zip','latest.json','latest.sig','SHA256SUMS.txt','components.json')){
             if($names -notcontains $required){throw ('Draft is missing '+$required)}
           }
           # Review-only previews are removed before the public release.

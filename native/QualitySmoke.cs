@@ -65,7 +65,7 @@ public partial class MainWindow
             check(downloadList?.Items.Contains(queued)==true&&VisualElements<Border>(Body).Any(x=>x.IsVisible&&AutomationProperties.GetName(x)=="Качество загрузки"&&Equals(x.ToolTip,"Экранка")),"existing poor-quality downloads stay in the queue and carry a visible badge");
             foreach(var width in new[]{360d,510d,1280d})
             {
-                MinWidth=360;Width=width;Height=640;await Task.Delay(50);current=selected;section="Фильмы";Render();UpdateLayout();
+                MinWidth=360;Width=width;Height=640;await Task.Delay(50);current=selected;section="Фильмы";ReleaseSelection(selected.Id).More=true;Render();UpdateLayout();
                 check(FindVisual<CheckBox>(Body,x=>AutomationProperties.GetName(x)=="Скрыть плохое качество") is {ActualHeight:>0}&&Body.ActualWidth>100,"quality controls remain available at window width "+width);
                 current=null;Render();UpdateLayout();
                 check(QualityButton() is {IsVisible:true,ActualWidth:>0,ActualHeight:>0},"single catalog quality dropdown remains available in the filter line at window width "+width);

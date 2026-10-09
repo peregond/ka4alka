@@ -51,7 +51,7 @@ public partial class MainWindow
                 Expect(texts.Any(x=>x.Text==ReleaseFreshness.Caption(indexed,DateTime.UtcNow))||(texts.Any(x=>x.Text==ReleaseFreshness.Age(indexed.DataReceivedUtc,DateTime.UtcNow))&&texts.Any(x=>x.Text==ReleaseFreshness.SourceName(indexed)+" · индекс")),name+": index provenance is missing.");
                 Expect(texts.Any(x=>x.Text.EndsWith("время неизвестно",StringComparison.Ordinal)),name+": legacy cache date was invented.");
                 Expect(texts.Any(x=>x.Text=="Русская · дубляж"||x.Text=="Озвучка: Русская · дубляж"),name+": Russian audio is hidden.");
-                Expect(texts.Any(x=>x.Text==ReleaseFreshness.ConnectionNote),name+": advertised participants are presented as confirmed peers.");
+                Expect(VisualElements<FrameworkElement>(Body).Any(x=>x.ToolTip is string tip&&tip.Contains(ReleaseFreshness.ConnectionNote)),name+": advertised participants are presented as confirmed peers.");
                 Expect(!texts.Any(x=>x.Text.Contains("source-secret")||x.Text.Contains("passkey=")),name+": source URL leaked into displayed status.");
                 if(misses.Count>0)Shot(name+"-initial");Check(misses.Count==0,string.Join(" | ",misses));
                 var toggle=FindVisual<Button>(Body,x=>AutomationProperties.GetName(x)=="Показать состояние источников")!;
@@ -61,6 +61,8 @@ public partial class MainWindow
                 var toolbarCheck=CheckReleaseToolbar(name,false,true);
                 var first=FindVisual<Button>(Body,x=>x.Tag is SourceEntry entry&&entry.Id==direct.Id)!;first.BringIntoView();await Settle();Shot(name);
                 checks.Add(new{Stage=name,DirectReceiptAge=true,IndexProvenance=true,LegacyDateUnknown=true,RussianAudioVisible=true,ParticipantsUnconfirmed=true,FailedRefreshKeepsPriorReceipt=true,Toolbar=toolbarCheck});
+                // The toolbar check may have re-rendered the page, so look the controls up again.
+                toggle=FindVisual<Button>(Body,x=>AutomationProperties.GetName(x)=="Показать состояние источников")!;sourcePanel=FindVisual<StackPanel>(Body,x=>x.Name=="ReleaseSourceDetails")!;
                 toggle.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Settle();
                 Check(sourcePanel.Visibility==Visibility.Collapsed,name+": repeated click did not collapse the source details.");
             }

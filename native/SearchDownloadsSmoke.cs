@@ -222,7 +222,7 @@ public partial class MainWindow
             var toggle=FindVisual<Button>(first,b=>AutomationProperties.GetName(b)==fixtures[^1].Action);check(toggle!=null&&VisualElements<System.Windows.Shapes.Path>(toggle).Any()&&toggle.ToolTip?.ToString()==fixtures[^1].Action,"pause or continue action is an icon button whose tooltip and accessible name state its action");
             foreach(var label in new[]{"Подробнее","Открыть папку","Действия загрузки"})
             {
-                var action=FindVisual<Button>(first,b=>AutomationProperties.GetName(b)==label);check(action!=null&&VisualElements<System.Windows.Shapes.Path>(action).Any(),"download action has an accessible label and recognizable icon: "+label);
+                var action=VisualElements<Button>(first).FirstOrDefault(b=>b.IsVisible&&AutomationProperties.GetName(b)==label);check(action!=null&&VisualElements<System.Windows.Shapes.Path>(action).Any(),"download action has an accessible label and recognizable icon: "+label);
             }
             var infoButton=FindVisual<Button>(first,b=>AutomationProperties.GetName(b)=="Подробнее")!;
             var infoPath=VisualElements<System.Windows.Shapes.Path>(infoButton).Single();
@@ -230,7 +230,7 @@ public partial class MainWindow
             check(glyphBox.Top>=infoButton.BorderThickness.Top+infoButton.Padding.Top-1&&glyphBox.Bottom<=infoButton.ActualHeight-infoButton.BorderThickness.Bottom-infoButton.Padding.Bottom+1,"information icon fits inside its button padding without clipping its lower edge");
             var more=FindVisual<Button>(first,b=>AutomationProperties.GetName(b)=="Действия загрузки")!;
             more.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await SettleDownloads();
-            check(more.ContextMenu is{IsOpen:true}&&more.ContextMenu.Items.OfType<MenuItem>().Select(x=>AutomationProperties.GetName(x)).Intersect(new[]{"Подробнее","Почему не скачивается?","Удалить из загрузок","Удалить файлы"}).Count()==4,"the row menu offers details, diagnostics and both removal actions");
+            check(more.ContextMenu is{IsOpen:true}&&more.ContextMenu.Items.OfType<MenuItem>().Select(x=>AutomationProperties.GetName(x)).Intersect(new[]{"Сведения о торренте","Почему не скачивается?","Удалить из загрузок","Удалить файлы"}).Count()==4,"the row menu offers details, diagnostics and both removal actions");
             var keep=more.ContextMenu!.Items.OfType<MenuItem>().Single(x=>AutomationProperties.GetName(x)=="Удалить из загрузок");var delete=more.ContextMenu.Items.OfType<MenuItem>().Single(x=>AutomationProperties.GetName(x)=="Удалить файлы");
 
             check(keep.Foreground is SolidColorBrush neutral&&Math.Abs(neutral.Color.R-neutral.Color.G)<35&&delete.Foreground is SolidColorBrush danger&&danger.Color.R>danger.Color.G+20,"keep-files removal is neutral gray and permanent file removal is red");
@@ -285,7 +285,13 @@ public partial class MainWindow
             }
             Height=360;await SettleDownloads();check(Body.ActualHeight>80&&Queue().ActualHeight>80,"download toolbar leaves room for the queue in a short window");Shot(this,"downloads-redesign-short");
             MinWidth=1280;Width=1280;Height=800;prefs.Light=false;ApplyTheme();Render();await SettleDownloads();
-            await ProbeDialog(w=>w.Title.StartsWith("Файлы · "),()=>FindVisual<Button>(FirstRow(),b=>AutomationProperties.GetName(b)=="Подробнее")!.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)),async dialog=>
+            var detailsToggle=FindVisual<Button>(FirstRow(),b=>AutomationProperties.GetName(b)=="Подробнее")!;var detailsItem=(DownloadItem)detailsToggle.Tag;
+            detailsToggle.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await SettleDownloads();
+            check(detailsItem.Expanded&&VisualElements<TextBlock>(FirstRow()).Any(t=>t.IsVisible&&t.Text=="ФАЙЛЫ · 2")&&VisualElements<TextBlock>(FirstRow()).Any(t=>t.IsVisible&&t.Text=="Серия 01.mkv")&&VisualElements<TextBlock>(FirstRow()).Any(t=>t.IsVisible&&t.Text=="Папка"),"Подробнее opens the queue row in place with its files, folder and sources");
+            Shot(this,"downloads-row-expanded");
+            detailsToggle=FindVisual<Button>(FirstRow(),b=>AutomationProperties.GetName(b)=="Подробнее")!;detailsToggle.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await SettleDownloads();
+            check(!detailsItem.Expanded&&!VisualElements<TextBlock>(FirstRow()).Any(t=>t.IsVisible&&t.Text=="ФАЙЛЫ · 2"),"a second click on Подробнее folds the row back");
+            await ProbeDialog(w=>w.Title.StartsWith("Файлы · "),()=>{var menuOwner=FindVisual<Button>(FirstRow(),b=>AutomationProperties.GetName(b)=="Действия загрузки")!;menuOwner.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));var entry=menuOwner.ContextMenu!.Items.OfType<MenuItem>().Single(x=>AutomationProperties.GetName(x)=="Сведения о торренте");menuOwner.ContextMenu.IsOpen=false;entry.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));},async dialog=>
             {
                 var files=FindVisual<ListBox>(dialog,b=>AutomationProperties.GetName(b)=="Файлы загрузки")!;
                 check(files.Items.Count==2&&VisualElements<TextBlock>(dialog).Any(t=>t.Text.Contains("Готово файлов: 1 из 2")),"details show episode names, individual progress and completed-file count");

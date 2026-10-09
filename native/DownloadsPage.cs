@@ -123,7 +123,11 @@ public partial class MainWindow
         }
         order.Click+=(_,_)=>OpenDownloadMenu(order);DockPanel.SetDock(order,Dock.Right);tabsRow.Children.Add(order);
         var segmentFrame=new Border{CornerRadius=new(12),BorderThickness=new(1),Padding=new(4),HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center};segmentFrame.SetResourceReference(Border.BackgroundProperty,"Panel");segmentFrame.SetResourceReference(Border.BorderBrushProperty,"EdgeSoft");AutomationProperties.SetName(segmentFrame,"Вкладки загрузок");
-        var segmentRow=new StackPanel{Orientation=Orientation.Horizontal};segmentFrame.Child=segmentRow;tabsRow.Children.Add(segmentFrame);
+        var segmentRow=new StackPanel{Orientation=Orientation.Horizontal};segmentFrame.Child=segmentRow;
+        // On narrow windows the strip scrolls sideways instead of being cut off; the wheel still scrolls the page.
+        var segmentScroll=new ScrollViewer{Name="DownloadTabsScroll",Content=segmentFrame,HorizontalScrollBarVisibility=ScrollBarVisibility.Auto,VerticalScrollBarVisibility=ScrollBarVisibility.Disabled,HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center};
+        segmentScroll.PreviewMouseWheel+=(sender,e)=>{if(e.Handled||sender is not ScrollViewer {Parent:UIElement parent})return;e.Handled=true;parent.RaiseEvent(new System.Windows.Input.MouseWheelEventArgs(e.MouseDevice,e.Timestamp,e.Delta){RoutedEvent=UIElement.MouseWheelEvent,Source=sender});};
+        tabsRow.Children.Add(segmentScroll);
         foreach(var (key,label) in new[]{("all","Все"),("active","Качаются"),("seeding","Раздаются"),("errors","Ошибки")})
         {
             var count=new TextBlock{FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=11,Opacity=.7,Margin=new(6,1,0,0),VerticalAlignment=VerticalAlignment.Center};downloadTabCounts[key]=count;
@@ -161,12 +165,14 @@ public partial class MainWindow
     {
         var zone=new Border{Name="DownloadDropZone",CornerRadius=new(18),Padding=new(28,20,28,20),Margin=new(0,4,0,12),Background=Brushes.Transparent};
         var dash=new System.Windows.Shapes.Rectangle{RadiusX=18,RadiusY=18,StrokeThickness=1.5,StrokeDashArray=[4,4],IsHitTestVisible=false};dash.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty,"TrackOff");
-        var row=new StackPanel{Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Center};
+        var row=new Grid{HorizontalAlignment=HorizontalAlignment.Center};row.ColumnDefinitions.Add(new(){Width=GridLength.Auto});row.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});row.ColumnDefinitions.Add(new(){Width=GridLength.Auto});
         var disc=new Border{Width=44,Height=44,CornerRadius=new(22),Margin=new(0,0,16,0),Child=new System.Windows.Shapes.Path{Data=(Geometry)FindResource("IconMagnet"),Width=20,Height=20,Stretch=Stretch.Uniform,StrokeThickness=1.8,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,StrokeLineJoin=PenLineJoin.Round}};disc.SetResourceReference(Border.BackgroundProperty,"AccentSoft");((System.Windows.Shapes.Path)disc.Child).SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty,"Accent");
-        row.Children.Add(disc);
-        var text=new TextBlock{Text="Перетащите .torrent-файл сюда или вставьте magnet-ссылку",FontSize=14,VerticalAlignment=VerticalAlignment.Center,TextWrapping=TextWrapping.Wrap,MaxWidth=420};text.SetResourceReference(TextBlock.ForegroundProperty,"Muted");row.Children.Add(text);
-        var key=new Border{CornerRadius=new(7),BorderThickness=new(1),Padding=new(7,4,7,4),Margin=new(16,0,0,0),VerticalAlignment=VerticalAlignment.Center,Child=new TextBlock{Text="Ctrl V",FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=11}};key.SetResourceReference(Border.BackgroundProperty,"Raised");key.SetResourceReference(Border.BorderBrushProperty,"Edge");((TextBlock)key.Child).SetResourceReference(TextBlock.ForegroundProperty,"Muted");row.Children.Add(key);
+        Grid.SetColumn(disc,0);row.Children.Add(disc);
+        var text=new TextBlock{Text="Перетащите .torrent-файл сюда или вставьте magnet-ссылку",FontSize=14,VerticalAlignment=VerticalAlignment.Center,TextWrapping=TextWrapping.Wrap,MaxWidth=420};text.SetResourceReference(TextBlock.ForegroundProperty,"Muted");Grid.SetColumn(text,1);row.Children.Add(text);
+        var key=new Border{CornerRadius=new(7),BorderThickness=new(1),Padding=new(7,4,7,4),Margin=new(16,0,0,0),VerticalAlignment=VerticalAlignment.Center,Child=new TextBlock{Text="Ctrl V",FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=11}};key.SetResourceReference(Border.BackgroundProperty,"Raised");key.SetResourceReference(Border.BorderBrushProperty,"Edge");((TextBlock)key.Child).SetResourceReference(TextBlock.ForegroundProperty,"Muted");Grid.SetColumn(key,2);row.Children.Add(key);
         var host=new Grid();host.Children.Add(dash);host.Children.Add(row);zone.Child=host;
+        // On very narrow windows the shortcut hint goes away so the sentence keeps enough room.
+        zone.SizeChanged+=(_,e)=>{var small=e.NewSize.Width<340;key.Visibility=small?Visibility.Collapsed:Visibility.Visible;zone.Padding=small?new(14,14,14,14):new(28,20,28,20);disc.Margin=small?new(0,0,10,0):new(0,0,16,0);};
         AutomationProperties.SetName(zone,"Перетащите .torrent-файл или вставьте magnet-ссылку");
         // The window handles the actual drop; the zone only shows the target while the pointer is over it.
         return zone;
@@ -221,7 +227,8 @@ public partial class MainWindow
         if(downloadAddButton!=null)downloadAddButton.Content=IconLabel(tiny?"":"Добавить торрент","IconPlus");
         var label=DownloadSortChoices.FirstOrDefault(x=>x.Key==downloadSort).Label??"Сначала новые";
         downloadOrder.Content=ChipContent(tiny?"":label,false,"IconFilter");downloadOrder.ToolTip="Сортировка: "+label;
-        if(downloadHeading!=null)downloadHeading.FontSize=shortView?22:28;
+        if(downloadHeading!=null)downloadHeading.FontSize=ActualWidth>0&&ActualWidth<400?16:ActualWidth<440?20:shortView?22:28;
+        foreach(var count in downloadTabCounts.Values)count.Visibility=ActualWidth>0&&ActualWidth<640?Visibility.Collapsed:Visibility.Visible;
         if(downloadHeadingHost!=null)downloadHeadingHost.Visibility=veryShort?Visibility.Collapsed:Visibility.Visible;
         if(downloadHeadingRow!=null)downloadHeadingRow.Margin=new(0,0,0,veryShort?2:shortView?8:16);
         if(downloadToolbar!=null)downloadToolbar.Margin=new(0);
@@ -234,7 +241,7 @@ public partial class MainWindow
             var columns=ActualWidth<780?1:3;
             for(var index=0;index<3;index++)
             {
-                var tile=downloadTiles.Children[index];Grid.SetColumn(tile,columns==1?0:index);Grid.SetRow(tile,columns==1?index:0);
+                var tile=downloadTiles.Children[index];Grid.SetColumn(tile,columns==1?0:index);Grid.SetRow(tile,columns==1?index:0);Grid.SetColumnSpan(tile,columns==1?3:1);
                 if(tile is FrameworkElement element)element.Margin=columns==1?new(0,0,0,index==2?0:8):new(index==0?0:6,0,index==2?0:6,0);
             }
             if(columns==1&&downloadTiles.RowDefinitions.Count<3)for(var index=0;index<3;index++)downloadTiles.RowDefinitions.Add(new(){Height=GridLength.Auto});
@@ -289,6 +296,21 @@ public partial class MainWindow
         if(wrap){Grid.SetColumn(actions,1);Grid.SetRow(actions,1);Grid.SetColumnSpan(actions,2);actions.HorizontalAlignment=HorizontalAlignment.Left;actions.Margin=new(8,10,0,0);}
         else{Grid.SetColumn(actions,2);Grid.SetRow(actions,0);Grid.SetColumnSpan(actions,1);actions.HorizontalAlignment=HorizontalAlignment.Right;actions.Margin=new(0);}
     }
+    // "Подробнее" opens the queue row in place: files, folder, sources and the added time.
+    void ToggleDownloadDetails(object sender,RoutedEventArgs e)
+    {
+        if(sender is not FrameworkElement {Tag:DownloadItem item})return;
+        item.Expanded=!item.Expanded;item.Refresh();
+    }
+    void DownloadDetailsPanelResized(object sender,SizeChangedEventArgs e)
+    {
+        if(sender is not Grid grid||!e.WidthChanged||grid.Children.Count<2||grid.ColumnDefinitions.Count<2)return;
+        var stacked=e.NewSize.Width<560;var info=grid.Children[1];
+        grid.ColumnDefinitions[1].MinWidth=stacked?0:220;grid.ColumnDefinitions[1].Width=stacked?new GridLength(0):new GridLength(1,GridUnitType.Star);
+        Grid.SetColumn(info,stacked?0:1);Grid.SetRow(info,stacked?1:0);
+        if(info is FrameworkElement element)element.Margin=stacked?new(0,10,0,0):new(0);
+        if(grid.Children[0] is FrameworkElement files)files.Margin=stacked?new(0):new(0,0,24,0);
+    }
     void WatchDownloadClick(object sender,RoutedEventArgs e){if(sender is FrameworkElement {Tag:DownloadItem item})WatchDownload(item);}
     void DownloadMoreClick(object sender,RoutedEventArgs e)
     {
@@ -300,7 +322,7 @@ public partial class MainWindow
             if(danger){entry.SetResourceReference(Control.ForegroundProperty,"Danger");if(entry.Icon is Path glyph){BindingOperations.ClearBinding(glyph,Shape.StrokeProperty);glyph.SetResourceReference(Shape.StrokeProperty,"Danger");}}
             menu.Items.Add(entry);return entry;
         }
-        Entry("Сведения о торренте","IconInfo","Подробнее",DownloadDetails,"Файлы, серии и источники");
+        Entry("Сведения о торренте","IconInfo","Сведения о торренте",DownloadDetails,"Файлы, серии и источники");
         Entry("Почему не скачивается?","IconAlert","Почему не скачивается?",ShowDownloadDiagnostics,"Проверить соединения и свободное место");
         menu.Items.Add(new Separator());
         Entry("Убрать из списка","IconQueueRemove","Удалить из загрузок",RemoveDownload,"Удалить из загрузок, сохранив скачанные файлы");
