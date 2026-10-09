@@ -30,6 +30,7 @@ public partial class MainWindow
         public object? RatingsContext;
         public DateTime RetryAfterUtc;
         public DateTime NextCacheTouchUtc;
+        public Exception? LastFailure;
     }
     IReadOnlyList<SourceEntry> sourceResults=[];
     string sourceQuery="",sourceCategory="Фильмы";
@@ -121,6 +122,7 @@ public partial class MainWindow
             return;
         }
         var sourceToken=item is MediaItem or DownloadItem?CancellationToken.None:sourceRequest?.Token??CancellationToken.None;
+        state.LastFailure=null;
         var request=state.Request=CancellationTokenSource.CreateLinkedTokenSource(sourceToken);request.CancelAfter(TimeSpan.FromSeconds(30));var token=request.Token;
         try
         {
@@ -138,7 +140,7 @@ public partial class MainWindow
             }
             finally{coverSlots.Release();}
         }
-        catch{if(ReferenceEquals(state.Request,request))state.RetryAfterUtc=DateTime.UtcNow.AddMinutes(2);}
+        catch(Exception error){if(ReferenceEquals(state.Request,request)){state.LastFailure=error;state.RetryAfterUtc=DateTime.UtcNow.AddMinutes(2);}}
         finally{if(ReferenceEquals(state.Request,request))state.Request=null;request.Dispose();}
     }
     static string? CoverUrl(object? item)=>item switch{SourceEntry source=>source.ImageUrl,MediaItem media=>media.ImageUrl,DownloadItem download=>download.ImageUrl,_=>null};

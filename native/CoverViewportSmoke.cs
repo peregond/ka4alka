@@ -83,11 +83,22 @@ public partial class MainWindow
 
     public async Task CoverViewportSmokeTest(string output)
     {
-        Directory.CreateDirectory(output);liveRequest?.Cancel();searchDelay.Stop();personRequest?.Cancel();catalogRefreshTimer.Stop();
+        Directory.CreateDirectory(output);liveRequest?.Cancel();liveLoading=false;searchDelay.Stop();personRequest?.Cancel();catalogRefreshTimer.Stop();
+        // A local IO fixture must not inherit a live catalog's startup shelves,
+        // loading panel, navigation restore or monitor-dependent page height.
+        // Keep the real window, ScrollViewer, image handlers and HTTP pipeline.
+        ResetDiscoveryData();CancelCatalogQualityCheck();CancelPeopleSearch();BeginCatalogNavigationRender();StopCoverViewport();
+        catalogList=null;catalogToolbar=null;inlineCatalogFilterScroll=null;discoveryHero=null;
+        Body.Children.Clear();Body.RowDefinitions.Clear();PageHeader.Children.Clear();FilterControls.Children.Clear();
+        FiltersPanel.Visibility=Visibility.Collapsed;LoadingIndicator.Visibility=Visibility.Collapsed;
+        designFixedViewport=true;MaxWidth=1200;MaxHeight=900;MinWidth=620;MinHeight=420;Width=900;Height=680;
+        Func<object>? failureState=null;
         async Task Until(Func<bool> ready,string failure)
         {
             for(var attempt=0;attempt<120;attempt++){UpdateLayout();if(ready())return;await Task.Delay(25);}
-            throw new Exception(failure);
+            var state=failureState?.Invoke();
+            if(state!=null)await File.WriteAllTextAsync(Path.Combine(output,"failure-state.json"),JsonSerializer.Serialize(state));
+            throw new Exception(failure+(state==null?"":Environment.NewLine+JsonSerializer.Serialize(state)));
         }
         using(var handler=new FeatureLookupFixture())
         using(var client=new SourceClient(handler))
@@ -122,6 +133,11 @@ public partial class MainWindow
         Body.Children.Clear();PageHeader.Children.Clear();var content=new StackPanel();var images=new List<Image>();
         for(var id=0;id<12;id++){var image=Poster(id,url+id+".png");images.Add(image);content.Children.Add(new Border{Height=160,Child=image});}
         var scroll=new ScrollViewer{Content=content,Height=280,Width=500,VerticalAlignment=VerticalAlignment.Top,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};Body.Children.Add(scroll);
+        failureState=()=>new{WindowWidth=ActualWidth,WindowHeight=ActualHeight,BodyWidth=Body.ActualWidth,BodyHeight=Body.ActualHeight,
+            ScrollHeight=scroll.ActualHeight,ViewportHeight=scroll.ViewportHeight,Offset=scroll.VerticalOffset,Tracked=coverViewport?.TrackedCount,Sweeps=coverViewport?.SweepCount,Slots=coverSlots.CurrentCount,
+            Posters=images.Select((image,id)=>{var request=ObserveDownloadCover(image);return new{Id=id,Requests=fixture.Count(id),image.IsLoaded,image.IsVisible,image.ActualWidth,image.ActualHeight,
+                Source=image.Source!=null,Position=coverViewport?.Measure(image),Pending=request.Request!=null,RetryAfter=request.RetryAfterUtc,
+                Failure=request.LastFailure?.ToString()};}).ToArray()};
         await Until(()=>images.Take(3).All(image=>image.Source!=null),"Visible posters and the nearest row did not load.");
         if(Enumerable.Range(3,9).Any(id=>fixture.Count(id)!=0))throw new Exception("An offscreen poster started network IO before scrolling.");
         if(images.Take(3).Any(image=>image.Source is not BitmapImage {IsFrozen:true,PixelWidth:280}))throw new Exception("Viewport posters lost frozen, bounded worker decoding.");
