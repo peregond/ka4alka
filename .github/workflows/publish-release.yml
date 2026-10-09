@@ -5,10 +5,7 @@ on:
       version:
         description: Version of the verified draft release to publish
         required: true
-        default: '0.40.3'
-  push:
-    branches: [claude/cool-turing-p412ok]
-    paths: ['.github/publish-trigger/0.40.3']
+        default: '0.40.4'
 permissions:
   contents: write
 jobs:
@@ -18,7 +15,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
-      RELEASE_VERSION: ${{ inputs.version || '0.40.3' }}
+      RELEASE_VERSION: ${{ inputs.version || '0.40.4' }}
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
     steps:
       - uses: actions/checkout@v4
