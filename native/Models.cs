@@ -90,6 +90,8 @@ public class Preferences
     public string Folder { get;set; }=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),"Downloads","Ka4alka");
     public bool FolderConfigured {get;set;}
     public bool Light {get;set;}=false;
+    public bool LanEnabled {get;set;}
+    public string LanDeviceName {get;set;}="";
     public string HomeCountry {get;set;}="rossiia";
     public int MaxDownloadKbps {get;set;}
     public int MaxUploadKbps {get;set;}
@@ -130,6 +132,10 @@ public class DownloadItem : INotifyPropertyChanged
     public string Id {get;set;}=Guid.NewGuid().ToString("N");
     public string Source {get;set;}="";
     public string? InfoHash {get;set;}
+    public string? RemoteSenderId {get;set;}
+    public string? RemoteRequestId {get;set;}
+    public string? RemoteSenderFingerprint {get;set;}
+    public string? RemoteContentDigest {get;set;}
     public string Folder {get;set;}="";
     public string Name {get;set;}="Получение метаданных…";
     public DateTime AddedUtc {get;set;}

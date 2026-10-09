@@ -5,21 +5,21 @@ on:
       version:
         description: Version matching native/Kachalka.csproj
         required: true
-        default: '0.38.0'
+        default: '0.39.0'
   push:
-    branches: [release/0.37.0, release/0.38.0]
-    paths: [.github/workflows/release.yml, 'native/**', 'update-core/**', 'updater/**', 'update-tests/**', 'tests/**', 'installer/**', build-release.ps1, package-release.ps1]
+    branches: [release/0.37.0, release/0.38.0, release/0.39.0]
+    paths: [.github/workflows/release.yml, 'native/**', 'lan-core/**', 'lan-tests/**', 'update-core/**', 'updater/**', 'update-tests/**', 'tests/**', 'installer/**', build-release.ps1, package-release.ps1]
 permissions:
   contents: write
 concurrency:
-  group: kachalka-release-0.38.0
+  group: kachalka-release-0.39.0
   cancel-in-progress: false
 jobs:
   release:
     runs-on: windows-latest
     timeout-minutes: 25
     env:
-      RELEASE_VERSION: ${{ inputs.version || '0.38.0' }}
+      RELEASE_VERSION: ${{ inputs.version || '0.39.0' }}
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
     steps:
       - uses: actions/checkout@v4
@@ -64,12 +64,12 @@ jobs:
         run: |
           $env:KACHALKA_DATA=Join-Path $env:RUNNER_TEMP 'kachalka-cinema-smoke'
           $output=Join-Path $pwd 'test-output/cinema-ui'
-          $process=Start-Process dist/Kachalka-0.38/Kachalka.exe -ArgumentList @('--cinema-smoke-test',$output) -PassThru
+          $process=Start-Process dist/Kachalka-0.39/Kachalka.exe -ArgumentList @('--cinema-smoke-test',$output) -PassThru
           if(-not $process.WaitForExit(60000)){$process.Kill();throw 'Person card UI smoke timed out'}
           if($process.ExitCode -ne 0 -or (Test-Path "$output/error.txt") -or -not (Test-Path "$output/checks.json")){throw 'Person card UI smoke failed'}
-      - name: Verify upgrade from previously published 0.37.0
+      - name: Verify upgrade from previously published 0.38.0
         shell: pwsh
-        run: ./tests/WindowsPublishedUpgrade.ps1 -FromVersion 0.37.0 -ReleaseDirectory ('dist/release-'+$env:RELEASE_VERSION)
+        run: ./tests/WindowsPublishedUpgrade.ps1 -FromVersion 0.38.0 -ReleaseDirectory ('dist/release-'+$env:RELEASE_VERSION)
       - name: Upload verified files to draft GitHub Release
         shell: pwsh
         env:
@@ -121,7 +121,7 @@ jobs:
             Copy-Item $source $target
             $previews+=$target
           }
-          foreach($scenario in @('release-freshness','interface-polish','bug-report')){
+          foreach($scenario in @('release-freshness','interface-polish','bug-report','lan-ui')){
             $screens=@(Get-ChildItem (Join-Path 'test-output' $scenario) -Filter '*.png')
             if($screens.Count -eq 0){throw ('Missing '+$scenario+' rendered review evidence')}
             foreach($screen in $screens){
@@ -148,6 +148,10 @@ jobs:
             test-output/release-freshness/*
             test-output/interface-polish/*
             test-output/bug-report/*
+            test-output/lan-*/checks.json
+            test-output/lan-*/checks.txt
+            test-output/lan-*/error.txt
+            test-output/lan-*/*.png
             test-output/cinema-ui/*
             test-output/cinema-source/*
             test-output/cinema-source-diagnostics/*

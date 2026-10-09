@@ -1,8 +1,8 @@
 name: Native UI preview
 on:
   push:
-    branches: [codex/download-reliability-0.35.0, codex/film-ux-0.35, codex/catalog-experience-0.37.0, codex/minimal-home-0.38.0]
-    paths: ['native/**', 'tests/**', '.github/workflows/ui-preview.yml']
+    branches: [codex/download-reliability-0.35.0, codex/film-ux-0.35, codex/catalog-experience-0.37.0, codex/minimal-home-0.38.0, codex/lan-downloads-0.39.0, release/0.39.0]
+    paths: ['native/**', 'lan-core/**', 'lan-tests/**', 'tests/**', '.github/workflows/ui-preview.yml']
   workflow_dispatch:
 permissions:
   contents: write
@@ -65,7 +65,7 @@ jobs:
         shell: pwsh
         run: |
           $failures=@()
-          foreach($scenario in @('cover-viewport','catalog-navigation','release-freshness','interface-polish','bug-report')){
+          foreach($scenario in @('cover-viewport','catalog-navigation','release-freshness','interface-polish','bug-report','lan')){
             try {
               $output=Join-Path $PWD ('test-output/ui-preview/'+$scenario)
               $app=Start-Process (Join-Path $PWD 'dist/ui-preview/Kachalka.exe') -ArgumentList @('--'+$scenario+'-smoke-test',('"'+$output+'"')) -PassThru

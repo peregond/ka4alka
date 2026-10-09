@@ -40,6 +40,7 @@ static class DownloadReliabilityTests
         long free=4L*1024*1024*1024;
         var space=new DownloadSpace(_=>new("fixture-volume",Volatile.Read(ref free)),path=>File.Exists(path)?new FileInfo(path).Length:0);
         var service=new DownloadService(Settings("reliability-download-cache",Port()),downloadLimitKbps:256,downloadSpace:space);
+        var diagnosticService=service;
         var notices=new List<DownloadNotice>();service.Notice+=notices.Add;
         try
         {
@@ -49,9 +50,9 @@ static class DownloadReliabilityTests
             printDiagnostics=()=>
             {
                 Console.WriteLine($"RELIABILITY SEED: state={seeder.State}, progress={seeder.Progress:F2}, bytesSent={seeder.Monitor.DataBytesSent}, connections={seeder.OpenConnections}, hash={seeder.InfoHashes.V1?.ToHex()}, configuredPort={seedPort}, error={seeder.Error?.Exception?.Message}");
-                foreach(var item in service.Items)
+                foreach(var item in diagnosticService.Items)
                 {
-                    if(!Managers(service).TryGetValue(item.Id,out var current)){Console.WriteLine($"RELIABILITY TASK: paused={item.Paused}, diskPaused={item.LowSpacePaused}, manager=absent");continue;}
+                    if(!Managers(diagnosticService).TryGetValue(item.Id,out var current)){Console.WriteLine($"RELIABILITY TASK: paused={item.Paused}, diskPaused={item.LowSpacePaused}, manager=absent");continue;}
                     Console.WriteLine($"RELIABILITY DOWNLOAD: state={current.State}, progress={current.Progress:F2}, selectedProgress={current.PartialProgress:F2}, bytesReceived={current.Monitor.DataBytesReceived}, connections={current.OpenConnections}, hash={current.InfoHashes.V1?.ToHex()}, paused={item.Paused}, diskPaused={item.LowSpacePaused}, error={current.Error?.Exception?.Message}");
                 }
             };
@@ -111,7 +112,12 @@ static class DownloadReliabilityTests
             // metadata discovery, then the now-known payload size triggers pause.
             Environment.SetEnvironmentVariable("KACHALKA_DATA",Path.Combine(root,"reliability-magnet-state"));
             free=DownloadSpace.SafetyBytes;
-            var magnetic=new DownloadService(Settings("reliability-metadata-cache",Port()),downloadLimitKbps:32,downloadSpace:space);var magneticNotices=new List<DownloadNotice>();magnetic.Notice+=magneticNotices.Add;
+            // This fixed synthetic volume has no payload allocation credited.
+            // MonoTorrent may preallocate/extend real fixture files while the
+            // metadata callback's disk check is queued. Logical file length
+            // cannot represent allocation on this independent fake volume.
+            var metadataSpace=new DownloadSpace(_=>new("fixture-volume",Volatile.Read(ref free)),_=>0);
+            var magnetic=new DownloadService(Settings("reliability-metadata-cache",Port()),downloadLimitKbps:32,downloadSpace:metadataSpace);var magneticNotices=new List<DownloadNotice>();magnetic.Notice+=magneticNotices.Add;diagnosticService=magnetic;
             try
             {
                 var magnet="magnet:?xt=urn:btih:"+seeder.InfoHashes.V1!.ToHex()+"&dn=reliable.bin";

@@ -21,6 +21,15 @@ public partial class MainWindow
         var snapshot=new DownloadDiagnosticSnapshot{CapturedUtc=DateTime.UtcNow,StartedUtc=DateTime.UtcNow.AddMinutes(-2),ManagerAvailable=true,State=TorrentState.Downloading,HasMetadata=true,NetworkAvailable=null,Connections=0,SpaceCheck=new(8L*1024*1024*1024,2L*1024*1024*1024,1L*1024*1024*1024,768L*1024*1024),Trackers=[new("tracker.example","udp","Offline",Failed:true),new("tracker2.example","https","Unknown")]};
         var windows=new List<Window>();var shots=new List<object>();
         void Check(bool value,string message){if(!value)throw new Exception(message);}
+        void CheckCopiedReport(bool value,Window window,string report,string message)
+        {
+            if(value)return;
+            var notice=FindVisual<TextBlock>(window,text=>text.Name=="DownloadDiagnosisNotice")?.Text??"Notice control missing.";
+            var evidence=DiagnosticReport.Redact("Copy notice: "+notice+Environment.NewLine+"Clipboard report:"+Environment.NewLine+report,
+                new[]{item.Folder,prefs.Folder,Preferences.DataDir,Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)});
+            if(evidence.Length>8192)evidence=evidence[..8192]+Environment.NewLine+"[remaining clipboard evidence omitted]";
+            throw new Exception(message+Environment.NewLine+evidence);
+        }
         async Task Settle(Window window){window.UpdateLayout();await window.Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);await Task.Delay(100);window.UpdateLayout();}
         Button FindButton(Window window,string name)=>FindVisual<Button>(window,b=>b.Name==name)??throw new Exception("Missing diagnostic button "+name);
         void Shot(Window window,string name)
@@ -48,7 +57,8 @@ public partial class MainWindow
                     var reason=FindVisual<TextBlock>(opened,t=>t.Name=="DownloadDiagnosisReason");
                     Check(reason?.Text=="Загрузка на паузе","Opening diagnostics changed or misrepresented a manual pause.");
                     FindButton(opened,"CopyDownloadDiagnosis").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
-                    Check(Clipboard.ContainsText()&&Clipboard.GetText().Contains("Диагностика загрузки")&&!Clipboard.GetText().Contains(item.Folder),"The row dialog did not copy a privacy-redacted report.");
+                    var copied=Clipboard.GetText();
+                    CheckCopiedReport(Clipboard.ContainsText()&&copied.Contains("Диагностика загрузки")&&!copied.Contains(item.Folder),opened,copied,"The row dialog did not copy a privacy-redacted report.");
                     rowChecked=true;
                 }
                 catch(Exception error){rowFailure=error;}
@@ -80,7 +90,8 @@ public partial class MainWindow
                 var copyOrigin=copy.TranslatePoint(new Point(),dialog);
                 Check(copyOrigin.X>=0&&copyOrigin.X+copy.ActualWidth<=dialog.ActualWidth+1,"Diagnostic footer action overflows horizontally.");
                 copy.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
-                Check(Clipboard.GetText().Contains("Состояние сети пока неизвестно")&&Clipboard.GetText().Contains("tracker.example"),"Report invented an outage or lost tracker observations.");
+                var copied=Clipboard.GetText();
+                CheckCopiedReport(copied.Contains("Состояние сети пока неизвестно")&&copied.Contains("tracker.example"),dialog,copied,"Report invented an outage or lost tracker observations.");
                 Shot(dialog,"diagnostics-"+size.Item1+"-"+(light?"light":"dark"));
             }
             snapshot=snapshot with{Paused=true};item.Paused=true;

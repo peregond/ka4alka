@@ -101,7 +101,7 @@ public partial class MainWindow
         {
             var grid=new Grid();
             foreach(var weight in new[]{1.6,.85,.7,1.2,.85,1.2,.7})grid.ColumnDefinitions.Add(new(){Width=new GridLength(weight,GridUnitType.Star)});
-            grid.ColumnDefinitions.Add(new(){Width=new GridLength(112)});
+            grid.ColumnDefinitions.Add(new(){Width=new GridLength(154)});
             return grid;
         }
         TextBlock Cell(string value,int column,bool muted=false)
@@ -109,12 +109,7 @@ public partial class MainWindow
             var label=new TextBlock{Text=value,TextWrapping=TextWrapping.Wrap,Margin=new(10,15,10,15),VerticalAlignment=VerticalAlignment.Center,FontSize=12};
             label.SetResourceReference(TextBlock.ForegroundProperty,muted?"Muted":"Text");Grid.SetColumn(label,column);return label;
         }
-        Button DownloadButton(SourceEntry entry)
-        {
-            var download=new Button{Content="Скачать",Tag=entry,Style=(Style)FindResource("PrimaryButton"),HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Center,Margin=new(0),Padding=new(13,9,13,9)};
-            AutomationProperties.SetName(download,"Скачать раздачу: "+entry.Title);
-            download.Click+=SourceDownload;return download;
-        }
+        FrameworkElement DownloadButton(SourceEntry entry)=>LanDownloadAction(entry);
         FrameworkElement CompactRelease(SourceEntry entry)
         {
             var body=new StackPanel();
@@ -143,7 +138,7 @@ public partial class MainWindow
                 var line=Text(value,12,true);line.Margin=new(0,0,0,6);details.Children.Add(line);
             }
             body.Children.Add(details);
-            var footer=new Grid();footer.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});footer.ColumnDefinitions.Add(new(){Width=GridLength.Auto});
+            var footer=new WrapPanel{HorizontalAlignment=HorizontalAlignment.Left};
             var expand=new Button{Content=state.Expanded.Contains(key)?"Скрыть детали":"Подробнее",Style=(Style)FindResource("QuietButton"),HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center,Margin=new(0),Padding=new(0,8,8,8),BorderThickness=new(0)};
             AutomationProperties.SetName(expand,"Показать или скрыть параметры раздачи: "+entry.Title);
             expand.Click+=(_,_)=>
@@ -152,7 +147,7 @@ public partial class MainWindow
                 details.Visibility=open?Visibility.Visible:Visibility.Collapsed;expand.Content=open?"Скрыть детали":"Подробнее";
                 if(open)state.Expanded.Add(key);else state.Expanded.Remove(key);
             };
-            footer.Children.Add(expand);var download=DownloadButton(entry);Grid.SetColumn(download,1);footer.Children.Add(download);body.Children.Add(footer);
+            footer.Children.Add(expand);var download=DownloadButton(entry);footer.Children.Add(download);body.Children.Add(footer);
             var card=new Border{Child=body,CornerRadius=new(12),Padding=new(16),Margin=new(0,0,0,10),BorderThickness=new(1)};
             card.SetResourceReference(Border.BackgroundProperty,"Panel");card.SetResourceReference(Border.BorderBrushProperty,"EdgeSoft");return card;
         }

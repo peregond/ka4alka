@@ -38,6 +38,7 @@ public partial class MainWindow:Window
         EnableShortcuts();
         try{downloads=new(null,prefs.MaxDownloadKbps,prefs.MaxUploadKbps);}catch(Exception e){downloads=newEmpty(prefs.MaxDownloadKbps,prefs.MaxUploadKbps);Status.Text="Не удалось прочитать очередь: "+e.Message;}
         InitializeDownloadReliability();
+        InitializeLanDevices();
         foreach(var name in new[]{"Фильмы","Сериалы"}) { var n=name;var b=ActionButton(n,n=="Фильмы"?"IconMovies":"IconSeries",()=>ShowCatalogSection(n),"NavButton");b.Tag=n;b.ToolTip=n;b.HorizontalContentAlignment=HorizontalAlignment.Left;b.Margin=new(0,0,0,5);Navigation.Children.Add(b); }
         refresh.Tick+=(_,_)=>RefreshDownloadsReliably();
         ContentRendered+=async(_,_)=>{if(!prefs.AutoResumeDownloads||downloads.PendingResumeCount==0)return;Status.Text="Продолжаем загрузки…";var resumed=await downloads.ResumePendingAsync();Status.Text=resumed>0?$"Продолжено загрузок: {resumed}":"Не удалось продолжить загрузки. Проверь очередь.";if(!closed){SyncTimer();if(section=="Загрузки")Render();}};
@@ -158,10 +159,10 @@ public partial class MainWindow:Window
     {
         if(closed)return;e.Cancel=true;if(closing)return;closing=true;StopCoverViewport();
         DiagnosticLog.Write("closing",new{QueueCount=downloads.Items.Count});Status.Text="Сохраняем загрузки и закрываем приложение…";
-        IsEnabled=false;StopDownloadReliability();personRequest?.Cancel();updateCancellation.Cancel();catalogRefreshTimer.Stop();refresh.Stop();searchDelay.Stop();liveRequest?.Cancel();sourceRequest?.Cancel();archiveRequest?.Cancel();broadcastRequest?.Cancel();
+        IsEnabled=false;StopDownloadReliability();var lanStopped=StopLanDevicesAsync();personRequest?.Cancel();updateCancellation.Cancel();catalogRefreshTimer.Stop();refresh.Stop();searchDelay.Stop();liveRequest?.Cancel();sourceRequest?.Cancel();archiveRequest?.Cancel();broadcastRequest?.Cancel();
         ResetDiscoveryData();CancelDetailMetadata();CancelCatalogQualityCheck();CancelPeopleSearch();foreach(var view in releaseViews.Values)view.Request?.Cancel();
         bool saved=false;
-        try{prefs.Save();await downloads.Close();saved=true;DiagnosticLog.Write("closed",new{QueueSaved=true});}
+        try{prefs.Save();await downloads.Close();await lanStopped;saved=true;DiagnosticLog.Write("closed",new{QueueSaved=true});}
         catch(Exception ex){ErrorLog.Write(ex);MessageBox.Show(ex.Message,"Не удалось сохранить очередь");}
         finally
         {
