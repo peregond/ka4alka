@@ -61,7 +61,7 @@ public partial class MainWindow
         var posterGrid=new Grid();
         posterGrid.Children.Add(new TextBlock{Text="Постер\nнедоступен",Foreground=(Brush)FindResource("BannerMuted"),Opacity=.75,TextAlignment=TextAlignment.Center,VerticalAlignment=VerticalAlignment.Center,FontSize=11});
         var image=new Image{DataContext=item,Stretch=Stretch.UniformToFill};image.Loaded+=SourceCover;image.DataContextChanged+=SourceCoverChanged;posterGrid.Children.Add(image);
-        detailPoster=new Border{Width=168,Height=252,CornerRadius=new(14),ClipToBounds=true,Background=item.Cover,BorderBrush=(Brush)FindResource("BannerChip"),BorderThickness=new(1),HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Bottom,Margin=new(0,0,28,0),Child=posterGrid};
+        detailPoster=new Border{Width=168,Height=252,CornerRadius=new(14),ClipToBounds=true,Background=item.Cover,BorderBrush=(Brush)FindResource("BannerChip"),BorderThickness=new(1),HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Top,Margin=new(0,0,28,0),Child=posterGrid};
         detailPoster.SizeChanged+=(sender,_)=>ClipPoster((Border)sender);
         detailHero.Children.Add(detailPoster);
 
@@ -237,12 +237,7 @@ public partial class MainWindow
         {
             detailActions.Children.Add(Action("Выбрать раздачу","IconDownload",true,()=>ScrollToReleases()));
         }
-        if(releases.Count>0&&done==null)
-        {
-            var all=Action("Все раздачи","IconFilter",false,()=>ScrollToReleases());
-            if(all.Content is Panel allRow)allRow.Children.Add(new TextBlock{Text=releases.Count.ToString(),FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=13,Opacity=.7,Margin=new(8,0,0,0),VerticalAlignment=VerticalAlignment.Center});
-            AutomationProperties.SetName(all,"Все раздачи");detailActions.Children.Add(all);
-        }
+        // No separate "all releases" button: the list sits right below the banner on this page.
         var saved=IsSaved(item);
         Button favorite=null!;favorite=new Button{Name="DetailFavorite",Style=(Style)FindResource("IconButton"),Width=52,Height=52,Margin=new(0,0,10,8)};
         favorite.SetResourceReference(Control.BackgroundProperty,"BannerAction");favorite.SetResourceReference(Control.BorderBrushProperty,"BannerEdge");favorite.Foreground=(Brush)FindResource("BannerText");
