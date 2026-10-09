@@ -65,7 +65,9 @@ jobs:
               elseif($p.ExitCode -ne 0){$status='exit '+$p.ExitCode}
             }catch{$status='crashed';$detail=$_.Exception.Message}
             if($status -eq 'ok' -and -not (Test-Path $out)){$status='noevidence';$detail='exit '+$p.ExitCode+'; output folder was never created'}
-            Write-Output ('    exit='+$p.ExitCode+' files='+@(Get-ChildItem $out -ErrorAction SilentlyContinue).Count)
+            $note='    '+$s.Dir+' exit='+$p.ExitCode+' files='+(@(Get-ChildItem $out -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object {$_.Name}) -join ',')
+            Write-Output $note
+            Add-Content test-output/scenarios.txt $note
             $results+=[pscustomobject]@{Scenario=$s.Dir;Status=$status}
             Write-Output ('=== '+$s.Dir+': '+$status)
             if($detail){Write-Output $detail}
