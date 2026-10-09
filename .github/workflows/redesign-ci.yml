@@ -64,6 +64,8 @@ jobs:
               elseif(Test-Path (Join-Path $out 'error.txt')){$status='failed';$detail=(Get-Content (Join-Path $out 'error.txt') -Raw)}
               elseif($p.ExitCode -ne 0){$status='exit '+$p.ExitCode}
             }catch{$status='crashed';$detail=$_.Exception.Message}
+            if($status -eq 'ok' -and -not (Test-Path $out)){$status='noevidence';$detail='exit '+$p.ExitCode+'; output folder was never created'}
+            Write-Output ('    exit='+$p.ExitCode+' files='+@(Get-ChildItem $out -ErrorAction SilentlyContinue).Count)
             $results+=[pscustomobject]@{Scenario=$s.Dir;Status=$status}
             Write-Output ('=== '+$s.Dir+': '+$status)
             if($detail){Write-Output $detail}
