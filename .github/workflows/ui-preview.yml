@@ -34,7 +34,12 @@ jobs:
           $output=Join-Path $PWD 'test-output/ui-preview/text-rendering'
           $app=Start-Process (Join-Path $PWD 'dist/ui-preview/Kachalka.exe') -ArgumentList @('--text-rendering-smoke-test',('"'+$output+'"')) -PassThru
           if(-not $app.WaitForExit(120000)){$app.Kill($true);throw 'Native typography verification timed out'}
-          if(Test-Path (Join-Path $output 'error.txt')){throw (Get-Content (Join-Path $output 'error.txt') -Raw)}
+          if(Test-Path (Join-Path $output 'error.txt')){
+            $errorText=Get-Content (Join-Path $output 'error.txt') -Raw
+            $message=($errorText -split "`r?`n")[0].Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A')
+            Write-Output "::error title=Native typography::$message"
+            throw $errorText
+          }
           if($app.ExitCode -ne 0 -or -not(Test-Path (Join-Path $output 'checks.json'))){throw 'Native typography evidence missing'}
           Get-Content (Join-Path $output 'checks.json')
       - name: Render and validate interface

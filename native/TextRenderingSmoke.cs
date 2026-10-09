@@ -38,33 +38,48 @@ public partial class MainWindow
             var source=PresentationSource.FromVisual(element) as HwndSource??throw new Exception("Text probe has no native HWND render target.");
             Check(TextProbeGetWindowRect(source.Handle,out var rect),"Native typography HWND exposes its physical bounds.");
             var dpi=(int)Math.Round(96*scale);
-            TextProbeSendMessage(source.Handle,0x02E0,new IntPtr(dpi|(dpi<<16)),ref rect);
-            await Settle(element);
+            var popup=element is ContextMenu;
+            if(!popup)
+            {
+                TextProbeSendMessage(source.Handle,0x02E0,new IntPtr(dpi|(dpi<<16)),ref rect);
+                await Settle(element);
+            }
+            source=PresentationSource.FromVisual(element) as HwndSource??throw new Exception("Native DPI transition detached the "+element.GetType().Name+" visual.");
+            var target=source.CompositionTarget??throw new Exception("Native DPI transition disposed the "+element.GetType().Name+" HWND target.");
             var actual=VisualTreeHelper.GetDpi(element);
             var nativeMessageEffective=Math.Abs(actual.DpiScaleX-scale)<.001&&Math.Abs(actual.DpiScaleY-scale)<.001;
+            var transitionMethod="No transition needed; native target already at requested DPI";
+            if(!popup&&nativeMessageEffective)transitionMethod="WM_DPICHANGED";
             if(!nativeMessageEffective)
             {
                 // Windows can discard synthetic monitor messages on a runner
                 // whose physical monitor remains at 96 DPI. Exercise WPF's
                 // same real HWND-target transition directly in this test;
                 // it updates renderer transforms, glyph DPI and visual flags.
+                // A popup closes when it receives a top-level DPI message.
+                // The after-parent path updates the same real render target
+                // without activating its HWND and dismissing the menu.
+                var eventType=popup?typeof(HwndTarget).Assembly.GetType("System.Windows.HwndDpiChangedAfterParentEventArgs")??throw new Exception("WPF popup DPI event is unavailable."):typeof(HwndDpiChangedEventArgs);
+                var methodName=popup?"OnDpiChangedAfterParent":"OnDpiChanged";
                 var signature=new[]{typeof(DpiScale),typeof(DpiScale),typeof(Rect)};
-                var constructor=typeof(HwndDpiChangedEventArgs).GetConstructor(BindingFlags.Instance|BindingFlags.NonPublic,null,signature,null)
+                var constructor=eventType.GetConstructor(BindingFlags.Instance|BindingFlags.NonPublic,null,signature,null)
                     ??throw new Exception("WPF native DPI event constructor is unavailable.");
                 var change=constructor.Invoke([actual,new DpiScale(scale,scale),new Rect(rect.Left,rect.Top,rect.Right-rect.Left,rect.Bottom-rect.Top)]);
-                var method=typeof(HwndTarget).GetMethod("OnDpiChanged",BindingFlags.Instance|BindingFlags.NonPublic,null,[typeof(HwndDpiChangedEventArgs)],null)
+                var method=typeof(HwndTarget).GetMethod(methodName,BindingFlags.Instance|BindingFlags.NonPublic,null,[eventType],null)
                     ??throw new Exception("WPF HWND-target DPI transition is unavailable.");
-                method.Invoke(source.CompositionTarget,[change]);
+                method.Invoke(target,[change]);transitionMethod="Test-only HwndTarget."+methodName+", the native WPF renderer transition";
                 if(ReferenceEquals(element,this))FitToMonitor(false);
                 await Settle(element);actual=VisualTreeHelper.GetDpi(element);
             }
-            var matrix=source.CompositionTarget.TransformToDevice;
+            source=PresentationSource.FromVisual(element) as HwndSource??throw new Exception("Scaled "+element.GetType().Name+" visual has no live HWND.");
+            target=source.CompositionTarget??throw new Exception("Scaled "+element.GetType().Name+" visual has no live HWND target.");
+            var matrix=target.TransformToDevice;
             Check(Math.Abs(actual.DpiScaleX-scale)<.001&&Math.Abs(actual.DpiScaleY-scale)<.001,
                 $"Native DPI transition reaches the actual {scale*100:F0}% visual metrics ({element.GetType().Name}: {actual.DpiScaleX:F3},{actual.DpiScaleY:F3}).");
             Check(Math.Abs(matrix.M11-scale)<.001&&Math.Abs(matrix.M22-scale)<.001,
                 $"The native HWND render target renders at {dpi} DPI.");
-            transitions.Add(new{Surface=element.GetType().Name,RequestedDpi=dpi,ActualDpi=actual.PixelsPerInchX,NativeMessageEffective=nativeMessageEffective,
-                Method=nativeMessageEffective?"WM_DPICHANGED":"Test-only HwndTarget.OnDpiChanged, the native WPF renderer transition"});
+            transitions.Add(new{Surface=element.GetType().Name,RequestedDpi=dpi,ActualDpi=actual.PixelsPerInchX,NativeMessageEffective=!popup&&nativeMessageEffective,
+                Method=transitionMethod});
         }
         void Fit(double scale)
         {
@@ -217,7 +232,7 @@ public partial class MainWindow
             }
             finally{Restore(FontFamilyProperty,previousFamily);}
             File.WriteAllText(Path.Combine(output,"checks.json"),JsonSerializer.Serialize(new{Version=typeof(MainWindow).Assembly.GetName().Version?.ToString(3),
-                DpiMethod="Controlled WM_DPICHANGED, with test-only HwndTarget.OnDpiChanged when the runner ignores synthetic monitor messages; actual WPF visual and render-target metrics verified; physical monitor DPI is unchanged and reported separately",
+                DpiMethod="Controlled WM_DPICHANGED for windows; test-only HwndTarget.OnDpiChanged fallback and OnDpiChangedAfterParent for popups; actual WPF visual and render-target metrics verified; physical monitor DPI is unchanged and reported separately",
                 Smoothing=new{smoothing.OriginalEnabled,smoothing.OriginalType,smoothing.Enabled,smoothing.Type},Fonts=fonts,Cases=cases,Variants=variants,DpiTransitions=transitions,Screenshots=screenshots,Checks=checks},new JsonSerializerOptions{WriteIndented=true}));
         }
         finally
