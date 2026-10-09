@@ -129,7 +129,9 @@ public partial class MainWindow
         var glyph=new System.Windows.Shapes.Path{Data=(Geometry)FindResource("IconDownload"),Width=16,Height=16,Stretch=Stretch.Uniform,StrokeThickness=1.8,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,StrokeLineJoin=PenLineJoin.Round,Margin=new(0,0,8,0),VerticalAlignment=VerticalAlignment.Center};glyph.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty,"Accent");
         localRow.Children.Add(glyph);localRow.Children.Add(new TextBlock{Text="Скачать",VerticalAlignment=VerticalAlignment.Center});local.Content=localRow;
         AutomationProperties.SetName(local,"Скачать раздачу: "+entry.Title);local.Click+=SourceDownload;
-        var remote=new Button{Style=(Style)FindResource("IconButton"),Width=44,Height=44,Margin=new(6,0,0,0),ToolTip="Скачать на другом устройстве"};
+        var remote=new Button{Style=(Style)FindResource("IconButton"),Width=44,Height=44,Margin=new(6,0,0,0),ToolTip="Отправить на другой компьютер в сети: он скачает раздачу сам"};
+        // The laptop action only makes sense once another computer is paired; until then it stays out of every row.
+        remote.Visibility=prefs.LanEnabled&&lanService?.IsRunning==true&&lanService.Devices.Any(device=>device.Paired)?Visibility.Visible:Visibility.Collapsed;
         remote.Content=IconLabel("","IconLaptop",18);
         AutomationProperties.SetName(remote,"Скачать на другом устройстве: "+entry.Title);
         remote.Click+=async(_,_)=>await SendReleaseToLanAsync(remote,entry);

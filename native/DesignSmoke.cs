@@ -289,6 +289,15 @@ public partial class MainWindow
             var shownReleases=VisualElements<Button>(Body).Where(x=>x.IsVisible&&x.Tag is SourceEntry&&x.Name!="DetailDownload").Select(x=>(SourceEntry)x.Tag).ToArray();
             if(shownReleases.Length!=1||shownReleases[0].Id!="series-s02")throw new Exception("Series season filter selected the wrong episode.");
             FindVisual<ScrollViewer>(Body,_=>true)?.ScrollToTop();await Settle();Shot("series-season-filter");
+            {
+                // Seasons are a segment strip above the quality row; choosing one there filters the list too.
+                var secondSeason=FindVisual<RadioButton>(Body,x=>AutomationProperties.GetName(x)=="Сезон: 2 сезон")??throw new Exception("Series season strip is missing.");
+                if(secondSeason.IsChecked!=true||!secondSeason.IsVisible)throw new Exception("Series season strip does not follow the selected season.");
+                var firstSeason=FindVisual<RadioButton>(Body,x=>AutomationProperties.GetName(x)=="Сезон: 1 сезон")!;firstSeason.IsChecked=true;await Settle();
+                var seasonReleases=VisualElements<Button>(Body).Where(x=>x.IsVisible&&x.Tag is SourceEntry&&x.Name!="DetailDownload").Select(x=>(SourceEntry)x.Tag).ToArray();
+                if(seasonReleases.Length!=1||seasonReleases[0].Id!="series-s01"||seasonFilter.SelectedItem?.ToString()!="1 сезон")throw new Exception("Choosing a season in the strip did not filter its releases.");
+                Shot("series-season-strip");
+            }
             await Size(1760,950);section="Загрузки";current=null;Render();await Settle();
             if(downloads.Items.Count!=0||downloads.EngineCreated)throw new Exception("Design smoke unexpectedly created a download.");
             Shot("downloads-empty");
@@ -343,6 +352,15 @@ public partial class MainWindow
             }
             if(downloads.EngineCreated)throw new Exception("Download visual fixtures unexpectedly started an engine.");
             downloads.Items.Clear();
+            {
+                // While the first catalog page loads, the grid shows grey poster shapes instead of a sentence.
+                var loadedItems=liveItems.ToArray();var wasLoading=liveLoading;
+                await Size(1760,950);section="Фильмы";current=null;liveItems=[];liveLoading=true;Render();await Settle();
+                var skeleton=FindVisual<System.Windows.Controls.Primitives.UniformGrid>(Body,x=>x.Name=="CatalogSkeleton");
+                if(skeleton==null||!skeleton.IsVisible||skeleton.Children.Count<2)throw new Exception("The loading catalog does not show poster placeholders.");
+                Shot("catalog-loading");
+                liveItems=loadedItems;liveLoading=wasLoading;Render();await Settle();
+            }
             File.WriteAllText(Path.Combine(output,"design.json"),JsonSerializer.Serialize(new
             {
                 CatalogFallback=designCatalogFallback,CatalogCacheFile=designCatalogFile,CatalogCount=liveItems.Count,CachedPosters=designCachedPosters,CatalogColumns=catalogColumnsLight,

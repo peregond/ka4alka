@@ -177,7 +177,8 @@ public partial class MainWindow
         // lists keep the row pinned under the search so selected-filter chips never move the list below them.
         AddDiscovery(content,cards,DiscoveryCatalog?TakeFiltersPanel():null);
         content.Children.Add(list);
-        if(cards.Length==0)
+        if(cards.Length==0&&liveLoading&&!CatalogQualityChecking)content.Children.Add(PosterSkeleton(2,"CatalogSkeleton"));
+        else if(cards.Length==0)
         {
             var empty=new StackPanel{HorizontalAlignment=HorizontalAlignment.Center,MaxWidth=370,Margin=new(24)};
             var label=Text(liveLoading?"Загружаем подборку…":CatalogQualityChecking?"Проверяем качество раздач…":liveError.Length>0?"Каталог пока недоступен":SearchActive&&peopleSearchItems.Length>0?"Фильмы и сериалы не найдены":"Ничего не найдено",23);label.FontWeight=FontWeights.SemiBold;label.TextAlignment=TextAlignment.Center;empty.Children.Add(label);

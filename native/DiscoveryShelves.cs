@@ -9,7 +9,7 @@ public partial class MainWindow
     enum DiscoveryShelfKind { Popular,New,Foreign,Native }
     sealed record DiscoveryRegionalPage(MediaItem[] Foreign,MediaItem[] Native,bool Loading);
     readonly Dictionary<string,DiscoveryRegionalPage> discoveryRegions=[];
-    sealed class DiscoveryShelfView(ContentControl row,TextBlock state,Button all)
+    sealed class DiscoveryShelfView(ContentControl row,TextBlock state,Button all,FrameworkElement skeleton)
     {
         MediaItem[] items=[];
         int columns=1;
@@ -20,7 +20,9 @@ public partial class MainWindow
         {
             items=source.DistinctBy(item=>item.Id).Take(40).ToArray();
             state.Text=loading?"Загружаем подборку…":"Подборка пока недоступна.";
-            state.Visibility=items.Length==0?Visibility.Visible:Visibility.Collapsed;
+            // While a shelf is still loading it shows grey poster shapes instead of a sentence.
+            skeleton.Visibility=items.Length==0&&loading?Visibility.Visible:Visibility.Collapsed;
+            state.Visibility=items.Length==0&&!loading?Visibility.Visible:Visibility.Collapsed;
             row.Visibility=items.Length>0?Visibility.Visible:Visibility.Collapsed;
             all.IsEnabled=items.Length>0;
             Render();
@@ -57,8 +59,9 @@ public partial class MainWindow
         chevron.SetBinding(System.Windows.Shapes.Shape.StrokeProperty,new System.Windows.Data.Binding("Foreground"){Source=all});allRow.Children.Add(chevron);all.Content=allRow;
         all.Click+=(_,_)=>OpenDiscoveryShelf(kind);AutomationProperties.SetName(all,"Все: "+title);header.Children.Add(all);
         var state=Text("Загружаем подборку…",13,true);state.Margin=new(0,0,0,16);sectionPanel.Children.Add(state);
+        var skeleton=PosterSkeleton(1,"Discovery"+kind+"Skeleton");skeleton.Visibility=Visibility.Collapsed;sectionPanel.Children.Add(skeleton);
         var row=new ContentControl{Name="Discovery"+kind+"Row",ContentTemplate=(DataTemplate)FindResource("MediaRow"),Margin=new(0,0,0,0)};sectionPanel.Children.Add(row);
-        return new(row,state,all){Changed=ApplyPosterDownloads};
+        return new(row,state,all,skeleton){Changed=ApplyPosterDownloads};
     }
     void OpenDiscoveryShelf(DiscoveryShelfKind kind)
     {
