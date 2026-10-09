@@ -389,6 +389,8 @@ public partial class MainWindow
             // queue ancestor must nevertheless remain the final back target.
             var linkedWithActor=linked with{People=[namesakeOne],Description="Описание сериала из очереди для проверки вложенного возврата."};
             cardMetadata[linked.Id]=Task.FromResult(linkedWithActor);await catalogIndex.AddAsync([linkedWithActor]);
+            var cachedDownloadOrigin=DownloadMetadata.EnrichMedia(DownloadMetadata.Card(fixtures[^1])!,catalogIndex.Recent(linked.Section,200));
+            check(cachedDownloadOrigin.Id==linked.Id&&cachedDownloadOrigin.PageUrl==linked.PageUrl&&cachedDownloadOrigin.People.Contains(namesakeOne),"the actual indexed download origin contains its identified actor before native navigation");
             await File.WriteAllTextAsync(ProfessionalCinemaPeople.CachePath(namesakeOne,linkedWithActor),JsonSerializer.Serialize(new ProfessionalPerson(namesakeOne,NamesakeBiography(namesakeOne),namesakePortraitUrl,namesakeOne.ProfileUrl!,"Kino-Teatr.ua",[],[namesakeOne.Name])));
             async Task<Button> NavigationControl(DependencyObject root,Func<Button,bool> predicate,string description)
             {
