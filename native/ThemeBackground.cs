@@ -11,7 +11,7 @@ static class ThemeBackground
     internal const int GrainSize=128;
     static readonly BitmapSource grainTile=CreateGrain();
     static readonly DrawingBrush darkAmbient=CreateAmbient(false),lightAmbient=CreateAmbient(true);
-    static readonly ImageBrush darkGrain=CreateGrainBrush(.38),lightGrain=CreateGrainBrush(.28);
+    static readonly ImageBrush darkGrain=CreateGrainBrush(.22),lightGrain=CreateGrainBrush(.18);
 
     internal static DrawingBrush Ambient(bool light)=>light?lightAmbient:darkAmbient;
     internal static ImageBrush Grain(bool light)=>light?lightGrain:darkGrain;
@@ -20,18 +20,18 @@ static class ThemeBackground
     static DrawingBrush CreateAmbient(bool light)
     {
         var diagonal=new LinearGradientBrush{StartPoint=new(0,0),EndPoint=new(1,1)};
-        diagonal.GradientStops.Add(new(Color(light?"#165D56B9":"#2236276A"),0));
-        diagonal.GradientStops.Add(new(Color(light?"#08497FC4":"#10425482"),.52));
-        diagonal.GradientStops.Add(new(Color(light?"#1461A9AD":"#1C235E60"),1));
-        var violet=new RadialGradientBrush{Center=new(.23,.08),GradientOrigin=new(.23,.08),RadiusX=.78,RadiusY=.86};
-        violet.GradientStops.Add(new(Color(light?"#127966D8":"#224C318C"),0));
-        violet.GradientStops.Add(new(Color(light?"#007966D8":"#004C318C"),1));
+        diagonal.GradientStops.Add(new(Color(light?"#104C786A":"#204F6660"),0));
+        diagonal.GradientStops.Add(new(Color(light?"#064F6962":"#0B354B45"),.52));
+        diagonal.GradientStops.Add(new(Color(light?"#043D6860":"#06213935"),1));
+        var softLight=new RadialGradientBrush{Center=new(.23,.08),GradientOrigin=new(.23,.08),RadiusX=.78,RadiusY=.86};
+        softLight.GradientStops.Add(new(Color(light?"#06465C56":"#0A415F59"),0));
+        softLight.GradientStops.Add(new(Color(light?"#00465C56":"#00415F59"),1));
         var teal=new RadialGradientBrush{Center=new(.95,.90),GradientOrigin=new(.95,.90),RadiusX=.60,RadiusY=.75};
-        teal.GradientStops.Add(new(Color(light?"#0A54B1AA":"#122F7372"),0));
-        teal.GradientStops.Add(new(Color(light?"#0054B1AA":"#002F7372"),1));
+        teal.GradientStops.Add(new(Color(light?"#03476F63":"#04325247"),0));
+        teal.GradientStops.Add(new(Color(light?"#00476F63":"#00325247"),1));
         var bounds=new RectangleGeometry(new Rect(0,0,1,1));
         var layers=new DrawingGroup();
-        foreach(var brush in new Brush[]{diagonal,violet,teal})layers.Children.Add(new GeometryDrawing(brush,null,bounds));
+        foreach(var brush in new Brush[]{diagonal,softLight,teal})layers.Children.Add(new GeometryDrawing(brush,null,bounds));
         var backdrop=new DrawingBrush(layers){Stretch=Stretch.Fill,ViewboxUnits=BrushMappingMode.Absolute,Viewbox=new(0,0,1,1)};
         backdrop.Freeze();return backdrop;
     }

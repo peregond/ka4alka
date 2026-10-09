@@ -28,7 +28,7 @@ public partial class MainWindow
         var banners=popular.Length>0?popular:cards;
         if(banners.Length>0)
         {
-            discoveryHero=new Grid{Margin=new(0,0,8,20)};
+            discoveryHero=new Grid{Margin=new(0,0,8,24)};
             discoveryHero.ColumnDefinitions.Add(new(){Width=new GridLength(1.8,GridUnitType.Star)});
             discoveryHero.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});
             discoveryHero.Children.Add(FeatureBanner(banners[0],true));
@@ -48,7 +48,7 @@ public partial class MainWindow
                 case DiscoveryShelfKind.Native:view.Set(regions.Native,regions.Loading);break;
             }
         }
-        var all=Text(section=="Фильмы"?"Все фильмы":"Все сериалы",24);all.Name="CatalogAllHeading";all.FontWeight=FontWeights.SemiBold;all.Margin=new(0,8,8,12);content.Children.Add(all);
+        var all=Text(section=="Фильмы"?"Все фильмы":"Все сериалы",20);all.Name="CatalogAllHeading";all.FontWeight=FontWeights.SemiBold;all.Margin=new(0,4,8,12);content.Children.Add(all);
         UpdateDiscoveryLayout();
         StartRegionalDiscovery(section,cards);
         if(!catalogPages.ContainsKey(section+"||1")&&!featuredRequests.Contains(section)&&!featuredFallback.Contains(section)){featuredRequests.Add(section);_=LoadFeatured(section);}
@@ -104,7 +104,7 @@ public partial class MainWindow
     Button FeatureBanner(MediaItem item,bool primary)
     {
         var frame=new Border{Name="FeatureFrame",CornerRadius=new(16),BorderThickness=new(1)};
-        frame.SetResourceReference(Border.BackgroundProperty,"PanelAlt");frame.SetResourceReference(Border.BorderBrushProperty,"Edge");
+        frame.SetResourceReference(Border.BackgroundProperty,"PanelAlt");frame.SetResourceReference(Border.BorderBrushProperty,"EdgeSoft");
         var grid=new Grid{Name="FeatureArtwork"};frame.Child=grid;
         // Clip the artwork to the inside of the border, keeping its rounded stroke intact.
         grid.SizeChanged+=(_,e)=>
@@ -116,13 +116,13 @@ public partial class MainWindow
         var picture=new ImageBrush{Stretch=Stretch.UniformToFill,AlignmentX=AlignmentX.Center,AlignmentY=AlignmentY.Top};
         BindingOperations.SetBinding(picture,ImageBrush.ImageSourceProperty,new Binding("Source"){Source=image});
         var backdrop=new Border{Background=picture};grid.Children.Add(backdrop);
-        grid.Children.Add(new Border{Background=new LinearGradientBrush(new GradientStopCollection{new(Color.FromArgb(230,7,12,29),0),new(Color.FromArgb(75,7,12,29),.6),new(Color.FromArgb(20,7,12,29),1)},0)});
-        grid.Children.Add(new Border{Background=new LinearGradientBrush(new GradientStopCollection{new(Color.FromArgb(0,7,12,29),0),new(Color.FromArgb(230,7,12,29),1)},90)});
-        var content=new StackPanel{VerticalAlignment=VerticalAlignment.Bottom,Margin=new(20,18,20,18)};grid.Children.Add(content);
-        var eyebrow=new TextBlock{Text=primary?"В ЦЕНТРЕ ВНИМАНИЯ":"СТОИТ ПОСМОТРЕТЬ",FontSize=10,FontWeight=FontWeights.SemiBold,Foreground=new SolidColorBrush(Color.FromRgb(185,200,255)),Margin=new(0,0,0,8)};content.Children.Add(eyebrow);
-        var title=new TextBlock{Text=item.Title,FontSize=primary?25:22,FontWeight=FontWeights.SemiBold,Foreground=Brushes.White,TextWrapping=TextWrapping.Wrap,TextTrimming=TextTrimming.CharacterEllipsis,MaxHeight=65,ToolTip=item.Title,Margin=new(0,0,0,6)};content.Children.Add(title);
-        content.Children.Add(new TextBlock{Text=string.Join(" · ",new[]{item.Year>0?item.Year.ToString():"",item.CardGenre}.Where(x=>x.Length>0)),Foreground=new SolidColorBrush(Color.FromRgb(202,212,237)),FontSize=12,TextTrimming=TextTrimming.CharacterEllipsis,Margin=new(0,0,0,12)});
-        var action=new Border{CornerRadius=new(9),Padding=new(12,9,12,9),HorizontalAlignment=HorizontalAlignment.Left,BorderThickness=new(1)};
+        grid.Children.Add(new Border{Background=new LinearGradientBrush(new GradientStopCollection{new(Color.FromArgb(230,13,20,21),0),new(Color.FromArgb(75,13,20,21),.6),new(Color.FromArgb(20,13,20,21),1)},0)});
+        grid.Children.Add(new Border{Background=new LinearGradientBrush(new GradientStopCollection{new(Color.FromArgb(0,13,20,21),0),new(Color.FromArgb(230,13,20,21),1)},90)});
+        var content=new StackPanel{VerticalAlignment=VerticalAlignment.Bottom,Margin=new(18,16,18,16)};grid.Children.Add(content);
+        var eyebrow=new TextBlock{Text=primary?"В центре внимания":"Стоит посмотреть",FontSize=11,Foreground=new SolidColorBrush(Color.FromRgb(202,218,212)),Margin=new(0,0,0,6)};content.Children.Add(eyebrow);
+        var title=new TextBlock{Text=item.Title,FontSize=primary?25:20,FontWeight=FontWeights.SemiBold,Foreground=Brushes.White,TextWrapping=TextWrapping.Wrap,TextTrimming=TextTrimming.CharacterEllipsis,MaxHeight=62,ToolTip=item.Title,Margin=new(0,0,0,5)};content.Children.Add(title);
+        content.Children.Add(new TextBlock{Text=string.Join(" · ",new[]{item.Year>0?item.Year.ToString():"",item.CardGenre}.Where(x=>x.Length>0)),Foreground=new SolidColorBrush(Color.FromRgb(214,221,219)),FontSize=12,TextTrimming=TextTrimming.CharacterEllipsis,Margin=new(0,0,0,10)});
+        var action=new Border{CornerRadius=new(8),Padding=new(11,7,11,7),HorizontalAlignment=HorizontalAlignment.Left,BorderThickness=new(1)};
         action.SetResourceReference(Border.BackgroundProperty,primary?"PrimaryFill":"BannerAction");action.SetResourceReference(Border.BorderBrushProperty,primary?"Primary":"Edge");
         var actionLabel=IconLabel("Подробнее","IconChevron");actionLabel.IsHitTestVisible=false;
         foreach(var label in VisualElements<TextBlock>(actionLabel))label.Foreground=Brushes.White;
@@ -137,7 +137,7 @@ public partial class MainWindow
         if(discoveryHero!=null)
         {
             var wide=Body.ActualWidth>=760;
-            discoveryHero.Height=Body.ActualWidth>=1050?260:wide?235:205;
+            discoveryHero.Height=Body.ActualWidth>=1050?235:wide?220:190;
             discoveryHero.ColumnDefinitions[1].Width=wide?new GridLength(1,GridUnitType.Star):new GridLength(0);
             if(discoveryHero.Children.Count>1)discoveryHero.Children[1].Visibility=wide?Visibility.Visible:Visibility.Collapsed;
         }

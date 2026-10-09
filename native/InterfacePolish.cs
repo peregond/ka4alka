@@ -14,15 +14,16 @@ static class InterfacePalette
     static IReadOnlyDictionary<string,Brush> Create(bool isLight)
     {
         string[] colors=isLight
-            ? ["#F3F5FA","#FFFFFF","#172139","#4D5B73","#B5C1D5","#E3EAFB","#3148A8","#FFFFFF","#E9EEF7","#E5ECF8","#4B4ED1","#FFFFFF","#4245C4","#E4EBFF","#FFFFFF","#D6DFED","#AE263E","#805200","#EC1D2844"]
-            : ["#0B1020","#151F33","#F8FAFF","#B4BFD4","#4A5D7A","#233356","#B8C4FF","#111B33","#10182A","#20304A","#5854DB","#FFFFFF","#6864E8","#243359","#111B2E","#2A3851","#FFADB9","#FFD166","#EC1D2844"];
+            ? ["#F4F6F6","#FFFFFF","#1D272B","#59676A","#9CA9AC","#D6EAE5","#146C62","#FFFFFF","#ECEFEF","#E6EFEC","#0F766E","#FFFFFF","#118077","#E2F1EC","#FAFCFB","#D1DADB","#AE263E","#805200","#EC232A2D"]
+            : ["#111417","#191D22","#F4F7F7","#ACB5BD","#46545A","#1D3734","#79D5C1","#102821","#151A1F","#24312F","#16766B","#FFFFFF","#118077","#203C36","#171D21","#303A40","#FFA8AF","#E7BF72","#EC232A2D"];
         var result=new Dictionary<string,Brush>();
         for(var index=0;index<keys.Length;index++)
         {
             var brush=new SolidColorBrush((Color)ColorConverter.ConvertFromString(colors[index]));brush.Freeze();result[keys[index]]=brush;
         }
-        var primary=new LinearGradientBrush((Color)ColorConverter.ConvertFromString(isLight?"#5548CB":"#6552DB"),(Color)ColorConverter.ConvertFromString(isLight?"#2B60CD":"#2C64D6"),35);
-        primary.Freeze();result["PrimaryFill"]=primary;return result;
+        // One solid brand accent gives every action the same visual weight.
+        // White labels retain 5.47:1 contrast, including the dark palette.
+        result["PrimaryFill"]=result["Primary"];return result;
     }
 }
 
