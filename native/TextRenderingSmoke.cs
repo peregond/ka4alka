@@ -161,7 +161,7 @@ public partial class MainWindow
                     try
                     {
                         await Dpi(modal,scale);await Settle(modal);
-                        Check(!IsEnabled,stage+": the real setup dialog is modal and disables its owner.");Policy(modal,stage+" modal");
+                        Check(!TextProbeIsWindowEnabled(new WindowInteropHelper(this).Handle),stage+": the real setup dialog is modal and disables its native owner HWND.");Policy(modal,stage+" modal");
                         Check(modal.FontFamily.Source==((FontFamily)FindResource("InterfaceFont")).Source,stage+": the modal inherits the interface typeface.");
                         foreach(var block in VisualElements<TextBlock>(modal))TextBounds(block,stage+" modal");
                         if(scale==1.25)Shot(modal,"text-modal-"+stage+".png","Actual modal Display/Auto policy");
@@ -171,7 +171,7 @@ public partial class MainWindow
                     finally{modal.Close();}
                 };
                 modal.ShowDialog();await complete.Task;
-                Check(IsEnabled,stage+": closing the modal restores its owner's input.");
+                Check(TextProbeIsWindowEnabled(new WindowInteropHelper(this).Handle),stage+": closing the modal restores its native owner's input.");
             }
             var previousFamily=ReadLocalValue(FontFamilyProperty);
             try
@@ -220,6 +220,7 @@ public partial class MainWindow
     [DllImport("user32.dll",EntryPoint="ClientToScreen")] static extern bool TextProbeClientToScreen(IntPtr hwnd,ref TextProbePoint point);
     [DllImport("user32.dll",EntryPoint="SendMessageW")] static extern IntPtr TextProbeSendMessage(IntPtr hwnd,int message,IntPtr parameter,ref TextProbeRect rect);
     [DllImport("user32.dll",EntryPoint="SetForegroundWindow")] static extern bool TextProbeSetForegroundWindow(IntPtr hwnd);
+    [DllImport("user32.dll",EntryPoint="IsWindowEnabled")] static extern bool TextProbeIsWindowEnabled(IntPtr hwnd);
     [DllImport("user32.dll",EntryPoint="GetSystemMetrics")] static extern int TextProbeGetSystemMetrics(int index);
     [DllImport("user32.dll",EntryPoint="GetDC")] static extern IntPtr TextProbeGetDc(IntPtr hwnd);
     [DllImport("user32.dll",EntryPoint="ReleaseDC")] static extern int TextProbeReleaseDc(IntPtr hwnd,IntPtr dc);

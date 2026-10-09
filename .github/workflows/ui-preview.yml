@@ -94,6 +94,24 @@ jobs:
         run: |
           # Keep review asset names portable across GitHub upload clients.
           $files=@(Get-ChildItem 'test-output/ui-preview' -Recurse -Filter '*.png' -ErrorAction SilentlyContinue | Where-Object {$_.Name -match '^[a-z0-9.-]+$'} | ForEach-Object {$_.FullName})
+          # Only typography metrics are added as JSON. Raw check messages can
+          # mention the setup dialog's download directory; omit them and never
+          # traverse profile, queue, network trust or diagnostics JSON files.
+          $typography=Join-Path $PWD 'test-output/ui-preview/text-rendering/checks.json'
+          if(Test-Path -LiteralPath $typography){
+            $report=Get-Content -LiteralPath $typography -Raw | ConvertFrom-Json
+            $sanitized=[ordered]@{
+              Version=$report.Version;DpiMethod=$report.DpiMethod;Smoothing=$report.Smoothing
+              Fonts=@($report.Fonts | Select-Object Resource,Family,Weight,CyrillicGlyphs,ResolvedFamilies)
+              Cases=@($report.Cases | Select-Object Stage,VisualDpi,SearchFont,SearchSize,SearchViewportHeight,CharacterHeight,SearchWidth)
+              Variants=@($report.Variants | Select-Object Theme,Font,VisualDpi,SearchHeight,CaretHeight,VisibleTextBlocks,WrappedBlocks,EllipsisBlocks,CyrillicGlyphs,Formatting,Rendering)
+              Screenshots=@($report.Screenshots | Select-Object File,Width,Height,VisualDpi,NativeMonitorDpi,Capture,Policy)
+              CheckCount=@($report.Checks).Count
+            }
+            $metadata=Join-Path $env:RUNNER_TEMP 'text-rendering-checks.json'
+            $sanitized | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $metadata -Encoding utf8NoBOM
+            $files+=$metadata
+          }
           if($files.Count -gt 0){
             $tag='ui-preview-${{ github.run_id }}'
             $existing=gh release view $tag --json isDraft --jq '.isDraft' 2>$null
