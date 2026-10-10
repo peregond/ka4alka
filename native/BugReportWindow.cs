@@ -17,7 +17,7 @@ public partial class MainWindow
     {
         var privatePaths=new[]{prefs.Folder,Preferences.DataDir,Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)}.Concat(downloads.Items.Select(item=>item.Folder)).ToArray();
         var area=SystemParameters.WorkArea;
-        var window=new Window{Owner=this,Title="Сообщить об ошибке",Width=Math.Min(700,Math.Max(340,area.Width-40)),Height=Math.Min(730,Math.Max(360,area.Height-40)),MinWidth=340,MinHeight=360,WindowStartupLocation=WindowStartupLocation.CenterOwner,UseLayoutRounding=true,FontFamily=FontFamily,FontSize=13};
+        var window=new Window{ShowInTaskbar=false,Owner=this,Title="Сообщить об ошибке",Width=Math.Min(700,Math.Max(340,area.Width-40)),Height=Math.Min(730,Math.Max(360,area.Height-40)),MinWidth=340,MinHeight=360,WindowStartupLocation=WindowStartupLocation.CenterOwner,UseLayoutRounding=true,FontFamily=FontFamily,FontSize=13};
         window.Resources.MergedDictionaries.Add(Resources);
         window.SetResourceReference(Control.BackgroundProperty,"Bg");window.SetResourceReference(Control.ForegroundProperty,"Text");
         var root=new DockPanel{Margin=new(20)};window.Content=root;

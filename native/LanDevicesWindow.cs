@@ -54,7 +54,7 @@ public partial class MainWindow
     Window LanWindow(string title,double width=580,double height=650)
     {
         var area=SystemParameters.WorkArea;
-        var window=new Window{Owner=this,Title=title,Width=Math.Min(width,Math.Max(320,area.Width-32)),Height=Math.Min(height,Math.Max(360,area.Height-32)),MinWidth=320,MinHeight=300,WindowStartupLocation=WindowStartupLocation.CenterOwner,UseLayoutRounding=true,SnapsToDevicePixels=true,FontFamily=FontFamily,FontSize=13};
+        var window=new Window{ShowInTaskbar=false,Owner=this,Title=title,Width=Math.Min(width,Math.Max(320,area.Width-32)),Height=Math.Min(height,Math.Max(360,area.Height-32)),MinWidth=320,MinHeight=300,WindowStartupLocation=WindowStartupLocation.CenterOwner,UseLayoutRounding=true,SnapsToDevicePixels=true,FontFamily=FontFamily,FontSize=13};
         window.Resources.MergedDictionaries.Add(Resources);
         window.SetResourceReference(Control.BackgroundProperty,"Bg");window.SetResourceReference(Control.ForegroundProperty,"Text");
         window.SourceInitialized+=(_,_)=>SystemWindowTheme.Apply(window,prefs.Light);

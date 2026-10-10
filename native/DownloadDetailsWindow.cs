@@ -20,7 +20,7 @@ public partial class MainWindow
         downloads.Update();
         var window=new Window
         {
-            Title="Файлы · "+item.DisplayName,Owner=this,
+            Title="Файлы · "+item.DisplayName,Owner=this,ShowInTaskbar=false,
             Width=Math.Clamp(ActualWidth-30,320,760),Height=Math.Clamp(ActualHeight-30,280,600),
             MinWidth=320,MinHeight=280,WindowStartupLocation=WindowStartupLocation.CenterOwner,
             UseLayoutRounding=true

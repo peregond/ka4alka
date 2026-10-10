@@ -134,7 +134,7 @@ public partial class MainWindow:Window
     void AddTorrent(object sender,RoutedEventArgs e)
     {
         if(!EnsureDownloadFolder()){Status.Text="Папка для загрузок не выбрана. Её можно выбрать в настройках.";return;}
-        var dialog=new Window{Title="Добавить торрент",Owner=this,Width=Math.Min(560,Math.Max(320,ActualWidth-32)),MaxHeight=Math.Max(280,MaxHeight-80),SizeToContent=SizeToContent.Height,WindowStartupLocation=WindowStartupLocation.CenterOwner,ResizeMode=ResizeMode.NoResize};
+        var dialog=new Window{ShowInTaskbar=false,Title="Добавить торрент",Owner=this,Width=Math.Min(560,Math.Max(320,ActualWidth-32)),MaxHeight=Math.Max(280,MaxHeight-80),SizeToContent=SizeToContent.Height,WindowStartupLocation=WindowStartupLocation.CenterOwner,ResizeMode=ResizeMode.NoResize};
         var p=new StackPanel{Margin=new Thickness(24)};dialog.Content=new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=p,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};var title=Text("Добавить загрузку",23);title.FontWeight=FontWeights.SemiBold;p.Children.Add(title);p.Children.Add(Text("Вставь magnet-ссылку или выбери файл .torrent.",13,true));var input=new TextBox{Margin=new(0,8,0,18)};p.Children.Add(input);dialog.ContentRendered+=(_,_)=>input.Focus();
         p.Children.Add(Text("Папка загрузки: "+prefs.Folder+". Изменить её можно в настройках.",12,true));
         var error=Text("",12);var actions=new WrapPanel();

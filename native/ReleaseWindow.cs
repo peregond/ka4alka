@@ -83,7 +83,7 @@ public partial class MainWindow
             var stack=new StackPanel{VerticalAlignment=VerticalAlignment.Center};
             if(queued.Completed)
             {
-                var pill=new Border{CornerRadius=new(999),Padding=new(12,6,12,6),HorizontalAlignment=HorizontalAlignment.Right};pill.SetResourceReference(Border.BackgroundProperty,"AccentSoft");
+                var pill=PillRadius.Apply(new Border{Padding=new(12,6,12,6),HorizontalAlignment=HorizontalAlignment.Right});pill.SetResourceReference(Border.BackgroundProperty,"AccentSoft");
                 var label=new TextBlock{Text="✓ Скачано",FontSize=13,FontWeight=FontWeights.SemiBold};label.SetResourceReference(TextBlock.ForegroundProperty,"Accent");pill.Child=label;stack.Children.Add(pill);
             }
             else
@@ -306,7 +306,7 @@ public partial class MainWindow
         }
         FrameworkElement RecommendedPill()
         {
-            var pill=new Border{CornerRadius=new(999),Padding=new(9,0,9,0),Height=22,Margin=new(0,0,10,6),HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center};pill.SetResourceReference(Border.BackgroundProperty,"AccentSoft");
+            var pill=new Border{CornerRadius=new(11),Padding=new(9,0,9,0),Height=22,Margin=new(0,0,10,6),HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center};pill.SetResourceReference(Border.BackgroundProperty,"AccentSoft");
             var label=new TextBlock{Text="★ Рекомендуем",FontSize=11,FontWeight=FontWeights.Bold,VerticalAlignment=VerticalAlignment.Center};label.SetResourceReference(TextBlock.ForegroundProperty,"Accent");pill.Child=label;return pill;
         }
         FrameworkElement ReasonLine(string reason)

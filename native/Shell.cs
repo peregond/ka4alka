@@ -15,6 +15,20 @@ sealed class ThemeBrush:IValueConverter
     public object ConvertBack(object value,Type targetType,object parameter,CultureInfo culture)=>throw new NotSupportedException();
 }
 
+// WPF scales an oversized CornerRadius separately along each side, so 999 turns a
+// wide badge into an ellipse. Half of the actual height gives a true pill.
+sealed class PillRadius:IValueConverter
+{
+    public static readonly PillRadius Instance=new();
+    public object Convert(object value,Type targetType,object parameter,CultureInfo culture)=>new CornerRadius(value is double height&&double.IsFinite(height)&&height>0?height/2:0);
+    public object ConvertBack(object value,Type targetType,object parameter,CultureInfo culture)=>throw new NotSupportedException();
+    public static T Apply<T>(T border) where T:Border
+    {
+        border.SetBinding(Border.CornerRadiusProperty,new Binding(nameof(FrameworkElement.ActualHeight)){RelativeSource=RelativeSource.Self,Converter=Instance});
+        return border;
+    }
+}
+
 public partial class MainWindow
 {
     Action? headerBackAction;

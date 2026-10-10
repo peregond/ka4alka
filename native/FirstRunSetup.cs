@@ -7,7 +7,7 @@ public partial class MainWindow
 {
     internal Window CreateFirstRunSetup()
     {
-        var window=new Window{Owner=this,Title="Качалка · первый запуск",Width=Math.Clamp(SystemParameters.WorkArea.Width-40,320,500),SizeToContent=SizeToContent.Height,MinWidth=320,MaxHeight=Math.Max(240,SystemParameters.WorkArea.Height-40),WindowStartupLocation=WindowStartupLocation.CenterOwner,ResizeMode=ResizeMode.NoResize,FontFamily=FontFamily,FontSize=13};
+        var window=new Window{ShowInTaskbar=false,Owner=this,Title="Качалка · первый запуск",Width=Math.Clamp(SystemParameters.WorkArea.Width-40,320,500),SizeToContent=SizeToContent.Height,MinWidth=320,MaxHeight=Math.Max(240,SystemParameters.WorkArea.Height-40),WindowStartupLocation=WindowStartupLocation.CenterOwner,ResizeMode=ResizeMode.NoResize,FontFamily=FontFamily,FontSize=13};
         window.Resources.MergedDictionaries.Add(Resources);
         window.SetResourceReference(Control.BackgroundProperty,"Bg");window.SetResourceReference(Control.ForegroundProperty,"Text");
         var panel=new StackPanel{Margin=new(24)};window.Content=new ScrollViewer{Content=panel,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};
