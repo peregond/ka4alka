@@ -9,68 +9,76 @@ using System.Text.RegularExpressions;
 namespace Kachalka;
 
 // Reads the shared catalog without bringing a browser engine into the desktop app.
-// The same site runs on chatgpt.site and on Railway. Addresses in Russia and
-// Belarus, which chatgpt.site refuses, start with Railway; everyone else starts
-// with chatgpt.site. The other copy answers when the first does not, and a short
-// cooldown keeps an unavailable or private copy from slowing every card.
+// chatgpt.site refuses addresses in Russia and Belarus. Full copies of the site
+// ("mirrors") are listed in distribution/relays.json on GitHub: those addresses
+// start with a mirror, everyone else starts with chatgpt.site and asks a mirror
+// only when it does not answer. A short cooldown keeps an unavailable or private
+// copy from slowing every card.
 public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null,IndexRelays? relays=null,Func<CancellationToken,Task<string?>>? country=null)
 {
     public static readonly Uri ChatGptSite=new("https://ka4alka-online-new.peregon.chatgpt.site/");
-    public static readonly Uri RailwaySite=new("https://web-production-d7aa7.up.railway.app/");
-    public static readonly IReadOnlyList<Uri> PublishedSites=[ChatGptSite,RailwaySite];
     public static Uri PublishedSite=>ChatGptSite;
-    public static bool IsPublishedSite(Uri uri)=>PublishedSites.Any(site=>site.Host==uri.Host);
-    readonly Uri[] sites=baseUri!=null?[baseUri]:[..PublishedSites];
-    readonly long[] retryAfterTicks=new long[baseUri!=null?1:PublishedSites.Count];
+    public static bool IsPublishedSite(Uri uri)=>uri.Host==ChatGptSite.Host;
+    readonly Uri primary=baseUri??ChatGptSite;
+    readonly System.Collections.Concurrent.ConcurrentDictionary<string,long> retryAfterTicks=new();
     readonly Func<CancellationToken,Task<string?>> countryOf=country??(ct=>SiteCountry.Get(client,ct));
-    bool CoolingDown(int index)=>DateTime.UtcNow.Ticks<Interlocked.Read(ref retryAfterTicks[index]);
-    void Cool(int index,TimeSpan span)=>Interlocked.Exchange(ref retryAfterTicks[index],DateTime.UtcNow.Add(span).Ticks);
-    async Task<int[]> Available(CancellationToken ct)
+    bool CoolingDown(Uri site)=>retryAfterTicks.TryGetValue(site.AbsoluteUri,out var ticks)&&DateTime.UtcNow.Ticks<ticks;
+    void Cool(Uri site,TimeSpan span)=>retryAfterTicks[site.AbsoluteUri]=DateTime.UtcNow.Add(span).Ticks;
+
+    async Task<IReadOnlyList<Uri>> Mirrors(CancellationToken ct)=>baseUri!=null||relays==null?[]:await relays.MirrorsAsync(ct);
+    // Copies of the site in the order they are asked, skipping those that rest.
+    // Outside Russia and Belarus the mirror list is read only when chatgpt.site fails.
+    async IAsyncEnumerable<Uri> Sites([System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {
-        var order=Enumerable.Range(0,sites.Length);
-        if(baseUri==null&&SiteCountry.Blocked(await countryOf(ct)))order=order.OrderByDescending(index=>sites[index]==RailwaySite);
-        return order.Where(index=>!CoolingDown(index)).ToArray();
+        var mirrorsFirst=baseUri==null&&relays!=null&&SiteCountry.Blocked(await countryOf(ct));
+        if(mirrorsFirst)foreach(var mirror in await Mirrors(ct))if(!CoolingDown(mirror))yield return mirror;
+        if(!CoolingDown(primary))yield return primary;
+        if(!mirrorsFirst)foreach(var mirror in await Mirrors(ct))if(!CoolingDown(mirror))yield return mirror;
     }
 
-    public void RetryNow(){for(var index=0;index<retryAfterTicks.Length;index++)Interlocked.Exchange(ref retryAfterTicks[index],0);}
+    public void RetryNow()=>retryAfterTicks.Clear();
 
     // Reads one path from the first copy of the site that answers. A refusal
-    // (401/403, the country block) rests that copy for 15 minutes, any other
-    // failure but 404 for 30 seconds, or 5 minutes once another copy has answered.
+    // (401/403, the country block) rests that copy for 15 minutes, a hung or
+    // refused connection for 2 minutes, any other failure but 404 for 30 seconds,
+    // and every failed copy at least 5 minutes once another copy has answered.
     public async Task<byte[]> ReadSite(string path,int limit,CancellationToken ct,Action<byte[]>? validate=null)
     {
-        var order=await Available(ct);
-        if(order.Length==0)throw new HttpRequestException("Онлайн-индекс временно недоступен.");
-        var failed=new List<int>();Exception? failure=null;
-        foreach(var index in order)
+        var failed=new List<Uri>();Exception? failure=null;
+        await foreach(var site in Sites(ct))
         {
             try
             {
-                var bytes=await client.Read(new Uri(sites[index],path),limit,ct);
+                var bytes=await client.Read(new Uri(site,path),limit,ct);
                 validate?.Invoke(bytes);
                 Answered(failed);
                 return bytes;
             }
             catch(Exception error) when(!ct.IsCancellationRequested&&error is HttpRequestException or JsonException or IOException or InvalidDataException or OperationCanceledException)
             {
-                if(Rest(index,error))failed.Add(index);
+                if(Rest(site,error))failed.Add(site);
                 failure=error;
             }
         }
-        throw failure!;
+        throw failure??new HttpRequestException("Онлайн-индекс временно недоступен.");
     }
 
     // 404 is an answer about this path (a missing backdrop, an older copy without the route), not an outage.
-    bool Rest(int index,Exception error)
+    bool Rest(Uri site,Exception error)
     {
         if(error is HttpRequestException{StatusCode:HttpStatusCode.NotFound})return false;
-        Cool(index,error is HttpRequestException{StatusCode:HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden}?TimeSpan.FromMinutes(15):TimeSpan.FromSeconds(30));
+        Cool(site,error switch
+        {
+            HttpRequestException{StatusCode:HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden}=>TimeSpan.FromMinutes(15),
+            HttpRequestException{StatusCode:null} or OperationCanceledException=>TimeSpan.FromMinutes(2),
+            _=>TimeSpan.FromSeconds(30)
+        });
         return true;
     }
     // Once another copy or relay has answered, the copies that failed rest longer.
-    void Answered(List<int> failed)
+    void Answered(List<Uri> failed)
     {
-        foreach(var index in failed)if(Interlocked.Read(ref retryAfterTicks[index])<DateTime.UtcNow.AddMinutes(5).Ticks)Cool(index,TimeSpan.FromMinutes(5));
+        foreach(var site in failed)if(!retryAfterTicks.TryGetValue(site.AbsoluteUri,out var ticks)||ticks<DateTime.UtcNow.AddMinutes(5).Ticks)Cool(site,TimeSpan.FromMinutes(5));
     }
 
     async Task<JsonDocument> Get(string path,CancellationToken ct)
@@ -203,12 +211,12 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null,Inde
     // has just refused, then each standalone relay.
     public async Task<byte[]> RelayTorrent(Uri torrent,CancellationToken ct)
     {
-        var hosts=new List<(Uri Host,int Site)>();
-        hosts.AddRange((await Available(ct)).Select(index=>(sites[index],index)));
-        if(relays!=null)hosts.AddRange((await relays.ListAsync(ct)).Select(relay=>(relay,-1)));
-        if(hosts.Count==0)hosts.Add((sites[0],0));
-        var failed=new List<int>();Exception? failure=null;
-        foreach(var (host,index) in hosts)
+        var hosts=new List<(Uri Host,bool Site)>();
+        await foreach(var site in Sites(ct))hosts.Add((site,true));
+        if(relays!=null)hosts.AddRange((await relays.ListAsync(ct)).Where(relay=>hosts.All(x=>x.Host!=relay)).Select(relay=>(relay,false)));
+        if(hosts.Count==0)hosts.Add((primary,true));
+        var failed=new List<Uri>();Exception? failure=null;
+        foreach(var (host,site) in hosts)
         {
             try
             {
@@ -222,7 +230,7 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null,Inde
             catch(Exception error) when(!ct.IsCancellationRequested&&error is HttpRequestException or IOException or InvalidDataException or OperationCanceledException)
             {
                 failure=error;
-                if(index>=0&&Rest(index,error))failed.Add(index);
+                if(site&&Rest(host,error))failed.Add(host);
             }
         }
         throw failure!;
