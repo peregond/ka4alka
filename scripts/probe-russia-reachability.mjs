@@ -11,6 +11,7 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const targets = [
   { name: "Онлайн-индекс: карточка", host: "ka4alka-online-new.peregon.chatgpt.site", path: "/api/media", query: "id=movies:obekt-prestupleniya" },
   { name: "Онлайн-индекс: каталог (>16 КБ)", host: "ka4alka-online-new.peregon.chatgpt.site", path: "/api/catalog", query: "section=movies&page=1" },
+  { name: "Онлайн-индекс: раздачи (>16 КБ)", host: "ka4alka-online-new.peregon.chatgpt.site", path: "/api/releases", query: "id=movies:obekt-prestupleniya" },
   { name: "Онлайн-индекс: torrent через бэкенд", host: "ka4alka-online-new.peregon.chatgpt.site", path: "/api/torrent", query: "url=" + encodeURIComponent("https://nnmclub.to/forum/download.php?id=1") },
   { name: "RuTor", host: "rutor.info", path: "/" },
   { name: "NNM-Club", host: "nnmclub.to", path: "/forum/index.php" },
@@ -92,7 +93,6 @@ for (const target of targets) {
   const body = {
     type: "http", target: target.host, inProgressUpdates: false,
     locations: probesId ? probesId : [{ country: "RU", limit: PROBES }],
-    ...(probesId ? {} : { limit: PROBES }),
     measurementOptions: { protocol: "HTTPS", request: { method: "GET", path: target.path, ...(target.query ? { query: target.query } : {}) } }
   };
   try {
