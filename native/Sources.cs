@@ -90,16 +90,58 @@ public sealed partial class SourceClient : IDisposable
             return new SourceEntry((string?)x.Element("guid")??link!,title,source,page!,link,null,size==0?null:size,seeds);
         }).Where(x=>x!=null).Cast<SourceEntry>().ToArray();
     }
+    public const int TorrentLimit=10*1024*1024;
+    // Set by the window to the online index relay; see OnlineIndexClient.CanRelay.
+    public Func<Uri,CancellationToken,Task<byte[]>>? TorrentRelay {get;set;}
     public async Task<string> TorrentFile(SourceEntry entry,CancellationToken ct)
     {
         if(entry.TorrentUrl==null)entry=await ResolveArchive(entry,ct);
         if(entry.TorrentUrl!.StartsWith("magnet:",StringComparison.OrdinalIgnoreCase))return entry.TorrentUrl;
-        var bytes=await Read(WebUri(entry.TorrentUrl),10*1024*1024,ct);
-        // Validate before making the response available to the download queue.
-        MonoTorrent.Torrent.Load(bytes);
+        var bytes=await TorrentBytes(WebUri(entry.TorrentUrl),ct);
         var folder=Path.Combine(Preferences.DataDir,"sources");Directory.CreateDirectory(folder);
         var path=Path.Combine(folder,Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes))+".torrent");
         await File.WriteAllBytesAsync(path,bytes,ct);return path;
+    }
+    // A blocked tracker may hang, reset the connection or return a provider's
+    // block page with status 200. The direct request and the online index relay
+    // run together and the first response that is a valid torrent is used.
+    async Task<byte[]> TorrentBytes(Uri torrent,CancellationToken ct)
+    {
+        var relay=TorrentRelay;
+        var routes=new List<(string Name,Func<CancellationToken,Task<byte[]>> Read)>{("direct",token=>Read(torrent,TorrentLimit,token))};
+        if(relay!=null&&OnlineIndexClient.CanRelay(torrent))routes.Add(("online-index",token=>relay(torrent,token)));
+        using var race=CancellationTokenSource.CreateLinkedTokenSource(ct);
+        async Task<byte[]> Validated((string Name,Func<CancellationToken,Task<byte[]>> Read) route)
+        {
+            var bytes=await route.Read(race.Token);
+            // Validate before making the response available to the download queue.
+            MonoTorrent.Torrent.Load(bytes);
+            return bytes;
+        }
+        var pending=routes.Select(route=>(route.Name,Task:Validated(route))).ToList();
+        var failures=new List<Exception>();
+        while(pending.Count>0)
+        {
+            var finished=await Task.WhenAny(pending.Select(x=>x.Task));
+            var route=pending.First(x=>x.Task==finished);pending.Remove(route);
+            try
+            {
+                var bytes=await finished;
+                race.Cancel();
+                foreach(var loser in pending)_=loser.Task.ContinueWith(task=>_=task.Exception,CancellationToken.None,TaskContinuationOptions.OnlyOnFaulted,TaskScheduler.Default);
+                if(routes.Count>1)DiagnosticLog.Write("torrent-file-route",new{Host=torrent.Host,Route=route.Name,FailedRoutes=failures.Count});
+                return bytes;
+            }
+            catch(Exception error) when(!ct.IsCancellationRequested)
+            {
+                failures.Add(error);
+                DiagnosticLog.Write("torrent-file-route-failed",new{Host=torrent.Host,Route=route.Name,Error=error.GetType().Name,Status=(error as HttpRequestException)?.StatusCode?.ToString()});
+            }
+        }
+        ct.ThrowIfCancellationRequested();
+        if(failures.Count==1)System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failures[0]).Throw();
+        // Not an HttpRequestException: the window shows this text instead of the generic source error.
+        throw new InvalidOperationException("Torrent-файл не удалось получить ни из источника, ни через онлайн-индекс. Попробуй другую раздачу.",new AggregateException(failures));
     }
     public void Dispose()=>http.Dispose();
 }

@@ -23,7 +23,7 @@ public partial class MainWindow:Window
     {
         InitializeComponent();
         InitializeStatusToast();
-        onlineIndex=new(sourceClient);sharedCatalog=new(sourceClient);
+        onlineIndex=new(sourceClient,relays:new IndexRelays(sourceClient));sourceClient.TorrentRelay=onlineIndex.RelayTorrent;sharedCatalog=new(sourceClient);
         catalogRefreshTimer.Tick+=(_,_)=>
         {
             if(closed)return;
