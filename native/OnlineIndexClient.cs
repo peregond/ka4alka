@@ -48,21 +48,29 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null,Inde
             {
                 var bytes=await client.Read(new Uri(sites[index],path),limit,ct);
                 validate?.Invoke(bytes);
-                foreach(var earlier in failed)if(Interlocked.Read(ref retryAfterTicks[earlier])<DateTime.UtcNow.AddMinutes(5).Ticks)Cool(earlier,TimeSpan.FromMinutes(5));
+                Answered(failed);
                 return bytes;
             }
-            catch(HttpRequestException error) when(!ct.IsCancellationRequested)
+            catch(Exception error) when(!ct.IsCancellationRequested&&error is HttpRequestException or JsonException or IOException or InvalidDataException or OperationCanceledException)
             {
-                // 404 is an answer about this path (a missing backdrop, an older copy without the route), not an outage.
-                if(error.StatusCode!=HttpStatusCode.NotFound){Cool(index,error.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden?TimeSpan.FromMinutes(15):TimeSpan.FromSeconds(30));failed.Add(index);}
+                if(Rest(index,error))failed.Add(index);
                 failure=error;
-            }
-            catch(Exception error) when(!ct.IsCancellationRequested&&error is JsonException or IOException or InvalidDataException or OperationCanceledException)
-            {
-                Cool(index,TimeSpan.FromSeconds(30));failed.Add(index);failure=error;
             }
         }
         throw failure!;
+    }
+
+    // 404 is an answer about this path (a missing backdrop, an older copy without the route), not an outage.
+    bool Rest(int index,Exception error)
+    {
+        if(error is HttpRequestException{StatusCode:HttpStatusCode.NotFound})return false;
+        Cool(index,error is HttpRequestException{StatusCode:HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden}?TimeSpan.FromMinutes(15):TimeSpan.FromSeconds(30));
+        return true;
+    }
+    // Once another copy or relay has answered, the copies that failed rest longer.
+    void Answered(List<int> failed)
+    {
+        foreach(var index in failed)if(Interlocked.Read(ref retryAfterTicks[index])<DateTime.UtcNow.AddMinutes(5).Ticks)Cool(index,TimeSpan.FromMinutes(5));
     }
 
     async Task<JsonDocument> Get(string path,CancellationToken ct)
@@ -199,14 +207,22 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null,Inde
         hosts.AddRange((await Available(ct)).Select(index=>(sites[index],index)));
         if(relays!=null)hosts.AddRange((await relays.ListAsync(ct)).Select(relay=>(relay,-1)));
         if(hosts.Count==0)hosts.Add((sites[0],0));
-        Exception? failure=null;
+        var failed=new List<int>();Exception? failure=null;
         foreach(var (host,index) in hosts)
         {
-            try{return await client.Read(RelayUri(torrent,host),SourceClient.TorrentLimit,ct);}
+            try
+            {
+                var bytes=await client.Read(RelayUri(torrent,host),SourceClient.TorrentLimit,ct);
+                // A block page with status 200 or a damaged file moves on to the next copy or relay.
+                try{MonoTorrent.Torrent.Load(bytes);}
+                catch(Exception error) when(error is not OperationCanceledException){throw new InvalidDataException("Онлайн-индекс вернул не torrent-файл.",error);}
+                Answered(failed);
+                return bytes;
+            }
             catch(Exception error) when(!ct.IsCancellationRequested&&error is HttpRequestException or IOException or InvalidDataException or OperationCanceledException)
             {
                 failure=error;
-                if(index>=0&&error is HttpRequestException{StatusCode:HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden})Cool(index,TimeSpan.FromMinutes(15));
+                if(index>=0&&Rest(index,error))failed.Add(index);
             }
         }
         throw failure!;

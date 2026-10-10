@@ -209,6 +209,22 @@ static class TorrentRelayTests
             var path=await client.TorrentFile(new SourceEntry(release.id,release.title,release.source,release.pageUrl,release.torrentUrl,null),default);
             Check(File.ReadAllBytes(path).SequenceEqual(torrent)&&!handler.Requests.Any(x=>x.Host==chatgpt),"from Russia a blocked tracker's torrent file comes through Railway without asking chatgpt.site");
         }
+        handler=new((uri,_)=>Task.FromResult(uri.Host==railway?Bytes(blockPage):uri.Host==chatgpt&&uri.AbsolutePath=="/api/torrent"?Bytes(torrent):Bytes(blockPage)));
+        using(var client=new SourceClient(handler))
+        {
+            var index=new OnlineIndexClient(client,country:Country("RU"));client.TorrentRelay=index.RelayTorrent;
+            var path=await client.TorrentFile(new SourceEntry(release.id,release.title,release.source,release.pageUrl,release.torrentUrl,null),default);
+            Check(File.ReadAllBytes(path).SequenceEqual(torrent)&&handler.Requests.Any(x=>x.Host==chatgpt&&x.AbsolutePath=="/api/torrent"),"a copy that returns a block page with status 200 for a torrent file hands over to the other copy");
+        }
+        handler=new((uri,_)=>Task.FromResult(uri.Host==railway?Bytes([],HttpStatusCode.GatewayTimeout):uri.Host==chatgpt&&uri.AbsolutePath=="/api/torrent"?Bytes(torrent):Bytes(blockPage)));
+        using(var client=new SourceClient(handler))
+        {
+            var index=new OnlineIndexClient(client,country:Country("RU"));client.TorrentRelay=index.RelayTorrent;
+            var entry=new SourceEntry(release.id,release.title,release.source,release.pageUrl,release.torrentUrl,null);
+            await client.TorrentFile(entry,default);var before=handler.Requests.Count;
+            await client.TorrentFile(entry,default);
+            Check(!handler.Requests.Skip(before).Any(x=>x.Host==railway),"a copy that failed a torrent file rests for the next download");
+        }
     }
     // From the October 2026 logs of a user in Russia: a RuTracker magnet carried only
     // opentrackr, which answered nowhere there; NNM-Club and MegaPeer looked empty.
