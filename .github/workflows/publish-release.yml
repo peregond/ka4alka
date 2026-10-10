@@ -6,6 +6,12 @@ on:
         description: Version of the verified draft release to publish
         required: true
         default: '0.40.10'
+  # Called by "Prepare signed Windows release" once all of its checks pass.
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
 permissions:
   contents: write
 jobs:
