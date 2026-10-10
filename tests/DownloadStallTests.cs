@@ -36,6 +36,7 @@ static class DownloadStallTests
             Check(engine.Dht.State!=MonoTorrent.Dht.DhtState.NotReady,"with the seeded node cache the DHT starts at once, without resolving a router name");
             await engine.StopAllAsync();
         }
+        Check(DownloadService.DiskCacheFor(16L<<30)==64<<20&&DownloadService.DiskCacheFor(6L<<30)==64<<20&&DownloadService.DiskCacheFor(4L<<30)==32<<20,"the disk write cache is 64 MB with at least 6 GB of memory and 32 MB below that");
         Check(MagnetDiscovery.PublicTrackers.Distinct().Count()==MagnetDiscovery.PublicTrackers.Count&&MagnetDiscovery.PublicTrackers.All(x=>Uri.TryCreate(x,UriKind.Absolute,out var uri)&&uri.Scheme is "udp" or "https"),"public fallback trackers are distinct UDP or HTTPS announce addresses");
     }
     public static async Task Run(string root)

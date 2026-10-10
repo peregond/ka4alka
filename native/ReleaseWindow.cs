@@ -315,6 +315,41 @@ public partial class MainWindow
             var icon=new System.Windows.Shapes.Path{Data=(Geometry)FindResource("IconInfo"),Width=14,Height=14,Stretch=Stretch.Uniform,StrokeThickness=1.6,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,Margin=new(0,0,6,0),VerticalAlignment=VerticalAlignment.Center};icon.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty,"Muted");row.Children.Add(icon);
             var text=new TextBlock{Text=reason,FontSize=12,VerticalAlignment=VerticalAlignment.Center};text.SetResourceReference(TextBlock.ForegroundProperty,"Muted");row.Children.Add(text);return row;
         }
+        // The recommended release on top of the list: larger, with its reason and one primary
+        // download button. It stays in the list below too, with its row actions and details.
+        FrameworkElement BestRelease(ReleaseRecommendation.Choice pick)
+        {
+            var entry=pick.Entry;
+            var grid=new Grid();grid.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});grid.ColumnDefinitions.Add(new(){Width=GridLength.Auto});
+            var info=new StackPanel{VerticalAlignment=VerticalAlignment.Center};
+            var pill=RecommendedPill();info.Children.Add(pill);
+            var title=Text(entry.Title,17);title.FontWeight=FontWeights.SemiBold;title.TextWrapping=TextWrapping.Wrap;title.MaxHeight=48;title.TextTrimming=TextTrimming.CharacterEllipsis;title.ToolTip=entry.Title;title.Margin=new(0,2,0,10);info.Children.Add(title);
+            var tags=new WrapPanel();
+            tags.Children.Add(ReleaseTag(QualityLabel(entry),true));
+            if(ReleaseFreshness.Audio(entry)!="Не указано")tags.Children.Add(ReleaseTag(ReleaseFreshness.Audio(entry),RussianAudio.Rank(entry)==3,ReleaseFreshness.AudioNote));
+            if(entry.Size.HasValue)tags.Children.Add(ReleaseTag(DownloadService.FormatBytes(entry.Size.Value)));
+            if(entry.Seeds>0)tags.Children.Add(ReleaseTag($"Отдают: {entry.Seeds.Value}",false,ReleaseFreshness.ConnectionNote));
+            tags.Children.Add(ReleaseTag(ReleaseFreshness.SourceName(entry)));
+            info.Children.Add(tags);info.Children.Add(ReasonLine(pick.Reason));
+            grid.Children.Add(info);
+            FrameworkElement action;
+            if(QueuedDownload(entry)!=null)action=ReleaseAction(entry);
+            else
+            {
+                var button=new Button{Name="BestReleaseDownload",Style=(Style)FindResource("PrimaryButton"),Tag=entry,Height=52,MinHeight=52,Padding=new(22,0,22,0),FontSize=15,ToolTip="Скачать рекомендованную раздачу"};
+                button.Content=IconLabel("Скачать","IconDownload",18);button.Click+=SourceDownload;
+                AutomationProperties.SetName(button,"Скачать рекомендованную раздачу: "+entry.Title);action=button;
+            }
+            action.VerticalAlignment=VerticalAlignment.Center;
+            // Narrow windows put the button under the details instead of beside them.
+            if(compact){action.HorizontalAlignment=HorizontalAlignment.Left;action.Margin=new(0,14,0,0);Grid.SetRow(action,1);grid.RowDefinitions.Add(new(){Height=GridLength.Auto});grid.RowDefinitions.Add(new(){Height=GridLength.Auto});Grid.SetColumnSpan(info,2);}
+            else{action.Margin=new(20,0,0,0);Grid.SetColumn(action,1);}
+            grid.Children.Add(action);
+            var card=new Border{Name="BestRelease",Child=grid,CornerRadius=new(20),Padding=new(20,18,20,18),Margin=new(0,0,0,16),BorderThickness=new(1)};
+            card.SetResourceReference(Border.BackgroundProperty,"AccentFaint");card.SetResourceReference(Border.BorderBrushProperty,"AccentLine");
+            AutomationProperties.SetName(card,"Рекомендованная раздача: "+entry.Title);
+            return card;
+        }
         FrameworkElement LowSeedLine()
         {
             var row=new StackPanel{Orientation=Orientation.Horizontal,Margin=new(0,4,0,0)};
@@ -346,6 +381,7 @@ public partial class MainWindow
                 empty.Children.Add(Text("Измени параметры или сбрось фильтры, чтобы увидеть все варианты.",13,true));
                 var surface=new Border{Child=empty,CornerRadius=new(16),BorderThickness=new(1)};surface.SetResourceReference(Border.BackgroundProperty,"Panel");surface.SetResourceReference(Border.BorderBrushProperty,"EdgeSoft");results.Children.Add(surface);return;
             }
+            if(recommended!=null&&visible.Contains(recommended.Entry))results.Children.Add(BestRelease(recommended));
             void MoreResults()
             {
                 if(displayed.Length==visible.Length)return;

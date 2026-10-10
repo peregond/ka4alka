@@ -44,6 +44,8 @@ public record MediaItem(int Id, string Title, string Section, string Genre, int 
     }
     // Year and genres under a poster; the "Фильм"/"Сериал" fallback adds nothing inside its own section, so it is left out.
     [JsonIgnore] public string CardMeta=>string.Join(" · ",new[]{Year>0?Year.ToString():"",InlineMetadata(liveGenre??Genre)}.Where(x=>x.Length>0));
+    // Shown over the poster on hover: the start of the description, or the year and genre when there is none.
+    [JsonIgnore] public string HoverText=>string.IsNullOrWhiteSpace(Description)?CardMeta:Description.Trim();
     [JsonIgnore] public string CardRatingSource => KpAvailable?"Кинопоиск":ImdbAvailable?"IMDb":"Оценка пока недоступна";
     static string InlineMetadata(string? value)=>string.Join(", ",(value??"").Split(',').Select(part=>Regex.Replace(part,@"\s+"," ").Trim()).Where(part=>part.Length>0));
     [JsonIgnore] public string CardGenre {get{var value=InlineMetadata(liveGenre??Genre);return value.Length==0?Section=="Сериалы"?"Сериал":"Фильм":value;}}

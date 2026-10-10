@@ -39,6 +39,11 @@ public sealed partial class DownloadService
             ApplyReliabilityStatus(item);
         }
     }
+    // Pieces are kept in memory until they can be written in larger blocks, so a fast
+    // release waits on the disk less often. 64 MB on computers with at least 6 GB of
+    // memory, 32 MB otherwise.
+    public static int DiskCacheFor(long memoryBytes)=>memoryBytes>=6L*1024*1024*1024?64*1024*1024:32*1024*1024;
+    static int DiskCache=>DiskCacheFor(GC.GetGCMemoryInfo().TotalAvailableMemoryBytes);
     ClientEngine Engine
     {
         get
@@ -47,7 +52,7 @@ public sealed partial class DownloadService
             // Port forwarding (UPnP/NAT-PMP) lets peers behind NAT connect to us; a
             // fresh release with few seeders otherwise finds most peers unreachable.
             var builder=customSettings!=null?new EngineSettingsBuilder(customSettings):new EngineSettingsBuilder {
-                CacheDirectory=Path.Combine(Preferences.DataDir,"cache"), MaximumConnections=150, MaximumHalfOpenConnections=16, DiskCacheBytes=16*1024*1024,
+                CacheDirectory=Path.Combine(Preferences.DataDir,"cache"), MaximumConnections=150, MaximumHalfOpenConnections=16, DiskCacheBytes=DiskCache,
                 AutoSaveLoadFastResume=true,AutoSaveLoadMagnetLinkMetadata=true,AllowPortForwarding=true
             };
             builder.MaximumDownloadRate=DownloadLimitKbps*1024;builder.MaximumUploadRate=UploadLimitKbps*1024;

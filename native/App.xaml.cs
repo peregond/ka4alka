@@ -27,6 +27,8 @@ public partial class App : Application
             try{window.PrepareDesignSmoke();}
             catch(Exception error){System.IO.Directory.CreateDirectory(e.Args[1]);System.IO.File.WriteAllText(System.IO.Path.Combine(e.Args[1],"error.txt"),error.ToString());window.Close();return;}
         }
+        // Smoke tests take screenshots and measure pixels, so they run without the decorative motion.
+        Kachalka.MainWindow.MotionAllowed=!e.Args.Any(arg=>arg.StartsWith("--",StringComparison.Ordinal)&&arg.EndsWith("-smoke-test",StringComparison.Ordinal));
         if(!e.Args.Any(arg=>arg.StartsWith("--",StringComparison.Ordinal)&&arg.EndsWith("-smoke-test",StringComparison.Ordinal)))
         {
             bool prompted=false;

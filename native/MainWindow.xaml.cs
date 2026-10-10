@@ -63,6 +63,19 @@ public partial class MainWindow:Window
     }
     void ShowDownloads(object sender,RoutedEventArgs e){searchDelay.Stop();section="Загрузки";current=null;activePerson=null;Render();}
     void PosterResized(object sender,SizeChangedEventArgs e){if(sender is Border poster){if(e.WidthChanged&&e.NewSize.Width>0){var height=e.NewSize.Width*1.5;if(double.IsNaN(poster.Height)||Math.Abs(poster.Height-height)>1)poster.Height=height;}ClipPoster(poster);}}
+    // Decorative motion follows the Windows "animate controls" setting and is off in smoke tests.
+    public static bool MotionAllowed {get;set;}=true;
+    static bool Motion=>MotionAllowed&&SystemParameters.ClientAreaAnimation;
+    string? lastViewKey;
+    // A new section, card or person page fades in; refreshing the same view does not.
+    void AnimateViewChange()
+    {
+        var key=section+"|"+current?.Id+"|"+activePerson?.Name;
+        if(key==lastViewKey)return;
+        var first=lastViewKey==null;lastViewKey=key;
+        if(first||!Motion)return;
+        CenterRegion.BeginAnimation(UIElement.OpacityProperty,new System.Windows.Media.Animation.DoubleAnimation(0,1,TimeSpan.FromMilliseconds(170)){EasingFunction=new System.Windows.Media.Animation.CubicEase{EasingMode=System.Windows.Media.Animation.EasingMode.EaseOut}});
+    }
     void Render()
     {
         if(!ready)return;BeginCatalogNavigationRender();savedScroll=null;personRequest?.Cancel();personRequest?.Dispose();personRequest=null;
@@ -95,7 +108,7 @@ public partial class MainWindow:Window
         IEnumerable<MediaItem> result=Catalog.Items.Concat(prefs.LiveFavorites).Where(x=>section=="Избранное"?prefs.Favorites.Contains(x.Id):x.Section==section).Where(x=>x.Title.Contains(Search.Text,StringComparison.CurrentCultureIgnoreCase)).Where(x=>genre=="Все"||x.Genre==genre);
         result=sort=="По году"?result.OrderByDescending(x=>x.Year):sort=="По названию"?result.OrderBy(x=>x.Title):result;
         var cards=result.ToArray();ShowCatalog(cards);if(cards.Length==0)PageHeader.Children.Add(Text("Ничего не найдено. Измени поиск или фильтры.",14,true));
-        }finally{EndCatalogNavigationRender();RefreshLoadingIndicator();ApplyPosterDownloads();}
+        }finally{EndCatalogNavigationRender();RefreshLoadingIndicator();ApplyPosterDownloads();AnimateViewChange();}
     }
     void RenderNavSelection()
     {
