@@ -44,9 +44,11 @@ public sealed partial class DownloadService
         get
         {
             if(engine!=null)return engine;
+            // Port forwarding (UPnP/NAT-PMP) lets peers behind NAT connect to us; a
+            // fresh release with few seeders otherwise finds most peers unreachable.
             var builder=customSettings!=null?new EngineSettingsBuilder(customSettings):new EngineSettingsBuilder {
-                CacheDirectory=Path.Combine(Preferences.DataDir,"cache"), MaximumConnections=50, DiskCacheBytes=4*1024*1024,
-                AutoSaveLoadFastResume=true,AutoSaveLoadMagnetLinkMetadata=true,AllowPortForwarding=false
+                CacheDirectory=Path.Combine(Preferences.DataDir,"cache"), MaximumConnections=150, MaximumHalfOpenConnections=16, DiskCacheBytes=4*1024*1024,
+                AutoSaveLoadFastResume=true,AutoSaveLoadMagnetLinkMetadata=true,AllowPortForwarding=true
             };
             builder.MaximumDownloadRate=DownloadLimitKbps*1024;builder.MaximumUploadRate=UploadLimitKbps*1024;
             return engine=new ClientEngine(builder.ToSettings());
@@ -99,7 +101,7 @@ public sealed partial class DownloadService
     async Task<TorrentManager> Manager(DownloadItem item)
     {
         if(managers.TryGetValue(item.Id,out var current))return current;
-        var settings=new TorrentSettingsBuilder{MaximumConnections=30}.ToSettings();
+        var settings=new TorrentSettingsBuilder{MaximumConnections=60}.ToSettings();
         var manager=item.Source.StartsWith("magnet:",StringComparison.OrdinalIgnoreCase)
           ? await Engine.AddAsync(MagnetLink.Parse(item.Source),item.Folder,settings)
           : await Engine.AddAsync(item.Source,item.Folder,settings);

@@ -42,7 +42,7 @@ public partial class MainWindow
         reliabilityPollBusy=true;
         try
         {
-            await downloads.PollReliabilityAsync(reliabilityCancellation.Token);
+            await downloads.PollReliabilityAsync(reliabilityCancellation.Token,prefs.AutoRecoverDownloads);
             if(closing||closed)return;
             downloads.Update();RefreshDownloadView();SyncTimer();
         }

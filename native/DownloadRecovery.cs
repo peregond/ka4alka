@@ -15,6 +15,18 @@ public sealed partial class DownloadService
     bool closeRequested;
     bool? networkAvailable;
     DateTime lastRecoveryUtc;
+    // Stall recovery: when an active torrent has had no connection for a while,
+    // or the computer has just woken up, restart its connections so it announces
+    // to every tracker and DHT again instead of waiting out the announce interval.
+    static readonly TimeSpan StallAfter=TimeSpan.FromSeconds(90);
+    // 5, 10, 20, then every 30 minutes while nobody connects, so a dead
+    // release does not keep re-announcing to trackers.
+    static TimeSpan StallRetryAfter(int restarts)=>TimeSpan.FromMinutes(Math.Min(30,5<<Math.Min(restarts-1,3)));
+    static readonly TimeSpan SleepGap=TimeSpan.FromMinutes(2);
+    readonly Dictionary<string,DateTime> idleSince=[];
+    readonly Dictionary<string,(DateTime Utc,int Count)> lastStallRestart=[];
+    DateTime lastActivePollUtc;
+    Func<DateTime> stallClock=()=>DateTime.UtcNow;
     public event Action<DownloadNotice>? Notice;
 
     public void SetNetworkAvailable(bool available)
@@ -65,7 +77,7 @@ public sealed partial class DownloadService
         if(firstPause)RaiseNotice(new(check.Error==null?DownloadNoticeKind.LowSpace:DownloadNoticeKind.Error,item.Id,item.DisplayName,check.Message));
         return false;
     }
-    public async Task PollReliabilityAsync(CancellationToken cancellationToken=default)
+    public async Task PollReliabilityAsync(CancellationToken cancellationToken=default,bool autoRecover=true)
     {
         if(closeRequested)return;
         using var linked=CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token,cancellationToken);var token=linked.Token;
@@ -81,9 +93,47 @@ public sealed partial class DownloadService
                 SnapshotFiles(item,manager);
                 if(!await EnsureSpaceAsync(item,manager,token))changed=true;
             }
+            if(autoRecover&&await RestartStalledAsync(token))changed=true;
             if(changed){Save();await ReleaseIdleEngine();}
         }
         finally{gate.Release();}
+    }
+    // Windows Modern Standby may resume without a power or network event: the
+    // first poll after a long pause restarts every active torrent. Otherwise a
+    // torrent that has had no connection for 90 seconds is restarted, with a
+    // growing pause between restarts until someone connects.
+    async Task<bool> RestartStalledAsync(CancellationToken token)
+    {
+        var now=stallClock();
+        var active=Items.Where(item=>!item.Paused&&!item.Busy&&!item.Completed&&!item.LowSpacePaused&&managers.TryGetValue(item.Id,out var m)&&m.State is TorrentState.Metadata or TorrentState.Downloading).ToArray();
+        var woke=lastActivePollUtc!=default&&now-lastActivePollUtc>SleepGap;
+        lastActivePollUtc=active.Length>0?now:default;
+        foreach(var id in idleSince.Keys.Except(active.Select(x=>x.Id)).ToArray())idleSince.Remove(id);
+        if(networkAvailable==false)return false;
+        var restarted=false;
+        foreach(var item in active)
+        {
+            token.ThrowIfCancellationRequested();
+            var manager=managers[item.Id];
+            if(!woke)
+            {
+                if(manager.OpenConnections>0){idleSince.Remove(item.Id);lastStallRestart.Remove(item.Id);continue;}
+                if(!idleSince.TryGetValue(item.Id,out var since)){idleSince[item.Id]=now;continue;}
+                if(now-since<StallAfter||lastStallRestart.TryGetValue(item.Id,out var last)&&now-last.Utc<StallRetryAfter(last.Count))continue;
+            }
+            lastStallRestart[item.Id]=(now,woke?0:(lastStallRestart.TryGetValue(item.Id,out var prior)?prior.Count:0)+1);idleSince.Remove(item.Id);
+            try
+            {
+                if(await RestartConnectionsAsync(item,manager,token))
+                {
+                    restarted=true;
+                    DiagnosticLog.Write("torrent-stall-restarted",new{item.Id,item.ReleaseSource,item.InfoHash,Reason=woke?"resume":"no-connections",State=manager.State.ToString()});
+                }
+            }
+            catch(OperationCanceledException){throw;}
+            catch(Exception error){DiagnosticLog.Write("torrent-stall-restart-error",new{item.Id,Error=error.Message});}
+        }
+        return restarted;
     }
     void WatchMetadata(DownloadItem item,TorrentManager manager)
     {
