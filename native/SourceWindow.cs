@@ -62,10 +62,12 @@ public partial class MainWindow
         catch(Exception){Status.Text="Не удалось получить ответ. Проверь соединение, адрес источника и API-ключ.";}
         finally{searching=false;if(!closed&&section=="Источники")Render();}
     }
+    // The recommended-release card's button: the same release, kept apart from the list rows that are tagged with a SourceEntry.
+    sealed record RecommendedDownload(SourceEntry Entry);
     async void SourceDownload(object sender,RoutedEventArgs e)
     {
         if(closing||closed)return;
-        var button=(Button)sender;var item=(SourceEntry)button.Tag;var media=current?.Cinema==true?current:null;
+        var button=(Button)sender;var item=button.Tag as SourceEntry??((RecommendedDownload)button.Tag).Entry;var media=current?.Cinema==true?current:null;
         if(media!=null)media=DownloadMetadata.EnrichMedia(media,prefs.LiveFavorites.Concat(liveItems).Concat(catalogIndex.Recent(media.Section,200)).Append(media));
         button.IsEnabled=false;
         try{if(!EnsureDownloadFolder()){Status.Text="Папка для загрузок не выбрана. Её можно выбрать в настройках.";return;}
@@ -106,6 +108,13 @@ public partial class MainWindow
         catch{ /* The preblurred poster or built-in gradient remains available. */ }
         finally{if(ReferenceEquals(state.FeatureRequest,request))state.FeatureRequest=null;}
     }
+    // A cover that arrives from the network or disk fades in instead of popping; one from
+    // memory (scrolling back) appears at once. Feature posters manage their own opacity.
+    static void FadeInCover(Image image)
+    {
+        if(image.Tag!=null||!Motion)return;
+        image.BeginAnimation(UIElement.OpacityProperty,new System.Windows.Media.Animation.DoubleAnimation(0,1,TimeSpan.FromMilliseconds(220)){EasingFunction=new System.Windows.Media.Animation.CubicEase{EasingMode=System.Windows.Media.Animation.EasingMode.EaseOut}});
+    }
     async Task LoadCover(Image image,CoverRequest state,object? item,string? url)
     {
         if(string.IsNullOrWhiteSpace(url))
@@ -138,7 +147,7 @@ public partial class MainWindow
                     bytes=>{using var stream=new MemoryStream(bytes);var result=new BitmapImage();result.BeginInit();result.CacheOption=BitmapCacheOption.OnLoad;result.DecodePixelWidth=item is MediaItem or DownloadItem?PosterDecodeWidth:100;result.StreamSource=stream;result.EndInit();result.Freeze();return result;},token);
                 token.ThrowIfCancellationRequested();
                 if(coverCache.Count>=48)coverCache.Remove(coverCache.Keys.First());coverCache[url]=bitmap;
-                if(!closing&&!closed&&image.IsLoaded&&ReferenceEquals(image.DataContext,item)&&CoverUrl(image.DataContext)==url&&ReferenceEquals(state.Request,request)&&CoverViewportFor(image)?.Measure(image).Near==true)image.Source=bitmap;
+                if(!closing&&!closed&&image.IsLoaded&&ReferenceEquals(image.DataContext,item)&&CoverUrl(image.DataContext)==url&&ReferenceEquals(state.Request,request)&&CoverViewportFor(image)?.Measure(image).Near==true){image.Source=bitmap;FadeInCover(image);}
             }
             finally{coverSlots.Release();}
         }

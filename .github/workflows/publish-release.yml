@@ -5,7 +5,7 @@ on:
       version:
         description: Version of the verified draft release to publish
         required: true
-        default: '0.40.10'
+        default: '0.40.11'
   # Called by "Prepare signed Windows release" once all of its checks pass.
   workflow_call:
     inputs:
@@ -21,7 +21,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
-      RELEASE_VERSION: ${{ inputs.version || '0.40.10' }}
+      RELEASE_VERSION: ${{ inputs.version || '0.40.11' }}
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
     steps:
       - uses: actions/checkout@v4

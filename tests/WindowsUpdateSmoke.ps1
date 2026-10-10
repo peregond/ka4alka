@@ -33,7 +33,12 @@ try{
    $scenarioDirectory=if($scenario -in @('dpi','close','cache')){$scenario+'-reliability'}elseif($scenario -eq 'lan'){'lan-ui'}else{$scenario}
    $scenarioEvidence=Join-Path $root ('test-output/'+$scenarioDirectory)
    $scenarioUi=Start-Process (Join-Path $root ('dist/Kachalka-'+$short+'/Kachalka.exe')) -ArgumentList @('--'+$scenario+'-smoke-test',('"'+$scenarioEvidence+'"')) -PassThru
-   if(-not $scenarioUi.WaitForExit(45000)){$scenarioUi.Kill($true);throw ($scenario+' UI smoke timed out')}
+   if(-not $scenarioUi.WaitForExit(45000)){
+     $scenarioUi.Kill($true)
+     $stalled=Join-Path $scenarioEvidence 'error.txt'
+     $finishedEvidence=Test-Path (Join-Path $scenarioEvidence 'checks.json')
+     throw ($scenario+' UI smoke timed out'+$(if(Test-Path $stalled){': '+(Get-Content $stalled -Raw)}elseif($finishedEvidence){' after writing its evidence (the window did not close)'}else{' without evidence'}))
+   }
    if(Test-Path (Join-Path $scenarioEvidence 'error.txt')){throw (Get-Content (Join-Path $scenarioEvidence 'error.txt') -Raw)}
    $scenarioFile=if($scenario -eq 'dpi'){'dpi-viewports.json'}elseif($scenario -eq 'close'){'closed.json'}else{'checks.json'}
    if(-not(Test-Path (Join-Path $scenarioEvidence $scenarioFile))){throw ($scenario+' UI evidence missing')}

@@ -31,7 +31,7 @@ public partial class MainWindow
     FrameworkElement BuildFeatureCarousel(MediaItem[] slides)
     {
         slides=slides.Take(5).ToArray();
-        var frame=new Border{Name="FeatureFrame",CornerRadius=new(22),MinHeight=260};
+        var frame=new Border{Name="FeatureFrame",CornerRadius=new(22),MinHeight=232};
         frame.Background=(Brush)FindResource("BannerBase");
         var grid=new Grid{Name="FeatureArtwork"};frame.Child=grid;
         grid.SizeChanged+=(_,e)=>
@@ -62,7 +62,7 @@ public partial class MainWindow
         var eyebrowRow=new StackPanel{Orientation=Orientation.Horizontal,Margin=new(0,0,0,14)};
         var dot=new Ellipse{Width=6,Height=6,Margin=new(0,0,8,0),VerticalAlignment=VerticalAlignment.Center};dot.SetResourceReference(Shape.FillProperty,"Accent");eyebrowRow.Children.Add(dot);
         var eyebrow=new TextBlock{FontSize=13,FontWeight=FontWeights.SemiBold,Foreground=(Brush)FindResource("BannerText"),VerticalAlignment=VerticalAlignment.Center};eyebrowRow.Children.Add(eyebrow);content.Children.Add(eyebrowRow);
-        var title=new TextBlock{Name="FeatureTitle",FontSize=52,FontWeight=FontWeights.ExtraBold,LineHeight=54,LineStackingStrategy=LineStackingStrategy.BlockLineHeight,Foreground=(Brush)FindResource("BannerText"),TextWrapping=TextWrapping.Wrap,TextTrimming=TextTrimming.CharacterEllipsis,MaxHeight=108,Margin=new(0,0,0,14)};content.Children.Add(title);
+        var title=new TextBlock{Name="FeatureTitle",FontSize=44,FontWeight=FontWeights.ExtraBold,LineHeight=46,LineStackingStrategy=LineStackingStrategy.BlockLineHeight,Foreground=(Brush)FindResource("BannerText"),TextWrapping=TextWrapping.Wrap,TextTrimming=TextTrimming.CharacterEllipsis,MaxHeight=108,Margin=new(0,0,0,14)};content.Children.Add(title);
         var meta=new WrapPanel{Margin=new(0,0,0,10)};content.Children.Add(meta);
         var people=new TextBlock{FontSize=14,Foreground=(Brush)FindResource("BannerMuted"),TextTrimming=TextTrimming.CharacterEllipsis,Margin=new(0,0,0,18)};content.Children.Add(people);
         var actions=new StackPanel{Orientation=Orientation.Horizontal,Margin=new(0,4,0,0)};content.Children.Add(actions);
@@ -177,12 +177,12 @@ public partial class MainWindow
     {
         if(carousel is not {} view)return;
         var narrow=width<760;var tiny=width<520;
-        view.Title.FontSize=tiny?28:narrow?36:52;view.Title.LineHeight=tiny?30:narrow?38:54;view.Title.MaxHeight=view.Title.LineHeight*2;
+        view.Title.FontSize=tiny?28:narrow?34:44;view.Title.LineHeight=tiny?30:narrow?36:46;view.Title.MaxHeight=view.Title.LineHeight*2;
         featureCompactText=narrow;
         if(view.Bound!=null)UpdateFeaturePeople(view,view.Bound);
         // The lite-mode portrait stays clear of text in narrow layouts.
         view.PosterHost.Visibility=prefs.LiteMode&&width>=860?Visibility.Visible:Visibility.Collapsed;
-        if(view.Frame.Child is Grid grid&&grid.Children.OfType<StackPanel>().FirstOrDefault(x=>x.Name=="FeatureContent") is {} content)content.Margin=tiny?new(20,24,20,22):narrow?new(24,28,24,26):new(36,32,36,32);
+        if(view.Frame.Child is Grid grid&&grid.Children.OfType<StackPanel>().FirstOrDefault(x=>x.Name=="FeatureContent") is {} content)content.Margin=tiny?new(20,20,20,20):narrow?new(24,24,24,22):new(36,28,36,26);
         view.About.Padding=new(tiny?16:22,0,tiny?16:22,0);
     }
 }
