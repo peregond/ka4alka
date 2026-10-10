@@ -23,6 +23,20 @@ public partial class MainWindow
         if(!SetCursorPos((int)point.X,(int)point.Y))throw new Exception("Cannot position the mouse for a native input test.");
         mouse_event(2,0,0,0,0);await Task.Delay(70);mouse_event(4,0,0,0,0);await Task.Delay(150);UpdateLayout();
     }
+    // A horizontal point on the target that the open menu does not cover, as a fraction of the target's width.
+    static double OutsideFraction(FrameworkElement target,FrameworkElement menu)
+    {
+        if(PresentationSource.FromVisual(menu)==null||PresentationSource.FromVisual(target)==null)return .5;
+        var targetLeft=target.PointToScreen(new Point()).X;var targetRight=target.PointToScreen(new Point(target.ActualWidth,0)).X;
+        var menuLeft=menu.PointToScreen(new Point()).X;var menuRight=menu.PointToScreen(new Point(menu.ActualWidth,0)).X;
+        var targetTop=target.PointToScreen(new Point()).Y;var targetBottom=target.PointToScreen(new Point(0,target.ActualHeight)).Y;
+        var menuTop=menu.PointToScreen(new Point()).Y;var menuBottom=menu.PointToScreen(new Point(0,menu.ActualHeight)).Y;
+        var width=targetRight-targetLeft;
+        if(width<=0||menuBottom<targetTop||menuTop>targetBottom||menuRight<targetLeft||menuLeft>targetRight)return .5;
+        // Use the wider uncovered side of the target.
+        var x=menuLeft-targetLeft>targetRight-menuRight?(targetLeft+menuLeft)/2:(menuRight+targetRight)/2;
+        return Math.Clamp((x-targetLeft)/width,.03,.97);
+    }
     async Task<object> CheckUiActions(string output)
     {
         var originalOffer=updateOffer;var originalJob=preparedUpdateJob;var originalChecking=checkingUpdate;
@@ -54,7 +68,12 @@ public partial class MainWindow
                 var popup=owner.ContextMenu!.Parent as Popup??throw new Exception("Menu popup parent is missing.");popup.PopupAnimation=popupAnimation;
                 await ClickWithMouse(owner);Check(owner.ContextMenu?.IsOpen==false,label+": second mouse click reopened the menu.");
                 await ClickWithMouse(owner);Check(owner.ContextMenu?.IsOpen==true,label+": third mouse click did not reopen the menu.");
-                await ClickWithMouse(Search);Check(owner.ContextMenu?.IsOpen==false,label+": outside click did not dismiss the menu.");
+                // The outside click lands on the search box away from the open menu: a long menu near the
+                // window's bottom opens upwards and can cover the box, and a click there would pick an item.
+                var keyBefore=CurrentCatalogKey;
+                await ClickWithMouse(Search,OutsideFraction(Search,owner.ContextMenu!),.5);
+                Check(owner.ContextMenu?.IsOpen==false,label+": outside click did not dismiss the menu.");
+                Check(CurrentCatalogKey==keyBefore,label+": the outside click selected a menu item instead of dismissing the menu.");
                 owner.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));Check(owner.ContextMenu?.IsOpen==true,label+": keyboard action failed to open.");
                 owner.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));Check(owner.ContextMenu?.IsOpen==false,label+": keyboard action failed to close.");
             }
