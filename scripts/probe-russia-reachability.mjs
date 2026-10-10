@@ -2,7 +2,7 @@
 // Globalping runs HTTP/DNS requests from volunteer probes on Russian networks;
 // OONI aggregates recent web connectivity tests from Russian users. The runner's
 // own request is printed as a baseline from outside Russia.
-import { writeFileSync, appendFileSync } from "node:fs";
+import { readFileSync, writeFileSync, appendFileSync } from "node:fs";
 
 const API = "https://api.globalping.io/v1/measurements";
 const PROBES = Number(process.env.PROBES ?? 8);
@@ -32,6 +32,14 @@ const targets = [
   { name: "HTTPS-трекер foreverpirates", host: "tracker.foreverpirates.co", path: "/announce" },
   { name: "HTTPS-трекер ftorrent", host: "open.ftorrent.com", path: "/announce" }
 ];
+// Deployed relays (distribution/relays.json) are what Russian users reach instead of the site.
+try {
+  const { relays = [] } = JSON.parse(readFileSync(new URL("../distribution/relays.json", import.meta.url), "utf8"));
+  for (const relay of relays.slice(0, 3)) {
+    const url = new URL(relay);
+    targets.splice(1, 0, { name: `Посредник ${url.hostname}: поиск`, host: url.hostname, path: url.pathname + "api/search", query: "id=movies:interstellar&title=%D0%98%D0%BD%D1%82%D0%B5%D1%80%D1%81%D1%82%D0%B5%D0%BB%D0%BB%D0%B0%D1%80&original=Interstellar&year=2014" });
+  }
+} catch { /* No relay is published yet. */ }
 const dnsTargets = ["api.knaben.org", "apibay.org", "rutor.info", "nnmclub.to", "megapeer.vip", "nyaa.si", "ka4alka-online-new.peregon.chatgpt.site", "tracker.opentrackr.org"];
 const ooniDomains = ["rutor.info", "nnmclub.to", "megapeer.vip", "bigfangroup.org", "nyaa.si", "eztvx.to", "api.knaben.org", "knaben.org", "apibay.org", "yts.gg", "archive.org", "w6.zona.plus", "chatgpt.site", "raw.githubusercontent.com", "github.com"];
 
