@@ -117,6 +117,30 @@ public partial class MainWindow:Window
         StyleNav(SavedButton,section=="Сохранённое"||savedReturn!=null&&section!="Настройки");
         StyleNav(SettingsButton,section=="Настройки");
     }
+    // The description overlay stays out of layout until a card is hovered; with motion on it fades in while the cover zooms slightly.
+    void PosterHoverIn(object sender,System.Windows.Input.MouseEventArgs e)=>PosterHover(sender,true);
+    void PosterHoverOut(object sender,System.Windows.Input.MouseEventArgs e)=>PosterHover(sender,false);
+    void PosterHover(object sender,bool over)
+    {
+        if(sender is not Button card||FindVisual<Border>(card,border=>border.Name=="PosterHover") is not {} overlay)return;
+        var cover=FindVisual<Image>(card,image=>image.Parent is Grid grid&&grid.Parent is Border{Name:"CardPoster"});
+        var ease=new System.Windows.Media.Animation.CubicEase{EasingMode=System.Windows.Media.Animation.EasingMode.EaseOut};
+        var duration=TimeSpan.FromMilliseconds(220);
+        if(over)overlay.Visibility=Visibility.Visible;
+        if(!Motion)
+        {
+            overlay.BeginAnimation(UIElement.OpacityProperty,null);overlay.Opacity=over?1:0;
+            if(!over)overlay.Visibility=Visibility.Collapsed;
+            return;
+        }
+        var fade=new System.Windows.Media.Animation.DoubleAnimation(over?1:0,duration){EasingFunction=ease};
+        if(!over)fade.Completed+=(_,_)=>{if(!card.IsMouseOver)overlay.Visibility=Visibility.Collapsed;};
+        overlay.BeginAnimation(UIElement.OpacityProperty,fade);
+        if(cover==null)return;
+        if(cover.RenderTransform is not System.Windows.Media.ScaleTransform zoom||zoom.IsFrozen)cover.RenderTransform=zoom=new System.Windows.Media.ScaleTransform();
+        var scale=new System.Windows.Media.Animation.DoubleAnimation(over?1.05:1,duration){EasingFunction=ease};
+        zoom.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleXProperty,scale);zoom.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty,scale);
+    }
     void OpenCard(object sender,RoutedEventArgs e)
     {
         if(section=="Сохранённое"&&current==null&&activePerson==null)savedReturn=new(savedCategory,savedPage,savedScroll?.VerticalOffset??0);
