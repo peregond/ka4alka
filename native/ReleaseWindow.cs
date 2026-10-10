@@ -56,7 +56,7 @@ public partial class MainWindow
     {
         var health=ReleaseRecommendation.HealthOf(entry.Seeds);var bars=ReleaseRecommendation.Bars(health);
         var key=health switch{ReleaseRecommendation.Health.Fast=>"Accent",ReleaseRecommendation.Health.Medium=>"Warning",ReleaseRecommendation.Health.Unknown=>"Subtle",_=>"Danger"};
-        var row=new StackPanel{Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center};
+        var row=new StackPanel{Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,8,0),ClipToBounds=true};
         var meter=new StackPanel{Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Bottom,Margin=new(0,0,10,2)};
         for(var index=0;index<3;index++)
         {
@@ -67,7 +67,7 @@ public partial class MainWindow
         var text=new StackPanel{VerticalAlignment=VerticalAlignment.Center};
         var numbers=new StackPanel{Orientation=Orientation.Horizontal};
         var seeds=new TextBlock{Text=entry.Seeds.HasValue?string.Format(System.Globalization.CultureInfo.InvariantCulture,"{0:N0}",entry.Seeds.Value).Replace(',',' '):"—",FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=14,FontWeight=FontWeights.SemiBold};seeds.SetResourceReference(TextBlock.ForegroundProperty,"Text");numbers.Children.Add(seeds);
-        var peers=new TextBlock{Text="  ·  "+(entry.Leechers?.ToString()??"—"),FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=14};peers.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");numbers.Children.Add(peers);text.Children.Add(numbers);
+        var peers=new TextBlock{Text=" · "+(entry.Leechers.HasValue?string.Format(System.Globalization.CultureInfo.InvariantCulture,"{0:N0}",entry.Leechers.Value).Replace(',',' '):"—"),FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=14};peers.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");numbers.Children.Add(peers);text.Children.Add(numbers);
         var caption=new TextBlock{Text=ReleaseRecommendation.Caption(health),FontSize=12};caption.SetResourceReference(TextBlock.ForegroundProperty,key);text.Children.Add(caption);
         row.Children.Add(text);
         row.ToolTip=$"Отдают: {entry.Seeds?.ToString()??"неизвестно"} · Скачивают: {entry.Leechers?.ToString()??"неизвестно"}. "+ReleaseFreshness.ConnectionNote;
@@ -261,7 +261,7 @@ public partial class MainWindow
         {
             var grid=new Grid();
             grid.ColumnDefinitions.Add(new(){Width=new GridLength(96)});grid.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star),MinWidth=240});
-            grid.ColumnDefinitions.Add(new(){Width=new GridLength(88)});grid.ColumnDefinitions.Add(new(){Width=new GridLength(156)});grid.ColumnDefinitions.Add(new(){Width=new GridLength(120)});grid.ColumnDefinitions.Add(new(){Width=new GridLength(176)});
+            grid.ColumnDefinitions.Add(new(){Width=new GridLength(88)});grid.ColumnDefinitions.Add(new(){Width=new GridLength(184)});grid.ColumnDefinitions.Add(new(){Width=new GridLength(120)});grid.ColumnDefinitions.Add(new(){Width=new GridLength(176)});
             return grid;
         }
         string QualityLabel(SourceEntry entry)=>ReleaseQuality.Height(entry) is int height?height+"p":entry.Quality;
@@ -378,10 +378,10 @@ public partial class MainWindow
             {
                 var isBest=recommended!=null&&ReferenceEquals(recommended.Entry,entry);
                 var row=RowGrid();
-                var quality=new StackPanel{VerticalAlignment=VerticalAlignment.Center};
-                var big=new TextBlock{Text=QualityLabel(entry),FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=16,FontWeight=FontWeights.SemiBold};quality.Children.Add(big);
+                var quality=new StackPanel{VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,8,0),ToolTip=entry.Quality=="Не указано"?"Качество не указано":null};
+                var big=new TextBlock{Text=entry.Quality=="Не указано"&&ReleaseQuality.Height(entry)==null?"—":QualityLabel(entry),FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=16,FontWeight=FontWeights.SemiBold,TextTrimming=TextTrimming.CharacterEllipsis};quality.Children.Add(big);
                 var under=entry.Hdr!="Не указано"?entry.Hdr:entry.Type!="Не указано"?entry.Type:"";
-                if(under.Length>0){var small=new TextBlock{Text=under,FontSize=12,Margin=new(0,2,0,0)};small.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");quality.Children.Add(small);}
+                if(under.Length>0){var small=new TextBlock{Text=under,FontSize=12,Margin=new(0,2,0,0),TextTrimming=TextTrimming.CharacterEllipsis};small.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");quality.Children.Add(small);}
                 row.Children.Add(quality);
                 var identity=new StackPanel{VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,12,0)};Grid.SetColumn(identity,1);
                 var titleLine=new DockPanel();if(isBest){var pill=RecommendedPill();pill.Margin=new(0,0,10,0);DockPanel.SetDock(pill,Dock.Left);titleLine.Children.Add(pill);}

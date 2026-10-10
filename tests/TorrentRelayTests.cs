@@ -20,6 +20,8 @@ static class TorrentRelayTests
     }
     static HttpResponseMessage Bytes(byte[] body,HttpStatusCode status=HttpStatusCode.OK)=>new(status){Content=new ByteArrayContent(body)};
 
+    static Func<CancellationToken,Task<string?>> Country(string? code)=>_=>Task.FromResult(code);
+
     public static async Task Run(string root)
     {
         static void Check(bool value,string label){if(!value)throw new Exception(label);Console.WriteLine("PASS: "+label);}
@@ -35,11 +37,11 @@ static class TorrentRelayTests
         var torrent=await File.ReadAllBytesAsync(torrentPath);
         var blockPage=Encoding.UTF8.GetBytes("<html><body>Доступ к информационному ресурсу ограничен на основании Федерального закона</body></html>");
         var release=new SourceEntry("MegaPeer:5","Фильм (2024) WEB-DL 1080p","MegaPeer","https://megapeer.vip/torrent/5/film","https://megapeer.vip/download/5",null);
-        bool IsRelay(Uri uri)=>uri.Host=="ka4alka-online-new.peregon.chatgpt.site";
+        bool IsRelay(Uri uri)=>OnlineIndexClient.IsPublishedSite(uri);
 
         async Task<(string? Path,Exception? Error,Handler Handler,TimeSpan Elapsed)> Fetch(SourceEntry entry,Func<Uri,CancellationToken,Task<HttpResponseMessage>> send,bool relay=true)
         {
-            var handler=new Handler(send);using var client=new SourceClient(handler);var index=new OnlineIndexClient(client);
+            var handler=new Handler(send);using var client=new SourceClient(handler);var index=new OnlineIndexClient(client,country:Country(null));
             if(relay)client.TorrentRelay=index.RelayTorrent;
             var clock=System.Diagnostics.Stopwatch.StartNew();
             using var timeout=new CancellationTokenSource(TimeSpan.FromSeconds(20));
@@ -87,7 +89,7 @@ static class TorrentRelayTests
         using(var client=new SourceClient(new Handler((_,_)=>Task.FromResult(Bytes(feed)))))
         {
             var media=new MediaItem(-1,"Интерстеллар","Фильмы","",2014,"—","—","#526B69"){OnlineId="movies:interstellar"};
-            var rows=await new OnlineIndexClient(client).Releases(media,default);
+            var rows=await new OnlineIndexClient(client,country:Country("DE")).Releases(media,default);
             Check(rows.Count==1&&rows[0].TorrentUrl==row.torrentUrl&&OnlineIndexClient.CanRelay(new Uri(rows[0].TorrentUrl!)),"BigFanGroup releases found by the online index are accepted and can be relayed");
         }
     }
@@ -100,6 +102,9 @@ static class TorrentRelayTests
         var parsed=IndexRelays.Parse(List("https://relay.example.workers.dev/","http://plain.example/","https://user@relay.example/","https://relay.example/?x=1","https://relay.example/path",
             "https://relay.example:8443/","https://ka4alka-online-new.peregon.chatgpt.site/","https://relay.example.workers.dev/","https://second.example/api/","not a url"));
         Check(parsed.Select(x=>x.AbsoluteUri).SequenceEqual(["https://relay.example.workers.dev/","https://second.example/api/"]),"the relay list keeps only distinct HTTPS base addresses other than the site");
+        var withMirrors=JsonSerializer.SerializeToUtf8Bytes(new{schemaVersion=1,relays=Array.Empty<string>(),mirrors=new[]{"https://mirror.example.app/","http://plain.example/","https://ka4alka-online-new.peregon.chatgpt.site/","https://m2.example/","https://m3.example/","https://m4.example/"}});
+        Check(IndexRelays.ParseMirrors(withMirrors).Select(x=>x.AbsoluteUri).SequenceEqual(["https://mirror.example.app/","https://m2.example/","https://m3.example/"])&&IndexRelays.ParseMirrors(List("https://relay.example/")).Count==0
+            &&IndexRelays.ParseMirrors(Encoding.UTF8.GetBytes("{\"schemaVersion\":1,\"relays\":[],\"mirrors\":\"x\"}")).Count==0,"mirrors are optional HTTPS copies of the site other than chatgpt.site, at most three");
         Check(IndexRelays.Parse(List(Enumerable.Range(1,9).Select(i=>$"https://r{i}.example/").ToArray())).Count==5,"the relay list is limited to five addresses");
         foreach(var invalid in new[]{"{}","{\"schemaVersion\":2,\"relays\":[]}","{\"schemaVersion\":1,\"relays\":\"https://r.example/\"}","[]"})
         {
@@ -114,9 +119,12 @@ static class TorrentRelayTests
         var release=new{id="NNM-Club:77",mediaId="movies:interstellar",title="Интерстеллар / Interstellar (2014) BDRip 1080p",source="NNM-Club",pageUrl="https://nnmclub.to/forum/viewtopic.php?t=77",torrentUrl="https://nnmclub.to/forum/download.php?id=77",size=1024L,seeds=12};
         var search=JsonSerializer.SerializeToUtf8Bytes(new{items=new[]{release},updated=true,sourceCount=1});
         var listAvailable=true;var siteRefuses=true;
+        var mirror="mirror.example.app";var chatgpt=OnlineIndexClient.ChatGptSite.Host;
+        byte[] Published(params string[] relays)=>JsonSerializer.SerializeToUtf8Bytes(new{schemaVersion=1,relays,mirrors=new[]{"https://"+mirror+"/"}});
         Handler Network()=>new((uri,_)=>Task.FromResult(uri.Host switch
         {
-            "raw.githubusercontent.com"=>listAvailable?Bytes(List("https://relay.example.workers.dev/")):throw new HttpRequestException("offline"),
+            "raw.githubusercontent.com"=>listAvailable?Bytes(Published("https://relay.example.workers.dev/")):throw new HttpRequestException("offline"),
+            "mirror.example.app"=>siteRefuses?throw new HttpRequestException("connection timed out"):Bytes(search),
             "ka4alka-online-new.peregon.chatgpt.site"=>siteRefuses?Bytes(Encoding.UTF8.GetBytes("<title>Attention Required! | Cloudflare</title>"),HttpStatusCode.Forbidden):Bytes(search),
             "relay.example.workers.dev"=>uri.AbsolutePath=="/api/search"?Bytes(search):uri.AbsolutePath=="/api/torrent"?Bytes(torrent):Bytes([],HttpStatusCode.NotFound),
             _=>Bytes(blockPage)
@@ -127,11 +135,11 @@ static class TorrentRelayTests
         var handler=Network();
         using(var client=new SourceClient(handler))
         {
-            var relays=new IndexRelays(client,cachePath:cacheFile);var index=new OnlineIndexClient(client,relays:relays);
+            var relays=new IndexRelays(client,cachePath:cacheFile);var index=new OnlineIndexClient(client,relays:relays,country:Country("RU"));
             var rows=await index.Releases(media,default,allowRelay:true);
             var asked=handler.Requests.Single(x=>x.Host=="relay.example.workers.dev");
             var query=System.Web.HttpUtility.ParseQueryString(asked.Query);
-            Check(rows.Count==1&&rows[0].TorrentUrl==release.torrentUrl,"an opened card gets releases from the relay when the site refuses the country");
+            Check(rows.Count==1&&rows[0].TorrentUrl==release.torrentUrl,"an opened card gets releases from the relay when neither copy of the site answers");
             Check(asked.AbsolutePath=="/api/search"&&query["id"]=="movies:interstellar"&&query["title"]=="Интерстеллар"&&query["original"]=="Interstellar"&&query["year"]=="2014","the relay receives the card's id, titles and year");
             var before=handler.Requests.Count;
             var failed=false;try{await index.Releases(media,default);}catch(HttpRequestException){failed=true;}
@@ -144,21 +152,97 @@ static class TorrentRelayTests
             var path=await client.TorrentFile(entry,default);
             var used=handler.Requests.Skip(before).ToArray();
             Check(File.ReadAllBytes(path).SequenceEqual(torrent)&&used.Any(x=>x.Host=="relay.example.workers.dev"&&x.AbsolutePath=="/api/torrent"),"a blocked tracker's torrent file arrives through the relay when the site refuses too");
-            Check(!used.Any(x=>x.Host=="ka4alka-online-new.peregon.chatgpt.site"),"a site that has just refused is not asked again during its cooldown");
+            Check(!used.Any(x=>OnlineIndexClient.IsPublishedSite(x)||x.Host==mirror),"copies of the site that have just failed are not asked again during their cooldown");
         }
 
         handler=Network();listAvailable=false;
         using(var client=new SourceClient(handler))
         {
-            var rows=await new OnlineIndexClient(client,relays:new IndexRelays(client,cachePath:cacheFile)).Releases(media,default,allowRelay:true);
+            var rows=await new OnlineIndexClient(client,relays:new IndexRelays(client,cachePath:cacheFile),country:Country("RU")).Releases(media,default,allowRelay:true);
             Check(rows.Count==1,"the saved relay list keeps working while GitHub is unavailable");
         }
 
         handler=Network();listAvailable=true;siteRefuses=false;
         using(var client=new SourceClient(handler))
         {
-            var rows=await new OnlineIndexClient(client,relays:new IndexRelays(client,cachePath:cacheFile)).Releases(media,default,allowRelay:true);
-            Check(rows.Count==1&&handler.Requests.All(x=>x.Host=="ka4alka-online-new.peregon.chatgpt.site"),"where the site answers, neither GitHub nor the relay is contacted");
+            var rows=await new OnlineIndexClient(client,relays:new IndexRelays(client,cachePath:cacheFile),country:Country("RU")).Releases(media,default,allowRelay:true);
+            Check(rows.Count==1&&handler.Requests.Select(x=>x.Host).Distinct().Order().SequenceEqual([mirror,"raw.githubusercontent.com"]),"from a Russian address the mirror published on GitHub answers first; chatgpt.site and the relay are not contacted");
+        }
+
+        // A mirror answers in Russia, chatgpt.site elsewhere: the address's country picks
+        // the first copy, and each copy stands in for the other.
+        Check(SiteCountry.Parse(Encoding.ASCII.GetBytes("fl=1\nip=203.0.113.5\nloc=RU\ntls=TLSv1.3\n"))=="RU"&&SiteCountry.Parse(Encoding.ASCII.GetBytes("h=x\r\nloc=DE\r\n"))=="DE"
+            &&SiteCountry.Parse(Encoding.ASCII.GetBytes("<html>loc=RU</html>"))==null&&SiteCountry.Parse(Encoding.ASCII.GetBytes("loc=Russia\n"))==null,"the country is read only from Cloudflare's trace line");
+        Check(SiteCountry.Blocked("RU")&&SiteCountry.Blocked("BY")&&!SiteCountry.Blocked("KZ")&&!SiteCountry.Blocked(null),"Russia and Belarus are the countries chatgpt.site refuses");
+        Check(OnlineIndexClient.PublishedSite.Host==chatgpt&&OnlineIndexClient.IsPublishedSite(new Uri("https://"+chatgpt+"/x"))&&!OnlineIndexClient.IsPublishedSite(new Uri("https://"+mirror+"/")),"only chatgpt.site is the built-in site");
+        // Every network below publishes the mirror on GitHub and no relay.
+        Handler Copies(Func<Uri,HttpResponseMessage> send)=>new((uri,_)=>Task.FromResult(uri.Host=="raw.githubusercontent.com"?Bytes(Published()):send(uri)));
+        OnlineIndexClient Index(SourceClient client,string? code)=>new(client,relays:new IndexRelays(client,cachePath:Path.Combine(root,"mirrors-"+Guid.NewGuid().ToString("N")+".json")),country:Country(code));
+        async Task<string[]> Asked(string? code,HttpStatusCode mirrorStatus=HttpStatusCode.OK,HttpStatusCode chatgptStatus=HttpStatusCode.OK)
+        {
+            HttpResponseMessage Reply(HttpStatusCode status)=>status==HttpStatusCode.OK?Bytes(search):Bytes([],status);
+            var network=Copies(uri=>uri.Host==mirror?Reply(mirrorStatus):uri.Host==chatgpt?Reply(chatgptStatus):Bytes(blockPage));
+            using var client=new SourceClient(network);
+            var rows=await Index(client,code).Releases(media,default);
+            if(rows.Count!=1)throw new Exception("no releases for "+code);
+            return network.Requests.Select(x=>x.Host).Where(x=>x!="raw.githubusercontent.com").ToArray();
+        }
+        Check((await Asked("RU")).SequenceEqual([mirror]),"an address in Russia goes to the mirror first");
+        Check((await Asked("BY")).SequenceEqual([mirror]),"an address in Belarus goes to the mirror first");
+        Check((await Asked("DE")).SequenceEqual([chatgpt]),"an address outside Russia and Belarus goes to chatgpt.site first");
+        Check((await Asked(null)).SequenceEqual([chatgpt]),"an unknown country keeps chatgpt.site first");
+        Check((await Asked("RU",mirrorStatus:HttpStatusCode.ServiceUnavailable)).SequenceEqual([mirror,chatgpt]),"from Russia, chatgpt.site still stands in when the mirror fails");
+        Check((await Asked("DE",chatgptStatus:HttpStatusCode.Forbidden)).SequenceEqual([chatgpt,mirror]),"abroad, the mirror stands in when chatgpt.site refuses");
+        handler=Copies(uri=>uri.Host==chatgpt?Bytes(search):Bytes(blockPage));
+        using(var client=new SourceClient(handler))
+        {
+            await Index(client,"DE").Releases(media,default);
+            Check(handler.Requests.All(x=>x.Host==chatgpt),"outside Russia the mirror list is not read while chatgpt.site answers");
+        }
+        handler=Copies(uri=>uri.Host==chatgpt?Bytes([],HttpStatusCode.ServiceUnavailable):uri.Host==mirror?Bytes(search):Bytes(blockPage));
+        using(var client=new SourceClient(handler))
+        {
+            var index=Index(client,"DE");
+            await index.Releases(media,default);var before=handler.Requests.Count;
+            await index.Releases(media,default);
+            Check(handler.Requests.Skip(before).All(x=>x.Host==mirror),"a failed copy rests while the other one answers");
+        }
+        handler=Copies(uri=>uri.Host==chatgpt?Bytes([],HttpStatusCode.NotFound):uri.Host==mirror?Bytes(search):Bytes(blockPage));
+        using(var client=new SourceClient(handler))
+        {
+            var index=Index(client,"DE");
+            await index.Releases(media,default);var before=handler.Requests.Count;
+            await index.Releases(media,default);
+            Check(handler.Requests.Skip(before).First().Host==chatgpt,"a 404 for one path does not rest the copy that returned it");
+        }
+        var download=new SourceEntry(release.id,release.title,release.source,release.pageUrl,release.torrentUrl,null);
+        handler=Copies(uri=>uri.Host==mirror&&uri.AbsolutePath=="/api/torrent"?Bytes(torrent):uri.Host==chatgpt?throw new InvalidOperationException("chatgpt.site must not be asked"):Bytes(blockPage));
+        using(var client=new SourceClient(handler))
+        {
+            var index=Index(client,"RU");client.TorrentRelay=index.RelayTorrent;
+            var path=await client.TorrentFile(download,default);
+            Check(File.ReadAllBytes(path).SequenceEqual(torrent)&&!handler.Requests.Any(x=>x.Host==chatgpt),"from Russia a blocked tracker's torrent file comes through the mirror without asking chatgpt.site");
+        }
+        handler=Copies(uri=>uri.Host==mirror?Bytes(blockPage):uri.Host==chatgpt&&uri.AbsolutePath=="/api/torrent"?Bytes(torrent):Bytes(blockPage));
+        using(var client=new SourceClient(handler))
+        {
+            var index=Index(client,"RU");client.TorrentRelay=index.RelayTorrent;
+            var path=await client.TorrentFile(download,default);
+            Check(File.ReadAllBytes(path).SequenceEqual(torrent)&&handler.Requests.Any(x=>x.Host==chatgpt&&x.AbsolutePath=="/api/torrent"),"a copy that returns a block page with status 200 for a torrent file hands over to the other copy");
+        }
+        handler=Copies(uri=>uri.Host==mirror?Bytes([],HttpStatusCode.GatewayTimeout):uri.Host==chatgpt&&uri.AbsolutePath=="/api/torrent"?Bytes(torrent):Bytes(blockPage));
+        using(var client=new SourceClient(handler))
+        {
+            var index=Index(client,"RU");client.TorrentRelay=index.RelayTorrent;
+            await client.TorrentFile(download,default);var before=handler.Requests.Count;
+            await client.TorrentFile(download,default);
+            Check(!handler.Requests.Skip(before).Any(x=>x.Host==mirror),"a copy that failed a torrent file rests for the next download");
+        }
+        handler=Copies(uri=>Bytes([],HttpStatusCode.Forbidden));
+        using(var client=new SourceClient(handler))
+        {
+            var failed=false;try{await Index(client,"RU").Releases(media,default);}catch(HttpRequestException){failed=true;}
+            Check(failed,"when no copy answers, the card reports the site as unavailable");
         }
     }
     // From the October 2026 logs of a user in Russia: a RuTracker magnet carried only

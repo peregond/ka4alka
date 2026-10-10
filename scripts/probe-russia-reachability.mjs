@@ -16,6 +16,10 @@ const targets = [
   { name: "Онлайн-индекс: каталог (>16 КБ)", host: "ka4alka-online-new.peregon.chatgpt.site", path: "/api/catalog", query: "section=movies&page=1" },
   { name: "Онлайн-индекс: раздачи (>16 КБ)", host: "ka4alka-online-new.peregon.chatgpt.site", path: "/api/releases", query: "id=movies:obekt-prestupleniya" },
   { name: "Онлайн-индекс: torrent через бэкенд", host: "ka4alka-online-new.peregon.chatgpt.site", path: "/api/torrent", query: "url=" + encodeURIComponent("https://nnmclub.to/forum/download.php?id=1") },
+  { name: "Railway: карточка", host: "web-production-d7aa7.up.railway.app", path: "/api/media", query: "id=movies:obekt-prestupleniya" },
+  { name: "Railway: раздачи", host: "web-production-d7aa7.up.railway.app", path: "/api/releases", query: "id=movies:obekt-prestupleniya" },
+  { name: "Railway: torrent через бэкенд", host: "web-production-d7aa7.up.railway.app", path: "/api/torrent", query: "url=" + encodeURIComponent("https://nnmclub.to/forum/download.php?id=1") },
+  { name: "Cloudflare trace (страна адреса)", host: "www.cloudflare.com", path: "/cdn-cgi/trace" },
   { name: "RuTor", host: "rutor.info", path: "/" },
   { name: "NNM-Club", host: "nnmclub.to", path: "/forum/index.php" },
   { name: "MegaPeer", host: "megapeer.vip", path: "/" },
@@ -40,8 +44,8 @@ try {
     targets.splice(1, 0, { name: `Посредник ${url.hostname}: поиск`, host: url.hostname, path: url.pathname + "api/search", query: "id=movies:interstellar&title=%D0%98%D0%BD%D1%82%D0%B5%D1%80%D1%81%D1%82%D0%B5%D0%BB%D0%BB%D0%B0%D1%80&original=Interstellar&year=2014" });
   }
 } catch { /* No relay is published yet. */ }
-const dnsTargets = ["api.knaben.org", "apibay.org", "rutor.info", "nnmclub.to", "megapeer.vip", "nyaa.si", "ka4alka-online-new.peregon.chatgpt.site", "tracker.opentrackr.org"];
-const ooniDomains = ["rutor.info", "nnmclub.to", "megapeer.vip", "bigfangroup.org", "nyaa.si", "eztvx.to", "api.knaben.org", "knaben.org", "apibay.org", "yts.gg", "archive.org", "w6.zona.plus", "chatgpt.site", "raw.githubusercontent.com", "github.com"];
+const dnsTargets = ["api.knaben.org", "apibay.org", "rutor.info", "nnmclub.to", "megapeer.vip", "nyaa.si", "ka4alka-online-new.peregon.chatgpt.site", "web-production-d7aa7.up.railway.app", "tracker.opentrackr.org"];
+const ooniDomains = ["rutor.info", "nnmclub.to", "megapeer.vip", "bigfangroup.org", "nyaa.si", "eztvx.to", "api.knaben.org", "knaben.org", "apibay.org", "yts.gg", "archive.org", "w6.zona.plus", "chatgpt.site", "up.railway.app", "raw.githubusercontent.com", "github.com"];
 
 async function request(body) {
   for (let attempt = 0; attempt < 4; attempt++) {

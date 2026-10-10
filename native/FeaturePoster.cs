@@ -52,7 +52,8 @@ public partial class MainWindow
                 }
                 try
                 {
-                    var bytes=await (client??sourceClient).Read(new Uri(OnlineIndexClient.PublishedSite,"api/backdrop?id="+Uri.EscapeDataString(id)),32768,token);
+                    var request="api/backdrop?id="+Uri.EscapeDataString(id);
+                    var bytes=client!=null?await client.Read(new Uri(OnlineIndexClient.PublishedSite,request),32768,token):await onlineIndex.ReadSite(request,32768,token);
                     var value=await Task.Run(()=>FeatureBackdrop.FromResponse(bytes,id),token);
                     lookup.Expires=DateTime.UtcNow.Add(value!=null?TimeSpan.FromDays(7):TimeSpan.FromHours(1));
                     try{await Task.Run(()=>Directory.CreateDirectory(Path.GetDirectoryName(path)!),token);await CacheFiles.WriteAllBytesAsync(path,bytes,token);}catch(IOException){}catch(UnauthorizedAccessException){}
@@ -103,8 +104,8 @@ public partial class MainWindow
                 var path=Path.Combine(Preferences.DataDir,"covers",Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(url)))+".img");
                 if(!coverCache.TryGetValue(url,out var bitmap))
                 {
-                    var proxy=new Uri(OnlineIndexClient.PublishedSite,"api/backdrop-image?file="+Uri.EscapeDataString(new Uri(url).Segments.Last().Insert(0,"/")));
-                    (bitmap,_)=await CoverCache.Load(path,2*1024*1024,ct=>sourceClient.Read(proxy,2*1024*1024,ct),bytes=>
+                    var proxy="api/backdrop-image?file="+Uri.EscapeDataString(new Uri(url).Segments.Last().Insert(0,"/"));
+                    (bitmap,_)=await CoverCache.Load(path,2*1024*1024,ct=>onlineIndex.ReadSite(proxy,2*1024*1024,ct),bytes=>
                     {
                         using var stream=new MemoryStream(bytes);var result=new BitmapImage();result.BeginInit();result.CacheOption=BitmapCacheOption.OnLoad;result.DecodePixelWidth=1280;result.StreamSource=stream;result.EndInit();if(!FeatureBackdrop.Landscape(result.PixelWidth,result.PixelHeight))throw new InvalidDataException("Источник вернул постер вместо широкого фона.");result.Freeze();return result;
                     },timeout.Token);
