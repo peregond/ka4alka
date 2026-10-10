@@ -161,5 +161,26 @@ static class TorrentRelayTests
             Check(rows.Count==1&&handler.Requests.All(x=>x.Host=="ka4alka-online-new.peregon.chatgpt.site"),"where the site answers, neither GitHub nor the relay is contacted");
         }
     }
+    // From the October 2026 logs of a user in Russia: a RuTracker magnet carried only
+    // opentrackr, which answered nowhere there; NNM-Club and MegaPeer looked empty.
+    public static async Task RunRussianNetworks()
+    {
+        static void Check(bool value,string label){if(!value)throw new Exception(label);Console.WriteLine("PASS: "+label);}
+        IReadOnlyList<string> pub=["https://public.example/announce"];
+        var rutracker=MagnetDiscovery.Fallbacks("RuTracker",pub)!;
+        Check(rutracker.Contains("http://bt2.t-ru.org/ann?magnet")&&rutracker.Contains("http://retracker.local/announce")&&rutracker.Contains(pub[0]),"RuTracker magnets gain RuTracker's own announce addresses, the local retracker and the public trackers");
+        Check(MagnetDiscovery.Fallbacks("The Pirate Bay",pub)!.SequenceEqual(pub)&&MagnetDiscovery.Fallbacks(null,pub)==null&&MagnetDiscovery.Fallbacks("Мой источник",pub)==null,"other public sources keep the public list and manual links stay untouched");
+        Check(MagnetDiscovery.RuTrackerTrackers.All(x=>Uri.TryCreate(x,UriKind.Absolute,out var uri)&&uri.Scheme=="http"),"RuTracker fallback trackers are valid announce addresses");
+        var media=new MediaItem(-1,"Интерстеллар","Фильмы","",2014,"—","—","#526B69"){OriginalTitle="Interstellar"};
+        using var blocked=new SourceClient(new Handler((_,_)=>throw new HttpRequestException("connection reset")));
+        foreach(var (name,search) in new (string,Func<Task>)[]{("NNM-Club",()=>new NnmClubSource(blocked).Search(media,default)),("MegaPeer",()=>new MegaPeerSource(blocked).Search(media,default))})
+        {
+            var unavailable=false;try{await search();}catch(HttpRequestException){unavailable=true;}
+            Check(unavailable,name+" reports a blocked tracker as unavailable instead of empty");
+        }
+        var empty=Encoding.UTF8.GetBytes("<html><body><table></table></body></html>");
+        using var answering=new SourceClient(new Handler((_,_)=>Task.FromResult(Bytes(empty))));
+        Check((await new NnmClubSource(answering).Search(media,default)).Count==0&&(await new MegaPeerSource(answering).Search(media,default)).Count==0,"a tracker that answers without matches is still empty, not unavailable");
+    }
     static byte[] RandomBytes(int length)=>System.Security.Cryptography.RandomNumberGenerator.GetBytes(length);
 }

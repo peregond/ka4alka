@@ -105,8 +105,8 @@ public sealed partial class DownloadService
           : await Engine.AddAsync(item.Source,item.Folder,settings);
         try
         {
-            if(MagnetDiscovery.PublicSource(item.ReleaseSource))
-                await MagnetDiscovery.ConfigureAsync(manager,publicTrackers);
+            if(MagnetDiscovery.Fallbacks(item.ReleaseSource,publicTrackers) is {} fallbacks)
+                await MagnetDiscovery.ConfigureAsync(manager,fallbacks);
         }
         catch{await Engine.RemoveAsync(manager);throw;}
         manager.ConnectionAttemptFailed+=(_,failure)=>DiagnosticLog.Write("peer-connection-failed",new{item.Id,item.ReleaseSource,item.InfoHash,Reason=failure.Reason.ToString()});
