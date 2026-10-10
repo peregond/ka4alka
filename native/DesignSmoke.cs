@@ -178,6 +178,7 @@ public partial class MainWindow
             if(ActualWidth<1700||ActualHeight<900||discoveryHero is not {ActualHeight:>180}||discoveryHero.Children.Count!=1||discoveryShelf is not {ActualWidth:>500})throw new Exception($"Cinematic desktop catalog is missing its banners or curated row ({ActualWidth}x{ActualHeight}, hero={discoveryHero?.ActualHeight}, shelf={discoveryShelf?.ActualWidth}).");
             if(VisualElements<UIElement>(Body).Any(x=>x.Effect!=null))throw new Exception("Cinematic catalog adds an expensive blur or shadow effect.");
             var bannerCornerChecks=CheckBannerCorners(output);
+            var bannerPlaceholderChecks=await CheckBannerPlaceholder(output);
             var featurePosterWidths=VisualElements<Image>(discoveryHero!).Select(x=>(x.Source as BitmapSource)?.PixelWidth??0).ToArray();
             var movies=liveItems;
             section="Сериалы";liveItems=catalogPages["Сериалы|sort-date|1"].Items;liveKey=CurrentCatalogKey;
@@ -367,6 +368,7 @@ public partial class MainWindow
                 ExternalSourcesRequired=false,FixtureHasCachedPoster=preview!=null,FeaturePosterWidths=featurePosterWidths,FilterPersistedAfterRender=true,FilterPersistedAfterResize=true,DownloadStarted=false,EngineCreated=downloads.EngineCreated,
                 ShortDescriptionLength=shortDescription.Length,ShortDescriptionExpanded=true,ShortDescriptionExpandedHeight=shortDescriptionExpandedHeight,SeriesSeasonFilter=true,
                 ReleaseToolbarChecks=releaseToolbarChecks,
+                BannerPlaceholder=bannerPlaceholderChecks,
                 DownloadTelemetryFitsNarrowWindow=true,DownloadTextFollowsTheme=true,
                 BackgroundTheme=new{Light=backgroundLight,Dark=backgroundDark},
                 TextRendering="Grayscale",TextFormatting="Ideal",FractionalRasterScales=new[]{1.2,1.25,1.5},QualityBadgeOnPoster=true,SeriesPosterAlignment=true,MultilineSeriesMetadataContained=true,

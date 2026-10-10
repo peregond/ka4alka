@@ -118,6 +118,6 @@ public partial class MainWindow
             finally{coverSlots.Release();}
         }
         catch(OperationCanceledException)when(ct.IsCancellationRequested){throw;}
-        catch{ /* Keep the flat banner and its separate portrait poster when the backdrop is unavailable. */ }
+        catch{ /* Keep the preblurred poster or built-in gradient if the backdrop is unavailable. */ }
     }
 }

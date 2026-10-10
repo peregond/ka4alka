@@ -103,7 +103,7 @@ public partial class MainWindow
         using var request=new CancellationTokenSource(TimeSpan.FromSeconds(25));state.FeatureRequest=request;state.FeatureAttempted=true;
         try{await ImproveFeaturePoster(image,item,request.Token);}
         catch(OperationCanceledException)when(request.IsCancellationRequested){}
-        catch{ /* The flat banner and separate poster remain available if no backdrop is returned. */ }
+        catch{ /* The preblurred poster or built-in gradient remains available. */ }
         finally{if(ReferenceEquals(state.FeatureRequest,request))state.FeatureRequest=null;}
     }
     async Task LoadCover(Image image,CoverRequest state,object? item,string? url)

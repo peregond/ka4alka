@@ -172,6 +172,9 @@ public partial class MainWindow
         await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.Background);
         if(feature.Source!=null||fixture.Count(15)!=0)throw new Exception("A banner without a landscape identity loaded its portrait poster as a backdrop.");
         if(coverViewport?.Measure(feature).Near!=true)throw new Exception("The visible banner was treated as an offscreen zero-sized Image.");
+        var placeholderPoster=Poster(16,url+"16.png");placeholderPoster.Width=placeholderPoster.Height=0;placeholderPoster.Opacity=0;placeholderPoster.Tag="FeaturePlaceholderPoster";banner.Children.Add(placeholderPoster);
+        await Until(()=>placeholderPoster.Source!=null,"The hidden placeholder poster failed to use its banner viewport.");
+        if(fixture.Count(16)!=1||coverViewport?.Measure(placeholderPoster).Near!=true)throw new Exception("The banner placeholder did not load exactly one ordinary poster.");
 
         // An already loaded container may move when adjacent content folds.
         // Keep extent and every element's size fixed to avoid ScrollChanged or

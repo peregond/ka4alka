@@ -62,6 +62,7 @@ DownloadTests.Run();
 DownloadFolderTests.Run();
 ReleaseQualityTests.Run();
 FeaturePosterTests.Run();
+PosterBlurTests.Run();
 AdditionalSourceTests.Run();
 await DownloadOrderingTests.Run();
 await CatalogBatchTests.Run();

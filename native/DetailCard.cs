@@ -45,14 +45,8 @@ public partial class MainWindow
         var artwork=new Grid{Name="DetailArtwork"};heroFrame.Child=artwork;
         artwork.SizeChanged+=(_,e)=>{if(e.NewSize.Width<=0||e.NewSize.Height<=0)return;var clip=new RectangleGeometry(new Rect(e.NewSize),24,24);clip.Freeze();artwork.Clip=clip;};
         var backdropImage=new Image{DataContext=item,Width=0,Height=0,Opacity=0,Tag="FeaturePoster"};if(!prefs.LiteMode){backdropImage.Loaded+=SourceCover;backdropImage.DataContextChanged+=SourceCoverChanged;}artwork.Children.Add(backdropImage);
-        if(!prefs.LiteMode)
-        {
-            var picture=new ImageBrush{Stretch=Stretch.UniformToFill,AlignmentX=AlignmentX.Center,AlignmentY=AlignmentY.Top};
-            BindingOperations.SetBinding(picture,ImageBrush.ImageSourceProperty,new Binding("Source"){Source=backdropImage});
-            artwork.Children.Add(new Border{Background=picture,IsHitTestVisible=false});
-            artwork.Children.Add(new Border{Background=(Brush)FindResource("ScrimHorizontal"),IsHitTestVisible=false});
-            artwork.Children.Add(new Border{Background=(Brush)FindResource("ScrimVertical"),IsHitTestVisible=false});
-        }
+        var image=new Image{DataContext=item,Stretch=Stretch.UniformToFill};image.Loaded+=SourceCover;image.DataContextChanged+=SourceCoverChanged;
+        if(!prefs.LiteMode)AddBannerArtwork(artwork,backdropImage,image);
         detailHero=new Grid{Name="DetailHero",Margin=new(32,28,32,28)};
         detailHero.ColumnDefinitions.Add(new(){Width=GridLength.Auto});detailHero.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});
         detailHero.RowDefinitions.Add(new(){Height=GridLength.Auto});
@@ -60,7 +54,7 @@ public partial class MainWindow
 
         var posterGrid=new Grid();
         posterGrid.Children.Add(new TextBlock{Text="Постер\nнедоступен",Foreground=(Brush)FindResource("BannerMuted"),Opacity=.75,TextAlignment=TextAlignment.Center,VerticalAlignment=VerticalAlignment.Center,FontSize=11});
-        var image=new Image{DataContext=item,Stretch=Stretch.UniformToFill};image.Loaded+=SourceCover;image.DataContextChanged+=SourceCoverChanged;posterGrid.Children.Add(image);
+        posterGrid.Children.Add(image);
         detailPoster=new Border{Width=168,Height=252,CornerRadius=new(14),ClipToBounds=true,Background=item.Cover,BorderBrush=(Brush)FindResource("BannerChip"),BorderThickness=new(1),HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Top,Margin=new(0,0,28,0),Child=posterGrid};
         detailPoster.SizeChanged+=(sender,_)=>ClipPoster((Border)sender);
         detailHero.Children.Add(detailPoster);

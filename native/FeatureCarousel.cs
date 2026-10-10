@@ -43,26 +43,18 @@ public partial class MainWindow
         // Lite mode paints no backdrop, so it does not request the large feature poster at all.
         if(!prefs.LiteMode){image.Loaded+=SourceCover;image.DataContextChanged+=SourceCoverChanged;}
         grid.Children.Add(image);
-        var backdrop=new Border();
-        if(!prefs.LiteMode)
-        {
-            var picture=new ImageBrush{Stretch=Stretch.UniformToFill,AlignmentX=AlignmentX.Center,AlignmentY=AlignmentY.Top};
-            BindingOperations.SetBinding(picture,ImageBrush.ImageSourceProperty,new Binding("Source"){Source=image});
-            backdrop.Background=picture;
-        }
-        grid.Children.Add(backdrop);
-        if(!prefs.LiteMode)
-        {
-            grid.Children.Add(new Border{Background=(Brush)FindResource("ScrimHorizontal"),IsHitTestVisible=false});
-            grid.Children.Add(new Border{Background=(Brush)FindResource("ScrimVertical"),IsHitTestVisible=false});
-        }
-        // Lite mode and missing landscape artwork use a portrait poster without stretching it.
+        // Only lite mode keeps a separate portrait. Normal banners reuse their
+        // ordinary decoded poster as a tiny preblurred, stretched background.
         var liteCover=new Border{Width=96,Height=144,CornerRadius=new(10),ClipToBounds=true,HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,36,0),Visibility=Visibility.Visible};
-        var liteImage=new Image{Stretch=Stretch.UniformToFill};liteImage.Loaded+=SourceCover;liteImage.DataContextChanged+=SourceCoverChanged;liteCover.Child=liteImage;liteCover.Tag=liteImage;
-        if(!prefs.LiteMode)
+        var liteImage=new Image{Stretch=Stretch.UniformToFill};liteImage.Loaded+=SourceCover;liteImage.DataContextChanged+=SourceCoverChanged;liteCover.Tag=liteImage;
+        if(prefs.LiteMode)liteCover.Child=liteImage;
+        else
         {
-            var fallback=new Style(typeof(Border));fallback.Setters.Add(new Setter(UIElement.VisibilityProperty,Visibility.Collapsed));
-            var missing=new DataTrigger{Binding=new Binding("Source"){Source=image},Value=null};missing.Setters.Add(new Setter(UIElement.VisibilityProperty,Visibility.Visible));fallback.Triggers.Add(missing);liteCover.Style=fallback;liteCover.ClearValue(UIElement.VisibilityProperty);
+            liteCover.Visibility=Visibility.Collapsed;
+            liteImage.Width=liteImage.Height=0;liteImage.Opacity=0;liteImage.Tag="FeaturePlaceholderPoster";grid.Children.Add(liteImage);
+            var onlyMissing=new Style(typeof(Image));onlyMissing.Setters.Add(new Setter(UIElement.VisibilityProperty,Visibility.Collapsed));
+            var missing=new DataTrigger{Binding=new Binding("Source"){Source=image},Value=null};missing.Setters.Add(new Setter(UIElement.VisibilityProperty,Visibility.Visible));onlyMissing.Triggers.Add(missing);liteImage.Style=onlyMissing;
+            AddBannerArtwork(grid,image,liteImage);
         }
         var posterHost=new Border{Child=liteCover};grid.Children.Add(posterHost);
 
@@ -188,9 +180,8 @@ public partial class MainWindow
         view.Title.FontSize=tiny?28:narrow?36:52;view.Title.LineHeight=tiny?30:narrow?38:54;view.Title.MaxHeight=view.Title.LineHeight*2;
         featureCompactText=narrow;
         if(view.Bound!=null)UpdateFeaturePeople(view,view.Bound);
-        // Hide the whole poster container in narrow layouts; Source still controls
-        // the inner fallback independently when a landscape finishes loading.
-        view.PosterHost.Visibility=width>=860?Visibility.Visible:Visibility.Collapsed;
+        // The lite-mode portrait stays clear of text in narrow layouts.
+        view.PosterHost.Visibility=prefs.LiteMode&&width>=860?Visibility.Visible:Visibility.Collapsed;
         if(view.Frame.Child is Grid grid&&grid.Children.OfType<StackPanel>().FirstOrDefault(x=>x.Name=="FeatureContent") is {} content)content.Margin=tiny?new(20,24,20,22):narrow?new(24,28,24,26):new(36,32,36,32);
         view.About.Padding=new(tiny?16:22,0,tiny?16:22,0);
     }
