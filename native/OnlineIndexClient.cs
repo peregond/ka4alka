@@ -9,39 +9,67 @@ using System.Text.RegularExpressions;
 namespace Kachalka;
 
 // Reads the shared catalog without bringing a browser engine into the desktop app.
-// A short cooldown keeps an unavailable or private Site from slowing every card.
-public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null,IndexRelays? relays=null)
+// The same site runs on chatgpt.site and on Railway. Addresses in Russia and
+// Belarus, which chatgpt.site refuses, start with Railway; everyone else starts
+// with chatgpt.site. The other copy answers when the first does not, and a short
+// cooldown keeps an unavailable or private copy from slowing every card.
+public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null,IndexRelays? relays=null,Func<CancellationToken,Task<string?>>? country=null)
 {
-    public static readonly Uri PublishedSite=new("https://ka4alka-online-new.peregon.chatgpt.site/");
-    readonly Uri site=baseUri??PublishedSite;
-    long retryAfterTicks;
-    bool CoolingDown=>DateTime.UtcNow.Ticks<Interlocked.Read(ref retryAfterTicks);
+    public static readonly Uri ChatGptSite=new("https://ka4alka-online-new.peregon.chatgpt.site/");
+    public static readonly Uri RailwaySite=new("https://web-production-d7aa7.up.railway.app/");
+    public static readonly IReadOnlyList<Uri> PublishedSites=[ChatGptSite,RailwaySite];
+    public static Uri PublishedSite=>ChatGptSite;
+    public static bool IsPublishedSite(Uri uri)=>PublishedSites.Any(site=>site.Host==uri.Host);
+    readonly Uri[] sites=baseUri!=null?[baseUri]:[..PublishedSites];
+    readonly long[] retryAfterTicks=new long[baseUri!=null?1:PublishedSites.Count];
+    readonly Func<CancellationToken,Task<string?>> countryOf=country??(ct=>SiteCountry.Get(client,ct));
+    bool CoolingDown(int index)=>DateTime.UtcNow.Ticks<Interlocked.Read(ref retryAfterTicks[index]);
+    void Cool(int index,TimeSpan span)=>Interlocked.Exchange(ref retryAfterTicks[index],DateTime.UtcNow.Add(span).Ticks);
+    async Task<int[]> Available(CancellationToken ct)
+    {
+        var order=Enumerable.Range(0,sites.Length);
+        if(baseUri==null&&SiteCountry.Blocked(await countryOf(ct)))order=order.OrderByDescending(index=>sites[index]==RailwaySite);
+        return order.Where(index=>!CoolingDown(index)).ToArray();
+    }
 
-    public void RetryNow()=>Interlocked.Exchange(ref retryAfterTicks,0);
+    public void RetryNow(){for(var index=0;index<retryAfterTicks.Length;index++)Interlocked.Exchange(ref retryAfterTicks[index],0);}
+
+    // Reads one path from the first copy of the site that answers. A refusal
+    // (401/403, the country block) rests that copy for 15 minutes, any other
+    // failure but 404 for 30 seconds, or 5 minutes once another copy has answered.
+    public async Task<byte[]> ReadSite(string path,int limit,CancellationToken ct,Action<byte[]>? validate=null)
+    {
+        var order=await Available(ct);
+        if(order.Length==0)throw new HttpRequestException("Онлайн-индекс временно недоступен.");
+        var failed=new List<int>();Exception? failure=null;
+        foreach(var index in order)
+        {
+            try
+            {
+                var bytes=await client.Read(new Uri(sites[index],path),limit,ct);
+                validate?.Invoke(bytes);
+                foreach(var earlier in failed)if(Interlocked.Read(ref retryAfterTicks[earlier])<DateTime.UtcNow.AddMinutes(5).Ticks)Cool(earlier,TimeSpan.FromMinutes(5));
+                return bytes;
+            }
+            catch(HttpRequestException error) when(!ct.IsCancellationRequested)
+            {
+                // 404 is an answer about this path (a missing backdrop, an older copy without the route), not an outage.
+                if(error.StatusCode!=HttpStatusCode.NotFound){Cool(index,error.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden?TimeSpan.FromMinutes(15):TimeSpan.FromSeconds(30));failed.Add(index);}
+                failure=error;
+            }
+            catch(Exception error) when(!ct.IsCancellationRequested&&error is JsonException or IOException or InvalidDataException or OperationCanceledException)
+            {
+                Cool(index,TimeSpan.FromSeconds(30));failed.Add(index);failure=error;
+            }
+        }
+        throw failure!;
+    }
 
     async Task<JsonDocument> Get(string path,CancellationToken ct)
     {
-        if(CoolingDown)throw new HttpRequestException("Онлайн-индекс временно недоступен.");
-        try
-        {
-            var bytes=await client.Read(new Uri(site,path),4*1024*1024,ct);
-            return JsonDocument.Parse(bytes);
-        }
-        catch(HttpRequestException error) when(error.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
-        {
-            Interlocked.Exchange(ref retryAfterTicks,DateTime.UtcNow.AddMinutes(15).Ticks);
-            throw;
-        }
-        catch(HttpRequestException)
-        {
-            Interlocked.Exchange(ref retryAfterTicks,DateTime.UtcNow.AddSeconds(30).Ticks);
-            throw;
-        }
-        catch(Exception error) when(error is JsonException or IOException || error is OperationCanceledException && !ct.IsCancellationRequested)
-        {
-            Interlocked.Exchange(ref retryAfterTicks,DateTime.UtcNow.AddSeconds(30).Ticks);
-            throw;
-        }
+        JsonDocument? json=null;
+        await ReadSite(path,4*1024*1024,ct,bytes=>json=JsonDocument.Parse(bytes));
+        return json!;
     }
 
     static string? String(JsonElement row,string key)=>row.TryGetProperty(key,out var value)&&value.ValueKind==JsonValueKind.String?value.GetString():null;
@@ -163,22 +191,22 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null,Inde
         ?new(site??PublishedSite,"api/torrent?url="+Uri.EscapeDataString(torrent.AbsoluteUri))
         :throw new ArgumentException("Этот torrent-файл нельзя получить через онлайн-индекс.",nameof(torrent));
     // Runs alongside the direct request, so a slow or unavailable site never
-    // delays a reachable tracker. The site is tried first unless it has just
-    // refused, then each standalone relay.
+    // delays a reachable tracker. Each copy of the site is tried first unless it
+    // has just refused, then each standalone relay.
     public async Task<byte[]> RelayTorrent(Uri torrent,CancellationToken ct)
     {
-        var hosts=new List<Uri>();
-        if(!CoolingDown)hosts.Add(site);
-        if(relays!=null)hosts.AddRange(await relays.ListAsync(ct));
-        if(hosts.Count==0)hosts.Add(site);
+        var hosts=new List<(Uri Host,int Site)>();
+        hosts.AddRange((await Available(ct)).Select(index=>(sites[index],index)));
+        if(relays!=null)hosts.AddRange((await relays.ListAsync(ct)).Select(relay=>(relay,-1)));
+        if(hosts.Count==0)hosts.Add((sites[0],0));
         Exception? failure=null;
-        foreach(var host in hosts)
+        foreach(var (host,index) in hosts)
         {
             try{return await client.Read(RelayUri(torrent,host),SourceClient.TorrentLimit,ct);}
             catch(Exception error) when(!ct.IsCancellationRequested&&error is HttpRequestException or IOException or InvalidDataException or OperationCanceledException)
             {
                 failure=error;
-                if(host==site&&error is HttpRequestException{StatusCode:HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden})Interlocked.Exchange(ref retryAfterTicks,DateTime.UtcNow.AddMinutes(15).Ticks);
+                if(index>=0&&error is HttpRequestException{StatusCode:HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden})Cool(index,TimeSpan.FromMinutes(15));
             }
         }
         throw failure!;

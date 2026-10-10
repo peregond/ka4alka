@@ -61,7 +61,7 @@ public sealed class IndexRelays(SourceClient client,Uri? listUri=null,string? ca
         return relays.EnumerateArray()
             .Select(row=>row.ValueKind==JsonValueKind.String&&Uri.TryCreate(row.GetString(),UriKind.Absolute,out var uri)?uri:null)
             .OfType<Uri>()
-            .Where(uri=>uri.Scheme=="https"&&string.IsNullOrEmpty(uri.UserInfo)&&uri.IsDefaultPort&&uri.Query.Length==0&&uri.Fragment.Length==0&&uri.AbsolutePath.EndsWith('/')&&uri.Host!=OnlineIndexClient.PublishedSite.Host)
+            .Where(uri=>uri.Scheme=="https"&&string.IsNullOrEmpty(uri.UserInfo)&&uri.IsDefaultPort&&uri.Query.Length==0&&uri.Fragment.Length==0&&uri.AbsolutePath.EndsWith('/')&&!OnlineIndexClient.IsPublishedSite(uri))
             .DistinctBy(uri=>uri.AbsoluteUri)
             .Take(5)
             .ToArray();
