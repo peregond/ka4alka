@@ -20,6 +20,15 @@ public partial class MainWindow
         Directory.CreateDirectory(output);await Task.Delay(180);
         liveRequest?.Cancel();liveLoading=false;searchDelay.Stop();catalogRefreshTimer.Stop();
         var checks=new List<string>();
+        // The harness kills a stalled smoke after 45 s without any evidence. A
+        // background watchdog records the last step the UI thread reached, so a
+        // hang names its place instead of only timing out.
+        var step="start";var finished=false;
+        new Thread(()=>
+        {
+            Thread.Sleep(38000);
+            if(!Volatile.Read(ref finished))try{File.WriteAllText(Path.Combine(output,"error.txt"),"Catalog navigation smoke stalled after "+Volatile.Read(ref step));}catch(IOException){}
+        }){IsBackground=true}.Start();
         string NavigationState()
         {
             catalogPositions.TryGetValue(navigationRoute,out var remembered);
@@ -31,9 +40,11 @@ public partial class MainWindow
         }
         void Check(bool ok,string message){if(!ok)throw new Exception(message+"\nNavigation state: "+NavigationState());checks.Add(message);}
         void Click(Button button)=>button.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
-        async Task Settle()
+        async Task Settle([System.Runtime.CompilerServices.CallerLineNumber] int line=0)
         {
+            Volatile.Write(ref step,"Settle at line "+line);
             await Task.Delay(130);UpdateLayout();await Task.Delay(70);
+            Volatile.Write(ref step,"Settle at line "+line+" (waiting for idle)");
             // Restoration verifies the queued WPF scroll at ContextIdle. A
             // timer alone can observe the new row before that verification
             // canonicalizes its leading title, especially after a reflow.
@@ -195,6 +206,7 @@ public partial class MainWindow
         Scroll().ScrollToVerticalOffset(500);await Settle();var defaultPosition=CaptureCatalogPosition()!;Click(Card(defaultPosition.ItemId!.Value));await Settle();
         Click(moviesNavigation);deadline=DateTime.UtcNow.AddSeconds(5);while(liveLoading&&DateTime.UtcNow<deadline)await Task.Delay(40);await Settle();
         Check(current==null&&Scroll().VerticalOffset<1,"explicit Films navigation from a detail resets the route instead of restoring its previous scroll");
+        Volatile.Write(ref finished,true);
         await File.WriteAllTextAsync(Path.Combine(output,"checks.json"),JsonSerializer.Serialize(new{Checks=checks,RealScrollViewers=true,
             CatalogTitleAnchor=true,ParticipantTitleAnchor=true,SearchFiltersPagePreserved=true,SettingsAndDownloadsReturn=true,
             ResizeAndAsyncRefreshPreserveTitle=true,SavedNavigationPreserved=true},new JsonSerializerOptions{WriteIndented=true}));
