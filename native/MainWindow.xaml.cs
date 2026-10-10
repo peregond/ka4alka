@@ -76,9 +76,11 @@ public partial class MainWindow:Window
         if(first||!Motion)return;
         CenterRegion.BeginAnimation(UIElement.OpacityProperty,new System.Windows.Media.Animation.DoubleAnimation(0,1,TimeSpan.FromMilliseconds(170)){EasingFunction=new System.Windows.Media.Animation.CubicEase{EasingMode=System.Windows.Media.Animation.EasingMode.EaseOut}});
     }
+    // Smoke diagnostics: which call last rebuilt the page, so a stale element names what replaced it.
+    internal int renderCount;internal string? lastRenderCaller;
     void Render()
     {
-        if(!ready)return;BeginCatalogNavigationRender();savedScroll=null;personRequest?.Cancel();personRequest?.Dispose();personRequest=null;
+        if(!ready)return;renderCount++;if(!MotionAllowed)lastRenderCaller=Environment.StackTrace;BeginCatalogNavigationRender();savedScroll=null;personRequest?.Cancel();personRequest?.Dispose();personRequest=null;
         SyncDiscoveryContext();
         if(activePerson!=null&&(section!=personSection||current?.Id!=personOrigin?.Id))activePerson=null;
         if(current==null&&activePerson==null&&section is not ("Настройки" or "Загрузки"))downloadReturnItem=null;

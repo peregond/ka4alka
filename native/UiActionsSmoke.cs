@@ -17,6 +17,8 @@ public partial class MainWindow
     async Task ClickWithMouse(FrameworkElement element,double fractionX=.5,double fractionY=.5)
     {
         SetForegroundWindow(new WindowInteropHelper(this).Handle);
+        if(PresentationSource.FromVisual(element)==null)
+            throw new Exception($"Cannot click {AutomationProperties.GetName(element)} ({element.GetType().Name} {element.Name}): it is no longer in the window after {renderCount} renders. Last render:\n{lastRenderCaller}");
         var point=element.PointToScreen(new Point(element.ActualWidth*fractionX,element.ActualHeight*fractionY));
         if(!SetCursorPos((int)point.X,(int)point.Y))throw new Exception("Cannot position the mouse for a native input test.");
         mouse_event(2,0,0,0,0);await Task.Delay(70);mouse_event(4,0,0,0,0);await Task.Delay(150);UpdateLayout();
