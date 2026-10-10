@@ -336,7 +336,7 @@ public partial class MainWindow
             if(QueuedDownload(entry)!=null)action=ReleaseAction(entry);
             else
             {
-                var button=new Button{Name="BestReleaseDownload",Style=(Style)FindResource("PrimaryButton"),Tag=entry,Height=52,MinHeight=52,Padding=new(22,0,22,0),FontSize=15,ToolTip="Скачать рекомендованную раздачу"};
+                var button=new Button{Name="BestReleaseDownload",Style=(Style)FindResource("PrimaryButton"),Tag=new RecommendedDownload(entry),Height=52,MinHeight=52,Padding=new(22,0,22,0),FontSize=15,ToolTip="Скачать рекомендованную раздачу"};
                 button.Content=IconLabel("Скачать","IconDownload",18);button.Click+=SourceDownload;
                 AutomationProperties.SetName(button,"Скачать рекомендованную раздачу: "+entry.Title);action=button;
             }

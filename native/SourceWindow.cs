@@ -62,10 +62,12 @@ public partial class MainWindow
         catch(Exception){Status.Text="Не удалось получить ответ. Проверь соединение, адрес источника и API-ключ.";}
         finally{searching=false;if(!closed&&section=="Источники")Render();}
     }
+    // The recommended-release card's button: the same release, kept apart from the list rows that are tagged with a SourceEntry.
+    sealed record RecommendedDownload(SourceEntry Entry);
     async void SourceDownload(object sender,RoutedEventArgs e)
     {
         if(closing||closed)return;
-        var button=(Button)sender;var item=(SourceEntry)button.Tag;var media=current?.Cinema==true?current:null;
+        var button=(Button)sender;var item=button.Tag as SourceEntry??((RecommendedDownload)button.Tag).Entry;var media=current?.Cinema==true?current:null;
         if(media!=null)media=DownloadMetadata.EnrichMedia(media,prefs.LiveFavorites.Concat(liveItems).Concat(catalogIndex.Recent(media.Section,200)).Append(media));
         button.IsEnabled=false;
         try{if(!EnsureDownloadFolder()){Status.Text="Папка для загрузок не выбрана. Её можно выбрать в настройках.";return;}
