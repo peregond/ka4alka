@@ -10,6 +10,7 @@ public static class BundledCatalog
         using var json=JsonDocument.Parse(stream);
         return json.RootElement.EnumerateArray().Select(row=>OnlineIndexClient.Media(row,row.GetProperty("section").GetString()=="movies"?"Фильмы":"Сериалы")).OfType<MediaItem>().DistinctBy(x=>x.Id).ToArray();
     });
+    public static IReadOnlyList<MediaItem> All=>snapshot.Value;
     public static int Count(string section)=>snapshot.Value.Count(x=>x.Section==section);
     public static CatalogPage Page(string section,int page)
     {

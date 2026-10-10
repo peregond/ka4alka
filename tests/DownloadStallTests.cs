@@ -11,6 +11,32 @@ using MonoTorrent.Client;
 // waiting for the next tracker announce. Stalled torrents now restart.
 static class DownloadStallTests
 {
+    public static async Task RunDhtBootstrap(string root)
+    {
+        static void Check(bool value,string text){if(!value)throw new Exception(text);Console.WriteLine("PASS: "+text);}
+        var node=DhtBootstrap.Compact(new IPEndPoint(IPAddress.Parse("67.215.246.10"),6881));
+        Check(node.Length==26&&node.AsSpan(20,4).SequenceEqual(new byte[]{67,215,246,10})&&node[24]==0x1A&&node[25]==0xE1,"a DHT router becomes a 26-byte compact node with its IPv4 address and port in network order");
+        var rejected=false;try{DhtBootstrap.Compact(new IPEndPoint(IPAddress.IPv6Loopback,1));}catch(ArgumentException){rejected=true;}
+        Check(rejected,"IPv6 router addresses are not encoded as IPv4 compact nodes");
+        var seed=DhtBootstrap.SeedList();
+        Check(seed[0]==(byte)'l'&&seed[^1]==(byte)'e'&&seed.Length==2+DhtBootstrap.Routers.Count*29&&DhtBootstrap.Routers.Count>=4,"the seed is a bencoded list of every bootstrap router");
+        var cache=Path.Combine(root,"dht-seed-cache");
+        Check(DhtBootstrap.EnsureSeed(cache)&&!DhtBootstrap.EnsureSeed(cache),"a missing node cache is seeded once and a real one is left alone");
+        await File.WriteAllTextAsync(Path.Combine(cache,DhtBootstrap.CacheFile),"le");
+        Check(DhtBootstrap.EnsureSeed(cache),"an empty saved node list is seeded again");
+        // Without the seed MonoTorrent waits for router.bittorrent.com to resolve before the DHT even starts.
+        using(var engine=new ClientEngine(new EngineSettingsBuilder{CacheDirectory=cache,AllowPortForwarding=false,AllowLocalPeerDiscovery=false}.ToSettings()))
+        {
+            var folder=Path.Combine(root,"dht-seed-data");Directory.CreateDirectory(folder);
+            await File.WriteAllBytesAsync(Path.Combine(folder,"dht.bin"),RandomNumberGenerator.GetBytes(64*1024));
+            var torrent=Path.Combine(root,"dht-seed.torrent");await new TorrentCreator().CreateAsync(new TorrentFileSource(Path.Combine(folder,"dht.bin")),torrent);
+            var manager=await engine.AddAsync(torrent,Path.Combine(root,"dht-seed-download"));await manager.StartAsync();
+            var until=DateTime.UtcNow.AddSeconds(10);while(engine.Dht.State==MonoTorrent.Dht.DhtState.NotReady&&DateTime.UtcNow<until)await Task.Delay(100);
+            Check(engine.Dht.State!=MonoTorrent.Dht.DhtState.NotReady,"with the seeded node cache the DHT starts at once, without resolving a router name");
+            await manager.StopAsync();
+        }
+        Check(MagnetDiscovery.PublicTrackers.Distinct().Count()==MagnetDiscovery.PublicTrackers.Count&&MagnetDiscovery.PublicTrackers.All(x=>Uri.TryCreate(x,UriKind.Absolute,out var uri)&&uri.Scheme is "udp" or "https"),"public fallback trackers are distinct UDP or HTTPS announce addresses");
+    }
     public static async Task Run(string root)
     {
         static void Check(bool value,string text){if(!value)throw new Exception(text);Console.WriteLine("PASS: "+text);}

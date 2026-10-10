@@ -13,6 +13,13 @@ public sealed partial class CinemaPeople(SourceClient client)
     static string Normalize(string text)=>Regex.Replace(text.ToLowerInvariant().Replace('ё','е'),@"[^\p{L}\p{N}]+"," ").Trim();
     static string Text(HtmlNode? node)=>Regex.Replace(HtmlEntity.DeEntitize(node?.InnerText??""),@"\s+"," ").Trim();
     public record Work(string Title,int Year,string? OriginalTitle=null);
+    // Films and series of any section whose credits name this person in the same role:
+    // the shared catalog already knows them, so they appear without a network lookup.
+    public static IEnumerable<MediaItem> Credited(IEnumerable<MediaItem> items,CinemaPerson person)
+    {
+        var name=Normalize(person.Name);
+        return items.Where(item=>item.People.Any(credit=>credit.Role==person.Role&&Normalize(credit.Name)==name));
+    }
     public static bool MatchesWork(MediaItem film,Work work)
     {
         if(work.Year is <1900 or >2100||film.Year!=work.Year)return false;
@@ -69,6 +76,10 @@ public sealed partial class CinemaPeople(SourceClient client)
         var key=Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(identity)));
         return Path.Combine(Preferences.DataDir,"people",key+".json");
     }
+    // Newest works not yet matched in a catalog are looked up remotely, a few at a time.
+    // Films and series from the shared catalogs are matched before that without a lookup,
+    // also when a cached profile is reused.
+    const int MaximumLookups=48;
     public async Task<PersonProfile> Load(CinemaPerson person,MediaItem? origin,IEnumerable<MediaItem> known,CancellationToken ct,Action<PersonProfile>? progress=null)
     {
         var context=SynchronizationContext.Current;var knownFilms=known.ToArray();
@@ -104,7 +115,7 @@ public sealed partial class CinemaPeople(SourceClient client)
             (sourceId==null||SourceIdentityId(credit)==null||SourceIdentityId(credit)==sourceId);
         bool Matches(MediaItem film)=>film.People.Any(MatchesCredit);
         bool KnownMatches(MediaItem film)=>film.People.Any(credit=>MatchesCredit(credit)&&(explicitProfile==null||ProfileIdentity(credit)==explicitProfile));
-        var otherKnown=knownFilms.Concat(origin==null?[]:[origin]).ToArray();
+        var otherKnown=knownFilms.Concat(origin==null?[]:[origin]).Concat(Credited(BundledCatalog.All,person)).DistinctBy(x=>(x.Section,x.Id)).ToArray();
         var films=(saved?.Filmography??[]).Where(Matches).Concat(otherKnown.Where(KnownMatches)).DistinctBy(x=>x.Id).ToList();
         string biography=saved?.Description??"",source=saved?.SourceUrl??"";var resolvedPerson=person;
         var confirmed=new System.Collections.Concurrent.ConcurrentBag<MediaItem>();
@@ -149,7 +160,7 @@ public sealed partial class CinemaPeople(SourceClient client)
         var complete=false;var failedWorks=0;
         try
         {
-            using var deadline=CancellationTokenSource.CreateLinkedTokenSource(ct);deadline.CancelAfter(TimeSpan.FromSeconds(75));
+            using var deadline=CancellationTokenSource.CreateLinkedTokenSource(ct);deadline.CancelAfter(TimeSpan.FromSeconds(120));
             var token=deadline.Token;
             ProfessionalPerson? professional=null;
             try{professional=await new ProfessionalCinemaPeople(client).Load(person,origin,token);}
@@ -183,8 +194,8 @@ public sealed partial class CinemaPeople(SourceClient client)
             }
             var candidates=works
                 .Where(work=>!films.Any(film=>MatchesWork(film,work)))
-                .OrderByDescending(x=>x.Year).Take(16).ToArray();
-            var catalog=new LiveCatalog(client);var index=new OnlineIndexClient(client);using var slots=new SemaphoreSlim(3);
+                .OrderByDescending(x=>x.Year).Take(MaximumLookups).ToArray();
+            var catalog=new LiveCatalog(client);var index=new OnlineIndexClient(client);using var slots=new SemaphoreSlim(5);
             async Task<T> Lookup<T>(Func<CancellationToken,Task<T>> read)
             {
                 using var request=CancellationTokenSource.CreateLinkedTokenSource(token);request.CancelAfter(TimeSpan.FromSeconds(8));

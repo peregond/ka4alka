@@ -13,6 +13,7 @@ public sealed class SharedCatalog(SourceClient client)
     DateTime generatedUtc,retryAfterUtc;
     bool restored;
     public bool RefreshDue=>generatedUtc<BoundaryUtc(DateTime.UtcNow)&&DateTime.UtcNow>=retryAfterUtc;
+    public IReadOnlyList<MediaItem> All=>items??[];
     public MediaItem? Find(MediaItem item)=>items?.FirstOrDefault(row=>row.Id==item.Id&&row.Section==item.Section);
     public static DateTime BoundaryUtc(DateTime now)
     {

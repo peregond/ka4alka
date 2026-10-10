@@ -110,9 +110,12 @@ public partial class MainWindow
             {
                 // Snapshot UI-owned lists first. Providers read disk caches and
                 // parse substantial HTML/JSON even when no network await yields.
-                var known=liveItems.Concat(prefs.LiveFavorites).ToArray();
+                // Both sections: an actor of films and series is matched in the shared catalog, not only in the list
+                // the card came from. Its array is replaced, never changed, so the deferred filter runs off the UI thread.
+                var shared=sharedCatalog.All;
+                var known=liveItems.Concat(prefs.LiveFavorites).ToArray().Concat(CinemaPeople.Credited(shared,person));
                 var profile=personProfileProvider is {} provider
-                    ?await provider(person,origin,known,request.Token,updated=>Apply(updated,attempt))
+                    ?await provider(person,origin,known.ToArray(),request.Token,updated=>Apply(updated,attempt))
                     :await LoadPersonInBackground(sourceClient,person,request.Token,origin,known,updated=>Apply(updated,attempt));
                 Apply(profile,attempt,true);
             }
@@ -128,8 +131,8 @@ public partial class MainWindow
         _=Refresh();
     }
 
-    static Task<PersonProfile> LoadPersonInBackground(SourceClient client,CinemaPerson person,CancellationToken ct,MediaItem? origin,MediaItem[] known,Action<PersonProfile>? progress=null)
-        =>Task.Run(()=>new LiveCatalog(client).Person(person,ct,origin,known,progress),ct);
+    static Task<PersonProfile> LoadPersonInBackground(SourceClient client,CinemaPerson person,CancellationToken ct,MediaItem? origin,IEnumerable<MediaItem> known,Action<PersonProfile>? progress=null)
+        =>Task.Run(()=>new LiveCatalog(client).Person(person,ct,origin,known.ToArray(),progress),ct);
 
     static Uri? PersonBiographyUrl(string? value)
     {

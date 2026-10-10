@@ -47,11 +47,17 @@ public sealed partial class DownloadService
             // Port forwarding (UPnP/NAT-PMP) lets peers behind NAT connect to us; a
             // fresh release with few seeders otherwise finds most peers unreachable.
             var builder=customSettings!=null?new EngineSettingsBuilder(customSettings):new EngineSettingsBuilder {
-                CacheDirectory=Path.Combine(Preferences.DataDir,"cache"), MaximumConnections=150, MaximumHalfOpenConnections=16, DiskCacheBytes=4*1024*1024,
+                CacheDirectory=Path.Combine(Preferences.DataDir,"cache"), MaximumConnections=150, MaximumHalfOpenConnections=16, DiskCacheBytes=16*1024*1024,
                 AutoSaveLoadFastResume=true,AutoSaveLoadMagnetLinkMetadata=true,AllowPortForwarding=true
             };
             builder.MaximumDownloadRate=DownloadLimitKbps*1024;builder.MaximumUploadRate=UploadLimitKbps*1024;
-            return engine=new ClientEngine(builder.ToSettings());
+            if(customSettings==null)
+            {
+                try{if(DhtBootstrap.EnsureSeed(builder.CacheDirectory))DiagnosticLog.Write("dht-bootstrap-seeded",new{Routers=DhtBootstrap.Routers.Count});}
+                catch(Exception error)when(error is IOException or UnauthorizedAccessException){DiagnosticLog.Write("dht-bootstrap-error",new{Error=error.Message});}
+            }
+            engine=new ClientEngine(builder.ToSettings());
+            return engine;
         }
     }
     public async Task SetLimitsAsync(int downloadKbps,int uploadKbps)

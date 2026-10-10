@@ -56,7 +56,7 @@ if(args.Contains("--professional-people-only")){await ProfessionalCinemaPeopleTe
 if(args.Contains("--zona-metadata-only")){await ZonaMovieMetadataTests.Run();return;}
 if(args.Contains("--catalog-regions-only")){await CatalogRegionsTests.Run();return;}
 if(args.Contains("--lan-only")){await DownloadLanTests.Run(root);return;}
-if(args.Contains("--torrent-relay-only")){await TorrentRelayTests.Run(root);await TorrentRelayTests.RunRelays(root);await TorrentRelayTests.RunRussianNetworks();await DownloadStallTests.Run(root);return;}
+if(args.Contains("--torrent-relay-only")){await TorrentRelayTests.Run(root);await TorrentRelayTests.RunRelays(root);await TorrentRelayTests.RunRussianNetworks();await DownloadStallTests.Run(root);await DownloadStallTests.RunDhtBootstrap(root);return;}
 await CacheStorageTests.Run(root);
 if(args.Contains("--cache-only"))return;
 DownloadTests.Run();
@@ -69,6 +69,7 @@ await TorrentRelayTests.Run(root);
 await TorrentRelayTests.RunRelays(root);
 await TorrentRelayTests.RunRussianNetworks();
 await DownloadStallTests.Run(root);
+await DownloadStallTests.RunDhtBootstrap(root);
 await DownloadOrderingTests.Run();
 await CatalogBatchTests.Run();
 CatalogPagingTests.Run();

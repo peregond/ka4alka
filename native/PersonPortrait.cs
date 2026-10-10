@@ -13,7 +13,7 @@ namespace Kachalka;
 public partial class MainWindow
 {
     readonly Dictionary<string,BitmapImage> portraitCache=[];
-    Border PersonPortrait(CinemaPerson person,double width,double height,MediaItem? origin=null,bool round=false)
+    Border PersonPortrait(CinemaPerson person,double width,double height,MediaItem? origin=null)
     {
         var grid=new Grid();var fallback=new StackPanel{HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center,IsHitTestVisible=false};
         var silhouette=new System.Windows.Shapes.Path{Data=Geometry.Parse("M12,3 A4,4 0 1 1 11.99,3 M4,21 L4,19 C4,13 20,13 20,19 L20,21"),Width=34,Height=34,Stretch=Stretch.Uniform,StrokeThickness=1.5,Opacity=.45};
@@ -21,11 +21,21 @@ public partial class MainWindow
         var absent=Text("Нет фото",10,true);absent.HorizontalAlignment=HorizontalAlignment.Center;absent.Margin=new(0,9,0,0);absent.Opacity=.7;fallback.Children.Add(absent);grid.Children.Add(fallback);
         AutomationProperties.SetName(fallback,"Нет фотографии: "+person.Name);
         var image=new Image{Stretch=Stretch.UniformToFill};
-        // Round avatars keep the upper part of a 4:5 photograph, where faces are, instead of its centre.
-        if(round){image.Width=width;image.Height=width*1.25;image.VerticalAlignment=VerticalAlignment.Top;}AutomationProperties.SetName(image,"Фотография: "+person.Name);grid.Children.Add(image);
+        AutomationProperties.SetName(image,"Фотография: "+person.Name);grid.Children.Add(image);
         var progress=Text("Фото…",9,true);progress.HorizontalAlignment=HorizontalAlignment.Center;progress.VerticalAlignment=VerticalAlignment.Bottom;progress.Margin=new(0,0,0,7);progress.Visibility=Visibility.Collapsed;progress.IsHitTestVisible=false;grid.Children.Add(progress);
-        var frame=new Border{Width=width,Height=round?width:height,CornerRadius=new(round?width/2:11),ClipToBounds=true,Child=grid,Margin=new(0,0,0,8),BorderThickness=new(1)};
-        frame.SetResourceReference(Border.BackgroundProperty,"PanelAlt");frame.SetResourceReference(Border.BorderBrushProperty,"EdgeSoft");frame.SizeChanged+=(_,_)=>ClipPoster(frame);
+        var frame=new Border{Width=width,Height=height,CornerRadius=new(11),ClipToBounds=true,Child=grid,Margin=new(0,0,0,8),BorderThickness=new(1)};
+        frame.SetResourceReference(Border.BackgroundProperty,"PanelAlt");frame.SetResourceReference(Border.BorderBrushProperty,"EdgeSoft");
+        // A photograph taller than the frame keeps its upper part, where the face is: the image fills the
+        // frame's width and only a little of the headroom is trimmed. A wider one stays centred.
+        void FitFace()
+        {
+            var w=frame.ActualWidth>0?frame.ActualWidth:frame.Width;var h=frame.ActualHeight>0?frame.ActualHeight:frame.Height;
+            if(image.Source is not BitmapSource bitmap||bitmap.PixelWidth<=0||w<=0||h<=0)return;
+            var tall=w*bitmap.PixelHeight/(double)bitmap.PixelWidth;
+            if(tall>h){image.Stretch=Stretch.Fill;image.Width=w;image.Height=tall;image.VerticalAlignment=VerticalAlignment.Top;image.Margin=new(0,-(tall-h)*.12,0,0);}
+            else{image.Stretch=Stretch.UniformToFill;image.Width=double.NaN;image.Height=double.NaN;image.VerticalAlignment=VerticalAlignment.Stretch;image.Margin=new(0);}
+        }
+        frame.SizeChanged+=(_,_)=>{ClipPoster(frame);FitFace();};
         CancellationTokenSource? request=null;bool attempted=false;string? portraitPath=null;
         Button? portraitOwner=null;bool cancelledByUnload=false;
         DispatcherOperation? visibleCheck=null;DateTime nextCacheTouch=DateTime.MinValue;
@@ -74,7 +84,7 @@ public partial class MainWindow
                             var pixels=(int)Math.Ceiling(width*2);var memoryKey=key+":"+pixels;
                             if(!force&&portraitCache.TryGetValue(memoryKey,out var cached))
                             {
-                                if(image.IsLoaded&&!pending.IsCancellationRequested){image.Source=cached;fallback.Visibility=Visibility.Collapsed;frame.ToolTip=person.Name;}
+                                if(image.IsLoaded&&!pending.IsCancellationRequested){image.Source=cached;FitFace();fallback.Visibility=Visibility.Collapsed;frame.ToolTip=person.Name;}
                                 return;
                             }
                             await coverSlots.WaitAsync(pending.Token);
@@ -84,7 +94,7 @@ public partial class MainWindow
                                 var (bitmap,_)=await CoverCache.Load(portraitPath,2*1024*1024,
                                     ct=>sourceClient.Read(new Uri(url),2*1024*1024,ct),bytes=>{using var stream=new MemoryStream(bytes);var result=new BitmapImage();result.BeginInit();result.CacheOption=BitmapCacheOption.OnLoad;result.DecodePixelWidth=pixels;result.StreamSource=stream;result.EndInit();result.Freeze();return result;},download.Token);
                                 if(portraitCache.Count>=48)portraitCache.Remove(portraitCache.Keys.First());portraitCache[memoryKey]=bitmap;
-                                if(image.IsLoaded&&!pending.IsCancellationRequested){image.Source=bitmap;fallback.Visibility=Visibility.Collapsed;frame.ToolTip=person.Name;}
+                                if(image.IsLoaded&&!pending.IsCancellationRequested){image.Source=bitmap;FitFace();fallback.Visibility=Visibility.Collapsed;frame.ToolTip=person.Name;}
                                 return;
                             }
                             finally{coverSlots.Release();}
