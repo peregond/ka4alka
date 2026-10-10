@@ -12,7 +12,10 @@ export async function GET(request: Request) {
   if (!env.TMDB_READ_TOKEN) return Response.json({ error: "Источник фонов пока не подключён." }, { status: 503, headers: { "Cache-Control": "no-store", "Retry-After": "60" } });
   try {
     // Accept only identities from the stored catalog. Caller-supplied titles/URLs are never queried.
-    const item = await getMedia(id).catch(() => null) ?? await sharedCatalogItem(id) ?? seed.find(row => row.id === id);
+    const stored = await getMedia(id).catch(() => null);
+    const catalog = (await sharedCatalogItem(id).catch(() => null) ?? seed.find(row => row.id === id) ?? null) as BackdropIdentity | null;
+    // D1 rows keep no IMDb ID; the catalog's exact identity still reaches TMDB.
+    const item = stored ? { ...stored, imdbId: catalog?.imdbId ?? null } : catalog;
     if (!item) return Response.json({ error: "Карточка не найдена." }, { status: 404 });
     const backdrop = await lookup(id, item as BackdropIdentity);
     return Response.json({ id, backdrop }, { headers: { "Cache-Control": `public, max-age=${backdrop ? 86400 : 3600}, s-maxage=${backdrop ? 604800 : 21600}` } });

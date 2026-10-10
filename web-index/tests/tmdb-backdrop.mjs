@@ -64,6 +64,10 @@ assert.equal((await route.GET(req('movies:dune'))).status, 503); assert.equal(ca
 env.TMDB_READ_TOKEN = 'fixture-token';
 const response = await route.GET(req('movies:dune')); assert.equal(response.status, 200);
 assert.equal((await response.json()).id, 'movies:dune'); assert.equal(response.headers.get('Cache-Control'), 'public, max-age=86400, s-maxage=604800');
+// A D1 row has no IMDb ID: the catalog's exact identity must still reach the TMDB lookup.
+let seen = null;
+const stored = load('../app/api/backdrop/route.ts', { 'cloudflare:workers': { env }, '@/app/data/seed.json': [{ id: 'movies:dune', section: 'movies', title: 'Дюна', year: 2021, imdbId: 'tt1160419' }], '@/lib/index-store': { getMedia: async () => ({ id: 'movies:dune', section: 'movies', title: 'Дюна', originalTitle: 'Dune', year: 2021 }) }, '@/lib/shared-catalog': { sharedCatalogItem: async () => { throw new Error('offline'); } }, '@/lib/tmdb-backdrop': { backdropCache: () => async (id, item) => { seen = item; return null; }, fetchBackdrop: api.fetchBackdrop } });
+assert.equal((await stored.GET(req('movies:dune'))).status, 200); assert.equal(seen.imdbId, 'tt1160419'); assert.equal(seen.originalTitle, 'Dune');
 let imageCalls = 0, upstreamMode = 'jpeg';
 const proxy = load('../app/api/backdrop-image/route.ts', { '@/lib/tmdb-backdrop': api }, { fetch: async (url, options) => {
   imageCalls++; assert.equal(url, 'https://image.tmdb.org/t/p/w1280/x.jpg'); assert.equal(options.redirect, 'manual');

@@ -84,8 +84,16 @@ export async function relayTorrent(request:Request):Promise<Response> {
   if(!upstream.ok)return failure(502,`Трекер вернул ${upstream.status}.`);
   if(!sameTracker(source,upstream.url||source.href))return failure(502,"Трекер перенаправил на другой сайт.");
   if(Number(upstream.headers.get("content-length")??0)>TORRENT_LIMIT)return failure(413,"Torrent-файл слишком большой.");
-  const body=new Uint8Array(await upstream.arrayBuffer());
-  if(body.byteLength>TORRENT_LIMIT)return failure(413,"Torrent-файл слишком большой.");
+  // Read in chunks: a missing or wrong Content-Length must not let a response grow past the limit.
+  const reader=upstream.body?.getReader();
+  if(!reader)return failure(502,"Трекер вернул не torrent-файл.");
+  const chunks:Uint8Array[]=[];let size=0;
+  try {
+    for(;;){const next=await reader.read();if(next.done)break;size+=next.value.byteLength;if(size>TORRENT_LIMIT)return failure(413,"Torrent-файл слишком большой.");chunks.push(next.value);}
+  } catch {return failure(502,"Трекер не ответил.");}
+  finally {await reader.cancel().catch(()=>undefined);}
+  const body=new Uint8Array(size);let offset=0;
+  for(const chunk of chunks){body.set(chunk,offset);offset+=chunk.byteLength;}
   if(!isTorrent(body))return failure(502,"Трекер вернул не torrent-файл.");
   const name=`${source.hostname.split(".")[0]}-${/(\d{1,12})/.exec(source.pathname+source.search)?.[1]??"release"}.torrent`;
   return new Response(body,{headers:{"Content-Type":"application/x-bittorrent","Content-Disposition":`attachment; filename="${name}"`,"Cache-Control":"no-store","X-Content-Type-Options":"nosniff"}});

@@ -60,6 +60,11 @@ upstream=()=>withUrl(new Response(torrent),'https://other.example/file.torrent')
 response=await get('https://megapeer.vip/download/5');assert.equal(response.status,502);assert.match((await response.json()).error,/другой сайт/);
 upstream=()=>withUrl(new Response(torrent,{headers:{'Content-Length':String(11*1024*1024)}}),'https://megapeer.vip/download/5');
 response=await get('https://megapeer.vip/download/5');assert.equal(response.status,413);
+let canceled=false;
+upstream=()=>withUrl(new Response(new ReadableStream({pull(controller){controller.enqueue(new Uint8Array(1024*1024));},cancel(){canceled=true;}})),'https://megapeer.vip/download/5');
+response=await get('https://megapeer.vip/download/5');assert.equal(response.status,413,'an endless body without Content-Length stops at the limit');assert(canceled,'the oversized upstream body is canceled');
+upstream=()=>withUrl(new Response(new Uint8Array(11*1024*1024)),'https://megapeer.vip/download/5');
+response=await get('https://megapeer.vip/download/5');assert.equal(response.status,413,'a body larger than the limit is refused without Content-Length');
 upstream=()=>{throw new TypeError('network');};
 response=await get('https://nnmclub.to/forum/download.php?id=7');assert.equal(response.status,502);
 
