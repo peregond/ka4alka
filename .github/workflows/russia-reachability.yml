@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [claude/compassionate-einstein-peg0a1]
-    paths: [scripts/probe-russia-reachability.mjs, scripts/probe-knaben-trackers.mjs, scripts/probe-site-geoblock.mjs, .github/workflows/russia-reachability.yml]
+    paths: [scripts/probe-russia-reachability.mjs, scripts/probe-knaben-trackers.mjs, scripts/probe-site-geoblock.mjs, scripts/probe-relay-live.mjs, relay-worker/**, web-index/lib/**, .github/workflows/russia-reachability.yml]
 permissions:
   contents: read
 jobs:
@@ -15,9 +15,23 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Install the site toolchain for the relay
+        working-directory: web-index
+        run: npm ci --no-audit --no-fund
+      - name: Run the standalone relay against live trackers
+        run: |
+          cd relay-worker
+          ../web-index/node_modules/.bin/wrangler dev --local --port 8798 --ip 127.0.0.1 --inspector-port 0 > ../relay-dev.log 2>&1 &
+          cd ..
+          node scripts/probe-relay-live.mjs
+      - name: Relay log
+        if: always()
+        run: tail -n 60 relay-dev.log || true
       - name: Compare the online index response by country
+        if: ${{ contains(github.event.head_commit.message, '[full probe]') }}
         run: node scripts/probe-site-geoblock.mjs
       - name: List trackers covered by Knaben, which answers in Russia
+        if: ${{ contains(github.event.head_commit.message, '[full probe]') }}
         run: node scripts/probe-knaben-trackers.mjs
       - name: Measure source and backend reachability from Russian networks
         if: ${{ contains(github.event.head_commit.message, '[full probe]') }}
