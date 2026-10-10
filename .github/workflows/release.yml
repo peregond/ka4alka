@@ -6,11 +6,16 @@ on:
         description: Version matching native/Kachalka.csproj
         required: true
         default: '0.40.10'
+      publish:
+        description: Publish the release as soon as every release check passes
+        type: boolean
+        default: true
   push:
     branches: [release/0.37.0, release/0.38.0, release/0.39.0, release/0.40.0, release/0.40.1, release/0.40.2, release/0.40.3, release/0.40.4, release/0.40.5, release/0.40.6, release/0.40.7, release/0.40.8, release/0.40.9, release/0.40.10]
     paths: [.github/workflows/release.yml, 'native/**', 'lan-core/**', 'lan-tests/**', 'update-core/**', 'updater/**', 'update-tests/**', 'tests/**', 'installer/**', build-release.ps1, package-release.ps1]
 permissions:
   contents: write
+  actions: read
 concurrency:
   group: kachalka-release-0.40.10
   cancel-in-progress: false
@@ -26,15 +31,45 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+      # The pull request's "Windows release validation" already ran the live source
+      # probes and the full test suite. When it passed on exactly this tree (the PR
+      # branch is always made from main), those steps are not repeated here; the
+      # package, its window-size check and the upgrade from the published version are.
+      - name: Find a passed Windows validation of this exact tree
+        id: tested
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tree=git rev-parse 'HEAD^{tree}'
+          $runs=gh api ("repos/${{ github.repository }}/actions/workflows/windows.yml/runs?status=success&per_page=30") --jq '.workflow_runs[].head_sha'
+          $verified=$false
+          foreach($sha in @($runs)){
+            if([string]::IsNullOrWhiteSpace($sha)){continue}
+            $other=gh api ("repos/${{ github.repository }}/git/commits/"+$sha) --jq '.tree.sha' 2>$null
+            if($LASTEXITCODE -eq 0 -and $other -eq $tree){$verified=$true;"Tree $tree passed Windows validation at $sha; source probes and the full suite are not repeated." >> $env:GITHUB_STEP_SUMMARY;break}
+          }
+          if(-not $verified){"No passed Windows validation of tree $tree; running every check." >> $env:GITHUB_STEP_SUMMARY}
+          "verified=$($verified.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
       - name: Verify direct Zona and fallback participant photographs
+        if: steps.tested.outputs.verified != 'true'
         run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --probe-portraits
       - name: Diagnose current cinema source paths
+        if: steps.tested.outputs.verified != 'true'
         run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --diagnose-cinema-source
       - name: Verify live cinema navigation
+        if: steps.tested.outputs.verified != 'true'
         run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --verify-cinema-source
       - name: Verify metadata and actual release for affected new films
+        if: steps.tested.outputs.verified != 'true'
         run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --probe-affected-films
       - name: Verify public replacement site
+        if: steps.tested.outputs.verified != 'true'
         shell: pwsh
         run: |
           try { ./tests/PublishedSiteProbe.ps1 }
@@ -44,10 +79,12 @@ jobs:
             throw
           }
       - name: Verify published film and series TMDB backdrops
+        if: steps.tested.outputs.verified != 'true'
         run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --probe-backdrops
       - name: Install NSIS
         run: ./scripts/install-nsis.ps1
       - name: Validate redesigned catalog, saved navigation, themes and Windows update
+        if: steps.tested.outputs.verified != 'true'
         shell: pwsh
         run: |
           try { ./tests/WindowsUpdateSmoke.ps1 }
@@ -108,7 +145,9 @@ jobs:
           dotnet run --project update-tests/Kachalka.UpdateTests.csproj -c Release -- --verify-release $download
           if($LASTEXITCODE -ne 0){throw 'Uploaded package signature or contents invalid'}
           'Windows validation passed; uploaded assets read back with matching SHA256 and valid publisher signature.' >> $env:GITHUB_STEP_SUMMARY
+      # Previews come from the full suite and only serve a manual review of the draft.
       - name: Attach temporary rendered UI previews to the draft release
+        if: steps.tested.outputs.verified != 'true' && inputs.publish != true
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -177,3 +216,11 @@ jobs:
             test-output/published-upgrade/checks.txt
             test-output/published-upgrade/data/updates/*/result.txt
             test-output/windows-update/data/updates/*/result.txt
+  publish:
+    needs: release
+    if: ${{ inputs.publish }}
+    permissions:
+      contents: write
+    uses: ./.github/workflows/publish-release.yml
+    with:
+      version: ${{ inputs.version }}
