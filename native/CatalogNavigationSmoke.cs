@@ -26,8 +26,13 @@ public partial class MainWindow
         var step="start";var finished=false;
         new Thread(()=>
         {
-            Thread.Sleep(38000);
-            if(!Volatile.Read(ref finished))try{File.WriteAllText(Path.Combine(output,"error.txt"),"Catalog navigation smoke stalled after "+Volatile.Read(ref step));}catch(IOException){}
+            Thread.Sleep(30000);
+            if(Volatile.Read(ref finished))return;
+            // An unhandled UI exception shows a modal message box and blocks the smoke, so the log tail is included.
+            var log=Path.Combine(Preferences.DataDir,"error.log");
+            try{var text=File.Exists(log)?File.ReadAllText(log):"";File.WriteAllText(Path.Combine(output,"error.txt"),"Catalog navigation smoke stalled after "+Volatile.Read(ref step)+
+                (text.Length>0?"\nError log:\n"+text[Math.Max(0,text.Length-4000)..]:""));}
+            catch(IOException){}
         }){IsBackground=true}.Start();
         string NavigationState()
         {
