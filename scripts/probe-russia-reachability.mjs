@@ -9,7 +9,10 @@ const PROBES = Number(process.env.PROBES ?? 8);
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 const targets = [
-  { name: "Онлайн-индекс: карточка", host: "ka4alka-online-new.peregon.chatgpt.site", path: "/api/media", query: "id=movies:obekt-prestupleniya" },
+  { name: "Онлайн-индекс: карточка", host: "ka4alka-online-new.peregon.chatgpt.site", path: "/api/media", query: "id=movies:obekt-prestupleniya", keepBody: true },
+  { name: "Cloudflare: 15 КБ", host: "speed.cloudflare.com", path: "/__down", query: "bytes=15000" },
+  { name: "Cloudflare: 300 КБ", host: "speed.cloudflare.com", path: "/__down", query: "bytes=300000" },
+  { name: "Cloudflare Workers (workers.dev)", host: "workers.cloudflare.com", path: "/" },
   { name: "Онлайн-индекс: каталог (>16 КБ)", host: "ka4alka-online-new.peregon.chatgpt.site", path: "/api/catalog", query: "section=movies&page=1" },
   { name: "Онлайн-индекс: раздачи (>16 КБ)", host: "ka4alka-online-new.peregon.chatgpt.site", path: "/api/releases", query: "id=movies:obekt-prestupleniya" },
   { name: "Онлайн-индекс: torrent через бэкенд", host: "ka4alka-online-new.peregon.chatgpt.site", path: "/api/torrent", query: "url=" + encodeURIComponent("https://nnmclub.to/forum/download.php?id=1") },
@@ -29,7 +32,7 @@ const targets = [
   { name: "HTTPS-трекер foreverpirates", host: "tracker.foreverpirates.co", path: "/announce" },
   { name: "HTTPS-трекер ftorrent", host: "open.ftorrent.com", path: "/announce" }
 ];
-const dnsTargets = ["rutor.info", "nnmclub.to", "megapeer.vip", "nyaa.si", "ka4alka-online-new.peregon.chatgpt.site", "tracker.opentrackr.org"];
+const dnsTargets = ["api.knaben.org", "apibay.org", "rutor.info", "nnmclub.to", "megapeer.vip", "nyaa.si", "ka4alka-online-new.peregon.chatgpt.site", "tracker.opentrackr.org"];
 const ooniDomains = ["rutor.info", "nnmclub.to", "megapeer.vip", "bigfangroup.org", "nyaa.si", "eztvx.to", "api.knaben.org", "knaben.org", "apibay.org", "yts.gg", "archive.org", "w6.zona.plus", "chatgpt.site", "raw.githubusercontent.com", "github.com"];
 
 async function request(body) {
@@ -60,7 +63,8 @@ function httpSummary(target, data) {
     firstByteMs: r.timings?.firstByte ?? null, downloadMs: r.timings?.download ?? null,
     truncated: r.truncated ?? null, bodyBytes: r.rawBody?.length ?? 0,
     blockPage: blockPage(r.rawBody) || blockPage(r.rawHeaders),
-    error: r.status === "finished" ? null : (r.rawOutput ?? "").replace(/\s+/g, " ").slice(0, 160)
+    error: r.status === "finished" ? null : (r.rawOutput ?? "").replace(/\s+/g, " ").slice(0, 160),
+    ...(target.keepBody ? { headers: (r.rawHeaders ?? "").slice(0, 1500), body: (r.rawBody ?? "").slice(0, 6000) } : {})
   }));
 }
 
@@ -112,6 +116,7 @@ for (const host of dnsTargets) {
 for (const domain of ooniDomains) report.ooni.push(await ooni(domain));
 
 writeFileSync("russia-reachability.json", JSON.stringify(report, null, 2));
+for (const row of report.http.filter(row => row.body !== undefined).slice(0, 2)) console.log(`--- ${row.target} · ${row.probe} · ${row.code}\n${row.headers}\n${row.body}\n---`);
 const lines = ["# Доступность из России", "", `Сформировано: ${report.generatedUtc}`, "", "## HTTP с российских зондов Globalping", "", "| Цель | Зонд | Итог | Код | мс | Байт тела | Страница блокировки | Ошибка |", "|---|---|---|---|---|---|---|---|"];
 for (const row of report.http) lines.push(`| ${row.target} | ${row.probe ?? ""} | ${row.status} | ${row.code ?? ""} | ${row.totalMs ?? ""} | ${row.bodyBytes ?? ""}${row.truncated ? "+" : ""} | ${row.blockPage ? "да" : ""} | ${row.error ?? ""} |`);
 lines.push("", "## Сводка по целям", "", "| Цель | Зондов | Ответили 2xx/3xx | Страница блокировки | Ошибка/тайм-аут |", "|---|---|---|---|---|");
