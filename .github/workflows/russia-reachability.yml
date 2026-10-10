@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [claude/compassionate-einstein-peg0a1]
-    paths: [scripts/probe-russia-reachability.mjs, scripts/probe-knaben-trackers.mjs, .github/workflows/russia-reachability.yml]
+    paths: [scripts/probe-russia-reachability.mjs, scripts/probe-knaben-trackers.mjs, scripts/probe-site-geoblock.mjs, .github/workflows/russia-reachability.yml]
 permissions:
   contents: read
 jobs:
@@ -15,9 +15,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Compare the online index response by country
+        run: node scripts/probe-site-geoblock.mjs
       - name: List trackers covered by Knaben, which answers in Russia
         run: node scripts/probe-knaben-trackers.mjs
       - name: Measure source and backend reachability from Russian networks
+        if: ${{ contains(github.event.head_commit.message, '[full probe]') }}
         run: node scripts/probe-russia-reachability.mjs
       - uses: actions/upload-artifact@v4
         if: always()
