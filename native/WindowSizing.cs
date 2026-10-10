@@ -67,6 +67,9 @@ public partial class MainWindow
     {
         // Isolated design captures choose their own viewport after the initial fit.
         if(designFixedViewport&&!first)return;
+        // Moving an iconic window places its minimized frame on screen and can keep
+        // the taskbar button from restoring it; the fit runs again after restore.
+        if(WindowState==WindowState.Minimized)return;
         var handle=new WindowInteropHelper(this).Handle;
         if(handle==IntPtr.Zero)return;
         var monitor=MonitorFromWindow(handle,MonitorDefaultNearest);
@@ -87,7 +90,7 @@ public partial class MainWindow
         {
             var currentInfo=new MonitorInfo{Size=(uint)Marshal.SizeOf<MonitorInfo>()};
             var currentMonitor=MonitorFromWindow(handle,MonitorDefaultNearest);
-            if(GetMonitorInfo(currentMonitor,ref currentInfo))PlaceWithinWorkArea(handle,currentInfo.Work,first);
+            if(WindowState!=WindowState.Minimized&&GetMonitorInfo(currentMonitor,ref currentInfo))PlaceWithinWorkArea(handle,currentInfo.Work,first);
         }));
     }
     static void PlaceWithinWorkArea(IntPtr handle,NativeRect work,bool center)

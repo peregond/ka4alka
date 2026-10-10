@@ -405,7 +405,7 @@ public partial class MainWindow
     void OpenDownloadMenu(Button button){var menu=button.ContextMenu;if(menu==null)return;menu.PlacementTarget=button;menu.IsOpen=true;}
     void DownloadLimits()
     {
-        var dialog=new Window{Title="Лимиты скорости",Owner=this,Width=Math.Min(440,Math.Max(320,ActualWidth-32)),MaxHeight=Math.Max(260,SystemParameters.WorkArea.Height-40),SizeToContent=SizeToContent.Height,WindowStartupLocation=WindowStartupLocation.CenterOwner,ResizeMode=ResizeMode.NoResize};
+        var dialog=new Window{ShowInTaskbar=false,Title="Лимиты скорости",Owner=this,Width=Math.Min(440,Math.Max(320,ActualWidth-32)),MaxHeight=Math.Max(260,SystemParameters.WorkArea.Height-40),SizeToContent=SizeToContent.Height,WindowStartupLocation=WindowStartupLocation.CenterOwner,ResizeMode=ResizeMode.NoResize};
         var panel=new StackPanel{Margin=new(24)};dialog.Content=new ScrollViewer{Content=panel,Style=(Style)FindResource("PageScroll"),VerticalScrollBarVisibility=ScrollBarVisibility.Auto};
         var title=Text("Скорость передачи",22);title.FontWeight=FontWeights.SemiBold;panel.Children.Add(title);panel.Children.Add(Text("Общий лимит для всей очереди. 0 — без ограничения.",12,true));
         TextBox Field(string label,int value){panel.Children.Add(Text(label,12));var field=new TextBox{Text=value.ToString(),Margin=new(0,0,0,14)};AutomationProperties.SetName(field,label);panel.Children.Add(field);return field;}

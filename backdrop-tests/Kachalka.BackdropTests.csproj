@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings></PropertyGroup>
+  <ItemGroup><Compile Include="../native/FeatureBackdrop.cs" Link="FeatureBackdrop.cs"/><Compile Include="../native/PosterBlur.cs" Link="PosterBlur.cs"/><Compile Include="../tests/FeaturePosterTests.cs" Link="FeaturePosterTests.cs"/><Compile Include="../tests/PosterBlurTests.cs" Link="PosterBlurTests.cs"/></ItemGroup>
+</Project>

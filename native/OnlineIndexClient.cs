@@ -10,17 +10,18 @@ namespace Kachalka;
 
 // Reads the shared catalog without bringing a browser engine into the desktop app.
 // A short cooldown keeps an unavailable or private Site from slowing every card.
-public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null)
+public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null,IndexRelays? relays=null)
 {
     public static readonly Uri PublishedSite=new("https://ka4alka-online-new.peregon.chatgpt.site/");
     readonly Uri site=baseUri??PublishedSite;
     long retryAfterTicks;
+    bool CoolingDown=>DateTime.UtcNow.Ticks<Interlocked.Read(ref retryAfterTicks);
 
     public void RetryNow()=>Interlocked.Exchange(ref retryAfterTicks,0);
 
     async Task<JsonDocument> Get(string path,CancellationToken ct)
     {
-        if(DateTime.UtcNow.Ticks<Interlocked.Read(ref retryAfterTicks))throw new HttpRequestException("Онлайн-индекс временно недоступен.");
+        if(CoolingDown)throw new HttpRequestException("Онлайн-индекс временно недоступен.");
         try
         {
             var bytes=await client.Read(new Uri(site,path),4*1024*1024,ct);
@@ -139,7 +140,48 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null)
         if(uri.AbsolutePath.EndsWith(".torrent",StringComparison.OrdinalIgnoreCase))return uri.AbsoluteUri;
         if(uri.Host=="nnmclub.to"&&uri.AbsolutePath=="/forum/download.php"&&uri.Fragment.Length==0&&Regex.IsMatch(uri.Query,@"^\?id=\d{1,12}$"))return uri.AbsoluteUri;
         if(uri.Host=="megapeer.vip"&&uri.Query.Length==0&&uri.Fragment.Length==0&&Regex.IsMatch(uri.AbsolutePath,@"^/download/\d{1,12}$"))return uri.AbsoluteUri;
+        if(uri.Host=="bigfangroup.org"&&uri.AbsolutePath=="/download.php"&&uri.Fragment.Length==0&&Regex.IsMatch(uri.Query,@"^\?id=\d{1,12}$"))return uri.AbsoluteUri;
         return uri.Host is "knaben.org" or "knaben.eu"&&uri.AbsolutePath.StartsWith("/live/dl/",StringComparison.Ordinal)?uri.AbsoluteUri:null;
+    }
+
+    // Trackers that some networks block (RuTor, NNM-Club, MegaPeer, BigFanGroup
+    // and Nyaa are in the Russian registry) stay reachable through the site or a
+    // standalone relay, which fetch only these exact download addresses.
+    public static bool CanRelay(Uri torrent)
+    {
+        if(torrent.Scheme!="https"||!string.IsNullOrEmpty(torrent.UserInfo)||!torrent.IsDefaultPort||torrent.Fragment.Length>0)return false;
+        return torrent.Host switch
+        {
+            "nnmclub.to"=>torrent.AbsolutePath=="/forum/download.php"&&Regex.IsMatch(torrent.Query,@"^\?id=\d{1,12}$"),
+            "megapeer.vip"=>torrent.Query.Length==0&&Regex.IsMatch(torrent.AbsolutePath,@"^/download/\d{1,12}$"),
+            "bigfangroup.org"=>torrent.AbsolutePath=="/download.php"&&Regex.IsMatch(torrent.Query,@"^\?id=\d{1,12}$"),
+            "nyaa.si"=>torrent.Query.Length==0&&Regex.IsMatch(torrent.AbsolutePath,@"^/download/\d{1,12}\.torrent$"),
+            _=>false
+        };
+    }
+    public static Uri RelayUri(Uri torrent,Uri? site=null)=>CanRelay(torrent)
+        ?new(site??PublishedSite,"api/torrent?url="+Uri.EscapeDataString(torrent.AbsoluteUri))
+        :throw new ArgumentException("Этот torrent-файл нельзя получить через онлайн-индекс.",nameof(torrent));
+    // Runs alongside the direct request, so a slow or unavailable site never
+    // delays a reachable tracker. The site is tried first unless it has just
+    // refused, then each standalone relay.
+    public async Task<byte[]> RelayTorrent(Uri torrent,CancellationToken ct)
+    {
+        var hosts=new List<Uri>();
+        if(!CoolingDown)hosts.Add(site);
+        if(relays!=null)hosts.AddRange(await relays.ListAsync(ct));
+        if(hosts.Count==0)hosts.Add(site);
+        Exception? failure=null;
+        foreach(var host in hosts)
+        {
+            try{return await client.Read(RelayUri(torrent,host),SourceClient.TorrentLimit,ct);}
+            catch(Exception error) when(!ct.IsCancellationRequested&&error is HttpRequestException or IOException or InvalidDataException or OperationCanceledException)
+            {
+                failure=error;
+                if(host==site&&error is HttpRequestException{StatusCode:HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden})Interlocked.Exchange(ref retryAfterTicks,DateTime.UtcNow.AddMinutes(15).Ticks);
+            }
+        }
+        throw failure!;
     }
 
     static SourceEntry? Release(JsonElement row,string expectedId)
@@ -158,10 +200,37 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null)
         return new SourceEntry(id,title,source,page,torrent,null,Long(row,"size"),Count(row,"seeds")){Via=String(row,"via"),Leechers=Count(row,"leechers")};
     }
 
-    public async Task<IReadOnlyList<SourceEntry>> Releases(MediaItem item,CancellationToken ct)
+    // Catalog-wide quality checks read the site only. An opened card may also ask
+    // a standalone relay when the site does not answer (allowRelay).
+    public async Task<IReadOnlyList<SourceEntry>> Releases(MediaItem item,CancellationToken ct,bool allowRelay=false)
     {
         var id=IdFor(item)??throw new InvalidDataException("Карточка не связана с онлайн-индексом.");
-        using var json=await Get("api/releases?id="+Uri.EscapeDataString(id),ct);
+        try
+        {
+            using var json=await Get("api/releases?id="+Uri.EscapeDataString(id),ct);
+            return ReleaseRows(json,id);
+        }
+        catch(Exception error) when(allowRelay&&relays!=null&&!ct.IsCancellationRequested&&error is HttpRequestException or IOException or InvalidDataException or JsonException or OperationCanceledException)
+        {
+            var query="api/search?id="+Uri.EscapeDataString(id)+"&title="+Uri.EscapeDataString(item.Title)+"&original="+Uri.EscapeDataString(item.OriginalTitle??"")+"&year="+Math.Clamp(item.Year,0,2100);
+            foreach(var relay in await relays.ListAsync(ct))
+            {
+                try
+                {
+                    using var json=JsonDocument.Parse(await client.Read(new Uri(relay,query),4*1024*1024,ct));
+                    return ReleaseRows(json,id);
+                }
+                catch(Exception relayError) when(!ct.IsCancellationRequested&&relayError is HttpRequestException or IOException or InvalidDataException or JsonException or OperationCanceledException)
+                {
+                    DiagnosticLog.Write("index-relay-failed",new{Relay=relay.Host,Error=relayError.GetType().Name,Status=(relayError as HttpRequestException)?.StatusCode?.ToString()});
+                }
+            }
+            throw;
+        }
+    }
+
+    static IReadOnlyList<SourceEntry> ReleaseRows(JsonDocument json,string id)
+    {
         if(!json.RootElement.TryGetProperty("items",out var items)||items.ValueKind!=JsonValueKind.Array)throw new InvalidDataException("Онлайн-индекс вернул неверные раздачи.");
         // Catalog quality/availability read this API directly too. Record this
         // response receipt before any caller merges it with older saved rows.

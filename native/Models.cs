@@ -169,6 +169,8 @@ public class DownloadItem : INotifyPropertyChanged
     public string? ReleasePageUrl {get;set;}
     public string? ReleaseUrl {get;set;}
     [JsonIgnore] public string DisplayName=>string.IsNullOrWhiteSpace(MediaTitle)?Name:MediaTitle;
+    [JsonIgnore] public string YearLabel=>MediaYear is >=1880 and <=2100?MediaYear.ToString(System.Globalization.CultureInfo.InvariantCulture):"";
+    [JsonIgnore] public bool HasYear=>YearLabel.Length>0;
     [JsonIgnore] public bool HasMediaCard=>DownloadMetadata.Card(this)!=null;
     [JsonIgnore] public int MinimumQualityHeight {get;set;}=720;
     [JsonIgnore] public string PosterQuality=>ReleaseQuality.Label(new SourceEntry("",string.IsNullOrWhiteSpace(ReleaseTitle)?Name:ReleaseTitle,"","",null,null));

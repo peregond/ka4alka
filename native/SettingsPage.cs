@@ -114,7 +114,7 @@ public partial class MainWindow
         Divider(appearance);
         // Lite mode drops decorative backdrops; posters, catalog and every function stay.
         var liteTitle=new WrapPanel();liteTitle.Children.Add(SwitchTitle("Лёгкий режим"));
-        var litePill=new Border{CornerRadius=new(999),Padding=new(9,2,9,2),Margin=new(10,2,0,2),VerticalAlignment=VerticalAlignment.Center,Child=new TextBlock{Text="Для слабых ноутбуков",FontSize=11,FontWeight=FontWeights.SemiBold}};litePill.SetResourceReference(Border.BackgroundProperty,"Raised");((TextBlock)litePill.Child).SetResourceReference(TextBlock.ForegroundProperty,"Muted");liteTitle.Children.Add(litePill);
+        var litePill=PillRadius.Apply(new Border{Padding=new(9,2,9,2),Margin=new(10,2,0,2),VerticalAlignment=VerticalAlignment.Center,Child=new TextBlock{Text="Для слабых ноутбуков",FontSize=11,FontWeight=FontWeights.SemiBold}});litePill.SetResourceReference(Border.BackgroundProperty,"Raised");((TextBlock)litePill.Child).SetResourceReference(TextBlock.ForegroundProperty,"Muted");liteTitle.Children.Add(litePill);
         var liteContent=new StackPanel();liteContent.Children.Add(liteTitle);var liteHint=Hint("Без фоновых обложек и лишних эффектов. Постеры и каталог остаются на месте.");liteHint.Margin=new(0,4,0,0);liteContent.Children.Add(liteHint);
         var lite=new CheckBox{Name="SettingsLiteMode",Style=(Style)FindResource("SettingsSwitch"),Content=liteContent,IsChecked=prefs.LiteMode,VerticalContentAlignment=VerticalAlignment.Center};
         AutomationProperties.SetName(lite,"Лёгкий режим");appearance.Children.Add(lite);
@@ -133,6 +133,9 @@ public partial class MainWindow
         AutomationProperties.SetName(homeCountry,"Страна отечественных подборок");catalogue.Children.Add(homeCountry);
         var countryHint=Hint("Учитываем страну производства. Фильмы совместного производства с выбранной страной тоже входят в отечественные подборки.");countryHint.Margin=new(0,8,0,0);catalogue.Children.Add(countryHint);
         var countryNotice=Notice(catalogue);
+        var tmdbLogo=new Image{Name="TmdbLogo",Source=new System.Windows.Media.Imaging.BitmapImage(new Uri("pack://application:,,,/Assets/tmdb-logo.png")),Width=128,Height=17,Stretch=Stretch.Uniform,HorizontalAlignment=HorizontalAlignment.Left,Margin=new(0,18,0,8)};
+        AutomationProperties.SetName(tmdbLogo,"The Movie Database — источник широких фонов");catalogue.Children.Add(tmdbLogo);
+        var artworkAttribution=Hint("Широкие фоны — TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.");artworkAttribution.Name="TmdbAttribution";catalogue.Children.Add(artworkAttribution);
         homeCountry.SelectionChanged+=(_,_)=>
         {
             if(homeCountry.SelectedItem is not CatalogChoice choice)return;

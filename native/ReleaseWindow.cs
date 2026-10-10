@@ -83,7 +83,7 @@ public partial class MainWindow
             var stack=new StackPanel{VerticalAlignment=VerticalAlignment.Center};
             if(queued.Completed)
             {
-                var pill=new Border{CornerRadius=new(999),Padding=new(12,6,12,6),HorizontalAlignment=HorizontalAlignment.Right};pill.SetResourceReference(Border.BackgroundProperty,"AccentSoft");
+                var pill=PillRadius.Apply(new Border{Padding=new(12,6,12,6),HorizontalAlignment=HorizontalAlignment.Right});pill.SetResourceReference(Border.BackgroundProperty,"AccentSoft");
                 var label=new TextBlock{Text="✓ Скачано",FontSize=13,FontWeight=FontWeights.SemiBold};label.SetResourceReference(TextBlock.ForegroundProperty,"Accent");pill.Child=label;stack.Children.Add(pill);
             }
             else
@@ -306,7 +306,7 @@ public partial class MainWindow
         }
         FrameworkElement RecommendedPill()
         {
-            var pill=new Border{CornerRadius=new(999),Padding=new(9,0,9,0),Height=22,Margin=new(0,0,10,6),HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center};pill.SetResourceReference(Border.BackgroundProperty,"AccentSoft");
+            var pill=new Border{CornerRadius=new(11),Padding=new(9,0,9,0),Height=22,Margin=new(0,0,10,6),HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center};pill.SetResourceReference(Border.BackgroundProperty,"AccentSoft");
             var label=new TextBlock{Text="★ Рекомендуем",FontSize=11,FontWeight=FontWeights.Bold,VerticalAlignment=VerticalAlignment.Center};label.SetResourceReference(TextBlock.ForegroundProperty,"Accent");pill.Child=label;return pill;
         }
         FrameworkElement ReasonLine(string reason)
@@ -319,7 +319,7 @@ public partial class MainWindow
         {
             var row=new StackPanel{Orientation=Orientation.Horizontal,Margin=new(0,4,0,0)};
             var icon=new System.Windows.Shapes.Path{Data=(Geometry)FindResource("IconAlert"),Width=14,Height=14,Stretch=Stretch.Uniform,StrokeThickness=1.6,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,Margin=new(0,0,6,0),VerticalAlignment=VerticalAlignment.Center};icon.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty,"Danger");row.Children.Add(icon);
-            var text=new TextBlock{Text="Мало сидов — загрузка может идти медленно",FontSize=12,VerticalAlignment=VerticalAlignment.Center};text.SetResourceReference(TextBlock.ForegroundProperty,"Danger");row.Children.Add(text);return row;
+            var text=new TextBlock{Text="Мало отдающих — загрузка может идти медленно",FontSize=12,VerticalAlignment=VerticalAlignment.Center};text.SetResourceReference(TextBlock.ForegroundProperty,"Danger");row.Children.Add(text);return row;
         }
         void Show()
         {
@@ -372,7 +372,7 @@ public partial class MainWindow
                 button.SetResourceReference(Control.ForegroundProperty,active?"Accent":"Subtle");AutomationProperties.SetName(button,"Сортировать раздачи: "+mode);
                 Grid.SetColumn(button,column);header.Children.Add(button);
             }
-            Heading("КАЧЕСТВО",0,"Выше качество");Heading("РАЗДАЧА",1,"По названию");Heading("РАЗМЕР",2,"Меньше размер");Heading("СИДЫ · ПИРЫ",3,"Больше отдающих");Heading("ДОБАВЛЕНА",4,null);
+            Heading("КАЧЕСТВО",0,"Выше качество");Heading("РАЗДАЧА",1,"По названию");Heading("РАЗМЕР",2,"Меньше размер");Heading("ОТДАЮТ · КАЧАЮТ",3,"Больше отдающих");Heading("ДОБАВЛЕНА",4,null);
             results.Children.Add(header);
             foreach(var entry in displayed)
             {

@@ -94,16 +94,16 @@ public partial class MainWindow
             CancelCover(state);CancelFeatureCover(state);state.Context=item;state.Url=url;state.RetryAfterUtc=default;state.NextCacheTouchUtc=default;state.FeatureAttempted=false;image.Source=null;
         }
         if(item is MediaItem card&&card.IsLive&&!ReferenceEquals(state.RatingsContext,item)){state.RatingsContext=item;_=UpdateCardRatings(card);}
-        _=LoadCover(image,state,item,url);
+        if(image.Tag?.ToString()!="FeaturePoster")_=LoadCover(image,state,item,url);
         if(image.Tag?.ToString()=="FeaturePoster"&&item is MediaItem feature&&!state.FeatureAttempted&&state.FeatureRequest==null)
             _=LoadFeatureCover(image,state,feature);
     }
     async Task LoadFeatureCover(Image image,CoverRequest state,MediaItem item)
     {
-        using var request=new CancellationTokenSource(TimeSpan.FromSeconds(15));state.FeatureRequest=request;state.FeatureAttempted=true;
+        using var request=new CancellationTokenSource(TimeSpan.FromSeconds(25));state.FeatureRequest=request;state.FeatureAttempted=true;
         try{await ImproveFeaturePoster(image,item,request.Token);}
         catch(OperationCanceledException)when(request.IsCancellationRequested){}
-        catch{ /* A normal poster remains available when the larger banner is unavailable. */ }
+        catch{ /* The preblurred poster or built-in gradient remains available. */ }
         finally{if(ReferenceEquals(state.FeatureRequest,request))state.FeatureRequest=null;}
     }
     async Task LoadCover(Image image,CoverRequest state,object? item,string? url)
@@ -201,7 +201,7 @@ public partial class MainWindow
     }
     void AddIndexer()
     {
-        var w=new Window{Title="Torznab-источник",Owner=this,Width=560,SizeToContent=SizeToContent.Height,WindowStartupLocation=WindowStartupLocation.CenterOwner};var p=new StackPanel{Margin=new(24)};w.Content=p;
+        var w=new Window{ShowInTaskbar=false,Title="Torznab-источник",Owner=this,Width=560,SizeToContent=SizeToContent.Height,WindowStartupLocation=WindowStartupLocation.CenterOwner};var p=new StackPanel{Margin=new(24)};w.Content=p;
         p.Children.Add(Text("Подключить индексатор",22));p.Children.Add(Text("Вставь Torznab URL из Jackett, Prowlarr или другого совместимого сервиса. Ключ хранится только до закрытия приложения.",12,true));
         TextBox Field(string label){p.Children.Add(Text(label,12));var box=new TextBox{Margin=new(0,0,0,12)};p.Children.Add(box);return box;}
         var name=Field("Название");var endpoint=Field("Torznab URL");p.Children.Add(Text("API-ключ",12));var key=new PasswordBox{Margin=new(0,0,0,15),Padding=new(10)};p.Children.Add(key);var error=Text("",12);

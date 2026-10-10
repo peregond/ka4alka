@@ -7,7 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>Kachalka</AssemblyName>
     <Product>Качалка</Product>
-    <Version>0.40.5</Version>
+    <Version>0.40.8</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets/app.ico</ApplicationIcon>
     <ServerGarbageCollection>false</ServerGarbageCollection>
@@ -18,6 +18,7 @@
   <ItemGroup><EmbeddedResource Include="../web-index/app/data/seed.json" LogicalName="Kachalka.catalog-seed.json" /></ItemGroup>
   <ItemGroup><Resource Include="Fonts/*.ttf" /></ItemGroup>
   <ItemGroup><Resource Include="Assets/logo.png" /><Resource Include="Assets/app.ico" /></ItemGroup>
+  <ItemGroup><Resource Include="Assets/tmdb-logo.png" /></ItemGroup>
   <ItemGroup>
     <None Update="Fonts/Onest-OFL.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" TargetPath="licenses/Onest-OFL.txt" />
     <None Update="Fonts/Unbounded-OFL.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" TargetPath="licenses/Unbounded-OFL.txt" />

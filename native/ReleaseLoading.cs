@@ -79,7 +79,7 @@ public partial class MainWindow
                 catch(TimeoutException){return item;}
             }
             // Supplement cached/indexed rows concurrently: a single screen copy must not suppress better sources.
-            var providers=new[]{new ReleaseSource("Онлайн-индекс",ct=>onlineIndex.Releases(item,ct))}
+            var providers=new[]{new ReleaseSource("Онлайн-индекс",ct=>onlineIndex.Releases(item,ct,allowRelay:true))}
                 .Concat(NativeReleaseSources.Create(sourceClient,Resolved,item.Section=="Сериалы"));
             var settled=false;
             void Apply(ReleaseSearchUpdate update)

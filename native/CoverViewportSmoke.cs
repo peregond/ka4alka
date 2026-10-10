@@ -24,9 +24,9 @@ public partial class MainWindow
         public void Release(string id){if(held.TryRemove(id,out var pending))pending.TrySetResult();}
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken ct)
         {
-            var id=Uri.UnescapeDataString(request.RequestUri!.Segments.Last()).Replace(".json","");Counts.AddOrUpdate(id,1,(_,count)=>count+1);Tokens[id]=ct;
+            var id=Uri.UnescapeDataString(request.RequestUri!.Query.Split("id=")[1]);Counts.AddOrUpdate(id,1,(_,count)=>count+1);Tokens[id]=ct;
             if(held.TryGetValue(id,out var pending))await pending.Task.WaitAsync(ct);
-            return new(HttpStatusCode.OK){Content=new StringContent(JsonSerializer.Serialize(new{d=new[]{new{id,i=new{imageUrl="https://m.media-amazon.com/images/M/fixture."+id+"._V1_.jpg"}}}}))};
+            return new(HttpStatusCode.OK){Content=new StringContent(JsonSerializer.Serialize(new{id,backdrop=new{url="https://image.tmdb.org/t/p/w1280/fixture.jpg",source="TMDB",tmdbId=1}}))};
         }
     }
     sealed class CoverViewportFixture(byte[] bytes):IAsyncDisposable
@@ -103,21 +103,21 @@ public partial class MainWindow
         using(var handler=new FeatureLookupFixture())
         using(var client=new SourceClient(handler))
         {
-            const string shared="tt9750301",canceled="tt9750302";handler.Hold(shared);
+            var fixtureId=Guid.NewGuid().ToString("N");var shared="movies:backdrop-shared-"+fixtureId;var canceled="series:backdrop-canceled-"+fixtureId;handler.Hold(shared);
             using var first=new CancellationTokenSource();using var second=new CancellationTokenSource();
-            var firstLookup=FeaturePosterUrl(shared,shared,first.Token,client);var secondLookup=FeaturePosterUrl(shared,shared,second.Token,client);
+            var firstLookup=FeaturePosterUrl(shared,first.Token,client);var secondLookup=FeaturePosterUrl(shared,second.Token,client);
             await Until(()=>handler.Counts.GetValueOrDefault(shared)>0,"Shared feature lookup did not start.");
-            if(handler.Counts[shared]!=1)throw new Exception("Two interested banners duplicated the same IMDb lookup.");
+            if(handler.Counts[shared]!=1)throw new Exception("Two interested banners duplicated the same backdrop lookup.");
             first.Cancel();try{await firstLookup;throw new Exception("Canceled feature subscriber still completed.");}catch(OperationCanceledException){}
             if(secondLookup.IsCompleted||handler.Tokens[shared].IsCancellationRequested)throw new Exception("One canceled banner canceled another banner's shared lookup.");
             handler.Release(shared);if(await secondLookup==null)throw new Exception("The remaining feature subscriber did not receive its poster URL.");
-            if(await FeaturePosterUrl(shared,shared,CancellationToken.None,client)==null||handler.Counts[shared]!=1)throw new Exception("A completed feature lookup was not cached.");
-            handler.Hold(canceled);using var canceledSubscriber=new CancellationTokenSource();var abandoned=FeaturePosterUrl(canceled,canceled,canceledSubscriber.Token,client);
+            if(await FeaturePosterUrl(shared,CancellationToken.None,client)==null||handler.Counts[shared]!=1)throw new Exception("A completed feature lookup was not cached.");
+            handler.Hold(canceled);using var canceledSubscriber=new CancellationTokenSource();var abandoned=FeaturePosterUrl(canceled,canceledSubscriber.Token,client);
             await Until(()=>handler.Counts.GetValueOrDefault(canceled)>0,"Cancelable feature lookup did not start.");canceledSubscriber.Cancel();
             try{await abandoned;throw new Exception("An abandoned lookup completed despite cancellation.");}catch(OperationCanceledException){}
             await Until(()=>handler.Tokens[canceled].IsCancellationRequested,"The last feature subscriber did not cancel its underlying request.");
             if(featurePosters.ContainsKey(canceled))throw new Exception("An offscreen canceled lookup poisoned the completed feature cache.");
-            var returned=FeaturePosterUrl(canceled,canceled,CancellationToken.None,client);handler.Release(canceled);
+            var returned=FeaturePosterUrl(canceled,CancellationToken.None,client);handler.Release(canceled);
             if(await returned==null||handler.Counts[canceled]!=2)throw new Exception("Returning to a canceled feature did not start a fresh successful lookup.");
         }
         MediaItem Card(int id,string url)=>new(-975000-id,"Постер "+id,"Фильмы","Драма",2026,"7.2","7.0","#526B69"){ImageUrl=url};
@@ -168,8 +168,13 @@ public partial class MainWindow
 
         // Hidden banner Image is measured through its visible Grid ancestor.
         Body.Children.Clear();var banner=new Grid{Width=420,Height=210,VerticalAlignment=VerticalAlignment.Top};var feature=Poster(15,url+"15.png");feature.Width=feature.Height=0;feature.Opacity=0;feature.Tag="FeaturePoster";banner.Children.Add(feature);Body.Children.Add(banner);
-        await Until(()=>feature.Source!=null,"The zero-sized FeaturePoster failed to load through its banner viewport.");
+        await Until(()=>coverViewport?.Measure(feature).Near==true,"The zero-sized backdrop failed to use its banner viewport.");
+        await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.Background);
+        if(feature.Source!=null||fixture.Count(15)!=0)throw new Exception("A banner without a landscape identity loaded its portrait poster as a backdrop.");
         if(coverViewport?.Measure(feature).Near!=true)throw new Exception("The visible banner was treated as an offscreen zero-sized Image.");
+        var placeholderPoster=Poster(16,url+"16.png");placeholderPoster.Width=placeholderPoster.Height=0;placeholderPoster.Opacity=0;placeholderPoster.Tag="FeaturePlaceholderPoster";banner.Children.Add(placeholderPoster);
+        await Until(()=>placeholderPoster.Source!=null,"The hidden placeholder poster failed to use its banner viewport.");
+        if(fixture.Count(16)!=1||coverViewport?.Measure(placeholderPoster).Near!=true)throw new Exception("The banner placeholder did not load exactly one ordinary poster.");
 
         // An already loaded container may move when adjacent content folds.
         // Keep extent and every element's size fixed to avoid ScrollChanged or

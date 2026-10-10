@@ -1,0 +1,54 @@
+name: Russia reachability probe
+# Manual diagnostics: what users in Russia and Belarus can reach. Runs the
+# standalone relay against live trackers, compares the site's answer by
+# country, measures sources from Globalping probes on Russian networks (with
+# OONI aggregates) and checks every relay listed in distribution/relays.json.
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install the site toolchain for the relay
+        working-directory: web-index
+        run: npm ci --no-audit --no-fund
+      - name: Run the standalone relay against live trackers
+        run: |
+          cd relay-worker
+          ../web-index/node_modules/.bin/wrangler dev --local --port 8798 --ip 127.0.0.1 --inspector-port 0 > ../relay-dev.log 2>&1 &
+          cd ..
+          node scripts/probe-relay-live.mjs
+      - name: Relay log
+        if: always()
+        run: tail -n 60 relay-dev.log || true
+      - name: Compare the site's answer by country
+        if: ${{ !cancelled() }}
+        run: node scripts/probe-site-geoblock.mjs
+      - name: List trackers covered by Knaben, which answers in Russia
+        if: ${{ !cancelled() }}
+        run: node scripts/probe-knaben-trackers.mjs
+      - name: Measure sources, the site and relays from Russian networks
+        if: ${{ !cancelled() }}
+        run: node scripts/probe-russia-reachability.mjs
+      - name: Check published relays from Russian networks
+        if: ${{ !cancelled() }}
+        run: |
+          status=0
+          for relay in $(node -e 'for(const r of require("./distribution/relays.json").relays??[])console.log(r)'); do
+            RELAY="$relay" node scripts/probe-relay-russia.mjs || status=1
+          done
+          exit $status
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: russia-reachability
+          path: |
+            russia-reachability.json
+            russia-reachability.md

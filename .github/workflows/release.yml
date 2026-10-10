@@ -5,21 +5,21 @@ on:
       version:
         description: Version matching native/Kachalka.csproj
         required: true
-        default: '0.40.5'
+        default: '0.40.8'
   push:
-    branches: [release/0.37.0, release/0.38.0, release/0.39.0, release/0.40.0, release/0.40.1, release/0.40.2, release/0.40.3, release/0.40.4, release/0.40.5]
+    branches: [release/0.37.0, release/0.38.0, release/0.39.0, release/0.40.0, release/0.40.1, release/0.40.2, release/0.40.3, release/0.40.4, release/0.40.5, release/0.40.6, release/0.40.7, release/0.40.8]
     paths: [.github/workflows/release.yml, 'native/**', 'lan-core/**', 'lan-tests/**', 'update-core/**', 'updater/**', 'update-tests/**', 'tests/**', 'installer/**', build-release.ps1, package-release.ps1]
 permissions:
   contents: write
 concurrency:
-  group: kachalka-release-0.40.5
+  group: kachalka-release-0.40.8
   cancel-in-progress: false
 jobs:
   release:
     runs-on: windows-latest
     timeout-minutes: 25
     env:
-      RELEASE_VERSION: ${{ inputs.version || '0.40.5' }}
+      RELEASE_VERSION: ${{ inputs.version || '0.40.8' }}
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
     steps:
       - uses: actions/checkout@v4
@@ -36,7 +36,15 @@ jobs:
         run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --probe-affected-films
       - name: Verify public replacement site
         shell: pwsh
-        run: ./tests/PublishedSiteProbe.ps1
+        run: |
+          try { ./tests/PublishedSiteProbe.ps1 }
+          catch {
+            $message=$_.Exception.Message.Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A')
+            Write-Output "::error title=Published site probe::$message"
+            throw
+          }
+      - name: Verify published film and series TMDB backdrops
+        run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --probe-backdrops
       - name: Install NSIS
         run: ./scripts/install-nsis.ps1
       - name: Validate redesigned catalog, saved navigation, themes and Windows update
@@ -67,9 +75,9 @@ jobs:
           $process=Start-Process dist/Kachalka-0.40/Kachalka.exe -ArgumentList @('--cinema-smoke-test',$output) -PassThru
           if(-not $process.WaitForExit(60000)){$process.Kill();throw 'Person card UI smoke timed out'}
           if($process.ExitCode -ne 0 -or (Test-Path "$output/error.txt") -or -not (Test-Path "$output/checks.json")){throw 'Person card UI smoke failed'}
-      - name: Verify upgrade from previously published 0.40.4
+      - name: Verify upgrade from previously published 0.40.6
         shell: pwsh
-        run: ./tests/WindowsPublishedUpgrade.ps1 -FromVersion 0.40.4 -ReleaseDirectory ('dist/release-'+$env:RELEASE_VERSION)
+        run: ./tests/WindowsPublishedUpgrade.ps1 -FromVersion 0.40.6 -ReleaseDirectory ('dist/release-'+$env:RELEASE_VERSION)
       - name: Upload verified files to draft GitHub Release
         shell: pwsh
         env:
@@ -105,7 +113,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $names=@('catalog-dark','catalog-light','detail-wide-dark','detail-wide-light','settings-dark','settings-light','downloads-dark','downloads-light','installer-finish')
+          $names=@('catalog-dark','catalog-light','detail-wide-dark','detail-wide-light','settings-dark','settings-light','downloads-dark','downloads-light','installer-finish','banner-placeholder-blurred','banner-placeholder-gradient','banner-placeholder-loaded')
           $previews=@()
           foreach($name in $names){
             $source=Join-Path 'test-output/design-modern' ($name+'.png')
@@ -165,6 +173,7 @@ jobs:
             test-output/download-end-to-end/*.json
             test-output/download-end-to-end/error.txt
             test-output/published-site/checks.json
+            test-output/transfer-*/backdrop-source/*
             test-output/published-upgrade/checks.txt
             test-output/published-upgrade/data/updates/*/result.txt
             test-output/windows-update/data/updates/*/result.txt

@@ -1,5 +1,5 @@
 import { decodeHtml, normalize, type Media } from "./catalog-source";
-import type { Release } from "./index-store";
+import type { Release } from "./release";
 
 const text=(value:string)=>decodeHtml(value.replace(/<[^>]*>/g," ").replace(/\s+/g," ")).trim();
 async function read(url:string,max=4_000_000) {
@@ -39,7 +39,7 @@ export function matches(media:Media,title:string,source:string) {
     return /^(?:s\d{1,2}(?:e\d{1,3})?|e\d{1,3}|season|сезон|серия|episode|complete|полный|все|web|hdtv|bdrip|bluray|remux|720p|1080p|2160p|4k|\d{4})\b/.test(tail);
   }));
   if(!hit)return false;
-  return media.section==="series"||!["RuTor","NNM-Club","MegaPeer","The Pirate Bay","Knaben"].includes(source)||media.year===0||new RegExp(`(^|\\D)${media.year}(\\D|$)`).test(title);
+  return media.section==="series"||!["RuTor","NNM-Club","MegaPeer","BigFanGroup","The Pirate Bay","Knaben"].includes(source)||media.year===0||new RegExp(`(^|\\D)${media.year}(\\D|$)`).test(title);
 }
 
 export async function knaben(media:Media):Promise<Release[]> {
@@ -172,6 +172,40 @@ export async function megaPeer(media:Media):Promise<Release[]> {
   return results;
 }
 
+const bigFanMovieCategories=new Set([13,14,15,18,19,20,21,22,23,24,26,27,28,29,30,31,33,36,39,47,48,51,52,53]);
+export function parseBigFanGroup(html:string,media:Media):Release[] {
+  const body=/<tbody\b[^>]*\bid=["']highlighted["'][^>]*>([\s\S]*?)<\/tbody>/i.exec(html)?.[1];
+  if(!body)return [];
+  const results:Release[]=[];const seen=new Set<string>();
+  for(const match of body.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)) {
+    const row=match[1],cells=[...row.matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/gi)].map(cell=>cell[1]);
+    const link=/<a\b[^>]*href=["']details\.php\?id=([1-9]\d{0,11})["'][^>]*>([\s\S]*?)<\/a>/i.exec(row);
+    const category=Number(/<a\b[^>]*href=["']browse\.php\?cat=(\d+)["']/i.exec(row)?.[1]??-1);
+    if(!link||category<0||seen.has(link[1]))continue;
+    // The tracker writes some season labels with a Latin "C".
+    const title=text(link[2]).replace(/C(езон)/g,"С$1");
+    const serial=category===11||/(?<![\p{L}\p{N}])(?:сезон|серии|s\d{1,2})/iu.test(title);
+    if(media.section==="series"?!(serial&&(bigFanMovieCategories.has(category)||category===11||category===12)):serial||!bigFanMovieCategories.has(category))continue;
+    if(!title||title.length>500||!matches(media,title,"BigFanGroup"))continue;
+    const sizeMatch=/(\d+(?:[.,]\d+)?)\s*(TB|GB|MB|KB|ТБ|ГБ|МБ|КБ)/i.exec(text(cells[5]??""));
+    const units:Record<string,number>={TB:1024**4,GB:1024**3,MB:1024**2,KB:1024,ТБ:1024**4,ГБ:1024**3,МБ:1024**2,КБ:1024};
+    const size=sizeMatch?Math.floor(Number(sizeMatch[1].replace(",","."))*units[sizeMatch[2].toUpperCase()]):null;
+    const seeds=/^\d{1,9}$/.test(text(cells[6]??""))?Number(text(cells[6]??"")):null;
+    seen.add(link[1]);
+    results.push(make(media,"BigFanGroup",link[1],title,`https://bigfangroup.org/details.php?id=${link[1]}`,`https://bigfangroup.org/download.php?id=${link[1]}`,size,seeds));
+  }
+  return results;
+}
+
+export async function bigFanGroup(media:Media):Promise<Release[]> {
+  const queries=[media.title,media.originalTitle].filter((value,index,all):value is string=>Boolean(value)&&all.indexOf(value)===index).slice(0,2);
+  const groups=await Promise.allSettled(queries.map(query=>readWindows1251(`https://bigfangroup.org/browse.php?ajax=1&search=${encodeWindows1251(query)}&cat=0&incldead=1&year=0&format=0&s=seed&d=desc`)));
+  if(groups.every(group=>group.status==="rejected"))throw new Error("BigFanGroup недоступен");
+  const unique=new Map<string,Release>();
+  for(const group of groups)if(group.status==="fulfilled")for(const item of parseBigFanGroup(group.value,media))unique.set(item.id,item);
+  return [...unique.values()].sort((a,b)=>(b.seeds??-1)-(a.seeds??-1)).slice(0,80);
+}
+
 export async function eztv(media:Media):Promise<Release[]> {
   const original=media.originalTitle;if(!original||/[\u0400-\u04ff]/i.test(original))return [];
   const search=JSON.parse(await read(`https://api.tvmaze.com/search/shows?q=${encodeURIComponent(original)}`,1_000_000)) as {show:{name:string;premiered?:string;externals?:{imdb?:string}}}[];
@@ -217,7 +251,7 @@ export async function archive(media:Media):Promise<Release[]> {
 }
 
 export async function collectReleases(media:Media) {
-  const sources=[rutor(media),nnmClub(media),megaPeer(media),pirateBay(media),knaben(media),archive(media),...(media.section==="series"?[eztv(media),nyaa(media)]:[yts(media)])];
+  const sources=[rutor(media),nnmClub(media),megaPeer(media),bigFanGroup(media),pirateBay(media),knaben(media),archive(media),...(media.section==="series"?[eztv(media),nyaa(media)]:[yts(media)])];
   const groups=await Promise.allSettled(sources);const rows=groups.flatMap(group=>group.status==="fulfilled"?group.value:[]);
   const unique=new Map<string,Release>();
   for(const item of rows){const key=(hashFrom(item.torrentUrl??"")??item.pageUrl??item.id).toUpperCase();if(!unique.has(key))unique.set(key,item);}

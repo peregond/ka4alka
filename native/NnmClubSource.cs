@@ -23,12 +23,14 @@ public sealed class NnmClubSource(SourceClient client)
             .Select(query=>query!.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Take(2);
-        var entries=new List<SourceEntry>();
+        var entries=new List<SourceEntry>();Exception? failure=null;var answered=false;
         foreach(var query in queries)
         {
-            try{entries.AddRange(Parse(await client.Read(QueryUri(query),2*1024*1024,ct),item));}
-            catch(Exception) when(!ct.IsCancellationRequested){/* Keep releases from the other title. */}
+            try{entries.AddRange(Parse(await client.Read(QueryUri(query),2*1024*1024,ct),item));answered=true;}
+            catch(Exception error) when(!ct.IsCancellationRequested){failure??=error;/* Keep releases from the other title. */}
         }
+        // A blocked tracker is unavailable, not a tracker without releases.
+        if(!answered&&failure!=null)System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
         return entries.DistinctBy(entry=>entry.Id).OrderByDescending(entry=>entry.Seeds??-1).Take(100).ToArray();
     }
 

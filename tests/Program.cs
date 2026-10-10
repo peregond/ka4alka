@@ -19,6 +19,7 @@ Console.WriteLine("PASS: exception diagnostics retain details and rotate oversiz
 if(args.Contains("--probe-magnet-discovery")){await MagnetDiscoveryProbe.Run(root);return;}
 if(args.Contains("--probe-releases")){await ReleaseProbe.Run();return;}
 if(args.Contains("--probe-affected-films")){await ReleaseProbe.AffectedFilms();return;}
+if(args.Contains("--probe-backdrops")){await BackdropSourceProbe.Run(root);return;}
 if(args.Contains("--probe-public"))
 {
  using var sourceClient=new SourceClient();
@@ -55,13 +56,18 @@ if(args.Contains("--professional-people-only")){await ProfessionalCinemaPeopleTe
 if(args.Contains("--zona-metadata-only")){await ZonaMovieMetadataTests.Run();return;}
 if(args.Contains("--catalog-regions-only")){await CatalogRegionsTests.Run();return;}
 if(args.Contains("--lan-only")){await DownloadLanTests.Run(root);return;}
+if(args.Contains("--torrent-relay-only")){await TorrentRelayTests.Run(root);await TorrentRelayTests.RunRelays(root);await TorrentRelayTests.RunRussianNetworks();return;}
 await CacheStorageTests.Run(root);
 if(args.Contains("--cache-only"))return;
 DownloadTests.Run();
 DownloadFolderTests.Run();
 ReleaseQualityTests.Run();
 FeaturePosterTests.Run();
+PosterBlurTests.Run();
 AdditionalSourceTests.Run();
+await TorrentRelayTests.Run(root);
+await TorrentRelayTests.RunRelays(root);
+await TorrentRelayTests.RunRussianNetworks();
 await DownloadOrderingTests.Run();
 await CatalogBatchTests.Run();
 CatalogPagingTests.Run();

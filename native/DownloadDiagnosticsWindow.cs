@@ -20,7 +20,7 @@ public partial class MainWindow
         var work=SystemParameters.WorkArea;
         var window=new Window
         {
-            Owner=this,Title="Почему не скачивается? · "+item.DisplayName,
+            Owner=this,Title="Почему не скачивается? · "+item.DisplayName,ShowInTaskbar=false,
             Width=Math.Clamp(ActualWidth-40,320,640),Height=Math.Clamp(ActualHeight-40,300,680),
             MinWidth=320,MinHeight=280,MaxWidth=Math.Max(320,work.Width-24),MaxHeight=Math.Max(280,work.Height-24),
             WindowStartupLocation=WindowStartupLocation.CenterOwner,UseLayoutRounding=true,

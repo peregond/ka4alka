@@ -1,7 +1,8 @@
 import { getIndexDb } from "@/db";
 import { normalize, type Media, type Section } from "./catalog-source";
+import type { Release } from "./release";
 
-export type Release = { id:string; mediaId:string; title:string; source:string; via?:string|null; pageUrl:string|null; torrentUrl:string|null; size:number|null; seeds:number|null; quality:string|null; season:number|null; episode:number|null; indexedAt?:number };
+export type { Release } from "./release";
 type MediaRow = {id:string;section:Section;title:string;title_search:string;original_title:string|null;original_search:string;year:number;poster:string|null;page_url:string;description:string|null;kinopoisk:string|null;imdb:string|null;catalog_rank:number|null;indexed_at:number};
 type ReleaseRow = {id:string;media_id:string;title:string;source:string;page_url:string|null;torrent_url:string|null;size:number|null;seeds:number|null;quality:string|null;season:number|null;episode:number|null;indexed_at:number};
 const asMedia=(row:MediaRow):Media=>({id:row.id,section:row.section,title:row.title,originalTitle:row.original_title,year:row.year,poster:row.poster,pageUrl:row.page_url,description:row.description,kinopoisk:row.kinopoisk,imdb:row.imdb});
