@@ -40,10 +40,11 @@ public partial class MainWindow
         {
             MinWidth=1000;MinHeight=720;Width=1000;Height=720;Left=0;Top=0;
             section="Фильмы";current=null;Search.Clear();submittedQuery="";searchCategory="";favoritesOnly=false;ResetCatalogFilters();
-            // A catalog request left over from the search checks would finish mid-test and rebuild the page under the mouse.
-            liveRequest?.Cancel();liveLoading=false;searchDelay.Stop();
-            if(catalogPages.TryGetValue(section+"|"+CatalogSelection.Filter+"|"+livePage,out var fixturePage))liveItems=fixturePage.Items;
             liveKey=CurrentCatalogKey;Render();await Task.Delay(200);UpdateLayout();
+            // A catalog request left over from the search checks rebuilds the page when it finishes; let it land
+            // before the mouse checks so it cannot replace the button under the cursor.
+            for(var wait=DateTime.UtcNow.AddSeconds(10);liveLoading&&DateTime.UtcNow<wait;)await Task.Delay(40);
+            await Task.Delay(200);UpdateLayout();
             foreach(var popupAnimation in new[]{PopupAnimation.None,PopupAnimation.Fade})
             foreach(var label in new[]{"Подборка","Жанр","Страна","Рейтинг от","Год выхода","Порядок","Качество каталога"})
             {
