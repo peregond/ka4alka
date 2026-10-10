@@ -381,7 +381,7 @@ public partial class MainWindow
                 empty.Children.Add(Text("Измени параметры или сбрось фильтры, чтобы увидеть все варианты.",13,true));
                 var surface=new Border{Child=empty,CornerRadius=new(16),BorderThickness=new(1)};surface.SetResourceReference(Border.BackgroundProperty,"Panel");surface.SetResourceReference(Border.BorderBrushProperty,"EdgeSoft");results.Children.Add(surface);return;
             }
-            if(recommended!=null&&visible.Contains(recommended.Entry))results.Children.Add(BestRelease(recommended));
+            if(recommended!=null&&visible.Length>1&&visible.Contains(recommended.Entry))results.Children.Add(BestRelease(recommended));
             void MoreResults()
             {
                 if(displayed.Length==visible.Length)return;
