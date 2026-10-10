@@ -58,7 +58,7 @@ internal sealed class CoverViewport(Window owner):IDisposable
         // An empty Image can arrange to 0 × 0. Its allocated layout slot is
         // expressed in the immediate parent's coordinates, and retains its
         // own position even when that parent is a much larger scrolling Canvas.
-        if(image.Tag?.ToString()!="FeaturePoster")
+        if(image.Tag?.ToString() is not ("FeaturePoster" or "FeaturePlaceholderPoster"))
             return image.ActualWidth>0&&image.ActualHeight>0?image:VisualTreeHelper.GetParent(image) as FrameworkElement;
         // Hidden banner brush images deliberately have no useful layout slot.
         for(DependencyObject? parent=VisualTreeHelper.GetParent(image);parent!=null;parent=VisualTreeHelper.GetParent(parent))
@@ -77,7 +77,7 @@ internal sealed class CoverViewport(Window owner):IDisposable
             if(updated!=anchor){if(anchor!=null&&anchor!=entry.Image)anchor.SizeChanged-=Resized;entry.Anchor=anchor=updated;if(anchor!=null&&anchor!=entry.Image)anchor.SizeChanged+=Resized;}
         }
         if(anchor==null||!anchor.IsVisible)return default;
-        var localBounds=anchor==entry.Image||entry.Image.Tag?.ToString()=="FeaturePoster"
+        var localBounds=anchor==entry.Image||entry.Image.Tag?.ToString() is "FeaturePoster" or "FeaturePlaceholderPoster"
             ?new Rect(new Point(),anchor.RenderSize):LayoutInformation.GetLayoutSlot(entry.Image);
         if(localBounds.IsEmpty||localBounds.Width<=0||localBounds.Height<=0)return default;
         var visible=true;var near=true;double distance=0;

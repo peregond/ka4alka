@@ -1,7 +1,7 @@
 name: Native UI preview
 on:
   push:
-    branches: [codex/download-reliability-0.35.0, codex/film-ux-0.35, codex/catalog-experience-0.37.0, codex/minimal-home-0.38.0, codex/lan-downloads-0.39.0, release/0.39.0, release/0.40.0, codex/font-rendering-0.40.1]
+    branches: [codex/download-reliability-0.35.0, codex/film-ux-0.35, codex/catalog-experience-0.37.0, codex/minimal-home-0.38.0, codex/lan-downloads-0.39.0, release/0.39.0, release/0.40.0, codex/font-rendering-0.40.1, codex/tmdb-backdrops]
     paths: ['native/**', 'lan-core/**', 'lan-tests/**', 'tests/**', '.github/workflows/ui-preview.yml']
   workflow_dispatch:
 permissions:

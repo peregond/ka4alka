@@ -5,6 +5,11 @@ type SharedIndex={items:Media[];generatedAtUtc:string};
 let cached:SharedIndex|null=null;
 let retryAfter=0;
 let checking:Promise<SharedIndex|null>|null=null;
+export async function sharedCatalogItem(id:string):Promise<Media|null> {
+  const section=id.startsWith("movies:")?"movies":"series";
+  await sharedCatalogPage(section,"",1);
+  return cached?.items.find(item=>item.id===id)??null;
+}
 export function refreshBoundary(now=Date.now()) {
   const date=new Date(now);date.setUTCHours(5,0,0,0);if(date.getTime()>now)date.setUTCDate(date.getUTCDate()-1);return date.getTime();
 }

@@ -1,5 +1,4 @@
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
@@ -7,50 +6,65 @@ using System.Windows.Controls;
 using System.Windows.Media.Imaging;
 namespace Kachalka;
 
-public static class FeaturePoster
-{
-    public static string? FromSuggestion(byte[] bytes,string imdbId)
-    {
-        using var json=JsonDocument.Parse(bytes);
-        if(!json.RootElement.TryGetProperty("d",out var rows)||rows.ValueKind!=JsonValueKind.Array)return null;
-        foreach(var row in rows.EnumerateArray())
-        {
-            if(!row.TryGetProperty("id",out var id)||id.GetString()!=imdbId||!row.TryGetProperty("i",out var image)||
-               !image.TryGetProperty("imageUrl",out var url)||!Uri.TryCreate(url.GetString(),UriKind.Absolute,out var uri)||
-               uri.Scheme!="https"||uri.Host!="m.media-amazon.com"||uri.UserInfo.Length>0||!uri.AbsolutePath.StartsWith("/images/M/",StringComparison.Ordinal))continue;
-            return Regex.Replace(uri.GetLeftPart(UriPartial.Path),@"\._V1_.*\.jpg$","._V1_QL85_UX1000_.jpg");
-        }
-        return null;
-    }
-}
-
 public partial class MainWindow
 {
-    readonly Dictionary<string,Task<string?>> featurePosters=[];
+    readonly Dictionary<string,(string? Url,DateTime Expires)> featurePosters=[];
     sealed class FeaturePosterLookup
     {
-        public readonly CancellationTokenSource Request=new(TimeSpan.FromSeconds(6));
+        public readonly CancellationTokenSource Request=new(TimeSpan.FromSeconds(15));
         public Task<string?> Task=null!;
         public int Subscribers;
+        public DateTime Expires;
     }
     readonly Dictionary<string,FeaturePosterLookup> featurePosterLookups=[];
-    async Task<string?> FeaturePosterUrl(string id,string query,CancellationToken ct,SourceClient? client=null)
+    DateTime backdropRetryAfterUtc;
+    async Task<string?> FeaturePosterUrl(string id,CancellationToken ct,SourceClient? client=null)
     {
         ct.ThrowIfCancellationRequested();
-        if(featurePosters.TryGetValue(id,out var cached)&&cached.IsCompletedSuccessfully)return await cached.WaitAsync(ct);
+        if(featurePosters.TryGetValue(id,out var cached)&&cached.Expires>DateTime.UtcNow)return cached.Url;
         if(!featurePosterLookups.TryGetValue(id,out var lookup)||lookup.Request.IsCancellationRequested)
         {
             lookup=new();featurePosterLookups[id]=lookup;var token=lookup.Request.Token;
             async Task<string?> Find()
             {
+                var path=Path.Combine(Preferences.DataDir,"covers","backdrop-"+Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(id)))+".json");
+                byte[]? saved=null;
                 try
                 {
-                    var prefix=query.Length>0&&char.IsAsciiLetter(query[0])?char.ToLowerInvariant(query[0]):'x';
-                    var bytes=await (client??sourceClient).Read(new Uri("https://v3.sg.media-imdb.com/suggestion/"+prefix+"/"+Uri.EscapeDataString(query)+".json"),256*1024,token);
-                    return await Task.Run(()=>FeaturePoster.FromSuggestion(bytes,id),token);
+                    saved=await Task.Run(()=>File.Exists(path)&&new FileInfo(path).Length<=32768?File.ReadAllBytes(path):null,token);
+                    if(saved!=null)
+                    {
+                        var value=FeatureBackdrop.FromResponse(saved,id);
+                        var age=DateTime.UtcNow-File.GetLastWriteTimeUtc(path);
+                        if(age<(value!=null?TimeSpan.FromDays(7):TimeSpan.FromHours(1))){lookup.Expires=File.GetLastWriteTimeUtc(path).Add(value!=null?TimeSpan.FromDays(7):TimeSpan.FromHours(1));return value;}
+                    }
+                }
+                catch(Exception)when(!token.IsCancellationRequested){saved=null;}
+                string? Retained()
+                {
+                    if(saved==null||DateTime.UtcNow-File.GetLastWriteTimeUtc(path)>=TimeSpan.FromDays(30))return null;
+                    var value=FeatureBackdrop.FromResponse(saved,id);if(value!=null)lookup.Expires=File.GetLastWriteTimeUtc(path).AddDays(30);return value;
+                }
+                if(client==null&&DateTime.UtcNow<backdropRetryAfterUtc)
+                {
+                    if(Retained() is {} retained)return retained;
+                    throw new IOException("Источник фонов временно недоступен.");
+                }
+                try
+                {
+                    var bytes=await (client??sourceClient).Read(new Uri(OnlineIndexClient.PublishedSite,"api/backdrop?id="+Uri.EscapeDataString(id)),32768,token);
+                    var value=await Task.Run(()=>FeatureBackdrop.FromResponse(bytes,id),token);
+                    lookup.Expires=DateTime.UtcNow.Add(value!=null?TimeSpan.FromDays(7):TimeSpan.FromHours(1));
+                    try{await Task.Run(()=>Directory.CreateDirectory(Path.GetDirectoryName(path)!),token);await CacheFiles.WriteAllBytesAsync(path,bytes,token);}catch(IOException){}catch(UnauthorizedAccessException){}
+                    return value;
                 }
                 catch(OperationCanceledException)when(token.IsCancellationRequested){throw;}
-                catch{return null;}
+                catch
+                {
+                    if(client==null)backdropRetryAfterUtc=DateTime.UtcNow.AddSeconds(30);
+                    if(Retained() is {} retained)return retained;
+                    throw;
+                }
             }
             lookup.Task=Find();
         }
@@ -59,15 +73,13 @@ public partial class MainWindow
         {
             var url=await lookup.Task.WaitAsync(ct);ct.ThrowIfCancellationRequested();
             if(featurePosters.Count>=16&&!featurePosters.ContainsKey(id))featurePosters.Remove(featurePosters.Keys.First());
-            featurePosters[id]=Task.FromResult(url);return url;
+            featurePosters[id]=(url,lookup.Expires);return url;
         }
         finally
         {
             if(--lookup.Subscribers==0)
             {
                 if(featurePosterLookups.TryGetValue(id,out var current)&&ReferenceEquals(current,lookup))featurePosterLookups.Remove(id);
-                // A shared lookup survives one banner leaving the viewport;
-                // cancel it only once every interested banner has left.
                 if(!lookup.Task.IsCompleted)lookup.Request.Cancel();lookup.Request.Dispose();
             }
         }
@@ -75,10 +87,10 @@ public partial class MainWindow
     async Task ImproveFeaturePoster(Image image,MediaItem item,CancellationToken ct=default)
     {
         ct.ThrowIfCancellationRequested();
-        var saved=BundledCatalog.Search(item.Section,item.Title).FirstOrDefault(x=>x.Id==item.Id);
-        var id=item.ImdbId??saved?.ImdbId;
-        if(id==null||!Regex.IsMatch(id,@"^tt[0-9]{7,10}$"))return;
-        var url=await FeaturePosterUrl(id,item.OriginalTitle??saved?.OriginalTitle??id,ct);
+        if(prefs.LiteMode)return;
+        var id=OnlineIndexClient.IdFor(item);
+        if(id==null)return;
+        var url=await FeaturePosterUrl(id,ct);
         ct.ThrowIfCancellationRequested();
         if(url==null||closing||closed||!image.IsLoaded||!ReferenceEquals(image.DataContext,item)||CoverViewportFor(image)?.Measure(image).Near!=true)return;
         try
@@ -91,9 +103,10 @@ public partial class MainWindow
                 var path=Path.Combine(Preferences.DataDir,"covers",Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(url)))+".img");
                 if(!coverCache.TryGetValue(url,out var bitmap))
                 {
-                    (bitmap,_)=await CoverCache.Load(path,1024*1024,ct=>sourceClient.Read(new Uri(url),1024*1024,ct),bytes=>
+                    var proxy=new Uri(OnlineIndexClient.PublishedSite,"api/backdrop-image?file="+Uri.EscapeDataString(new Uri(url).Segments.Last().Insert(0,"/")));
+                    (bitmap,_)=await CoverCache.Load(path,2*1024*1024,ct=>sourceClient.Read(proxy,2*1024*1024,ct),bytes=>
                     {
-                        using var stream=new MemoryStream(bytes);var result=new BitmapImage();result.BeginInit();result.CacheOption=BitmapCacheOption.OnLoad;result.DecodePixelWidth=900;result.StreamSource=stream;result.EndInit();result.Freeze();return result;
+                        using var stream=new MemoryStream(bytes);var result=new BitmapImage();result.BeginInit();result.CacheOption=BitmapCacheOption.OnLoad;result.DecodePixelWidth=1280;result.StreamSource=stream;result.EndInit();if(!FeatureBackdrop.Landscape(result.PixelWidth,result.PixelHeight))throw new InvalidDataException("Источник вернул постер вместо широкого фона.");result.Freeze();return result;
                     },timeout.Token);
                     timeout.Token.ThrowIfCancellationRequested();
                     if(coverCache.Count>=48)coverCache.Remove(coverCache.Keys.First());coverCache[url]=bitmap;
@@ -105,6 +118,6 @@ public partial class MainWindow
             finally{coverSlots.Release();}
         }
         catch(OperationCanceledException)when(ct.IsCancellationRequested){throw;}
-        catch{ /* The already displayed cached thumbnail remains available. */ }
+        catch{ /* Keep the preblurred poster or built-in gradient if the backdrop is unavailable. */ }
     }
 }

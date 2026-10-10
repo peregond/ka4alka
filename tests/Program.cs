@@ -19,6 +19,7 @@ Console.WriteLine("PASS: exception diagnostics retain details and rotate oversiz
 if(args.Contains("--probe-magnet-discovery")){await MagnetDiscoveryProbe.Run(root);return;}
 if(args.Contains("--probe-releases")){await ReleaseProbe.Run();return;}
 if(args.Contains("--probe-affected-films")){await ReleaseProbe.AffectedFilms();return;}
+if(args.Contains("--probe-backdrops")){await BackdropSourceProbe.Run(root);return;}
 if(args.Contains("--probe-public"))
 {
  using var sourceClient=new SourceClient();
@@ -62,6 +63,7 @@ DownloadTests.Run();
 DownloadFolderTests.Run();
 ReleaseQualityTests.Run();
 FeaturePosterTests.Run();
+PosterBlurTests.Run();
 AdditionalSourceTests.Run();
 await TorrentRelayTests.Run(root);
 await TorrentRelayTests.RunRelays(root);

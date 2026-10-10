@@ -2,7 +2,7 @@
 
 Нативное приложение для Windows: фильмы и сериалы с постерами, выбор раздачи и загрузка через torrent или magnet. Без Electron и встроенного браузерного движка.
 
-**[Скачать установщик 0.40.5 для Windows x64](https://github.com/peregond/ka4alka/releases/download/v0.40.5/Kachalka-Setup-0.40.5.exe)**
+**[Скачать установщик 0.40.7 для Windows x64](https://github.com/peregond/ka4alka/releases/download/v0.40.7/Kachalka-Setup-0.40.7.exe)**
 
 [Все выпуски и изменения](https://github.com/peregond/ka4alka/releases) · [Каталог «Ка4алка Онл@йн»](https://ka4alka-online-new.peregon.chatgpt.site/)
 
@@ -41,7 +41,7 @@
 
 ## Установка
 
-1. Скачайте `Kachalka-Setup-0.40.5.exe` и запустите его.
+1. Скачайте `Kachalka-Setup-0.40.7.exe` и запустите его.
 2. Откройте «Качалку» через ярлык на рабочем столе или в меню «Пуск».
 3. При первом запуске выберите место для загрузок. В нём создаётся папка `Ka4alka`; путь сохраняется и позже меняется в настройках.
 

@@ -1,0 +1,2 @@
+FeaturePosterTests.Run();
+PosterBlurTests.Run();

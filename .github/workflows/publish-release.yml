@@ -5,7 +5,7 @@ on:
       version:
         description: Version of the verified draft release to publish
         required: true
-        default: '0.40.5'
+        default: '0.40.7'
 permissions:
   contents: write
 jobs:
@@ -15,7 +15,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
-      RELEASE_VERSION: ${{ inputs.version || '0.40.5' }}
+      RELEASE_VERSION: ${{ inputs.version || '0.40.7' }}
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
     steps:
       - uses: actions/checkout@v4

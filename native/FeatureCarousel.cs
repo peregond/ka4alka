@@ -21,7 +21,7 @@ public partial class MainWindow
         public required WrapPanel Meta;
         public required StackPanel Dots;
         public required Button About,Favorite,Previous,Next;
-        public required Border LiteCover;
+        public required Border LiteCover,PosterHost;
         public MediaItem? Bound;
         public PropertyChangedEventHandler? Watch;
     }
@@ -43,23 +43,20 @@ public partial class MainWindow
         // Lite mode paints no backdrop, so it does not request the large feature poster at all.
         if(!prefs.LiteMode){image.Loaded+=SourceCover;image.DataContextChanged+=SourceCoverChanged;}
         grid.Children.Add(image);
-        var backdrop=new Border();
-        if(!prefs.LiteMode)
+        // Only lite mode keeps a separate portrait. Normal banners reuse their
+        // ordinary decoded poster as a tiny preblurred, stretched background.
+        var liteCover=new Border{Width=96,Height=144,CornerRadius=new(10),ClipToBounds=true,HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,36,0),Visibility=Visibility.Visible};
+        var liteImage=new Image{Stretch=Stretch.UniformToFill};liteImage.Loaded+=SourceCover;liteImage.DataContextChanged+=SourceCoverChanged;liteCover.Tag=liteImage;
+        if(prefs.LiteMode)liteCover.Child=liteImage;
+        else
         {
-            var picture=new ImageBrush{Stretch=Stretch.UniformToFill,AlignmentX=AlignmentX.Center,AlignmentY=AlignmentY.Top};
-            BindingOperations.SetBinding(picture,ImageBrush.ImageSourceProperty,new Binding("Source"){Source=image});
-            backdrop.Background=picture;
+            liteCover.Visibility=Visibility.Collapsed;
+            liteImage.Width=liteImage.Height=0;liteImage.Opacity=0;liteImage.Tag="FeaturePlaceholderPoster";grid.Children.Add(liteImage);
+            var onlyMissing=new Style(typeof(Image));onlyMissing.Setters.Add(new Setter(UIElement.VisibilityProperty,Visibility.Collapsed));
+            var missing=new DataTrigger{Binding=new Binding("Source"){Source=image},Value=null};missing.Setters.Add(new Setter(UIElement.VisibilityProperty,Visibility.Visible));onlyMissing.Triggers.Add(missing);liteImage.Style=onlyMissing;
+            AddBannerArtwork(grid,image,liteImage);
         }
-        grid.Children.Add(backdrop);
-        if(!prefs.LiteMode)
-        {
-            grid.Children.Add(new Border{Background=(Brush)FindResource("ScrimHorizontal"),IsHitTestVisible=false});
-            grid.Children.Add(new Border{Background=(Brush)FindResource("ScrimVertical"),IsHitTestVisible=false});
-        }
-        // Light mode keeps the flat Panel surface and shows the small poster instead of a backdrop.
-        var liteCover=new Border{Width=96,Height=144,CornerRadius=new(10),ClipToBounds=true,HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,36,0),Visibility=prefs.LiteMode?Visibility.Visible:Visibility.Collapsed};
-        if(prefs.LiteMode){var liteImage=new Image{Stretch=Stretch.UniformToFill};liteImage.Loaded+=SourceCover;liteImage.DataContextChanged+=SourceCoverChanged;liteCover.Child=liteImage;liteCover.Tag=liteImage;}
-        grid.Children.Add(liteCover);
+        var posterHost=new Border{Child=liteCover};grid.Children.Add(posterHost);
 
         var content=new StackPanel{Name="FeatureContent",VerticalAlignment=VerticalAlignment.Bottom,HorizontalAlignment=HorizontalAlignment.Left,MaxWidth=660,Margin=new(36,32,36,32)};grid.Children.Add(content);
         var eyebrowRow=new StackPanel{Orientation=Orientation.Horizontal,Margin=new(0,0,0,14)};
@@ -89,7 +86,7 @@ public partial class MainWindow
         var previous=Arrow("IconChevronLeft","Предыдущий фильм");var next=Arrow("IconChevron","Следующий фильм");controls.Children.Add(previous);controls.Children.Add(next);
         if(slides.Length<2){dots.Visibility=Visibility.Collapsed;previous.Visibility=Visibility.Collapsed;next.Visibility=Visibility.Collapsed;}
 
-        var view=new FeatureCarouselView{Slides=slides,Frame=frame,Poster=image,Eyebrow=eyebrow,Title=title,People=people,Meta=meta,Dots=dots,About=aboutAction,Favorite=favorite,Previous=previous,Next=next,LiteCover=liteCover};
+        var view=new FeatureCarouselView{Slides=slides,Frame=frame,Poster=image,Eyebrow=eyebrow,Title=title,People=people,Meta=meta,Dots=dots,About=aboutAction,Favorite=favorite,Previous=previous,Next=next,LiteCover=liteCover,PosterHost=posterHost};
         carousel=view;
         previous.Click+=(_,_)=>ShowFeatureSlide(view,(view.Index+view.Slides.Length-1)%view.Slides.Length);
         next.Click+=(_,_)=>ShowFeatureSlide(view,(view.Index+1)%view.Slides.Length);
@@ -183,8 +180,8 @@ public partial class MainWindow
         view.Title.FontSize=tiny?28:narrow?36:52;view.Title.LineHeight=tiny?30:narrow?38:54;view.Title.MaxHeight=view.Title.LineHeight*2;
         featureCompactText=narrow;
         if(view.Bound!=null)UpdateFeaturePeople(view,view.Bound);
-        // The Lite cover sits on the right; below this width the text column would run over it.
-        view.LiteCover.Visibility=prefs.LiteMode&&width>=860?Visibility.Visible:Visibility.Collapsed;
+        // The lite-mode portrait stays clear of text in narrow layouts.
+        view.PosterHost.Visibility=prefs.LiteMode&&width>=860?Visibility.Visible:Visibility.Collapsed;
         if(view.Frame.Child is Grid grid&&grid.Children.OfType<StackPanel>().FirstOrDefault(x=>x.Name=="FeatureContent") is {} content)content.Margin=tiny?new(20,24,20,22):narrow?new(24,28,24,26):new(36,32,36,32);
         view.About.Padding=new(tiny?16:22,0,tiny?16:22,0);
     }
