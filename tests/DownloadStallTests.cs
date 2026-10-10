@@ -25,7 +25,8 @@ static class DownloadStallTests
         await File.WriteAllTextAsync(Path.Combine(cache,DhtBootstrap.CacheFile),"le");
         Check(DhtBootstrap.EnsureSeed(cache),"an empty saved node list is seeded again");
         // Without the seed MonoTorrent waits for router.bittorrent.com to resolve before the DHT even starts.
-        using(var engine=new ClientEngine(new EngineSettingsBuilder{CacheDirectory=cache,AllowPortForwarding=false,AllowLocalPeerDiscovery=false}.ToSettings()))
+        // Fast resume is off: on Windows a stop could race the engine's own fast-resume write for the same file.
+        using(var engine=new ClientEngine(new EngineSettingsBuilder{CacheDirectory=cache,AllowPortForwarding=false,AllowLocalPeerDiscovery=false,AutoSaveLoadFastResume=false}.ToSettings()))
         {
             var folder=Path.Combine(root,"dht-seed-data");Directory.CreateDirectory(folder);
             await File.WriteAllBytesAsync(Path.Combine(folder,"dht.bin"),RandomNumberGenerator.GetBytes(64*1024));
@@ -33,7 +34,7 @@ static class DownloadStallTests
             var manager=await engine.AddAsync(torrent,Path.Combine(root,"dht-seed-download"));await manager.StartAsync();
             var until=DateTime.UtcNow.AddSeconds(10);while(engine.Dht.State==MonoTorrent.Dht.DhtState.NotReady&&DateTime.UtcNow<until)await Task.Delay(100);
             Check(engine.Dht.State!=MonoTorrent.Dht.DhtState.NotReady,"with the seeded node cache the DHT starts at once, without resolving a router name");
-            await manager.StopAsync();
+            await engine.StopAllAsync();
         }
         Check(MagnetDiscovery.PublicTrackers.Distinct().Count()==MagnetDiscovery.PublicTrackers.Count&&MagnetDiscovery.PublicTrackers.All(x=>Uri.TryCreate(x,UriKind.Absolute,out var uri)&&uri.Scheme is "udp" or "https"),"public fallback trackers are distinct UDP or HTTPS announce addresses");
     }
