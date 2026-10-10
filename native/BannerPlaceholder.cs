@@ -24,6 +24,12 @@ sealed class BannerPlaceholder : Image
         Loaded+=(_,_)=>Refresh();Unloaded+=(_,_)=>{generation++;Source=null;};
     }
     static void Changed(DependencyObject sender,DependencyPropertyChangedEventArgs args)=>((BannerPlaceholder)sender).Refresh();
+    protected override Size MeasureOverride(Size availableSize)
+    {
+        // This is decorative artwork. A portrait's natural aspect ratio must
+        // not grow a banner measured with unbounded height inside a ScrollViewer.
+        _=base.MeasureOverride(availableSize);return new Size();
+    }
     void Refresh()
     {
         var version=++generation;Source=null;

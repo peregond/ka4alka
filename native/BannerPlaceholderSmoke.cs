@@ -33,6 +33,7 @@ public partial class MainWindow
         {
             host.Show();await Ready();
             if(placeholder.Source is not BitmapSource {IsFrozen:true} small||small.PixelWidth>96||small.PixelHeight>96||layer.Visibility!=Visibility.Visible)throw new Exception("The banner does not show its bounded preblurred poster.");
+            if(placeholder.DesiredSize.Width!=0||placeholder.DesiredSize.Height!=0)throw new Exception("Decorative poster artwork changes the banner's intrinsic size.");
             if(!ReferenceEquals(source.Source,poster))throw new Exception("Preparing the banner changed its foreground poster.");
             var first=BannerPlaceholder.Prepare(poster);var second=BannerPlaceholder.Prepare(poster);
             if(!ReferenceEquals(first,second)||!ReferenceEquals(await first,small))throw new Exception("Banner preparation is not cached and coalesced.");

@@ -117,6 +117,8 @@ public partial class MainWindow
         }
         void CheckHero(string stage)
         {
+            var frame=FindVisual<Border>(Body,x=>x.Name=="CinemaFilm")??throw new Exception(stage+": detail banner was not found.");
+            if(detailHero==null||frame.ActualHeight>detailHero.ActualHeight+detailHero.Margin.Top+detailHero.Margin.Bottom+2)throw new Exception(stage+": decorative artwork expands the detail banner beyond its contents.");
             var title=FindVisual<TextBlock>(Body,x=>x.Name=="DetailTitle")??throw new Exception(stage+": DetailTitle was not found.");
             var synopsis=detailSynopsis??throw new Exception(stage+": detailSynopsis was not found.");
             foreach(var (name,element) in new[]{("title",title),("synopsis",synopsis)})
