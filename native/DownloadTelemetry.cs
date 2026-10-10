@@ -61,7 +61,7 @@ public static class DownloadPresentation
         switch(s.State)
         {
             case TorrentState.Metadata:
-                item.Status=idle&&s.Connections==0?"Ожидание участников для получения файлов":"Получение метаданных…";
+                item.Status=idle&&s.Connections==0?"Ожидание участников":"Получение метаданных…";
                 item.Stats="Получаем список файлов и размер раздачи";
                 item.Hint=idle&&s.Connections==0?(s.Trackers?.WaitingHint??MissingPeers):"Загрузка файлов начнётся после получения метаданных magnet-ссылки.";
                 break;
@@ -72,7 +72,7 @@ public static class DownloadPresentation
             case TorrentState.Downloading:
                 item.Status=down>0?"Скачивание":idle?(s.Connections==0?"Ожидание участников":"Ожидание данных"):"Подключение к участникам…";
                 item.Stats=$"{progress:F1}% · {volume} · ↓ {DownloadService.FormatBytes(down)}/с · ↑ {DownloadService.FormatBytes(up)}/с";
-                if(idle&&down==0)item.Hint=s.Connections==0?(s.Trackers?.WaitingHint??MissingPeers):"Участники подключены, но пока не передают файлы. Если ожидание затянется, попробуй другую раздачу с сидами.";
+                if(idle&&down==0)item.Hint=s.Connections==0?(s.Trackers?.WaitingHint??MissingPeers):"Участники подключены, но пока не передают файлы. Если ожидание затянется, попробуй раздачу, где больше отдающих.";
                 if(down>0&&total.HasValue&&progress<100)item.Remaining=Eta((total.Value-transferred)/(double)down);
                 break;
             case TorrentState.Seeding:
@@ -87,7 +87,7 @@ public static class DownloadPresentation
                 break;
         }
     }
-    const string MissingPeers="Сейчас никто не подключён к этой раздаче. Попробуй другой вариант с сидами; скорость зависит от участников, которые раздают файлы.";
+    const string MissingPeers="Сейчас никто не подключён к этой раздаче. Попробуй вариант, где больше отдающих; скорость зависит от участников, которые раздают файлы.";
     static string Eta(double seconds)
     {
         if(!double.IsFinite(seconds)||seconds<=0)return "";
