@@ -56,7 +56,7 @@ public partial class MainWindow
         for(var index=0;index<6;index++)
         {
             var cell=new StackPanel{Margin=new(0,0,8,8),HorizontalAlignment=HorizontalAlignment.Center};
-            var portrait=new Border{Width=88,Height=88,CornerRadius=new(44),Margin=new(0,10,0,10),HorizontalAlignment=HorizontalAlignment.Center};portrait.SetResourceReference(Border.BackgroundProperty,"Raised");cell.Children.Add(portrait);
+            var portrait=new Border{Width=96,Height=120,CornerRadius=new(11),Margin=new(0,10,0,10),HorizontalAlignment=HorizontalAlignment.Center};portrait.SetResourceReference(Border.BackgroundProperty,"Raised");cell.Children.Add(portrait);
             var name=SkeletonBar(11,new(0,0,0,6));name.Width=84;cell.Children.Add(name);var role=SkeletonBar(9,new(0),.7);role.Width=52;cell.Children.Add(role);grid.Children.Add(cell);
         }
         var measured=0d;

@@ -98,7 +98,8 @@ public partial class MainWindow
 
     // ----- Downloads widget in the sidebar -----
     TextBlock? widgetDown,widgetUp,widgetHeading;
-    Button? widgetAll;
+    FrameworkElement? widgetAll;
+    Button? widgetOpen;
     StackPanel? widgetRowsHost;
     readonly ContentControl[] widgetRows=[new(),new(),new()];
     int widgetVisibleRows;
@@ -106,18 +107,22 @@ public partial class MainWindow
     {
         if(widgetDown!=null)return;
         var host=DownloadsWidgetContent;
-        var head=new DockPanel{Margin=new(0,0,0,10)};
-        widgetAll=new Button{Style=(Style)FindResource("QuietButton"),MinHeight=0,Padding=new(6,2,2,2),Margin=new(0),FontSize=12,ToolTip="Открыть загрузки"};
-        var allRow=new StackPanel{Orientation=Orientation.Horizontal};allRow.Children.Add(new TextBlock{Text="Все",VerticalAlignment=VerticalAlignment.Center,FontSize=12,FontWeight=FontWeights.SemiBold});
-        allRow.Children.Add(new Path{Data=(Geometry)FindResource("IconChevron"),Width=12,Height=12,Stretch=Stretch.Uniform,StrokeThickness=1.8,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,StrokeLineJoin=PenLineJoin.Round,Margin=new(2,0,0,0),VerticalAlignment=VerticalAlignment.Center,Stroke=null});
-        widgetAll.Content=allRow;((Path)allRow.Children[1]).SetBinding(Shape.StrokeProperty,new Binding("Foreground"){Source=widgetAll});
-        widgetAll.SetResourceReference(Control.ForegroundProperty,"Muted");widgetAll.Click+=ShowDownloads;System.Windows.Automation.AutomationProperties.SetName(widgetAll,"Все загрузки");
-        DockPanel.SetDock(widgetAll,Dock.Right);head.Children.Add(widgetAll);
-        widgetHeading=new TextBlock{Text="Загрузки",FontSize=14,FontWeight=FontWeights.Bold,VerticalAlignment=VerticalAlignment.Center};head.Children.Add(widgetHeading);host.Children.Add(head);
-        var speeds=new StackPanel{Orientation=Orientation.Horizontal,Margin=new(0,0,0,12)};
+        // The header (title, "Все" and both speeds) is one button: the widget takes
+        // the place of the Downloads navigation button while it is shown.
+        widgetOpen=new Button{Name="DownloadsWidgetOpen",Style=(Style)FindResource("QuietButton"),MinHeight=0,Padding=new(6,4,6,4),Margin=new(-6,-4,-6,8),HorizontalContentAlignment=HorizontalAlignment.Stretch,ToolTip="Открыть загрузки"};
+        System.Windows.Automation.AutomationProperties.SetName(widgetOpen,"Открыть загрузки");widgetOpen.Click+=ShowDownloads;
+        var header=new StackPanel();
+        var head=new DockPanel{Margin=new(0,0,0,8)};
+        var allRow=new StackPanel{Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center};allRow.Children.Add(new TextBlock{Text="Все",VerticalAlignment=VerticalAlignment.Center,FontSize=12,FontWeight=FontWeights.SemiBold});
+        allRow.Children.Add(new Path{Data=(Geometry)FindResource("IconChevron"),Width=12,Height=12,Stretch=Stretch.Uniform,StrokeThickness=1.8,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,StrokeLineJoin=PenLineJoin.Round,Margin=new(2,0,0,0),VerticalAlignment=VerticalAlignment.Center});
+        ((TextBlock)allRow.Children[0]).SetResourceReference(TextBlock.ForegroundProperty,"Muted");((Path)allRow.Children[1]).SetResourceReference(Shape.StrokeProperty,"Muted");
+        widgetAll=allRow;DockPanel.SetDock(allRow,Dock.Right);head.Children.Add(allRow);
+        widgetHeading=new TextBlock{Text="Загрузки",FontSize=14,FontWeight=FontWeights.Bold,VerticalAlignment=VerticalAlignment.Center};widgetHeading.SetResourceReference(TextBlock.ForegroundProperty,"Text");head.Children.Add(widgetHeading);header.Children.Add(head);
+        var speeds=new StackPanel{Orientation=Orientation.Horizontal};
         widgetDown=new TextBlock{FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=12,Margin=new(0,0,14,0)};widgetDown.SetResourceReference(TextBlock.ForegroundProperty,"Accent");
         widgetUp=new TextBlock{FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=12};widgetUp.SetResourceReference(TextBlock.ForegroundProperty,"Info");
-        speeds.Children.Add(widgetDown);speeds.Children.Add(widgetUp);host.Children.Add(speeds);
+        speeds.Children.Add(widgetDown);speeds.Children.Add(widgetUp);header.Children.Add(speeds);
+        widgetOpen.Content=header;host.Children.Add(widgetOpen);
         widgetRowsHost=new StackPanel{Name="DownloadsWidgetRows"};
         foreach(var row in widgetRows){row.ContentTemplate=(DataTemplate)FindResource("WidgetRow");row.Visibility=Visibility.Collapsed;widgetRowsHost.Children.Add(row);}
         host.Children.Add(widgetRowsHost);
@@ -137,6 +142,8 @@ public partial class MainWindow
         var onDownloads=section=="Загрузки";
         // The Downloads page already shows the same speed in its own tiles, so the sidebar summary stays away there.
         var visible=!narrow&&!onDownloads&&items.Count>0&&rows>0&&(!veryShortHeight());
+        // Exactly one way to the Downloads page in the sidebar: the widget, or the button where the widget is hidden.
+        DownloadsButton.Visibility=visible?Visibility.Collapsed:Visibility.Visible;
         if(!visible){DownloadsWidget.Visibility=Visibility.Collapsed;return;}
         BuildDownloadsWidget();
         DownloadsWidget.Visibility=Visibility.Visible;

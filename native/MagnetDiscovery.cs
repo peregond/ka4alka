@@ -10,7 +10,13 @@ public static class MagnetDiscovery
         "https://open.ftorrent.com/announce",
         "https://tr.nyacat.pw/announce",
         "udp://open.stealth.si:80/announce",
-        "udp://exodus.desync.com:6969/announce"
+        "udp://exodus.desync.com:6969/announce",
+        // Large public trackers that answer outside Russia; each gets its own tier, so a
+        // timeout there never holds up the others.
+        "udp://tracker.opentrackr.org:1337/announce",
+        "udp://open.demonii.com:1337/announce",
+        "udp://tracker.torrent.eu.org:451/announce",
+        "udp://explodie.org:6969/announce"
     });
     // RuTracker's own announce addresses for magnet links (t-ru.org is not in the
     // Russian registry) and the local retracker many Russian providers run. A

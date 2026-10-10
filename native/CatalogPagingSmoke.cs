@@ -50,7 +50,7 @@ public partial class MainWindow
         CheckCatalogFilterLine(Check,"desktop");
         CheckDiscoveryShelves(Check,"desktop-movies");
         await CheckDiscoveryShelfActions(rows,Settle,Check);
-        Check(SavedButton.IsVisible&&SavedButton.TransformToAncestor(SidebarContent).Transform(new Point()).Y<DownloadsButton.TransformToAncestor(SidebarContent).Transform(new Point()).Y&&!VisualElements<Button>(inlineCatalogFilters!).Any(button=>AutomationProperties.GetName(button)=="Сохранённое"),"Saved is a separate sidebar destination above Downloads without duplicating the catalog filter line");
+        Check(SavedButton.IsVisible&&SavedButton.TransformToAncestor(SidebarContent).Transform(new Point()).Y<(DownloadsButton.IsVisible?(FrameworkElement)DownloadsButton:DownloadsWidget).TransformToAncestor(SidebarContent).Transform(new Point()).Y&&!VisualElements<Button>(inlineCatalogFilters!).Any(button=>AutomationProperties.GetName(button)=="Сохранённое"),"Saved is a separate sidebar destination above Downloads without duplicating the catalog filter line");
         Check(!VisualElements<TextBlock>(PageHeader).Any(x=>x.Text=="Настроить подборку"),"no redundant selection heading");
         var genreMenuButton=FindVisual<Button>(RootGrid,x=>AutomationProperties.GetName(x)=="Жанр")!;
         genreMenuButton.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Task.Delay(100);
