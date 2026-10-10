@@ -1,0 +1,26 @@
+name: Russia reachability probe
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/compassionate-einstein-peg0a1]
+    paths: [scripts/probe-russia-reachability.mjs, .github/workflows/russia-reachability.yml]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Measure source and backend reachability from Russian networks
+        run: node scripts/probe-russia-reachability.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: russia-reachability
+          path: |
+            russia-reachability.json
+            russia-reachability.md
