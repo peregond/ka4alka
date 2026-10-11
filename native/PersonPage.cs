@@ -8,6 +8,8 @@ namespace Kachalka;
 public partial class MainWindow
 {
     bool personProfileLoading;
+    // Smoke diagnostics: the width and placement chosen by the person hero's last layout.
+    internal string heroLayoutTrace="";
     void RenderPerson(CinemaPerson person,MediaItem? origin)
     {
         personProfileLoading=true;
@@ -52,7 +54,7 @@ public partial class MainWindow
         void HeroLayout()
         {
             if(hero.ActualWidth<=0)return;
-            var narrow=hero.ActualWidth<600;var tiny=hero.ActualWidth<280;
+            var narrow=hero.ActualWidth<600;heroLayoutTrace=$"{hero.ActualWidth:F0}{(narrow?" narrow":" wide")}";var tiny=hero.ActualWidth<280;
             portrait.Width=narrow?112:150;portrait.Height=narrow?140:190;hero.ColumnDefinitions[0].Width=new(narrow?132:174);name.FontSize=narrow?24:30;
             Grid.SetRow(identity,tiny?1:0);Grid.SetColumn(identity,tiny?0:1);Grid.SetColumnSpan(identity,tiny?2:1);identity.Margin=tiny?new(0,16,0,0):new(0);
             Grid.SetColumnSpan(portrait,tiny?2:1);portrait.Margin=new(0,0,narrow?20:24,0);

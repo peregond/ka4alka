@@ -18,7 +18,7 @@ public partial class MainWindow
         var status=FindVisual<TextBlock>(Body,element=>element.Name=="PersonFilmographyStatus")??throw new Exception("Person filmography status is missing.");
         if(status.Text.Contains("загружаем",StringComparison.OrdinalIgnoreCase))throw new Exception("Settled cached filmography reverted to a loading state.");
         if(!narrow&&panel.Parent is not StackPanel{Name:"PersonIdentity"})throw new Exception("Wide biography should sit beside the portrait and under the name.");
-        if(narrow&&grid.ActualWidth<600&&panel.Parent!=grid)throw new Exception($"Narrow biography should use the full hero width (window {ActualWidth:F1}, body {Body.ActualWidth:F1}, hero {hero.ActualWidth:F1}, grid {grid.ActualWidth:F1}, panel parent {(panel.Parent as FrameworkElement)?.Name}).");
+        if(narrow&&grid.ActualWidth<600&&panel.Parent!=grid)throw new Exception($"Narrow biography should use the full hero width (window {ActualWidth:F1}, body {Body.ActualWidth:F1}, hero {hero.ActualWidth:F1}, grid {grid.ActualWidth:F1}, panel parent {(panel.Parent as FrameworkElement)?.Name}, heroes {VisualElements<Grid>(Body).Count(x=>x.Name=="PersonHeroContent")}, last hero layout {heroLayoutTrace}, grid loaded {grid.IsLoaded}).");
         var nameTop=name.TransformToAncestor(hero).Transform(new Point()).Y;
         var biographyTop=biography.TransformToAncestor(hero).Transform(new Point()).Y;
         if(biographyTop<nameTop+name.ActualHeight-1)throw new Exception("Biography overlaps the person's name.");
