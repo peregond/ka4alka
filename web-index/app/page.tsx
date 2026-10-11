@@ -89,7 +89,7 @@ export default function Home() {
 
   return <SidebarProvider style={{"--sidebar-width":"14.5rem"} as CSSProperties}>
     <Sidebar collapsible="offcanvas" className="index-sidebar">
-      <SidebarHeader className="brand-header"><button type="button" className="brand-home" onClick={goHome} aria-label="На главную — Ка4алка Онл@йн"><span className="brand-mark"><Clapperboard size={22}/></span><span className="brand-copy"><strong>Ка4алка</strong><span>Онл@йн</span></span></button></SidebarHeader>
+      <SidebarHeader className="brand-header"><button type="button" className="brand-home" onClick={goHome} aria-label="На главную — Ка4алка Онл@йн"><span className="brand-mark"><img src="/brand/logo.png" width={45} height={45} alt="" /></span><span className="brand-copy"><strong>Ка4алка</strong><span>Онл@йн</span></span></button></SidebarHeader>
       <SidebarContent className="nav-content"><p className="nav-caption">КАТАЛОГ</p><SidebarMenu>
         <SidebarMenuItem><SidebarMenuButton isActive={section==="movies"} onClick={()=>switchSection("movies")}><Film size={19}/><span>Фильмы</span></SidebarMenuButton></SidebarMenuItem>
         <SidebarMenuItem><SidebarMenuButton isActive={section==="series"} onClick={()=>switchSection("series")}><Tv size={19}/><span>Сериалы</span></SidebarMenuButton></SidebarMenuItem>
