@@ -1,8 +1,13 @@
-import { ArrowDown, ArrowDownToLine, ArrowRight, ArrowUpRight, Bookmark, Check, Code2, Laptop, Monitor, Moon, Network, Plus, Search, Settings2, ShieldCheck } from "lucide-react";
+import { ArrowDown, ArrowDownToLine, ArrowRight, ArrowUpRight, Check, Code2, Laptop, Monitor, Moon, Network, Plus, Search, Settings2, ShieldCheck } from "lucide-react";
+import { ScrollHeader } from "@/components/scroll-header";
 import { ProductPreview } from "@/components/product-preview";
 import { getLatestRelease } from "@/lib/app-release";
 
 export const dynamic = "force-dynamic";
+
+function SavedHeartIcon() {
+  return <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 21 C9 18 3 14 3 8 C3 2 10 2 12 7 C14 2 21 2 21 8 C21 14 15 18 12 21 Z" /></svg>;
+}
 
 function TelegramIcon() {
   return <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21.4 3.3 2.9 10.5c-1.3.5-1.3 1.2-.2 1.5l4.7 1.5 1.8 5.4c.2.6.1.8.7.8.4 0 .6-.2.8-.4l2.3-2.2 4.8 3.5c.9.5 1.6.2 1.8-.8l3.1-14.6c.3-1.3-.5-1.9-1.3-1.4ZM8.2 13.1l10.5-6.6c.5-.3.9-.1.6.2l-8.5 7.7-.3 3.2-2.3-4.5Z" /></svg>;
@@ -17,13 +22,7 @@ export default async function Home() {
   const size = Math.round(release.installerSize / 1_000_000);
   return <>
     <a className="skip-link" href="#main">Перейти к содержимому</a>
-    <header className="site-header">
-      <div className="nav-inner">
-        <a className="brand" href="#" aria-label="Качалка — на главную"><img src="/brand/logo.png" width="40" height="40" alt="" /><span>Качалка<span className="brand-platform">для Windows</span></span></a>
-        <nav className="desktop-nav" aria-label="Основная навигация"><a href="#features">Возможности</a><a href="#interface">Интерфейс</a><a href="#installation">Установка</a></nav>
-        <a className="button button-small" href="/download"><ArrowDownToLine size={16} aria-hidden="true" />Скачать<span className="nav-windows"> для Windows</span></a>
-      </div>
-    </header>
+    <ScrollHeader />
     <main id="main">
       <section className="hero section-wrap" aria-labelledby="hero-title">
         <a className="release-badge" href={release.releaseUrl} target="_blank" rel="noreferrer"><span className="status-dot" />Версия {release.version}<span className="badge-divider" />Уже на GitHub<ArrowUpRight size={13} aria-hidden="true" /></a>
@@ -48,7 +47,7 @@ export default async function Home() {
       <section className="comfort section-wrap" aria-labelledby="comfort-title">
         <div className="comfort-heading"><p className="eyebrow">ПРОДУМАНО ДЛЯ КАЖДОГО ДНЯ</p><h2 id="comfort-title">Как удобно тебе.</h2><p>Сохрани интересное. Настрой своё. Вернись к тому, на чём остановился.</p></div>
         <div className="comfort-grid">
-          <article className="comfort-item"><Bookmark size={23} aria-hidden="true" /><h3>Не потеряй находку</h3><p>Добавляй фильмы и сериалы в «Сохранённое» — всё, что хочется посмотреть, останется в одном списке.</p></article>
+          <article className="comfort-item"><SavedHeartIcon /><h3>Не потеряй находку</h3><p>Добавляй фильмы и сериалы в «Сохранённое» — всё, что хочется посмотреть, останется в одном списке.</p></article>
           <article className="comfort-item"><Moon size={23} aria-hidden="true" /><h3>Светлая или тёмная</h3><p>Выбирай тему в настройках. Приложение запомнит её вместе с папкой загрузок и лимитами скорости.</p></article>
           <article className="comfort-item"><ShieldCheck size={23} aria-hidden="true" /><h3>Продолжай с того же места</h3><p>Очередь сохраняется между запусками. Активные задачи можно продолжать автоматически, а ручные паузы остаются на паузе.</p></article>
         </div>
@@ -73,7 +72,7 @@ export default async function Home() {
         <p className="install-note">Если кнопки «Выполнить в любом случае» нет, не меняй защиту Windows. На рабочем компьютере обратись к администратору. <a href="https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/smartscreen-reputation" target="_blank" rel="noreferrer">О SmartScreen — Microsoft<ArrowUpRight size={12} aria-hidden="true" /></a></p>
       </section>
 
-      <section id="questions" className="faq section-wrap" aria-labelledby="faq-title"><div className="faq-heading"><p className="eyebrow">ПЕРЕД ПЕРВЫМ ЗАПУСКОМ</p><h2 id="faq-title">Пара вопросов.</h2><p>Остались другие?<br /><a href="https://github.com/peregond/ka4alka/issues" target="_blank" rel="noreferrer">Напиши на GitHub <ArrowUpRight size={15} aria-hidden="true" /></a></p></div><div className="faq-list">
+      <section id="questions" className="faq section-wrap" aria-labelledby="faq-title"><div className="faq-heading"><p className="eyebrow">ПЕРЕД ПЕРВЫМ ЗАПУСКОМ</p><h2 id="faq-title">Пара вопросов.</h2><p>Будем рады вашим идеям и обратной связи.<br /><a href="https://t.me/+6sT2ocaKvLxlNmRi" target="_blank" rel="noopener noreferrer">Присоединяйтесь к нашей группе в Telegram <ArrowUpRight size={15} aria-hidden="true" /></a></p></div><div className="faq-list">
         <details><summary>Какая Windows нужна?<Plus size={20} aria-hidden="true" /></summary><p>Windows 10 или Windows 11, 64-разрядная версия (x64). В сборку включён .NET — устанавливать его отдельно не нужно.</p></details>
         <details><summary>Как установить Качалку?<Plus size={20} aria-hidden="true" /></summary><p>Нажми «Скачать для Windows», открой установщик и следуй его шагам. При первом запуске выбери папку для загрузок. Если предпочитаешь ZIP, распакуй архив целиком и запусти Kachalka.exe, оставив остальные файлы рядом.</p></details>
         <details><summary>Нужен отдельный торрент-клиент?<Plus size={20} aria-hidden="true" /></summary><p>Нет. Качалка сама работает с magnet-ссылками и .torrent-файлами: добавляет задачи, скачивает и позволяет управлять очередью внутри приложения.</p></details>
