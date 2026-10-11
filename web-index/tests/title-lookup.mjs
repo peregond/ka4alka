@@ -41,18 +41,196 @@ assert.equal(redirects, 1);
 await assert.rejects(tmdb.fetchMovie('tt1160419', 'fixture-token', async () => new Response(' '.repeat(1_000_001))), /too large/);
 
 // ----- TheTVDB: series -----
-const extended = { id: 368010, name: 'Solar Opposites', year: '2020', originalCountry: 'usa', overview: 'English fallback.',
-  genres: [{ name: 'Animation' }, { name: 'Comedy' }, { name: 'Science Fiction' }],
-  characters: [{ personName: 'Thomas Middleditch', peopleType: 'Actor', sort: 2 }, { personName: 'Justin Roiland', peopleType: 'Actor', sort: 1 }, { personName: 'Justin Roiland', peopleType: 'Actor', sort: 7 }, { personName: 'Шоураннер', peopleType: 'Writer', sort: 0 }],
-  translations: { nameTranslations: [{ name: 'Солнечные оппозиты', language: 'rus' }, { name: 'Solar Opposites', language: 'eng' }],
-    overviewTranslations: [{ overview: 'Инопланетяне\n сбежали с  планеты.', language: 'rus' }, { overview: 'Aliens fled.', language: 'eng' }] } };
+// Public Solar Opposites fields observed on TheTVDB v4, 2026-10-11.
+// Full extended records contain characters; short=true omits that field.
+const extended = {
+  "id": 375892,
+  "name": "Solar Opposites",
+  "year": "2020",
+  "firstAired": "2020-05-08",
+  "originalCountry": "usa",
+  "overview": "A family of aliens move to middle America, where they debate whether life is better there or on their home planet.\r\n",
+  "genres": [
+    {
+      "id": 2,
+      "name": "Science Fiction"
+    },
+    {
+      "id": 15,
+      "name": "Comedy"
+    },
+    {
+      "id": 17,
+      "name": "Animation"
+    }
+  ],
+  "characters": [
+    {
+      "peopleType": "Actor",
+      "personName": "Sean Giambrone",
+      "sort": 3,
+      "type": 3
+    },
+    {
+      "peopleType": "Actor",
+      "personName": "Justin Roiland",
+      "sort": 7,
+      "type": 3
+    },
+    {
+      "peopleType": "Actor",
+      "personName": "Mary Mack",
+      "sort": 4,
+      "type": 3
+    },
+    {
+      "peopleType": "Actor",
+      "personName": "Sagan McMahan",
+      "sort": 5,
+      "type": 3
+    },
+    {
+      "peopleType": "Actor",
+      "personName": "Andy Daly",
+      "sort": 10,
+      "type": 3
+    },
+    {
+      "peopleType": "Actor",
+      "personName": "Jason Mantzoukas",
+      "sort": 9,
+      "type": 3
+    },
+    {
+      "peopleType": "Actor",
+      "personName": "Christina Hendricks",
+      "sort": 11,
+      "type": 3
+    },
+    {
+      "peopleType": "Actor",
+      "personName": "Alfred Molina",
+      "sort": 14,
+      "type": 3
+    },
+    {
+      "peopleType": "Actor",
+      "personName": "Thomas Middleditch",
+      "sort": 2,
+      "type": 3
+    },
+    {
+      "peopleType": "Actor",
+      "personName": "Sterling K. Brown",
+      "sort": 15,
+      "type": 3
+    },
+    {
+      "peopleType": "Actor",
+      "personName": "Dan Stevens",
+      "sort": 1,
+      "type": 3
+    },
+    {
+      "peopleType": "Actor",
+      "personName": "Tiffany Haddish",
+      "sort": 8,
+      "type": 3
+    },
+    {
+      "peopleType": "Actor",
+      "personName": "Kieran Culkin",
+      "sort": 19,
+      "type": 3
+    },
+    {
+      "peopleType": "Actor",
+      "personName": "Kieran Culkin",
+      "sort": 20,
+      "type": 3
+    },
+    {
+      "peopleType": "Actor",
+      "personName": "Charlotte Nicdao",
+      "sort": 16,
+      "type": 3
+    },
+    {
+      "peopleType": "Actor",
+      "personName": "Clancy Brown",
+      "sort": 17,
+      "type": 3
+    },
+    {
+      "peopleType": "Actor",
+      "personName": "Carlos Alazraqui",
+      "sort": 18,
+      "type": 3
+    },
+    {
+      "peopleType": "Actor",
+      "personName": "Rob Schrab",
+      "sort": 12,
+      "type": 3
+    },
+    {
+      "peopleType": "Actor",
+      "personName": "Kari Wahlgren",
+      "sort": 13,
+      "type": 3
+    },
+    {
+      "peopleType": "Actor",
+      "personName": "Justin Roiland",
+      "sort": 6,
+      "type": 3
+    },
+    {
+      "peopleType": "Actor",
+      "personName": "Dan Bakkedahl",
+      "sort": 21,
+      "type": 3
+    }
+  ],
+  "translations": {
+    "nameTranslations": [
+      {
+        "name": "Solar Opposites",
+        "language": "eng"
+      },
+      {
+        "name": "Обратная сторона Земли",
+        "language": "rus"
+      },
+      {
+        "name": "Солнечные противоположности",
+        "language": "rus",
+        "isAlias": true
+      }
+    ],
+    "overviewTranslations": [
+      {
+        "overview": "A family of aliens move to middle America, where they debate whether life is better there or on their home planet.\r\n",
+        "language": "eng"
+      },
+      {
+        "overview": "Семья инопланетян бежит со своей умирающей планеты и терпит крушение на Земле. Они обосновываются в тихом провинциальном городке в США и прилежно стараются адаптироваться к местным правилам и обычаям. Пытаясь стать своими среди чужих, пришельцы решают, годится ли Земля для проживания и последующего заселения, а пока главная их задача — заботиться о Пупе, живом тераформаторе, который очень любит сладкое, но однажды эволюционирует и захватит планету.",
+        "language": "rus"
+      }
+    ]
+  }
+};
 const show = tvdb.parseSeries('tt8910922', extended);
-assert.equal(show.source, 'TheTVDB'); assert.equal(show.title, 'Солнечные оппозиты'); assert.equal(show.originalTitle, 'Solar Opposites'); assert.equal(show.year, 2020);
-assert.equal(show.overview, 'Инопланетяне сбежали с планеты.'); same(show.genres, ['Animation', 'Comedy', 'Science Fiction']); same(show.countries, ['usa']);
-same(show.actors, ['Justin Roiland', 'Thomas Middleditch']);
+assert.equal(show.source, 'TheTVDB'); assert.equal(show.title, 'Обратная сторона Земли'); assert.equal(show.originalTitle, 'Solar Opposites'); assert.equal(show.year, 2020);
+assert.equal(show.overview, extended.translations.overviewTranslations.find(row => row.language === 'rus').overview); same(show.genres, ['Science Fiction', 'Comedy', 'Animation']); same(show.countries, ['usa']);
+same(show.actors, ['Dan Stevens', 'Thomas Middleditch', 'Sean Giambrone', 'Mary Mack', 'Sagan McMahan', 'Justin Roiland', 'Tiffany Haddish', 'Jason Mantzoukas', 'Andy Daly', 'Christina Hendricks', 'Rob Schrab', 'Kari Wahlgren']);
+assert.equal(tvdb.parseSeries('tt8910922', { ...extended, characters: undefined }).actors.length, 0, 'short records have no cast');
+const aliasesFirst = { ...extended, translations: { ...extended.translations, nameTranslations: [...extended.translations.nameTranslations].reverse() } };
+assert.equal(tvdb.parseSeries('tt8910922', aliasesFirst).title, 'Обратная сторона Земли', 'canonical Russian title wins over an alias in either order');
+assert.equal(tvdb.parseSeries('tt8910922', { ...extended, translations: { nameTranslations: [{ name: 'Солнечные противоположности', language: 'rus', isAlias: true }] } }).title, 'Солнечные противоположности', 'an alias remains a usable fallback');
 const english = tvdb.parseSeries('tt8910922', { ...extended, translations: { overviewTranslations: [{ overview: 'Aliens fled.', language: 'eng' }] } });
 assert.equal(english.title, 'Solar Opposites'); assert.equal(english.originalTitle, null); assert.equal(english.overview, 'Aliens fled.');
-assert.equal(tvdb.parseSeries('tt8910922', { ...extended, translations: {} }).overview, 'English fallback.');
+assert.equal(tvdb.parseSeries('tt8910922', { ...extended, translations: {} }).overview, 'A family of aliens move to middle America, where they debate whether life is better there or on their home planet.');
 assert.equal(tvdb.parseSeries('tt1', { id: 0, name: 'x' }), null); assert.equal(tvdb.parseSeries('tt1', { id: 5, name: ' ' }), null);
 
 let log = [], logins = 0, rejectNext = false;
@@ -64,9 +242,9 @@ const tvdbFake = found => async (url, options) => {
   return Response.json(url.includes('/search/remoteid/') ? found : { data: extended });
 };
 let now = 0;
-const get = tvdb.tvdbSession('fixture-key', tvdbFake({ data: [{ series: { id: 368010 } }] }), () => now);
+const get = tvdb.tvdbSession('fixture-key', tvdbFake({ data: [{ series: { id: 375892 } }] }), () => now);
 const viaSearch = await tvdb.fetchSeries('tt8910922', get);
-assert.equal(viaSearch.sourceId, 368010); assert(log[1].endsWith('/search/remoteid/tt8910922') && log[2].includes('/series/368010/extended?meta=translations&short=true'));
+assert.equal(viaSearch.sourceId, 375892); assert(log[1].endsWith('/search/remoteid/tt8910922') && log[2].endsWith('/series/375892/extended?meta=translations'));
 await tvdb.fetchSeries('tt8910922', get); assert.equal(logins, 1, 'the session is reused');
 rejectNext = true; await tvdb.fetchSeries('tt8910922', get); assert.equal(logins, 2, 'a refused session is renewed once');
 now = 26 * 86400000; await tvdb.fetchSeries('tt8910922', get); assert.equal(logins, 3, 'an old session is renewed');

@@ -1,9 +1,32 @@
 # Handoff: verify TheTVDB v4 / TMDB title lookup against the live APIs
 
-Status: **unverified.** The paths and fields in `web-index/lib/tvdb-title.ts` and
-`web-index/lib/tmdb-title.ts` were written from documentation and third-party
-clients, never against a real response. An attempt to verify them stopped because
-the session had no `TVDB_API_KEY` / `TMDB_READ_TOKEN`. Nothing was changed in code.
+Status: **TheTVDB verified live on 2026-10-11; TMDB blocked by HTTP 401.**
+
+The actual `tvdbSession` / `fetchSeries` / `parseSeries` code was exercised with
+Solar Opposites (`tt8910922`). Login returns `data.token`, remote search returns
+`data: [{ series: { id: 375892, ... } }]`, and extended details return `data`.
+The expected `name`, string `year`, `firstAired`, `overview`, `genres`,
+`originalCountry`, and nested `translations` fields match. Translation language
+codes are `rus` / `eng`. Russian name translations also contain an `isAlias`
+entry; the parser now prefers the canonical name regardless of ordering.
+
+**Correction:** `short=true` removes `characters`. The full
+`/series/375892/extended?meta=translations` response has 21 character records with
+`peopleType: "Actor"`, `personName`, numeric `sort`, and `type: 3`; its body was
+50,492 bytes, below the existing 2 MB limit (the short response was 17,981 bytes).
+`fetchSeries` now requests the full record. The test fixture uses a public field
+subset from the live full record, including duplicate cast names and translations.
+
+TMDB's exact Dune find request (`tt1160419`, `language=ru-RU`) returned HTTP 401
+both through `fetchMovie` and an independent HTTP client. Movie details and their
+field shapes remain unverified; no TMDB parser change was inferred from an
+authentication failure. Live token expiry / renewal after a real 401 were not
+forced; renewal and expiry behavior remain covered by fixture tests.
+
+Validation: `node tests/title-lookup.mjs` and `tsc --noEmit` passed in an isolated
+temporary copy using the existing installed dependencies. The corrected TVDB
+lookup was then confirmed against the live API with Russian text and 12 unique,
+sorted actors. Credentials and login responses were not retained in files.
 
 ## What to do
 
@@ -14,7 +37,7 @@ Never print the keys, write them to files, logs, fixtures or commit messages.
    token sit in the response (assumed `data.token`)?
 2. `GET /v4/search/remoteid/tt8910922` (Solar Opposites): response shape, is there a
    `series.id`?
-3. `GET /v4/series/{id}/extended?meta=translations&short=true`: check `name`, `year`,
+3. `GET /v4/series/{id}/extended?meta=translations`: check `name`, `year`,
    `overview`, `genres`, `characters` (`peopleType`, `personName`, `sort`),
    `originalCountry`, `translations.nameTranslations` and `overviewTranslations`
    (`language` = `rus` / `eng`). Response must be under 2 MB.

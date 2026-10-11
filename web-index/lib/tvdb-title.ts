@@ -6,12 +6,18 @@ type Row = Record<string, unknown>;
 const BASE = "https://api4.thetvdb.com/v4";
 const rows = (value: unknown): Row[] => Array.isArray(value) ? value.filter((row): row is Row => !!row && typeof row === "object") : [];
 
-// `extended` is /series/{id}/extended?meta=translations&short=true. Russian text wins, then English, then the record's own.
+// `short=true` omits characters in the live API. Keep the full extended record
+// with translations; Russian text wins, then English, then the record's own.
 export function parseSeries(imdbId: string, extended: Row): TitleInfo | null {
   const id = extended.id;
   if (typeof id !== "number" || !Number.isSafeInteger(id) || id <= 0) return null;
   const translations = (extended.translations ?? {}) as Row;
-  const pick = (list: unknown, field: string, language: string) => rows(list).find(row => row.language === language && clean(row[field], 4000)) ?.[field];
+  const pick = (list: unknown, field: string, language: string) => {
+    const translated = rows(list).filter(row => row.language === language && clean(row[field], 4000));
+    // The API also returns aliases in nameTranslations. Prefer its canonical
+    // name regardless of their order, retaining an alias when it is all we have.
+    return (translated.find(row => row.isAlias !== true) ?? translated[0])?.[field];
+  };
   const original = clean(extended.name, 200);
   const title = clean(pick(translations.nameTranslations, "name", "rus"), 200) || original;
   if (!title) return null;
@@ -52,6 +58,6 @@ export async function fetchSeries(imdbId: string, get: (path: string, signal: Ab
   // One exact series only; an IMDb id that TheTVDB lists as a film or an episode is not a series.
   const id = series.length === 1 ? Number(series[0].id) : 0;
   if (!Number.isSafeInteger(id) || id <= 0) return null;
-  const detail = await get(`/series/${id}/extended?meta=translations&short=true`, signal);
+  const detail = await get(`/series/${id}/extended?meta=translations`, signal);
   return parseSeries(imdbId, (detail?.data ?? {}) as Row);
 }
