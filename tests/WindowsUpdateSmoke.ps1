@@ -142,6 +142,9 @@ try{
  $limit=(Get-Date).AddSeconds(20)
  while((Test-Path (Join-Path $install 'Kachalka.exe')) -and (Get-Date) -lt $limit){Start-Sleep -Milliseconds 250}
  if(Test-Path (Join-Path $install 'Kachalka.exe')){throw 'Application was not removed'}
+ # The uninstaller runs from a temporary copy and clears the registry after the files, so wait for it as for the files.
+ $limit=(Get-Date).AddSeconds(20)
+ while((Test-Path 'HKCU:/Software/Classes/kachalka') -and (Get-Date) -lt $limit){Start-Sleep -Milliseconds 250}
  if(Test-Path 'HKCU:/Software/Classes/kachalka'){throw 'Uninstaller left the kachalka:// registration'}
  if(-not(Test-Path (Join-Path $state 'settings.json'))){throw 'Uninstaller removed settings'}
  'PASS: uninstall removes executable and preserves user state' | Add-Content (Join-Path $evidence 'checks.txt')
