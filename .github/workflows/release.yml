@@ -1,11 +1,20 @@
 name: Prepare signed Windows release
 on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
+      publish:
+        type: boolean
+        default: true
+        required: false
   workflow_dispatch:
     inputs:
       version:
         description: Version matching native/Kachalka.csproj
         required: true
-        default: '0.40.12'
+        default: '0.40.13'
       publish:
         description: Publish the release as soon as every release check passes
         type: boolean
@@ -17,14 +26,14 @@ permissions:
   contents: write
   actions: read
 concurrency:
-  group: kachalka-release-0.40.12
+  group: kachalka-release-0.40.13
   cancel-in-progress: false
 jobs:
   release:
     runs-on: windows-latest
     timeout-minutes: 25
     env:
-      RELEASE_VERSION: ${{ inputs.version || '0.40.12' }}
+      RELEASE_VERSION: ${{ inputs.version || '0.40.13' }}
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
     steps:
       - uses: actions/checkout@v4
@@ -143,9 +152,9 @@ jobs:
           $process=Start-Process dist/Kachalka-0.40/Kachalka.exe -ArgumentList @('--cinema-smoke-test',$output) -PassThru
           if(-not $process.WaitForExit(60000)){$process.Kill();throw 'Person card UI smoke timed out'}
           if($process.ExitCode -ne 0 -or (Test-Path "$output/error.txt") -or -not (Test-Path "$output/checks.json")){throw 'Person card UI smoke failed'}
-      - name: Verify upgrade from previously published 0.40.11
+      - name: Verify upgrade from previously published 0.40.12
         shell: pwsh
-        run: ./tests/WindowsPublishedUpgrade.ps1 -FromVersion 0.40.11 -ReleaseDirectory ('dist/release-'+$env:RELEASE_VERSION)
+        run: ./tests/WindowsPublishedUpgrade.ps1 -FromVersion 0.40.12 -ReleaseDirectory ('dist/release-'+$env:RELEASE_VERSION)
       - name: Upload verified files to draft GitHub Release
         shell: pwsh
         env:

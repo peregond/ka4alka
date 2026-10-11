@@ -1,0 +1,25 @@
+name: Publish catalog and application 0.40.13
+on:
+  push:
+    branches: [release/0.40.13]
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: publish-catalog-app-0.40.13
+  cancel-in-progress: false
+jobs:
+  catalog:
+    uses: ./.github/workflows/catalog-daily.yml
+    with:
+      detail_limit: '1000'
+      metadata_budget_seconds: '600'
+    secrets: inherit
+  application:
+    needs: catalog
+    uses: ./.github/workflows/release.yml
+    with:
+      version: '0.40.13'
+      publish: true
+    secrets: inherit
