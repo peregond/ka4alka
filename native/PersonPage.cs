@@ -72,10 +72,6 @@ public partial class MainWindow
             UpdateBiography();
         }
         hero.SizeChanged+=(_,_)=>HeroLayout();biography.SizeChanged+=(_,_)=>UpdateBiography();
-        // A window resize can settle the hero's width without a final SizeChanged on it (the caption-less
-        // window resizes in more than one pass), so every layout pass also confirms the narrow/wide placement.
-        void ConfirmHeroLayout(object? sender,EventArgs e){if(hero.ActualWidth>0&&(hero.ActualWidth<600)!=hero.Children.Contains(biographyPanel))HeroLayout();}
-        hero.LayoutUpdated+=ConfirmHeroLayout;hero.Unloaded+=(_,_)=>hero.LayoutUpdated-=ConfirmHeroLayout;
         var status=Text("Загружаем фильмографию…",12,true);status.Name="PersonFilmographyStatus";status.Margin=new(2,0,0,14);body.Children.Add(status);
         var top=PersonGallery("Лучшие фильмы по Кинопоиску","Оценки среди подтверждённых работ участника.","PersonTopFilms");body.Children.Add(top.Frame);
         var awards=PersonGallery("Фильмы с наградами","Награды за работу этого участника.","PersonAwardFilms");body.Children.Add(awards.Frame);
