@@ -67,7 +67,8 @@ public partial class MainWindow
         toolbar.Children.Add(inlineCatalogFilterScroll);FilterControls.Children.Add(toolbar);UpdateFilterRail();
         ShowCatalog(filtered.Skip((savedPage-1)*CatalogPaging.Size).Take(CatalogPaging.Size).ToArray());
         var list=catalogList!;Body.Children.Remove(list);ScrollViewer.SetVerticalScrollBarVisibility(list,ScrollBarVisibility.Disabled);ScrollViewer.SetHorizontalScrollBarVisibility(list,ScrollBarVisibility.Disabled);WheelScroll.SetIsEnabled(list,false);
-        var content=new StackPanel();content.Children.Add(list);
+        // As on the catalog page, the scroll viewer extends 6 px past the gutter so hover and focus rings are not clipped.
+        var content=new StackPanel{Margin=new(6,6,6,0)};content.Children.Add(list);
         if(filtered.Length==0)
         {
             var empty=new StackPanel{HorizontalAlignment=HorizontalAlignment.Center,MaxWidth=380,Margin=new(20,28,20,20)};
@@ -87,7 +88,7 @@ public partial class MainWindow
             }
             Page("Назад",savedPage-1,savedPage>1);foreach(var page in CatalogPaging.Numbers(savedPage,pageCount))Page(page.ToString(),page,true);Page("Далее",savedPage+1,savedPage<pageCount);content.Children.Add(pages);
         }
-        var scroll=savedScroll=new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=content,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};Body.Children.Add(scroll);
+        var scroll=savedScroll=new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=content,Margin=new(-6,-6,-6,0),VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};Body.Children.Add(scroll);
         if(restoreSavedOffset is {} offset)
         {
             restoreSavedOffset=null;scroll.Loaded+=(_,_)=>Dispatcher.BeginInvoke(DispatcherPriority.Loaded,new Action(()=>{if(ReferenceEquals(savedScroll,scroll))scroll.ScrollToVerticalOffset(offset);}));

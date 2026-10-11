@@ -15,6 +15,7 @@ public partial class MainWindow
 
     internal Window CreateBugReport(Func<CancellationToken,Task<string>>? collectReport=null,Action<Uri>? openBrowser=null,Action<string>? copyReport=null,Action<string>? saveReport=null,Func<string,string,string,BugReportDraft>? draftBuilder=null,Func<string,CancellationToken,Task>? saveAsyncReport=null)
     {
+        var openCard=current is {} card&&activePerson==null?ShareLink.Create(card):null;
         var privatePaths=new[]{prefs.Folder,Preferences.DataDir,Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)}.Concat(downloads.Items.Select(item=>item.Folder)).ToArray();
         var area=SystemParameters.WorkArea;
         var window=new Window{ShowInTaskbar=false,Owner=this,Title="Сообщить об ошибке",Width=Math.Min(700,Math.Max(340,area.Width-40)),Height=Math.Min(730,Math.Max(360,area.Height-40)),MinWidth=340,MinHeight=360,WindowStartupLocation=WindowStartupLocation.CenterOwner,UseLayoutRounding=true,FontFamily=FontFamily,FontSize=13};
@@ -145,6 +146,8 @@ public partial class MainWindow
             {
                 var report=collectReport==null?await DiagnosticReport.CreateAsync(prefs,downloads,token):await collectReport(token);
                 var cleaned=await Task.Run(()=>DiagnosticReport.Redact(report,privatePaths),token);
+                // The card that was open names the film or series the problem is about.
+                if(openCard!=null)cleaned="Открытая карточка: "+openCard+"\n\n"+cleaned;
                 if(closed)return;preview.Text=cleaned;preview.IsReadOnly=false;loading=false;ScheduleDraft();problem.Focus();
             }
             catch(OperationCanceledException)when(closed){}

@@ -79,6 +79,11 @@ Section "Качалка"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Kachalka" "DisplayIcon" "$INSTDIR\Kachalka.exe"
   WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Kachalka" "NoModify" 1
   WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Kachalka" "NoRepair" 1
+  ; kachalka:// links open a film or series card; the app registers the same command on every start.
+  WriteRegStr HKCU "Software\Classes\kachalka" "" "URL:Качалка"
+  WriteRegStr HKCU "Software\Classes\kachalka" "URL Protocol" ""
+  WriteRegStr HKCU "Software\Classes\kachalka\DefaultIcon" "" '"$INSTDIR\Kachalka.exe",0'
+  WriteRegStr HKCU "Software\Classes\kachalka\shell\open\command" "" '"$INSTDIR\Kachalka.exe" "%1"'
 SectionEnd
 
 Function un.onInit
@@ -99,6 +104,7 @@ Section "Uninstall"
   Delete "$DESKTOP\Качалка.lnk"
   DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Kachalka"
   DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "Ka4alka"
+  DeleteRegKey HKCU "Software\Classes\kachalka"
   Delete "$LOCALAPPDATA\Kachalka\installation\Uninstall.exe"
   RMDir "$LOCALAPPDATA\Kachalka\installation"
   ; Settings, queue, and downloaded files are deliberately retained.

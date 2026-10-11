@@ -21,6 +21,22 @@ public static class WindowsIntegration
         if(enabled)key.SetValue(StartupName,StartupCommand,RegistryValueKind.String);
         else key.DeleteValue(StartupName,false);
     }
+    // kachalka:// links open in this copy of the app. Registered for the current user on every start, so a
+    // moved or portable copy takes the links over; the uninstaller removes the key.
+    public const string ShareLinkKey=@"Software\Classes\"+ShareLink.Scheme;
+    public static string ShareLinkCommand=>"\""+Executable+"\" \"%1\"";
+    public static bool ShareLinksRegistered
+    {
+        get{using var key=Registry.CurrentUser.OpenSubKey(ShareLinkKey+@"\shell\open\command");return string.Equals(key?.GetValue("") as string,ShareLinkCommand,StringComparison.OrdinalIgnoreCase);}
+    }
+    public static void RegisterShareLinks()
+    {
+        if(ShareLinksRegistered)return;
+        using var key=Registry.CurrentUser.CreateSubKey(ShareLinkKey,true);
+        key.SetValue("","URL:Качалка",RegistryValueKind.String);key.SetValue("URL Protocol","",RegistryValueKind.String);
+        using(var icon=key.CreateSubKey("DefaultIcon",true))icon.SetValue("","\""+Executable+"\",0",RegistryValueKind.String);
+        using var command=key.CreateSubKey(@"shell\open\command",true);command.SetValue("",ShareLinkCommand,RegistryValueKind.String);
+    }
     internal static string FirewallScript(string executable)
     {
         var literal="'"+Path.GetFullPath(executable).Replace("'","''")+"'";

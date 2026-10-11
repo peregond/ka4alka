@@ -240,6 +240,15 @@ public partial class MainWindow
         void Paint(){var now=IsSaved(item);favorite.Content=IconLabel("",now?"IconHeartFilled":"IconHeart",20);favorite.ToolTip=now?"Сохранено":"Сохранить";AutomationProperties.SetName(favorite,now?"Сохранено":"Сохранить");}
         Paint();favorite.Click+=(_,_)=>{ToggleSaved(item);Paint();UpdateSavedCount();};
         detailActions.Children.Add(favorite);
+        if(ShareLink.Create(item)!=null)
+        {
+            var share=new Button{Name="DetailShare",Style=(Style)FindResource("IconButton"),Width=52,Height=52,Margin=new(0,0,10,8),ToolTip="Скопировать ссылку на "+(item.Section=="Сериалы"?"сериал":"фильм")};
+            share.SetResourceReference(Control.BackgroundProperty,"BannerAction");share.SetResourceReference(Control.BorderBrushProperty,"BannerEdge");share.Foreground=(Brush)FindResource("BannerText");
+            share.Content=IconLabel("","IconShare",20);AutomationProperties.SetName(share,"Поделиться");
+            // The card's details may have loaded since the buttons were built, so the link takes the current title.
+            share.Click+=(_,_)=>CopyShareLink(current is {} open&&open.Id==item.Id?open:item);
+            detailActions.Children.Add(share);
+        }
     }
     FrameworkElement DownloadProgressButton(DownloadItem item)
     {
