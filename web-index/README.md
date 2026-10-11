@@ -142,3 +142,15 @@ The portable build runs Vinext directly without a host `timeout` command. The ma
 
 - [vinext Documentation](https://github.com/cloudflare/vinext)
 - [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)
+
+## Копия каталога на Railway
+
+Для России и Беларуси подготовлен отдельный сервис `catalog` в Railway `ka4alka-site`: https://catalog-production-e329.up.railway.app/. Лендинг `web` на ka4alka.cc остаётся отдельным сервисом. Оба режима каталога собираются из `web-index/`; интерфейс и поиск раздач общие с Sites.
+
+Railway: репозиторий `peregond/ka4alka`, ветка `claude/quirky-hopper-1vlmj6`, Root Directory `/web-index`, Dockerfile `Dockerfile`. В `main` изменения не отправляются. Для подключения GitHub требуется Railway GitHub App с доступом к репозиторию.
+
+Нужен Node.js 24+. Сборка `npm run build:railway`, запуск `npm run start:railway` (слушает `0.0.0.0` и `PORT`). Sites сохраняет свой режим сборки и Cloudflare D1. Railway использует `lib/railway-db.mjs`, адаптер D1 для SQLite, и автоматически применяет SQL-миграции из `drizzle/`. Постоянный Volume `/data`, `DATABASE_PATH=/data/catalog.sqlite`, одна реплика. Данные hosted D1 не переносятся; каталог восстанавливается из общего публичного feed и включённого snapshot.
+
+Добавьте `TVDB_API_KEY` и `TMDB_READ_TOKEN` в защищённые Railway Variables сервиса `catalog`. Настройки Codex/Sites не передаются автоматически. Не копируйте proxy placeholders из Codex. Без секретов `/api/title` и `/api/backdrop` отвечают 503; основной каталог, постеры и поиск раздач не требуют этих секретов.
+
+Проверки: `node tests/railway-db.mjs`, `node tests/title-lookup.mjs`, `tsc --noEmit`, production build; `/api/health` проверяет доступность базы. Локальные базы исключены из Git и Docker-контекста.
