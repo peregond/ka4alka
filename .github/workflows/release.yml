@@ -100,7 +100,7 @@ jobs:
         if: steps.tested.outputs.verified != 'true'
         run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --probe-affected-films
       - name: Verify public replacement site
-        if: steps.tested.outputs.verified != 'true'
+        # The live backend can change independently of a previously tested desktop tree.
         shell: pwsh
         run: |
           try { ./tests/PublishedSiteProbe.ps1 }

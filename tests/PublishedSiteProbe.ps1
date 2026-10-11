@@ -21,7 +21,17 @@ $detail=Read-Api ('api/media?id='+[Uri]::EscapeDataString($id))
 if($detail.item.id -ne $id -or [string]::IsNullOrWhiteSpace($detail.item.title)){throw 'Public card metadata is unavailable'}
 $releases=Read-Api ('api/releases?id='+[Uri]::EscapeDataString($id))
 if('items' -notin $releases.PSObject.Properties.Name){throw 'Public release API is unavailable'}
+# A desktop release must not ship before its new server route and both providers work.
+$titles=@(
+ @{Imdb='tt8910922';Section='series';Source='TheTVDB';Id=375892},
+ @{Imdb='tt1160419';Section='movies';Source='TMDB';Id=438631}
+)
+foreach($title in $titles){
+ $item=(Read-Api ('api/title?imdb='+$title.Imdb+'&section='+$title.Section)).item
+ if($null -eq $item -or $item.imdbId -ne $title.Imdb -or $item.section -ne $title.Section -or $item.source -ne $title.Source -or $item.sourceId -ne $title.Id){throw ('Published title identity or provider differs: '+$title.Imdb)}
+ if([string]::IsNullOrWhiteSpace($item.overview) -or @($item.actors).Count -eq 0 -or @($item.genres).Count -eq 0){throw ('Published title description, genres or cast are missing: '+$title.Imdb)}
+}
 $evidence='test-output/published-site';New-Item -ItemType Directory -Force $evidence | Out-Null
-@{Site=$base;Movies=$first.indexCount;Series=$series.indexCount;Page50=@($distant.items).Count;Card=$detail.item.title;Releases=@($releases.items).Count;PublicApi=$true} | ConvertTo-Json | Set-Content (Join-Path $evidence 'checks.json') -Encoding utf8NoBOM
+@{Site=$base;Movies=$first.indexCount;Series=$series.indexCount;Page50=@($distant.items).Count;Card=$detail.item.title;Releases=@($releases.items).Count;TitleProviders=@('TheTVDB','TMDB');PublicApi=$true} | ConvertTo-Json | Set-Content (Join-Path $evidence 'checks.json') -Encoding utf8NoBOM
 Get-Content (Join-Path $evidence 'checks.json')
-'PASS: public replacement site serves both libraries, distinct page 50, newest-first cards, details and the release API.'
+'PASS: public replacement site serves both libraries, distinct page 50, newest-first cards, releases and TheTVDB/TMDB title descriptions.'
