@@ -69,7 +69,7 @@ public partial class MainWindow
                 checks[group.Key]=Remember(new(group.Key,rowState,group.Count()));
             }
         }
-        IndexRows(saved,SourceState.Saved);checks["Онлайн-индекс"]=Remember(new("Онлайн-индекс",SourceState.Searching));view.Sources=checks.Values.ToArray();
+        IndexRows(saved,SourceState.Saved);if(!ImdbSuggestions.IsImdbOnly(item))checks["Онлайн-индекс"]=Remember(new("Онлайн-индекс",SourceState.Searching));view.Sources=checks.Values.ToArray();
         await Task.Yield();if(!IsCurrent()){releasesSettled.TrySetResult();return;}
         var entered=false;
         try
@@ -81,7 +81,8 @@ public partial class MainWindow
                 catch(TimeoutException){return item;}
             }
             // Supplement cached/indexed rows concurrently: a single screen copy must not suppress better sources.
-            var providers=new[]{new ReleaseSource("Онлайн-индекс",ct=>onlineIndex.Releases(item,ct,allowRelay:true))}
+            // The online index only knows catalog titles; an IMDb-only title goes straight to the trackers.
+            var providers=(ImdbSuggestions.IsImdbOnly(item)?[]:new[]{new ReleaseSource("Онлайн-индекс",ct=>onlineIndex.Releases(item,ct,allowRelay:true))})
                 .Concat(NativeReleaseSources.Create(sourceClient,Resolved,item.Section=="Сериалы"));
             var settled=false;
             void Apply(ReleaseSearchUpdate update)

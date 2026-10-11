@@ -42,6 +42,8 @@ public partial class MainWindow
     readonly OnlineIndexClient onlineIndex;
     Task<MediaItem> Metadata(MediaItem item,bool priority=false,CancellationToken ct=default,Action<MediaItem>? updated=null,bool force=false)
     {
+        // A title found only on IMDb has no catalog page to read; its card shows what the search returned.
+        if(ImdbSuggestions.IsImdbOnly(item))return Task.FromResult(item);
         item=DownloadMetadata.EnrichMedia(item,new[]{sharedCatalog.Find(item)}.OfType<MediaItem>().Concat(BundledCatalog.Search(item.Section,item.Title)));
         if(force){cardMetadata.Remove(item.Id);resolvedPriorityMetadata.Remove(item.Id);}
         if(cardMetadata.TryGetValue(item.Id,out var task)&&(!priority||task.IsCompletedSuccessfully&&(resolvedPriorityMetadata.Contains(item.Id)||MediaMetadata.HasFullDetails(task.Result))||priorityMetadata.Contains(item.Id)))return task;
@@ -306,7 +308,8 @@ public partial class MainWindow
             {
                 var result=await UnifiedSearch.FindAsync(query,
                     (kind,t)=>searchProvider!=null?searchProvider(kind,query,t):CatalogBatches.ReadPage(c=>onlineIndex.Browse(kind,query,1,c),c=>new LiveCatalog(sourceClient).Browse(kind,query,1,c),false,t),
-                    kind=>catalogIndex.Search(kind,query).Concat(sharedCatalog.Search(kind,query)).Concat(BundledCatalog.Search(kind,query)).ToArray(),token);
+                    kind=>catalogIndex.Search(kind,query).Concat(sharedCatalog.Search(kind,query)).Concat(BundledCatalog.Search(kind,query)).ToArray(),token,
+                    searchProvider!=null?null:t=>ImdbSuggestions.SearchAsync(query,t));
                 items=result.Items;if(result.Offline)liveError="Часть источников недоступна · добавлены результаты из сохранённого каталога";
             }
             try{await catalogIndex.AddAsync(items,token);}catch(IOException){}catch(UnauthorizedAccessException){}
