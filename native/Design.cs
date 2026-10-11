@@ -49,6 +49,23 @@ public partial class MainWindow
     {
         if(poster.ActualWidth>0&&poster.ActualHeight>0)poster.Clip=new RectangleGeometry(new Rect(0,0,poster.ActualWidth,poster.ActualHeight),poster.CornerRadius.TopLeft,poster.CornerRadius.TopLeft);
     }
+    // The hover and focus rings reach 4 px outside a poster card. Returns the first ancestor (up to stop)
+    // whose clip cuts that ring, so a layout change cannot silently crop the first column again.
+    static string? RingClipper(FrameworkElement card,DependencyObject stop)
+    {
+        var ring=new Rect(-4,-4,card.ActualWidth+8,card.ActualHeight+8);
+        for(var parent=VisualTreeHelper.GetParent(card);parent is Visual visual;parent=VisualTreeHelper.GetParent(parent))
+        {
+            if(VisualTreeHelper.GetClip(visual) is {} clip)
+            {
+                var bounds=card.TransformToAncestor(visual).TransformBounds(ring);
+                if(!clip.Bounds.Contains(bounds))
+                    return $"{visual.GetType().Name} {(visual as FrameworkElement)?.Name} clips at {clip.Bounds} while the ring needs {bounds}";
+            }
+            if(ReferenceEquals(parent,stop))break;
+        }
+        return null;
+    }
     static IEnumerable<T> VisualElements<T>(DependencyObject root) where T:DependencyObject
     {
         if(root is T value)yield return value;
