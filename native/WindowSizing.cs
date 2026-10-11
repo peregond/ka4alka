@@ -47,7 +47,7 @@ public partial class MainWindow
     void EnableAdaptiveLayout()
     {
         SizeChanged+=(_,_)=>windowResizes++;
-        SourceInitialized+=(_,_)=>{var handle=new WindowInteropHelper(this).Handle;HwndSource.FromHwnd(handle)?.AddHook(WindowMessage);SystemWindowTheme.Apply(this,prefs.Light,true);FitToMonitor(true);};
+        SourceInitialized+=(_,_)=>{var handle=new WindowInteropHelper(this).Handle;HwndSource.FromHwnd(handle)?.AddHook(WindowMessage);EnableCustomFrame(handle);SystemWindowTheme.Apply(this,prefs.Light,true);FitToMonitor(true);};
         LocationChanged+=(_,_)=>QueueMonitorFit();
         StateChanged+=(_,_)=>QueueMonitorFit();
         SizeChanged+=(_,_)=>ApplyCompactLayout();
@@ -83,7 +83,7 @@ public partial class MainWindow
         if(!changed&&Width<=MaxWidth&&Height<=MaxHeight)return;
         activeMonitor=monitor;activeScaleX=scaleX;activeScaleY=scaleY;
         var fit=WindowSizing.FitPixels(info.Work.Width,info.Work.Height,scaleX,scaleY);
-        MaxWidth=fit.MaxWidth;MaxHeight=fit.MaxHeight;
+        (MaxWidth,MaxHeight)=MaximizedLimit(handle,fit,scaleX,scaleY);
         MinWidth=fit.MinWidth;MinHeight=fit.MinHeight;
         if(WindowState==WindowState.Normal){Width=first?fit.Width:Math.Min(Width,fit.Width);Height=first?fit.Height:Math.Min(Height,fit.Height);}
         ApplyCompactLayout();
@@ -94,6 +94,19 @@ public partial class MainWindow
             if(WindowState!=WindowState.Minimized&&GetMonitorInfo(currentMonitor,ref currentInfo))PlaceWithinWorkArea(handle,currentInfo.Work,first);
         }));
     }
+    // Windows maximizes a window to the work area plus its resize frame on every side, hanging the frame outside the
+    // monitor. A MaxWidth/MaxHeight of exactly the work area cut that rectangle short and left a strip of two frames
+    // uncovered on the right and bottom, so the limits leave room for the overhang.
+    internal static (double Width,double Height) MaximizedLimit(IntPtr handle,WindowDimensions fit,double scaleX,double scaleY)
+    {
+        var dpi=GetDpiForWindow(handle);if(dpi==0)dpi=(uint)Math.Round(96*scaleX);
+        var frameX=GetSystemMetricsForDpi(SmCxSizeFrame,dpi)+GetSystemMetricsForDpi(SmCxPaddedBorder,dpi);
+        var frameY=GetSystemMetricsForDpi(SmCySizeFrame,dpi)+GetSystemMetricsForDpi(SmCxPaddedBorder,dpi);
+        return(fit.MaxWidth+2*frameX/scaleX,fit.MaxHeight+2*frameY/scaleY);
+    }
+    const int SmCxSizeFrame=32,SmCySizeFrame=33,SmCxPaddedBorder=92;
+    [DllImport("user32.dll")] static extern uint GetDpiForWindow(IntPtr window);
+    [DllImport("user32.dll")] static extern int GetSystemMetricsForDpi(int index,uint dpi);
     static void PlaceWithinWorkArea(IntPtr handle,NativeRect work,bool center)
     {
         if(!GetWindowRect(handle,out var window))return;
@@ -139,7 +152,8 @@ public partial class MainWindow
         AddTorrentButton.Content=IconLabel(tiny?"":narrow?"Добавить":"Добавить торрент","IconMagnet",18);
         AddTorrentButton.Padding=new Thickness(tiny?0:narrow?14:18,0,tiny?0:narrow?14:18,0);AddTorrentButton.MinHeight=control;AddTorrentButton.Height=control;AddTorrentButton.MinWidth=tiny?control:0;AddTorrentButton.Margin=new Thickness(0,0,tiny?8:12,0);
         BackButton.Width=control;BackButton.Height=control;BackButton.Margin=new Thickness(0,0,tiny?8:12,0);ThemeButton.Width=control;ThemeButton.Height=control;
-        HeaderArea.Margin=new Thickness(gutter,veryShort?6:shortView?12:20,gutter,veryShort?6:shortView?8:20);
+        // The top band is the window's caption (drag, snap, window buttons), so the header starts below it.
+        HeaderArea.Margin=new Thickness(gutter,CaptionBand+(veryShort?2:shortView?6:10),gutter,veryShort?6:shortView?8:20);
         if(ReferenceEquals(FiltersPanel.Parent,HeaderArea))FiltersPanel.Margin=new Thickness(0,shortView?6:12,0,0);
         CenterRegion.Margin=new Thickness(gutter,0,gutter,0);StatusToast.Margin=new Thickness(gutter,0,gutter,20);
         SearchBar.Margin=new Thickness(0,0,tiny?8:12,0);SearchBar.Height=control;Search.MinHeight=control;

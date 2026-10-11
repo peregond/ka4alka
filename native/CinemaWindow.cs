@@ -23,7 +23,7 @@ public partial class MainWindow
         if(item.People.Length>0)
         {
             var row=new UniformGrid{Name="CinemaPeopleGrid",Columns=3,Margin=new(0,0,-12,0)};people.Children.Add(row);
-            row.SizeChanged+=(_,_)=>{var columns=Math.Clamp((int)Math.Floor(row.ActualWidth/124),1,8);if(row.Columns!=columns){row.Columns=columns;limitCrew();}};
+            row.SizeChanged+=(_,_)=>{var columns=Math.Clamp((int)Math.Floor(ScrollStableWidth(row)/124),1,8);if(row.Columns!=columns){row.Columns=columns;limitCrew();}};
             foreach(var person in item.People)
             {
                 var button=Button(person.Name,()=>OpenPerson(person,item));button.Name="CinemaPersonTile";button.Tag=person;button.Style=(Style)FindResource("PersonTileButton");

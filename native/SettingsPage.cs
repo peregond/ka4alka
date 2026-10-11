@@ -78,7 +78,7 @@ public partial class MainWindow
         var appearance=Card("Внешний вид","Тема оформления и режим для слабых компьютеров.","IconTheme");
         var themeCaption=Text("Тема",13);themeCaption.FontWeight=FontWeights.SemiBold;themeCaption.SetResourceReference(TextBlock.ForegroundProperty,"TextSoft");themeCaption.Margin=new(0,0,0,10);appearance.Children.Add(themeCaption);
         var themes=new UniformGrid{Columns=2,Margin=new(0,0,-12,-12)};appearance.Children.Add(themes);
-        themes.SizeChanged+=(_,_)=>{var columns=themes.ActualWidth>=440?2:1;if(themes.Columns!=columns)themes.Columns=columns;};
+        themes.SizeChanged+=(_,_)=>{var columns=ScrollStableWidth(themes)>=440?2:1;if(themes.Columns!=columns)themes.Columns=columns;};
         foreach(var light in new[]{false,true})
         {
             var selected=prefs.Light==light;
