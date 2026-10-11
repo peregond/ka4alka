@@ -46,6 +46,7 @@ public partial class MainWindow
 
     void EnableAdaptiveLayout()
     {
+        SizeChanged+=(_,_)=>windowResizes++;
         SourceInitialized+=(_,_)=>{var handle=new WindowInteropHelper(this).Handle;HwndSource.FromHwnd(handle)?.AddHook(WindowMessage);SystemWindowTheme.Apply(this,prefs.Light,true);FitToMonitor(true);};
         LocationChanged+=(_,_)=>QueueMonitorFit();
         StateChanged+=(_,_)=>QueueMonitorFit();
@@ -102,6 +103,7 @@ public partial class MainWindow
     }
     void ApplyCompactLayout()
     {
+        compactLayouts++;
         if(!ready)return;
         var narrow=ActualWidth>0&&ActualWidth<950;
         var tiny=ActualWidth>0&&ActualWidth<780;

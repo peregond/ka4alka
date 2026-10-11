@@ -192,6 +192,12 @@ public partial class MainWindow
                 if(genres.Length==0||genres.Any(x=>x.Text.Contains('\n')||x.Text.Contains('\r')||x.TextWrapping!=TextWrapping.NoWrap||(x.Parent as FrameworkElement)?.Parent is not Border{Name:"PosterHover"}))throw new Exception("Series genres must be one line inside the poster hover overlay.");
                 var posters=VisualElements<Border>(discoveryShelf!).Where(x=>x.Name=="CardPoster").Select(x=>x.TransformToAncestor(discoveryShelf!).TransformBounds(new Rect(new Point(),x.RenderSize))).ToArray();
                 if(posters.Length<2||posters.Max(x=>x.Top)-posters.Min(x=>x.Top)>1||posters.Max(x=>x.Height)-posters.Min(x=>x.Height)>1)throw new Exception("Series shelf posters are not aligned at the top.");
+                // The first card of a shelf and of the catalog grid keeps its whole hover ring.
+                foreach(var host in new FrameworkElement?[]{discoveryShelf,catalogList})
+                {
+                    var first=host==null?null:VisualElements<Button>(host).FirstOrDefault(x=>x.Tag is MediaItem&&x.IsVisible);
+                    if(first!=null&&RingClipper(first,Body) is {} clipper)throw new Exception("The first poster's hover ring is cropped: "+clipper);
+                }
             }
             CheckSeriesLayout();
             // Reproduce metadata arriving after the row was already measured.
