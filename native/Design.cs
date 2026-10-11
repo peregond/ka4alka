@@ -58,8 +58,9 @@ public partial class MainWindow
         {
             if(VisualTreeHelper.GetClip(visual) is {} clip)
             {
+                // Only the sides matter: a scroll viewer legitimately clips a row scrolled out of view.
                 var bounds=card.TransformToAncestor(visual).TransformBounds(ring);
-                if(!clip.Bounds.Contains(bounds))
+                if(bounds.Left<clip.Bounds.Left-.5||bounds.Right>clip.Bounds.Right+.5)
                     return $"{visual.GetType().Name} {(visual as FrameworkElement)?.Name} clips at {clip.Bounds} while the ring needs {bounds}";
             }
             if(ReferenceEquals(parent,stop))break;

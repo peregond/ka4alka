@@ -1,4 +1,4 @@
-param([string]$FromVersion='0.40.11',[string]$ReleaseDirectory='dist/release-0.40.12')
+param([string]$FromVersion='0.40.12',[string]$ReleaseDirectory='dist/release-0.40.13')
 $ErrorActionPreference='Stop'
 Set-Location (Split-Path $PSScriptRoot)
 $release=[System.IO.Path]::GetFullPath($ReleaseDirectory)

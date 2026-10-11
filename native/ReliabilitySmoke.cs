@@ -35,7 +35,12 @@ public partial class MainWindow
                 foreach(var page in new[]{"Фильмы","Сохранённое","Загрузки","Настройки"})
                 {
                     section=page;current=null;Render();UpdateLayout();
-                    if(page=="Фильмы")CheckCatalogFilterLine((ok,message)=>{if(!ok)throw new Exception(message);},"DPI-"+pixels.Width+"-"+scale);
+                    if(page=="Фильмы")
+                    {
+                        CheckCatalogFilterLine((ok,message)=>{if(!ok)throw new Exception(message);},"DPI-"+pixels.Width+"-"+scale);
+                        var first=VisualElements<Button>(Body).FirstOrDefault(x=>x.Tag is MediaItem&&x.IsVisible&&x.ActualWidth>0);
+                        if(first!=null&&RingClipper(first,Body) is {} clipper)throw new Exception($"First poster's hover ring is cropped at {scale*100}% of {pixels.Width} px: {clipper}");
+                    }
                     if(ActualWidth>fit.MaxWidth+1||ActualHeight>fit.MaxHeight+1)throw new Exception("Window overflows scaled work area");
                     if(Body.ActualWidth<90||Body.ActualHeight<20)throw new Exception($"{page}: no usable content at {scale*100}%: body {Body.ActualWidth} x {Body.ActualHeight}, header {PageHeader.ActualHeight}, window {ActualWidth} x {ActualHeight}");
                     CheckSidebarFooter((ok,message)=>{if(!ok)throw new Exception(message);},page+"-DPI-"+pixels.Width+"-"+scale);
