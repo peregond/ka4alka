@@ -1,0 +1,49 @@
+name: Text catalog regression checks
+on:
+  pull_request:
+    paths:
+      - 'native/**'
+      - 'tests/**'
+      - 'catalog-text-tests/**'
+      - 'scripts/**'
+      - 'web-index/lib/shared-catalog.ts'
+      - 'web-index/tests/shared-catalog-limit.mjs'
+      - '.github/workflows/catalog-*.yml'
+      - '.github/workflows/release.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'native/**'
+      - 'tests/**'
+      - 'catalog-text-tests/**'
+      - 'scripts/**'
+      - 'web-index/lib/shared-catalog.ts'
+      - 'web-index/tests/shared-catalog-limit.mjs'
+      - '.github/workflows/catalog-*.yml'
+      - '.github/workflows/release.yml'
+permissions:
+  contents: read
+jobs:
+  catalog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify producer, publication and bundled resources
+        run: |
+          python3 scripts/test-refresh-library.py
+          python3 scripts/test-library-metadata.py
+          python3 scripts/test-catalog-text.py
+          python3 scripts/test-catalog-snapshot.py
+          python3 scripts/test-catalog-collections.py
+          python3 scripts/test-bundle-catalog.py
+      - name: Verify bounded web catalog reads
+        run: node web-index/tests/shared-catalog-limit.mjs
+      - name: Verify transport and local catalog scheduling
+        run: dotnet run --project catalog-text-tests/Kachalka.CatalogTextTests.csproj --configuration Release

@@ -13,7 +13,7 @@ public sealed class CacheStorage
 {
     public const long DefaultLimit=1024L*1024*1024;
     static readonly string[] Folders=["covers","portraits","catalog","details","people","release-index","regions"];
-    static readonly string[] RootFiles=["catalog-index.json","catalog-shared.json"];
+    static readonly string[] RootFiles=["catalog-index.json","catalog-shared.json","catalog-shared-sync.json"];
     readonly string root,statePath;
     readonly long limit;
     readonly Func<DateTime> clock;
@@ -197,3 +197,4 @@ public static class CacheFiles
     }
     public static Task WriteAllTextAsync(string path,string text,CancellationToken ct=default)=>WriteAllBytesAsync(path,Encoding.UTF8.GetBytes(text),ct);
 }
+

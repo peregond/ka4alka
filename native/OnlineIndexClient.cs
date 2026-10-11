@@ -124,10 +124,11 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null,Inde
         if(!Slug(slug)||onlineId!=SectionKey(section)+":"+slug)return null;
         var url=page.AbsoluteUri;
         var hash=SHA256.HashData(Encoding.UTF8.GetBytes(url));var id=-(BitConverter.ToInt32(hash,0)&int.MaxValue);
-        return new MediaItem(id,title,section,"",Integer(row,"year"),Score(String(row,"kinopoisk")),Score(String(row,"imdb")),"#526B69")
+        return new MediaItem(id,title,section,String(row,"genre")??"",Integer(row,"year"),Score(String(row,"kinopoisk")),Score(String(row,"imdb")),"#526B69")
         {
             OnlineId=onlineId,PageUrl=url,ImageUrl=Https(String(row,"poster")),
             OriginalTitle=String(row,"originalTitle"),ImdbId=String(row,"imdbId"),Description=String(row,"description"),
+            GenreKeys=MetadataArray<string>(row,"genreKeys").Where(x=>!string.IsNullOrWhiteSpace(x)).Distinct().ToArray(),
             Country=String(row,"country")??"",CountryKeys=CatalogRegions.CountryKeys(MetadataArray<string>(row,"countryKeys")),
             CountryKeysComplete=!row.TryGetProperty("countryKeysComplete",out var completeCountries)||completeCountries.ValueKind!=JsonValueKind.False,
             People=MetadataArray<CinemaPerson>(row,"people").Where(x=>!string.IsNullOrWhiteSpace(x.Name)&&!string.IsNullOrWhiteSpace(x.Role)&&(x.PageUrl==""||CinemaMetadata.CatalogUrl(x.PageUrl,"/persons/","/person/","/people/")!=null)).ToArray(),
@@ -292,3 +293,4 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null,Inde
             .Select(row=>row with{DataReceivedUtc=receivedUtc,DataProvider="Онлайн-индекс"}).ToArray();
     }
 }
+
