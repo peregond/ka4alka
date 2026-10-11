@@ -11,6 +11,7 @@ from pathlib import Path
 
 MAX_ITEMS = 15_000
 MAX_SNAPSHOT_BYTES = 32 * 1024 * 1024
+BUNDLED_CATALOG_PATH = Path(__file__).resolve().parents[1] / 'web-index/app/data/seed.json'
 ITEM_FIELDS = frozenset(['id', 'section', 'title', 'year', 'poster', 'pageUrl',
     'originalTitle', 'description', 'kinopoisk', 'imdb', 'imdbId', 'genre',
     'genreKeys', 'country', 'countryKeys', 'countryKeysComplete', 'people',
@@ -186,8 +187,11 @@ def main():
         parser.error('Metadata limits must be 0..1000 records and 1..365 days')
     if not 0 <= args.metadata_budget_seconds <= 1200:
         parser.error('Metadata time budget must be 0..1200 seconds')
-    previous_path = Path(args.previous) if args.previous else Path(__file__).resolve().parents[1] / 'web-index/app/data/seed.json'
-    previous = load_previous(previous_path)
+    previous = load_previous(BUNDLED_CATALOG_PATH)
+    if args.previous:
+        # A server snapshot can predate titles added to the shipped primary library.
+        # Keep those titles while preferring the server's refreshed rich metadata.
+        previous = merge_catalog(previous, load_previous(args.previous))
     rows = merge_catalog(previous, collect())
     now = datetime.datetime.now(datetime.timezone.utc)
     rows.sort(key=lambda row: min(row['year'], now.year), reverse=True)

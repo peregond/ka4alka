@@ -8,13 +8,15 @@ permissions:
   actions: read
 concurrency:
   group: publish-catalog-app-0.40.13
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   catalog:
     uses: ./.github/workflows/catalog-daily.yml
     with:
-      detail_limit: '1000'
-      metadata_budget_seconds: '600'
+      # Reuse the metadata already refreshed for this publication; daily runs
+      # retain their normal 1000-record / 600-second enrichment budget.
+      detail_limit: '0'
+      metadata_budget_seconds: '0'
     secrets: inherit
   application:
     needs: catalog
