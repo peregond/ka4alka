@@ -47,6 +47,7 @@ internal static class Program
         var expected=Environment.GetEnvironmentVariable("KACHALKA_SCREENSHOT_VERSION")??"0.40.18";
         if(version!=expected)throw new InvalidOperationException("Screenshot driver requires the public "+expected+" assembly, got "+version);
         var state=Path.Combine(outputDirectory,"isolated-state-"+Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(state);
         var downloads=Path.Combine(Path.GetPathRoot(state)!,"Ka4alka");Directory.CreateDirectory(downloads);
         Environment.SetEnvironmentVariable("KACHALKA_DATA",state);
         File.WriteAllText(Path.Combine(state,"settings.json"),JsonSerializer.Serialize(new
