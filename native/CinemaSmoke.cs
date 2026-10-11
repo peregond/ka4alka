@@ -66,8 +66,11 @@ public partial class MainWindow
             await File.WriteAllTextAsync(Path.Combine(output,"portrait-missing.json"),JsonSerializer.Serialize(missing));throw new Exception("Cached person photograph missing: "+JsonSerializer.Serialize(missing));
         }
         designFixedViewport=true;MaxWidth=2000;MaxHeight=1200;MinWidth=1440;Width=1440;Height=900;await Task.Delay(150);Shot("person-wide");AssertPersonPageLayout(false);AssertPersonFilmGrid();var stallStart=(hero:heroLayouts,bio:biographyUpdates,resize:windowResizes,compact:compactLayouts);var narrowDone=false;
+        var layoutPasses=0;var operations=new System.Collections.Concurrent.ConcurrentDictionary<string,int>();
+        LayoutUpdated+=(_,_)=>Interlocked.Increment(ref layoutPasses);
+        Dispatcher.Hooks.OperationCompleted+=(_,args)=>operations.AddOrUpdate(args.Operation.Priority.ToString(),1,(_,count)=>count+1);
         new Thread(()=>{Thread.Sleep(20000);if(Volatile.Read(ref narrowDone))return;try{File.WriteAllText(Path.Combine(output,"error.txt"),
-            $"Narrow person layout never settled: hero layouts {heroLayouts-stallStart.hero}, biography updates {biographyUpdates-stallStart.bio}, window resizes {windowResizes-stallStart.resize}, compact layouts {compactLayouts-stallStart.compact}, last hero layout {heroLayoutTrace}");}catch(IOException){}}){IsBackground=true}.Start();
+            $"Narrow person layout never settled: hero layouts {heroLayouts-stallStart.hero}, biography updates {biographyUpdates-stallStart.bio}, window resizes {windowResizes-stallStart.resize}, compact layouts {compactLayouts-stallStart.compact}, last hero layout {heroLayoutTrace}, window layout passes {Volatile.Read(ref layoutPasses)}, dispatcher operations {string.Join(", ",operations.Select(x=>x.Key+" "+x.Value))}");}catch(IOException){}}){IsBackground=true}.Start();
         MinWidth=620;Width=620;Height=720;await Task.Delay(150);
         // The caption-less window finishes a resize over more than one dispatcher turn; let its layout settle.
         for(var pass=0;pass<3;pass++){UpdateLayout();await Dispatcher.InvokeAsync(()=>{},System.Windows.Threading.DispatcherPriority.ContextIdle);}
