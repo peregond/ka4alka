@@ -12,7 +12,7 @@ on:
         default: true
   push:
     branches: [release/0.37.0, release/0.38.0, release/0.39.0, release/0.40.0, release/0.40.1, release/0.40.2, release/0.40.3, release/0.40.4, release/0.40.5, release/0.40.6, release/0.40.7, release/0.40.8, release/0.40.9, release/0.40.10, release/0.40.11, release/0.40.12]
-    paths: [.github/workflows/release.yml, 'native/**', 'lan-core/**', 'lan-tests/**', 'update-core/**', 'updater/**', 'update-tests/**', 'tests/**', 'installer/**', build-release.ps1, package-release.ps1]
+    paths: [.github/workflows/release.yml, 'native/**', 'lan-core/**', 'lan-tests/**', 'update-core/**', 'updater/**', 'update-tests/**', 'tests/**', 'installer/**', scripts/bundle-catalog.py, scripts/test-bundle-catalog.py, scripts/catalog_snapshot.py, scripts/catalog_collections.py, scripts/refresh-library.py, scripts/catalog-collections.json, build-release.ps1, package-release.ps1]
 permissions:
   contents: write
   actions: read
@@ -36,16 +36,47 @@ jobs:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
           restore-keys: nuget-${{ runner.os }}-
-      # The pull request's "Windows release validation" already ran the live source
-      # probes and the full test suite. When it passed on exactly this tree (the PR
-      # branch is always made from main), those steps are not repeated here; the
-      # package, its window-size check and the upgrade from the published version are.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify text catalog packaging
+        run: python scripts/test-bundle-catalog.py
+      - name: Bundle the verified daily text catalog for this release
+        id: bundled
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $download=Join-Path $env:RUNNER_TEMP 'kachalka-bundled-catalog'
+          New-Item -ItemType Directory -Force $download | Out-Null
+          gh release download catalog-data --repo $env:GITHUB_REPOSITORY --pattern manifest.json --dir $download
+          if($LASTEXITCODE -ne 0){throw 'Cannot download the required catalog manifest'}
+          $manifest=Join-Path $download 'manifest.json'
+          $archiveName=python scripts/catalog_snapshot.py --asset-name $manifest
+          if($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($archiveName)){throw 'Catalog manifest has no trusted snapshot asset'}
+          gh release download catalog-data --repo $env:GITHUB_REPOSITORY --pattern $archiveName --dir $download
+          if($LASTEXITCODE -ne 0){throw 'Cannot download the verified catalog snapshot'}
+          $resources=@('web-index/app/data/seed.json','web-index/app/data/starter.json','scripts/catalog-collections.json')
+          $before=@($resources | ForEach-Object {(Get-FileHash $_ -Algorithm SHA256).Hash}) -join ':'
+          python scripts/bundle-catalog.py --manifest $manifest --archive (Join-Path $download $archiveName) --output-dir web-index/app/data --collections-output scripts/catalog-collections.json
+          if($LASTEXITCODE -ne 0){throw 'Daily text catalog cannot be bundled safely'}
+          $after=@($resources | ForEach-Object {(Get-FileHash $_ -Algorithm SHA256).Hash}) -join ':'
+          $changed=$before -ne $after
+          "changed=$($changed.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+          "Bundled verified daily text catalog. Embedded resources changed: $changed." >> $env:GITHUB_STEP_SUMMARY
+      # A passed suite for HEAD can be reused only when the bundled resources
+      # still match that checkout. A newer daily snapshot requires every check.
       - name: Find a passed Windows validation of this exact tree
         id: tested
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          if('${{ steps.bundled.outputs.changed }}' -ne 'false'){
+            'Bundled catalog resources changed outside the committed tree; running every Windows check.' >> $env:GITHUB_STEP_SUMMARY
+            'verified=false' >> $env:GITHUB_OUTPUT
+            exit 0
+          }
           $tree=git rev-parse 'HEAD^{tree}'
           $runs=gh api ("repos/${{ github.repository }}/actions/workflows/windows.yml/runs?status=success&per_page=30") --jq '.workflow_runs[].head_sha'
           $verified=$false

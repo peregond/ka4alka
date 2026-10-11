@@ -56,7 +56,7 @@ public partial class MainWindow
         if(profiles.Length==0&&pages.Length==0&&ids.Length==0)yield return people[0];
     }
     CinemaPerson[] KnownSearchPeople(string term)=>MergePeopleSearch(term,
-        liveItems.Concat(prefs.LiveFavorites).Concat(catalogIndex.Recent("Фильмы",200)).Concat(catalogIndex.Recent("Сериалы",200))
+        liveItems.Concat(prefs.LiveFavorites).Concat(sharedCatalog.All).Concat(BundledCatalog.All).Concat(catalogIndex.Recent("Фильмы",200)).Concat(catalogIndex.Recent("Сериалы",200))
         .SelectMany(item=>item.People),[]);
 
     void CancelPeopleSearch(bool clear=false)
@@ -82,6 +82,10 @@ public partial class MainWindow
             try
             {
                 await Task.Yield();
+                await sharedCatalog.RestoreAsync(request.Token);
+                if(request.IsCancellationRequested||!ReferenceEquals(peopleSearchRequest,request))return;
+                peopleSearchItems=MergePeopleSearch(term,peopleSearchItems,KnownSearchPeople(term));
+                if(!closed&&current==null&&activePerson==null&&SearchActive&&submittedQuery==query&&(section is "Фильмы" or "Сериалы"))RenderCatalogKeepingPosition();
                 IReadOnlyList<CinemaPerson> remote=peopleSearchProvider!=null?
                     await peopleSearchProvider(query,request.Token).WaitAsync(request.Token):
                     await new ProfessionalCinemaPeople(sourceClient).SearchPeople(query,request.Token).WaitAsync(request.Token);

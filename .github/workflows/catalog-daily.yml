@@ -3,6 +3,15 @@ on:
   schedule:
     - cron: '0 5 * * *'
   workflow_dispatch:
+    inputs:
+      detail_limit:
+        description: Maximum daily detail lookups (0..1000)
+        default: '1000'
+        required: false
+      metadata_budget_seconds:
+        description: Time budget for starting detail requests (0..1200 seconds)
+        default: '600'
+        required: false
 permissions:
   contents: write
 concurrency:
@@ -11,15 +20,48 @@ concurrency:
 jobs:
   catalog:
     runs-on: windows-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - name: Check collector
         run: |
           python scripts/test-refresh-library.py
           python scripts/test-library-metadata.py
+          python scripts/test-catalog-text.py
+          python scripts/test-catalog-snapshot.py
+          python scripts/test-catalog-collections.py
+      - name: Restore the last complete library before adding new titles
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          New-Item -ItemType Directory -Force catalog-previous | Out-Null
+          $release=gh api "repos/$env:GITHUB_REPOSITORY/releases/tags/catalog-data" 2>&1
+          if($LASTEXITCODE -ne 0){
+            if(($release | Out-String) -notmatch 'HTTP 404'){throw 'Previous publication is unavailable; refusing to reset the accumulated library'}
+            Copy-Item web-index/app/data/seed.json catalog-previous/catalog.json
+          } else {
+            $publication=($release -join "`n") | ConvertFrom-Json
+            if(@($publication.assets | Where-Object name -eq 'manifest.json').Count -gt 0){
+              gh release download catalog-data --pattern manifest.json --dir catalog-previous
+              if($LASTEXITCODE -ne 0){throw 'Cannot restore the previous manifest; leaving published data unchanged'}
+              $snapshotName=python scripts/catalog_snapshot.py --asset-name catalog-previous/manifest.json
+              if($LASTEXITCODE -ne 0){throw 'Previous manifest is invalid; refusing to reset the accumulated library'}
+              gh release download catalog-data --pattern $snapshotName --dir catalog-previous
+              if($LASTEXITCODE -ne 0){throw 'Cannot restore the immutable previous snapshot'}
+              python scripts/catalog_snapshot.py --restore catalog-previous/manifest.json (Join-Path catalog-previous $snapshotName) catalog-previous/catalog.json
+              if($LASTEXITCODE -ne 0){throw 'Previous snapshot failed validation; leaving published data unchanged'}
+            } else {
+              # Compatibility with publications made before immutable snapshots existed.
+              gh release download catalog-data --pattern catalog.json --dir catalog-previous
+              if($LASTEXITCODE -ne 0){throw 'Cannot restore the previous library; leaving published data unchanged'}
+            }
+          }
       - name: Collect current films and series
-        run: python scripts/refresh-library.py --output catalog-output/catalog.json
+        env:
+          CATALOG_DETAIL_LIMIT: ${{ inputs.detail_limit || '1000' }}
+          CATALOG_METADATA_BUDGET: ${{ inputs.metadata_budget_seconds || '600' }}
+        run: python scripts/refresh-library.py --previous catalog-previous/catalog.json --output catalog-output/catalog.json --detail-limit $env:CATALOG_DETAIL_LIMIT --metadata-budget-seconds $env:CATALOG_METADATA_BUDGET
       - name: Publish complete library independently of application updates
         shell: pwsh
         env:
@@ -31,10 +73,23 @@ jobs:
             gh release create $tag --target $env:GITHUB_SHA --title 'Обновляемая библиотека' --notes 'Общий каталог автоматически обновляется ежедневно около 05:00 UTC. Он содержит только метаданные фильмов и сериалов и не требует обновления приложения.' --latest=false
             if($LASTEXITCODE -ne 0){throw 'Cannot create shared catalog release'}
           }
+          $immutable=@(Get-ChildItem catalog-output -Filter 'catalog-*.json.gz')
+          if($immutable.Count -ne 1){throw 'Expected one immutable compressed text snapshot'}
+          gh release upload $tag ($immutable[0].FullName)
+          if($LASTEXITCODE -ne 0){throw 'Cannot publish immutable snapshot'}
+          gh release download $tag --pattern ($immutable[0].Name) --dir snapshot-verified
+          if($LASTEXITCODE -ne 0){throw 'Cannot verify immutable snapshot'}
+          if((Get-FileHash $immutable[0].FullName).Hash -ne (Get-FileHash (Join-Path snapshot-verified $immutable[0].Name)).Hash){throw 'Snapshot readback checksum mismatch'}
           gh release upload $tag catalog-output/catalog.json --clobber
-          if($LASTEXITCODE -ne 0){throw 'Cannot publish catalog'}
+          if($LASTEXITCODE -ne 0){throw 'Cannot publish legacy catalog alias'}
           gh release download $tag --pattern catalog.json --dir catalog-verified
           if($LASTEXITCODE -ne 0){throw 'Cannot verify published catalog'}
           if((Get-FileHash catalog-output/catalog.json).Hash -ne (Get-FileHash catalog-verified/catalog.json).Hash){throw 'Catalog readback checksum mismatch'}
+          # Switch the manifest only after the immutable download and alias have passed readback checks.
+          gh release upload $tag catalog-output/manifest.json --clobber
+          if($LASTEXITCODE -ne 0){throw 'Cannot publish catalog manifest'}
+          gh release download $tag --pattern manifest.json --dir catalog-verified
+          if($LASTEXITCODE -ne 0){throw 'Cannot verify catalog manifest'}
+          if((Get-FileHash catalog-output/manifest.json).Hash -ne (Get-FileHash catalog-verified/manifest.json).Hash){throw 'Manifest readback checksum mismatch'}
           $feed=Get-Content catalog-verified/catalog.json -Raw | ConvertFrom-Json
           "Published $($feed.items.Count) entries, generated $($feed.generatedAtUtc)." >> $env:GITHUB_STEP_SUMMARY
