@@ -269,15 +269,23 @@ public partial class MainWindow
             catch(Exception error){Feedback(diagnosticNotice,"Не удалось скопировать логи: "+error.Message,true);}
             finally{copyingReport=false;}
         }));
-        diagnosticActions.Children.Add(ActionButton("Сообщить об ошибке","IconInfo",()=>
+        diagnostics.Children.Add(Text("Скопируй логи и приложи их к сообщению в чате поддержки.",11,true));
+        var community=Card("Новости и поддержка","Новости Качалки и помощь сообщества в Telegram.","IconBell");
+        var communityActions=new WrapPanel();community.Children.Add(communityActions);
+        var communityNotice=Notice(community);
+        void OpenTelegram(string url)
         {
-            try{ShowBugReport();}
-            catch(Exception error){Feedback(diagnosticNotice,"Не удалось открыть форму: "+error.Message,true);}
-        }));
-        diagnostics.Children.Add(Text("Отчёт отправляется только вручную — приложение само его никуда не отправляет.",11,true));
+            try{System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url){UseShellExecute=true});}
+            catch(Exception){Feedback(communityNotice,"Не удалось открыть Telegram. Попробуй открыть ссылку в браузере.",true);}
+        }
+        var news=ActionButton("Новости в Telegram","IconBell",()=>OpenTelegram("https://t.me/ka4alkacc"));
+        news.ToolTip="https://t.me/ka4alkacc";AutomationProperties.SetName(news,"Новости в Telegram");communityActions.Children.Add(news);
+        var help=ActionButton("Сообщить об ошибке","IconHelp",()=>OpenTelegram("https://t.me/+6sT2ocaKvLxlNmRi"));
+        help.ToolTip="Открыть чат поддержки в Telegram";AutomationProperties.SetName(help,"Сообщить об ошибке");communityActions.Children.Add(help);
+
         // Sections run from what people change often to what they set once or open when something goes wrong;
         // on wide windows the list on the left groups them the same way and jumps between the cards.
-        var groups=new (string Caption,string[] Sections)[]{("Основное",["Загрузки","Внешний вид","Каталог","Уведомления"]),("Система",["Устройства в сети","Запуск и Windows","Обновления"]),("Обслуживание",["Кэш","Помощь и диагностика"])};
+        var groups=new (string Caption,string[] Sections)[]{("Основное",["Загрузки","Внешний вид","Каталог","Уведомления"]),("Система",["Устройства в сети","Запуск и Windows","Обновления"]),("Обслуживание",["Новости и поддержка","Кэш","Помощь и диагностика"])};
         var wanted=groups.SelectMany(group=>group.Sections).ToArray();
         foreach(var name in wanted.Reverse())if(sectionFrames.TryGetValue(name,out var frame)){content.Children.Remove(frame);content.Children.Insert(0,frame);}
         Button? activeSection=null;
