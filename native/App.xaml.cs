@@ -70,6 +70,7 @@ public partial class App : Application
                 catch(Exception error){System.IO.Directory.CreateDirectory(e.Args[1]);System.IO.File.WriteAllText(System.IO.Path.Combine(e.Args[1],"error.txt"),error.ToString());window.Close();}
             };
         }
+        RegisterSmoke("--startup-performance-smoke-test",window.StartupPerformanceSmokeTest);
         RegisterSmoke("--cover-viewport-smoke-test",window.CoverViewportSmokeTest);
         RegisterSmoke("--catalog-navigation-smoke-test",window.CatalogNavigationSmokeTest);
         RegisterSmoke("--release-freshness-smoke-test",window.ReleaseFreshnessSmokeTest);

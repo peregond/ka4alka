@@ -75,12 +75,11 @@ public partial class MainWindow
         try
         {
             await releaseSlots.WaitAsync(token);entered=true;
-            async Task<MediaItem> Resolved(CancellationToken ct)
+            Task<MediaItem> Resolved(CancellationToken ct)
             {
-                // An IMDb-only title is searched by the name it already has; TVmaze text must not delay the trackers.
-                if(ImdbSuggestions.IsImdbOnly(item))return item;
-                try{return await detailTask.WaitAsync(TimeSpan.FromSeconds(8),ct);}
-                catch(TimeoutException){return item;}
+                ct.ThrowIfCancellationRequested();
+                // Descriptions and cast can be slow. Trackers can search the known title immediately.
+                return Task.FromResult(detailTask.IsCompletedSuccessfully?detailTask.Result:item);
             }
             // Supplement cached/indexed rows concurrently: a single screen copy must not suppress better sources.
             // The online index only knows catalog titles; an IMDb-only title goes straight to the trackers.

@@ -37,7 +37,7 @@ public partial class MainWindow:Window
             }
         };
         catalogRefreshTimer.Start();
-        ContentRendered+=(_,_)=>{_=MaintainCacheAsync();_=RefreshSharedCatalogAsync();};
+        ContentRendered+=(_,_)=>{_=RestoreCatalogIndexAsync();_=MaintainCacheAsync();_=RefreshSharedCatalogAsync();};
         EnableAdaptiveLayout();
         EnableShortcuts();InitializeDownloadDrop();
         try{downloads=new(null,prefs.MaxDownloadKbps,prefs.MaxUploadKbps);}catch(Exception e){downloads=newEmpty(prefs.MaxDownloadKbps,prefs.MaxUploadKbps);Status.Text="Не удалось прочитать очередь: "+e.Message;}
@@ -50,6 +50,12 @@ public partial class MainWindow:Window
         Closing+=OnClosing;ready=true;ApplyLiteMode();ApplyTheme();ApplyCompactLayout();Render();
     }
     static DownloadService newEmpty(int down,int up){var path=Path.Combine(Preferences.DataDir,"queue.json");if(File.Exists(path))File.Move(path,path+".unreadable-"+DateTime.Now.Ticks);return new(null,down,up);}
+    async Task RestoreCatalogIndexAsync()
+    {
+        try{await catalogIndex.RestoreAsync(metadataLifetime.Token);}
+        catch(OperationCanceledException) when(metadataLifetime.IsCancellationRequested){}
+        catch(Exception error){if(!closed)ErrorLog.Write(error);}
+    }
     Task RefreshSharedCatalogAsync(bool force=false)
     {
         forceSharedCatalogRefresh|=force;

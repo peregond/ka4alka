@@ -138,7 +138,8 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null,Inde
         };
     }
 
-    public async Task<IReadOnlyList<MediaItem>> Browse(string section,string query,int page,CancellationToken ct)
+    public Task<IReadOnlyList<MediaItem>> Browse(string section,string query,int page,CancellationToken ct)=>Task.Run(()=>BrowseCore(section,query,page,ct),ct);
+    async Task<IReadOnlyList<MediaItem>> BrowseCore(string section,string query,int page,CancellationToken ct)
     {
         var key=SectionKey(section)??throw new ArgumentOutOfRangeException(nameof(section));
         var path="api/catalog?section="+key+"&q="+Uri.EscapeDataString(query.Trim())+"&page="+Math.Clamp(page,1,CatalogPaging.Limit);
@@ -147,7 +148,8 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null,Inde
         return items.EnumerateArray().Take(80).Where(x=>x.ValueKind==JsonValueKind.Object).Select(x=>Media(x,section)).OfType<MediaItem>().DistinctBy(x=>x.Id).ToArray();
     }
 
-    public async Task<CatalogPage> BrowsePage(string section,int page,CancellationToken ct)
+    public Task<CatalogPage> BrowsePage(string section,int page,CancellationToken ct)=>Task.Run(()=>BrowsePageCore(section,page,ct),ct);
+    async Task<CatalogPage> BrowsePageCore(string section,int page,CancellationToken ct)
     {
         var key=SectionKey(section)??throw new ArgumentOutOfRangeException(nameof(section));
         using var json=await Get("api/catalog?section="+key+"&page="+Math.Clamp(page,1,CatalogPaging.Limit),ct);
@@ -157,7 +159,8 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null,Inde
         return new(items,hasNext&&page<CatalogPaging.Limit,[],[]);
     }
 
-    public async Task<MediaItem> Detail(MediaItem item,CancellationToken ct)
+    public Task<MediaItem> Detail(MediaItem item,CancellationToken ct)=>Task.Run(()=>DetailCore(item,ct),ct);
+    async Task<MediaItem> DetailCore(MediaItem item,CancellationToken ct)
     {
         var id=IdFor(item)??throw new InvalidDataException("Карточка не связана с онлайн-индексом.");
         using var json=await Get("api/media?id="+Uri.EscapeDataString(id),ct);
@@ -180,7 +183,8 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null,Inde
 
     // Description, genres and cast of a title found only on IMDb: the site asks TheTVDB for series and TMDB for films.
     // A refusal or a source that is not connected there is an answer about this title, not an outage of the site.
-    public async Task<MediaItem> Title(MediaItem item,CancellationToken ct)
+    public Task<MediaItem> Title(MediaItem item,CancellationToken ct)=>Task.Run(()=>TitleCore(item,ct),ct);
+    async Task<MediaItem> TitleCore(MediaItem item,CancellationToken ct)
     {
         var section=SectionKey(item.Section)??throw new ArgumentOutOfRangeException(nameof(item));
         if(item.ImdbId==null||!Regex.IsMatch(item.ImdbId,@"^tt\d{5,10}$"))throw new InvalidDataException("У карточки нет идентификатора IMDb.");

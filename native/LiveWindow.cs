@@ -34,7 +34,7 @@ public partial class MainWindow
     CancellationTokenSource? liveRequest;
     readonly Dictionary<int,IReadOnlyList<SourceEntry>> liveReleases=[];
     readonly HashSet<int> cachedReleaseViews=[];
-    readonly CatalogIndex catalogIndex=new(Preferences.DataDir);
+    readonly CatalogIndex catalogIndex=new(Preferences.DataDir,deferRestore:true);
     readonly HashSet<int> requestedDetails=[];
     readonly Dictionary<int,Task<MediaItem>> cardMetadata=[];
     readonly MetadataScheduler metadataScheduler=new();
@@ -198,7 +198,7 @@ public partial class MainWindow
         StartCatalogQualityCheck(rawPage);
         var cards=rawPage.Where(CatalogQualityMatches).ToArray();
         ShowCatalog(cards);
-        var list=catalogList!;
+        var list=catalogList!;list.Opacity=liveLoading&&cards.Length>0?.65:1;
         Body.Children.Remove(list);ScrollViewer.SetVerticalScrollBarVisibility(list,ScrollBarVisibility.Disabled);ScrollViewer.SetHorizontalScrollBarVisibility(list,ScrollBarVisibility.Disabled);WheelScroll.SetIsEnabled(list,false);
         // The scroll viewer extends 6 px past the gutter so hover rings and focus rings are not clipped.
         var content=new StackPanel{Margin=new(6,6,6,0)};RenderPeopleSearchResults(content,false);
@@ -295,7 +295,7 @@ public partial class MainWindow
         liveRequest?.Cancel();liveRequest?.Dispose();liveRequest=new();var token=liveRequest.Token;liveLoading=true;liveError="";
         var request=liveRequest;var selection=CatalogSelection;var forceRefresh=catalogRefreshRequested;catalogRefreshRequested=false;
         bool IsCurrent()=>ReferenceEquals(liveRequest,request)&&!token.IsCancellationRequested&&liveKey==key&&submittedQuery==query;
-        liveItems=[];catalogHasNext=false;
+        if(!forceRefresh){liveItems=[];catalogHasNext=false;}
         var cacheKey=category+"|"+selection.Filter+"|"+page+(selection.Region.Length>0?"|region:"+selection.Region+"|home:"+CatalogRegions.HomeCountry(selection.HomeCountry):"")+(selection.Collection.StartsWith("seasonal:",StringComparison.Ordinal)?"|"+selection.Collection:"");
         await Task.Yield();
         try
@@ -341,7 +341,7 @@ public partial class MainWindow
             }
             else
             {
-                await sharedCatalog.RestoreAsync(token);
+                await Task.WhenAll(sharedCatalog.RestoreAsync(token),catalogIndex.RestoreAsync(token));
                 var result=await UnifiedSearch.FindAsync(query,
                     (kind,t)=>searchProvider!=null?searchProvider(kind,query,t):CatalogBatches.ReadPage(c=>onlineIndex.Browse(kind,query,1,c),c=>new LiveCatalog(sourceClient).Browse(kind,query,1,c),false,t),
                     kind=>catalogIndex.Search(kind,query).Concat(sharedCatalog.Search(kind,query)).Concat(BundledCatalog.Search(kind,query)).ToArray(),token,

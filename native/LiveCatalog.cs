@@ -30,7 +30,8 @@ public sealed class LiveCatalog(SourceClient client)
         }
         return new(rows,hasNext&&page<CatalogPaging.Limit,Choices("genre"),Choices("country"));
     }
-    public async Task<CatalogPage> BrowsePage(string section,int page,CatalogSelection selection,CancellationToken ct,bool forceRefresh=false)
+    public Task<CatalogPage> BrowsePage(string section,int page,CatalogSelection selection,CancellationToken ct,bool forceRefresh=false)=>Task.Run(()=>BrowsePageCore(section,page,selection,ct,forceRefresh),ct);
+    async Task<CatalogPage> BrowsePageCore(string section,int page,CatalogSelection selection,CancellationToken ct,bool forceRefresh=false)
     {
         var path=section=="Сериалы"?"/tvseries":"/movies";
         var filter=selection.Filter;
@@ -65,7 +66,8 @@ public sealed class LiveCatalog(SourceClient client)
             return new MediaItem(id,title,section,"",year,"—","—","#526B69"){PageUrl=url,ImageUrl=n.SelectSingleNode(".//meta[@itemprop='image']")?.GetAttributeValue("content","")};
         }).Where(x=>x!=null).Cast<MediaItem>().Take(CatalogPaging.SourceSize).ToArray();
     }
-    public async Task<IReadOnlyList<MediaItem>> Browse(string section,string query,int page,CancellationToken ct)
+    public Task<IReadOnlyList<MediaItem>> Browse(string section,string query,int page,CancellationToken ct)=>Task.Run(()=>BrowseCore(section,query,page,ct),ct);
+    async Task<IReadOnlyList<MediaItem>> BrowseCore(string section,string query,int page,CancellationToken ct)
     {
         var path=section=="Сериалы"?"/tvseries":"/movies";
         var url=string.IsNullOrWhiteSpace(query)?Base+path+"/filter/sort-date?page="+page:Base+"/search-form?query="+Uri.EscapeDataString(query);
@@ -73,7 +75,8 @@ public sealed class LiveCatalog(SourceClient client)
         try{var bytes=await client.Read(new Uri(url),4*1024*1024,ct);var parsed=Parse(bytes,section);if(parsed.Count>0){System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(cache)!);await CacheFiles.WriteAllBytesAsync(cache,bytes,ct);}return parsed;}
         catch(Exception) when(!ct.IsCancellationRequested&&System.IO.File.Exists(cache)){return Parse(await CacheFiles.ReadAllBytesAsync(cache,ct),section);}
     }
-    public async Task<MediaItem> Detail(MediaItem item,CancellationToken ct)
+    public Task<MediaItem> Detail(MediaItem item,CancellationToken ct)=>Task.Run(()=>DetailCore(item,ct),ct);
+    async Task<MediaItem> DetailCore(MediaItem item,CancellationToken ct)
     {
         var key=Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(item.PageUrl!)));
         var cache=System.IO.Path.Combine(Preferences.DataDir,"details",key+".json");
@@ -162,7 +165,8 @@ public sealed class LiveCatalog(SourceClient client)
         }
         catch(Exception) when(!ct.IsCancellationRequested&&saved!=null){return saved;}
     }
-    public async Task<IReadOnlyList<SourceEntry>> Releases(string title,CancellationToken ct)
+    public Task<IReadOnlyList<SourceEntry>> Releases(string title,CancellationToken ct)=>Task.Run(()=>ReleasesCore(title,ct),ct);
+    async Task<IReadOnlyList<SourceEntry>> ReleasesCore(string title,CancellationToken ct)
     {
         Exception? failure=null;
         foreach(var host in new[]{"rutor.info","rutor.is"})
