@@ -88,7 +88,7 @@ public partial class MainWindow:Window
         Render();
     }
     void ShowDownloads(object sender,RoutedEventArgs e){searchDelay.Stop();section="Загрузки";current=null;activePerson=null;Render();}
-    void PosterResized(object sender,SizeChangedEventArgs e){if(sender is Border poster){if(poster is not PosterFrame&&e.WidthChanged&&e.NewSize.Width>0){var height=e.NewSize.Width*1.5;if(double.IsNaN(poster.Height)||Math.Abs(poster.Height-height)>1)poster.Height=height;}ClipPoster(poster);}}
+    void PosterResized(object sender,SizeChangedEventArgs e){if(sender is Border poster){if(e.WidthChanged&&e.NewSize.Width>0){var height=e.NewSize.Width*1.5;if(double.IsNaN(poster.Height)||Math.Abs(poster.Height-height)>1)poster.Height=height;}ClipPoster(poster);}}
     // Decorative motion follows the Windows "animate controls" setting and is off in smoke tests.
     public static bool MotionAllowed {get;set;}=true;
     static bool Motion=>MotionAllowed&&SystemParameters.ClientAreaAnimation;
