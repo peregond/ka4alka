@@ -2,6 +2,18 @@ using Kachalka;
 
 static class ReleaseSearchTests
 {
+    sealed class AliasHandler:System.Net.Http.HttpMessageHandler
+    {
+        public string? EnglishQuery;
+        protected override Task<System.Net.Http.HttpResponseMessage> SendAsync(System.Net.Http.HttpRequestMessage request,CancellationToken ct)
+        {
+            var uri=request.RequestUri!;
+            var body=uri.Host.StartsWith("rutor.",StringComparison.Ordinal)?"<html><div id='index'></div></html>":uri.Host=="nyaa.si"?"<rss><channel/></rss>":throw new Exception("Unexpected provider: "+uri.Host);
+            if(uri.Host=="nyaa.si")EnglishQuery=Uri.UnescapeDataString(uri.Query);
+            return Task.FromResult(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK){Content=new System.Net.Http.StringContent(body)});
+        }
+    }
+
     sealed class Reporter(Action<ReleaseSearchUpdate> report):IProgress<ReleaseSearchUpdate>{public void Report(ReleaseSearchUpdate value)=>report(value);}
     public static async Task Run()
     {
@@ -45,6 +57,23 @@ static class ReleaseSearchTests
         Check(ReleaseSearch.Distinct([row,row with{Source="Other",Seeds=10}]).Single().Seeds==10,"same torrent from multiple live sources is deduplicated");
         var fallback=row with{Id="other",TorrentUrl="magnet:?xt=urn:btih:"+new string('b',40)};
         Check(ReleaseSearch.WithSaved([fresh],[saved,fallback]).Length==2,"partial source success retains distinct saved alternatives");
+
+        using(var handler=new AliasHandler())
+        using(var client=new SourceClient(handler))
+        {
+            var known=new MediaItem(-34,"Южный парк","Сериалы","",1997,"—","—","#526B69");
+            var aliases=new TaskCompletionSource<MediaItem>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var providers=NativeReleaseSources.Create(client,_=>Task.FromResult(known),true,ct=>aliases.Task.WaitAsync(ct));
+            var english=providers.Single(x=>x.Name=="Nyaa").Search(CancellationToken.None);
+            try
+            {
+                await providers.Single(x=>x.Name=="RuTor").Search(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(2));
+                Check(!english.IsCompleted,"Russian tracker searches finish while an English-only tracker waits for the missing original title");
+            }
+            finally{aliases.TrySetResult(known with{OriginalTitle="South Park"});}
+            await english.WaitAsync(TimeSpan.FromSeconds(2));
+            Check(handler.EnglishQuery?.Contains("South Park",StringComparison.Ordinal)==true,"English source still receives the asynchronously resolved original title");
+        }
 
         var movie=new MediaItem(-33,"Лунный берег","Фильмы","",2026,"—","—","#526B69"){OriginalTitle="Moonrise",PageUrl="https://w6.zona.plus/movies/moonrise"};
         Check(!LiveCatalog.Matches(movie,row with{Source="Internet Archive",Title="Moonrise (2025) 1080p"}),"wrong declared film year is rejected beyond RuTor");

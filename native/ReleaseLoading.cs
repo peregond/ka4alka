@@ -81,10 +81,19 @@ public partial class MainWindow
                 // Descriptions and cast can be slow. Trackers can search the known title immediately.
                 return Task.FromResult(detailTask.IsCompletedSuccessfully?detailTask.Result:item);
             }
+            async Task<MediaItem> Aliases(CancellationToken ct)
+            {
+                // English-only sources need an original title only when the known name is Cyrillic.
+                // Russian providers start immediately and do not join this wait.
+                var known=await Resolved(ct);
+                if(ImdbSuggestions.IsImdbOnly(known)||!string.IsNullOrWhiteSpace(known.OriginalTitle)||!known.Title.Any(c=>c is >= '\u0400' and <= '\u04FF'))return known;
+                try{return await detailTask.WaitAsync(TimeSpan.FromSeconds(8),ct);}
+                catch(TimeoutException){return known;}
+            }
             // Supplement cached/indexed rows concurrently: a single screen copy must not suppress better sources.
             // The online index only knows catalog titles; an IMDb-only title goes straight to the trackers.
             var providers=(ImdbSuggestions.IsImdbOnly(item)?[]:new[]{new ReleaseSource("Онлайн-индекс",ct=>onlineIndex.Releases(item,ct,allowRelay:true))})
-                .Concat(NativeReleaseSources.Create(sourceClient,Resolved,item.Section=="Сериалы"));
+                .Concat(NativeReleaseSources.Create(sourceClient,Resolved,item.Section=="Сериалы",Aliases));
             var settled=false;
             void Apply(ReleaseSearchUpdate update)
             {
