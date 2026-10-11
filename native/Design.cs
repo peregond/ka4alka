@@ -45,6 +45,22 @@ public partial class MainWindow
             else if(e.Key==Key.Escape&&Search.IsKeyboardFocusWithin&&Search.Text.Length>0){ClearSearch(Search,e);e.Handled=true;}
         };
     }
+    // The width an element has while its page's vertical scroll bar is shown, whether or not the bar is shown now.
+    // Columns or a narrow/wide switch based on the plain width can loop: another column shortens the page, the bar
+    // goes away, the wider element takes one more column, the page grows, the bar comes back, and so on. WPF then
+    // never finishes the layout at that window width (the window stops responding to resizes).
+    static double ScrollStableWidth(FrameworkElement element)
+    {
+        if(Environment.GetEnvironmentVariable("KACHALKA_PLAIN_WIDTH")=="1")return element.ActualWidth; // TEMPORARY A/B probe
+        for(var node=VisualTreeHelper.GetParent(element);node!=null;node=VisualTreeHelper.GetParent(node))
+        {
+            if(node is not ScrollViewer scroll||scroll.VerticalScrollBarVisibility!=ScrollBarVisibility.Auto)continue;
+            if(scroll.ComputedVerticalScrollBarVisibility==Visibility.Visible)return element.ActualWidth;
+            var bar=scroll.Template?.FindName("PART_VerticalScrollBar",scroll) as System.Windows.Controls.Primitives.ScrollBar;
+            return Math.Max(0,element.ActualWidth-(bar!=null&&double.IsFinite(bar.Width)?bar.Width:SystemParameters.VerticalScrollBarWidth));
+        }
+        return element.ActualWidth;
+    }
     static void ClipPoster(Border poster)
     {
         if(poster.ActualWidth>0&&poster.ActualHeight>0)poster.Clip=new RectangleGeometry(new Rect(0,0,poster.ActualWidth,poster.ActualHeight),poster.CornerRadius.TopLeft,poster.CornerRadius.TopLeft);

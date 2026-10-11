@@ -143,6 +143,7 @@ public partial class MainWindow
             await Settle();liveKey=CurrentCatalogKey;
             await Size(1760,950);
             Render();await Settle();
+            var windowFrame=await CheckWindowFrame("desktop",Settle,true);
             if(TextOptions.GetTextFormattingMode(this)!=TextFormattingMode.Display||TextOptions.GetTextRenderingMode(this)!=TextRenderingMode.Auto)throw new Exception("Text does not use Windows display metrics and system antialiasing.");
             var wheelScrolling=await CheckWheelScrolling();
             MinWidth=360;MinHeight=300;
@@ -384,7 +385,7 @@ public partial class MainWindow
                 BackgroundTheme=new{Light=backgroundLight,Dark=backgroundDark},
                 TextRendering="Grayscale",TextFormatting="Ideal",FractionalRasterScales=new[]{1.2,1.25,1.5},QualityBadgeOnPoster=true,SeriesPosterAlignment=true,MultilineSeriesMetadataContained=true,
                 SearchAndSettings=searchSettings,
-                UiActions=uiActions,
+                UiActions=uiActions,WindowFrame=windowFrame,
                 WheelScrolling=wheelScrolling,
                 SourceFailureVisible=true,SourceProgressPreservesOpenFilter=true,SourceProgressPreservesScroll=true,SourceRetryState=true,
                 WidthChecks=checks,Screens=new[]{"sources-light","sources-dark","sources-510","search-light","search-dark","search-small","search-minimum","settings-light","settings-dark","settings-small","settings-minimum","catalog-light","catalog-dark","detail-wide-light","detail-wide-dark","detail-720","release-720","detail-510","release-510","short-description-expanded","series-season-filter","downloads-empty","downloads-light","downloads-dark","downloads-510","downloads-360"}

@@ -65,7 +65,7 @@ public partial class MainWindow
             var missing=VisualElements<Image>(Body).Select(x=>new{Photo=AutomationProperties.GetName(x),x.IsLoaded,x.ActualWidth,x.ActualHeight,Bounds=x.TransformToAncestor(Body).TransformBounds(new Rect(new Point(),x.RenderSize)),Tooltip=(VisualTreeHelper.GetParent(VisualTreeHelper.GetParent(x)) as FrameworkElement)?.ToolTip?.ToString()});
             await File.WriteAllTextAsync(Path.Combine(output,"portrait-missing.json"),JsonSerializer.Serialize(missing));throw new Exception("Cached person photograph missing: "+JsonSerializer.Serialize(missing));
         }
-        var fit=FrameVariant=="chrome0-fit";designFixedViewport=true;MaxWidth=2000;MaxHeight=1200;MinWidth=fit?1020:1440;Width=fit?1020:1440;Height=fit?700:900;await Task.Delay(150);Shot("person-wide");AssertPersonPageLayout(false);AssertPersonFilmGrid();var stallStart=(hero:heroLayouts,bio:biographyUpdates,resize:windowResizes,compact:compactLayouts);var narrowDone=false;
+        designFixedViewport=true;MaxWidth=2000;MaxHeight=1200;MinWidth=1440;Width=1440;Height=900;await Task.Delay(150);Shot("person-wide");AssertPersonPageLayout(false);AssertPersonFilmGrid();var stallStart=(hero:heroLayouts,bio:biographyUpdates,resize:windowResizes,compact:compactLayouts);var narrowDone=false;
         var layoutPasses=0;var operations=new System.Collections.Concurrent.ConcurrentDictionary<string,int>();var stallDiagnostics=new LayoutStallDiagnostics(this);
         LayoutUpdated+=(_,_)=>Interlocked.Increment(ref layoutPasses);
         Dispatcher.Hooks.OperationCompleted+=(_,args)=>operations.AddOrUpdate(args.Operation.Priority.ToString(),1,(_,count)=>count+1);
@@ -75,6 +75,17 @@ public partial class MainWindow
         // The caption-less window finishes a resize over more than one dispatcher turn; let its layout settle.
         for(var pass=0;pass<3;pass++){UpdateLayout();await Dispatcher.InvokeAsync(()=>{},System.Windows.Threading.DispatcherPriority.ContextIdle);}
         Volatile.Write(ref narrowDone,true);Shot("person-narrow");AssertPersonPageLayout(true);
+        // Every width around the poster and narrow/wide thresholds must settle. A column count or a narrow/wide switch that
+        // followed the page's own scroll bar used to loop forever at one width (the 620 px client of a caption-less window).
+        MinWidth=540;var unsettled=new List<double>();
+        for(var width=560d;width<=760;width+=6)
+        {
+            Width=width;
+            var idle=Dispatcher.InvokeAsync(()=>{},System.Windows.Threading.DispatcherPriority.ContextIdle).Task;
+            if(await Task.WhenAny(idle,Task.Delay(3000))!=idle)unsettled.Add(width);
+        }
+        if(unsettled.Count>0)throw new Exception("Person page layout never settled at window widths "+string.Join(", ",unsettled)+"\n"+stallDiagnostics.Report());
+        MinWidth=620;Width=620;Height=720;await Task.Delay(150);UpdateLayout();AssertPersonPageLayout(true);
         var film=FindVisual<Button>(Body,x=>AutomationProperties.GetName(x)=="Открыть "+next.Title)??throw new Exception("Filmography action missing.");
         film.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
         if(current?.Id!=next.Id||activePerson!=null)throw new Exception("Film → person → film navigation failed.");
