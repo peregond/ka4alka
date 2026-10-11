@@ -4,7 +4,18 @@ $base='https://ka4alka-online-new.peregon.chatgpt.site/'
 # The endpoint must be the one compiled into the application being released.
 if(-not (Get-Content native/OnlineIndexClient.cs -Raw).Contains('new("'+$base+'")')){throw 'Published site probe differs from the application endpoint'}
 function Read-Api([string]$path){
- $response=Invoke-WebRequest ($base+$path) -TimeoutSec 60 -Headers @{'User-Agent'='Kachalka/0.11'}
+ Write-Host ('Checking public API: '+$path)
+ for($attempt=1;$attempt -le 3;$attempt++){
+  try {
+   $response=Invoke-WebRequest ($base+$path) -TimeoutSec 60 -Headers @{'User-Agent'='Kachalka/0.11'}
+   break
+  } catch {
+   $status=[int]$_.Exception.Response.StatusCode
+   if($attempt -ge 3 -or $status -notin @(408,429,500,502,503,504)){throw}
+   Write-Host ('Public API returned '+$status+'; retrying '+$path+' (attempt '+($attempt+1)+' of 3).')
+   Start-Sleep -Seconds (2*$attempt)
+  }
+ }
  if($response.StatusCode -ne 200 -or $response.Headers.'Content-Type' -notmatch 'application/json'){throw ('Public API did not return JSON: '+$path)}
  return $response.Content | ConvertFrom-Json
 }
