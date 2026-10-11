@@ -89,6 +89,9 @@ public sealed partial class DownloadService
             {
                 token.ThrowIfCancellationRequested();
                 if(item.Paused||item.Busy||item.Completed||!managers.TryGetValue(item.Id,out var manager)||!manager.HasMetadata)continue;
+                // The metadata watch checks this manager after automatic
+                // startup; do not hold the queue gate across its hash check.
+                if(manager.State is TorrentState.Metadata or TorrentState.Starting or TorrentState.Hashing or TorrentState.HashingPaused)continue;
                 if(lastSpaceChecks.TryGetValue(item.Id,out var checkedUtc)&&DateTime.UtcNow-checkedUtc<TimeSpan.FromSeconds(15))continue;
                 SnapshotFiles(item,manager);
                 if(!await EnsureSpaceAsync(item,manager,token))changed=true;
@@ -145,6 +148,13 @@ public sealed partial class DownloadService
             try
             {
                 await manager.WaitForMetadataAsync(stop.Token);
+                // MonoTorrent completes its metadata task before its automatic
+                // startup finishes. Stopping during Starting/Hashing can be
+                // overwritten by that startup's final Downloading transition.
+                // Wait without holding the queue gate so an explicit pause or
+                // shutdown can still cancel/stop metadata discovery normally.
+                while(manager.State is TorrentState.Metadata or TorrentState.Starting or TorrentState.Hashing or TorrentState.HashingPaused)
+                    await Task.Delay(25,stop.Token);
                 await gate.WaitAsync(stop.Token);
                 try
                 {
