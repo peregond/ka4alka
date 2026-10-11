@@ -89,6 +89,7 @@ await PersonProfileLoadingTests.Run();
 await ProfessionalCinemaPeopleTests.Run();
 await UXReliabilityTests.Run(root);
 await WindowsIntegrationTests.Run();
+await ShareLinkTests.Run();
 await WindowsNotificationTests.Run();
 DownloadDiagnosticsTests.Run();
 DownloadSpaceTests.Run(root);

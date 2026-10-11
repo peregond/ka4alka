@@ -50,7 +50,10 @@ try {
   # Native activation also works when accessibility includes a mnemonic in Name.
   $next=[InstallerScreen]::GetDlgItem($process.MainWindowHandle,1)
   if($null -ne $guide -and $next -ne [IntPtr]::Zero){$finish=[System.Windows.Automation.AutomationElement]::FromHandle($next);break}
-  if($next -ne [IntPtr]::Zero -and [InstallerScreen]::IsWindowEnabled($next)){
+  # The finish page is recognised natively by its launch checkbox: when UI Automation exposes the guide a beat
+  # late, another click on IDOK there would press Finish and close the installer before the checks.
+  $onFinish=[InstallerScreen]::FindRunCheckbox($process.MainWindowHandle) -ne [IntPtr]::Zero
+  if(-not $onFinish -and $next -ne [IntPtr]::Zero -and [InstallerScreen]::IsWindowEnabled($next)){
    [InstallerScreen]::SendMessage($next,0x00F5,[IntPtr]::Zero,[IntPtr]::Zero) | Out-Null
   }
   Start-Sleep -Milliseconds 250

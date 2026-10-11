@@ -187,9 +187,11 @@ public partial class MainWindow
             Render();await Settle();
             void CheckSeriesLayout()
             {
-                // The year and genre line lives in the poster's hover overlay, not under the title.
+                // Under each title a steady line holds the year and one genre; hovering a poster adds no text over it.
                 var genres=VisualElements<TextBlock>(Body).Where(x=>x.Name=="CardGenreText").ToArray();
-                if(genres.Length==0||genres.Any(x=>x.Text.Contains('\n')||x.Text.Contains('\r')||x.TextWrapping!=TextWrapping.NoWrap||(x.Parent as FrameworkElement)?.Parent is not Border{Name:"PosterHover"}))throw new Exception("Series genres must be one line inside the poster hover overlay.");
+                if(genres.Length==0||genres.Any(x=>x.Text.Contains('\n')||x.Text.Contains('\r')||x.Text.Contains(',')||x.TextWrapping!=TextWrapping.NoWrap||x.Parent is not StackPanel{} card||card.Children.IndexOf(x)<1||card.Children[card.Children.IndexOf(x)-1] is not TextBlock{Name:"CardTitleText"}))
+                    throw new Exception("Under each poster title there must be one line with the year and a single genre: "+string.Join(" | ",genres.Take(4).Select(x=>x.Text)));
+                if(VisualElements<Border>(Body).Any(x=>x.Name=="PosterHover"))throw new Exception("Posters must not show text over the cover on hover.");
                 var posters=VisualElements<Border>(discoveryShelf!).Where(x=>x.Name=="CardPoster").Select(x=>x.TransformToAncestor(discoveryShelf!).TransformBounds(new Rect(new Point(),x.RenderSize))).ToArray();
                 if(posters.Length<2||posters.Max(x=>x.Top)-posters.Min(x=>x.Top)>1||posters.Max(x=>x.Height)-posters.Min(x=>x.Height)>1)throw new Exception("Series shelf posters are not aligned at the top.");
                 // The first card of a shelf and of the catalog grid keeps its whole hover ring.

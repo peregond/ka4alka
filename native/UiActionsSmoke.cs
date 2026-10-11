@@ -85,6 +85,19 @@ public partial class MainWindow
             current=null;Render();UpdateLayout();
             banner=About();banner.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
             Check(current?.Id==featured.Id,"Keyboard activation of the carousel action did not open the same media card.");
+            // A kachalka:// link inside a message pasted into the search opens its card; the card's share button copies the link back.
+            var sharedFixture=DownloadMetadata.Card(new(){MediaTitle="Общая ссылка: проверка",MediaSection="Фильмы",MediaPageUrl=LiveCatalog.Base+"/movies/share-link-smoke",MediaYear=2026})!;
+            cardMetadata[sharedFixture.Id]=Task.FromResult(sharedFixture);requestedDetails.Add(sharedFixture.Id);liveReleases[sharedFixture.Id]=[];
+            var sharedLink=ShareLink.Create(sharedFixture)??throw new Exception("A catalog film has no share link.");
+            current=null;Render();UpdateLayout();
+            Search.Text="Посмотри: "+sharedLink;SubmitSearch(Search,new RoutedEventArgs());await Task.Delay(150);UpdateLayout();
+            Check(current is {Title:"Общая ссылка: проверка",Section:"Фильмы",Year:2026}&&current.PageUrl==sharedFixture.PageUrl&&Search.Text.Length==0&&!SearchActive,"A share link submitted in the search did not open its card: "+current?.Title+" "+current?.PageUrl);
+            var share=FindVisual<Button>(Body,b=>b.Name=="DetailShare")??throw new Exception("The film card has no share button.");
+            Check(AutomationProperties.GetName(share)=="Поделиться"&&share.IsVisible,"The share button is not visible or not named for screen readers.");
+            share.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            string? copied=null;try{copied=Clipboard.GetText();}catch(System.Runtime.InteropServices.COMException){}
+            Check(Status.Text.StartsWith("Ссылка на «Общая ссылка: проверка» скопирована",StringComparison.Ordinal)&&copied==sharedLink||Status.Text.StartsWith("Не удалось скопировать ссылку",StringComparison.Ordinal),"The share button did not copy the card's link: "+Status.Text+" / "+copied);
+            Shot(this,"share-link-card-dark");
             section="Настройки";current=null;Render();UpdateLayout();
             checkingUpdate=false;updateOffer=null;preparedUpdateJob=null;UpdateStatus("Проверка ещё не выполнялась.");
             Check(updateActionButton is {IsEnabled:true}&&Equals(updateActionButton.Content,"Проверить обновления"),"Initial update action is not Check.");
@@ -114,7 +127,7 @@ public partial class MainWindow
                 Check(VisualElements<Button>(setup).Any(b=>AutomationProperties.GetName(b)=="Разрешить Качалку в брандмауэре"),"First-run setup is missing its explicit firewall action.");
                 Check(VisualElements<TextBlock>(setup).Any(b=>b.Text==prefs.Folder),"First-run setup does not show the chosen download folder.");Shot(setup,"first-run-dark");
             }
-            return new{NativeMouseMenuToggle=true,MenuDismissAnimations=new[]{"None","Fade"},MenuOutsideDismiss=true,KeyboardMenuToggle=true,WholeBannerOpensCard=true,KeyboardBanner=true,SingleUpdateAction=true,UpdateRetry=true,ReadyStatePreserved=true,FirstRunFirewallOptIn=true,StartupSwitchWorks=true};
+            return new{NativeMouseMenuToggle=true,MenuDismissAnimations=new[]{"None","Fade"},MenuOutsideDismiss=true,KeyboardMenuToggle=true,WholeBannerOpensCard=true,KeyboardBanner=true,ShareLinkOpensCard=true,ShareButtonCopiesLink=true,SingleUpdateAction=true,UpdateRetry=true,ReadyStatePreserved=true,FirstRunFirewallOptIn=true,StartupSwitchWorks=true};
         }
         finally
         {
