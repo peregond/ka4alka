@@ -33,17 +33,21 @@ public static class ReleaseFreshness
         var upstream=FromIndex(entry)||!string.IsNullOrWhiteSpace(entry.Via)?" Дата обновления на самом трекере неизвестна.":"";
         return origin+(received.HasValue?" получены "+received.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm",CultureInfo.InvariantCulture):": время получения неизвестно")+"."+upstream+" "+ConnectionNote;
     }
+    public static string AudioTrack(SourceEntry entry)
+    {
+        var types=ReleaseAudio.TypeNames(entry);
+        var label=RussianAudio.Rank(entry)==3
+            ? "Русская"+(types.Count==0?"":" · "+string.Join(" / ",types).ToLowerInvariant())
+            : entry.Voice;
+        return label;
+    }
     public static string Audio(SourceEntry entry)
     {
-        if(RussianAudio.Rank(entry)!=3)return entry.Voice;
-        return entry.Voice switch
-        {
-            "Дубляж"=>"Русская · дубляж",
-            "Многоголосая"=>"Русская · многоголосая",
-            "Оригинал"=>"Русская / оригинал",
-            _=>"Русская"
-        };
+        var label=AudioTrack(entry);
+        var studios=ReleaseAudio.StudioNames(entry);
+        return studios.Count==0?label:(label=="Не указано"?"":label+" · ")+string.Join(" / ",studios);
     }
+
     public static string SourceStateText(SourceCheck check,DateTime now)
     {
         var state=check.State switch

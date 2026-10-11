@@ -19,7 +19,7 @@ public partial class MainWindow
         var now=DateTime.UtcNow;
         var movie=new MediaItem(-88038,"Данные раздач","Фильмы","драма",2026,"8.1","7.9","#526B69")
             {PageUrl="https://example.invalid/freshness-film",Description="Возраст данных помогает выбрать вариант. Получение ответа источника само по себе не подтверждает подключение к участникам раздачи."};
-        var direct=new SourceEntry("freshness-ui-direct","Данные раздач (2026) WEB-DL 1080p RUS DUB","RuTor","https://example.invalid/private/path?passkey=source-secret","magnet:?xt=urn:btih:"+new string('a',40),null,4_000_000_000,342)
+        var direct=new SourceEntry("freshness-ui-direct","Данные раздач (2026) WEB-DL 1080p RUS DUB [LostFilm]","RuTor","https://example.invalid/private/path?passkey=source-secret","magnet:?xt=urn:btih:"+new string('a',40),null,4_000_000_000,342)
             {DataReceivedUtc=now.AddMinutes(-7),DataProvider="RuTor",Leechers=12};
         var indexed=direct with{Id="freshness-ui-indexed",Source="The Pirate Bay",Title="Freshness Film 1080p ENG subs RUS",TorrentUrl="magnet:?xt=urn:btih:"+new string('b',40),DataReceivedUtc=now,DataProvider="Онлайн-индекс"};
         var legacy=direct with{Id="freshness-ui-legacy",Source="NNM-Club",Title="Данные раздач (2026) WEB-DL 1080p",TorrentUrl="magnet:?xt=urn:btih:"+new string('c',40),DataReceivedUtc=null,DataProvider=null,Seeds=null,Leechers=null};
@@ -65,6 +65,19 @@ public partial class MainWindow
                 toggle=FindVisual<Button>(Body,x=>AutomationProperties.GetName(x)=="Показать состояние источников")!;sourcePanel=FindVisual<StackPanel>(Body,x=>x.Name=="ReleaseSourceDetails")!;
                 toggle.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Settle();
                 Check(sourcePanel.Visibility==Visibility.Collapsed,name+": repeated click did not collapse the source details.");
+                var studio=FindVisual<ComboBox>(Body,x=>AutomationProperties.GetName(x)=="Раздачи: Студия озвучки")!;
+                var audioType=FindVisual<ComboBox>(Body,x=>AutomationProperties.GetName(x)=="Раздачи: Тип озвучки")!;
+                Check(studio.IsVisible&&audioType.IsVisible,name+": audio filters are not visible in the primary row.");
+                studio.SelectedItem="LostFilm";await Settle();
+                Check(VisualElements<Button>(Body).Any(x=>x.Tag is SourceEntry e&&e.Id==direct.Id)
+                    &&!VisualElements<Button>(Body).Any(x=>x.Tag is SourceEntry e&&e.Id==indexed.Id),name+": studio filter did not select the advertised track.");
+                Check(VisualElements<TextBlock>(Body).Any(x=>x.Text=="LostFilm"),name+": studio label is missing from the release card.");
+                audioType.SelectedItem="Оригинал";await Settle();
+                Check(!VisualElements<Button>(Body).Any(x=>x.Tag is SourceEntry),name+": studio and audio type are not combined.");
+                studio.SelectedItem="Все";await Settle();
+                Check(VisualElements<Button>(Body).Any(x=>x.Tag is SourceEntry e&&e.Id==indexed.Id)
+                    &&!VisualElements<Button>(Body).Any(x=>x.Tag is SourceEntry e&&e.Id==direct.Id),name+": original audio filter is incorrect.");
+                audioType.SelectedItem="Все";await Settle();
             }
             File.WriteAllText(Path.Combine(output,"checks.json"),JsonSerializer.Serialize(checks,new JsonSerializerOptions{WriteIndented=true}));
         }

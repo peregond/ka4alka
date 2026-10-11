@@ -64,6 +64,7 @@ if(args.Contains("--cache-only"))return;
 DownloadTests.Run();await ImdbSuggestionTests.Run();
 DownloadFolderTests.Run();
 ReleaseQualityTests.Run();
+ReleaseAudioTests.Run();
 FeaturePosterTests.Run();
 PosterBlurTests.Run();
 AdditionalSourceTests.Run();
