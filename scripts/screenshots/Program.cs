@@ -44,9 +44,10 @@ internal static class Program
     static int StartReleasedApplication()
     {
         var version=typeof(Kachalka.App).Assembly.GetName().Version?.ToString(3);
-        if(version!="0.39.0")throw new InvalidOperationException("Screenshot driver requires the public 0.39.0 assembly, got "+version);
+        var expected=Environment.GetEnvironmentVariable("KACHALKA_SCREENSHOT_VERSION")??"0.40.18";
+        if(version!=expected)throw new InvalidOperationException("Screenshot driver requires the public "+expected+" assembly, got "+version);
         var state=Path.Combine(outputDirectory,"isolated-state-"+Guid.NewGuid().ToString("N"));
-        var downloads=Path.Combine(state,"Downloads","Ka4alka");Directory.CreateDirectory(downloads);
+        var downloads=Path.Combine(Path.GetPathRoot(state)!,"Ka4alka");Directory.CreateDirectory(downloads);
         Environment.SetEnvironmentVariable("KACHALKA_DATA",state);
         File.WriteAllText(Path.Combine(state,"settings.json"),JsonSerializer.Serialize(new
         {
@@ -165,7 +166,7 @@ internal static class Program
         var posters=VisiblePosters(window);
         captures.Add(new{File=filename,Width=width,Height=height,LoadedVisiblePosters=posters.Count(Loaded),PendingVisiblePosters=posters.Count(image=>!Loaded(image)),
             Titles=posters.Where(Loaded).Select(image=>((MediaItem)image.DataContext).Title).Distinct().ToArray()});
-        Console.WriteLine("Captured "+filename+" from actual public 0.39.0 client area.");
+        Console.WriteLine("Captured "+filename+" from actual public "+typeof(Kachalka.App).Assembly.GetName().Version!.ToString(3)+" client area.");
     }
 
     static async Task Capture(Kachalka.App app)
