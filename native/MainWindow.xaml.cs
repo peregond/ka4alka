@@ -145,24 +145,6 @@ public partial class MainWindow:Window
         StyleNav(SavedButton,section=="Сохранённое"||savedReturn!=null&&section!="Настройки");
         StyleNav(SettingsButton,section=="Настройки");
     }
-    // The year, genre and description overlay stays out of layout until a card is hovered; with motion on it fades in.
-    // The cover itself is never scaled, so the whole poster stays visible inside its frame.
-    void PosterHoverIn(object sender,System.Windows.Input.MouseEventArgs e)=>PosterHover(sender,true);
-    void PosterHoverOut(object sender,System.Windows.Input.MouseEventArgs e)=>PosterHover(sender,false);
-    void PosterHover(object sender,bool over)
-    {
-        if(sender is not Button card||FindVisual<Border>(card,border=>border.Name=="PosterHover") is not {} overlay)return;
-        if(over)overlay.Visibility=Visibility.Visible;
-        if(!Motion)
-        {
-            overlay.BeginAnimation(UIElement.OpacityProperty,null);overlay.Opacity=over?1:0;
-            if(!over)overlay.Visibility=Visibility.Collapsed;
-            return;
-        }
-        var fade=new System.Windows.Media.Animation.DoubleAnimation(over?1:0,TimeSpan.FromMilliseconds(200)){EasingFunction=new System.Windows.Media.Animation.CubicEase{EasingMode=System.Windows.Media.Animation.EasingMode.EaseOut}};
-        if(!over)fade.Completed+=(_,_)=>{if(!card.IsMouseOver)overlay.Visibility=Visibility.Collapsed;};
-        overlay.BeginAnimation(UIElement.OpacityProperty,fade);
-    }
     void OpenCard(object sender,RoutedEventArgs e)
     {
         if(section=="Сохранённое"&&current==null&&activePerson==null)savedReturn=new(savedCategory,savedPage,savedScroll?.VerticalOffset??0);

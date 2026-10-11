@@ -91,8 +91,9 @@ public partial class MainWindow
             detailRatings.Children.Add(row);
         }
         Rating("Кинопоиск",item.Kinopoisk);Rating("IMDb",item.Imdb);
-        var traits=string.Join(" · ",new[]{item.Genre,item.Country}.Where(x=>!string.IsNullOrWhiteSpace(x)));
-        if(traits.Length>0)detailMetaRow.Children.Add(new TextBlock{Name="DetailTraits",Text=traits,FontSize=14,Foreground=(Brush)FindResource("BannerMuted"),VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,12,4)});
+        // Every genre is listed here; a poster's caption shows only the first.
+        var traits=string.Join(" · ",new[]{item.AllGenres,item.Country}.Where(x=>!string.IsNullOrWhiteSpace(x)));
+        if(traits.Length>0)detailMetaRow.Children.Add(new TextBlock{Name="DetailTraits",Text=traits,FontSize=14,Foreground=(Brush)FindResource("BannerMuted"),TextWrapping=TextWrapping.Wrap,VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,12,4)});
         foreach(var quality in item.ReleaseResolutions.OrderByDescending(x=>x).Select(x=>x>=2160?"4K":x+"p").Take(4))
             detailMetaRow.Children.Add(new Border{BorderBrush=(Brush)FindResource("BannerBadgeEdge"),BorderThickness=new(1),CornerRadius=new(6),Padding=new(6,2,6,2),Margin=new(0,0,8,4),VerticalAlignment=VerticalAlignment.Center,Child=new TextBlock{Text=quality,FontSize=11,FontWeight=FontWeights.Bold,Foreground=(Brush)FindResource("BannerText")}});
         if(item.OnlyPoorQuality){var poor=PoorQualityBadge(item.PosterQuality);poor.Foreground=(Brush)FindResource("BannerText");detailInfo.Children.Add(poor);}
