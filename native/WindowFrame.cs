@@ -40,7 +40,7 @@ public partial class MainWindow
             var frame=Marshal.ReadInt32(lParam,0)-left;
             // Windows places a maximized window with its frame outside the monitor on every side, so the top keeps
             // the same inset as the sides; a restored window gives the caption's height back to the client area.
-            if(IsZoomed(hwnd))Marshal.WriteInt32(lParam,4,top+frame);
+            if(IsZoomed(hwnd)){Marshal.WriteInt32(lParam,4,top+frame);LeaveRoomForHiddenTaskbar(hwnd,lParam);}
             else{Marshal.WriteInt32(lParam,4,top);if(frame>0)resizeBorder=frame;}
             handled=true;return IntPtr.Zero;
         }
@@ -52,8 +52,14 @@ public partial class MainWindow
             var x=(short)(lParam.ToInt64()&0xFFFF);var y=(short)((lParam.ToInt64()>>16)&0xFFFF);
             if(!IsZoomed(hwnd)&&GetWindowRect(hwnd,out var window)&&y-window.Top<resizeBorder)
                 return x-window.Left<resizeBorder*2?HtTopLeft:window.Right-x<resizeBorder*2?HtTopRight:HtTop;
-            var point=PointFromScreen(new Point(x,y));
-            return point.Y<CaptionBand&&!InteractiveAt(point)?HtCaption:HtClient;
+            // While the window is created or closed it has no presentation source to map the point into.
+            if(PresentationSource.FromVisual(this)==null)return HtClient;
+            try
+            {
+                var point=PointFromScreen(new Point(x,y));
+                return point.Y<CaptionBand&&!InteractiveAt(point)?HtCaption:HtClient;
+            }
+            catch(InvalidOperationException){return HtClient;}
         }
         return IntPtr.Zero;
     }
@@ -64,9 +70,27 @@ public partial class MainWindow
             if(node is ButtonBase or TextBoxBase or Thumb or ScrollBar or Selector)return true;
         return false;
     }
+    // A maximized window covers the monitor's work area. With an auto-hiding taskbar that area is the whole monitor, and
+    // the taskbar only comes up when the mouse reaches a screen edge the window does not cover, so that edge keeps 2 px.
+    static void LeaveRoomForHiddenTaskbar(IntPtr hwnd,IntPtr rectangle)
+    {
+        var info=new MonitorInfo{Size=(uint)Marshal.SizeOf<MonitorInfo>()};
+        if(!GetMonitorInfo(MonitorFromWindow(hwnd,MonitorDefaultNearest),ref info))return;
+        foreach(var (edge,offset,inward) in new[]{(0u,0,2),(1u,4,2),(2u,8,-2),(3u,12,-2)})
+        {
+            var bar=new AppBarData{Size=(uint)Marshal.SizeOf<AppBarData>(),Edge=edge,Area=info.Monitor};
+            if(SHAppBarMessage(AbmGetAutoHideBarEx,ref bar)!=IntPtr.Zero)Marshal.WriteInt32(rectangle,offset,Marshal.ReadInt32(rectangle,offset)+inward);
+        }
+    }
+    const uint AbmGetAutoHideBarEx=0x0B;
+    [StructLayout(LayoutKind.Sequential)] struct AppBarData{public uint Size;public IntPtr Window;public uint CallbackMessage;public uint Edge;public NativeRect Area;public IntPtr Param;}
+    [DllImport("shell32.dll")] static extern IntPtr SHAppBarMessage(uint message,ref AppBarData data);
+    // Windows 10 draws no border above a window without a caption; a one-pixel line keeps the top edge visible there.
+    static readonly bool DrawsOwnTopEdge=Environment.OSVersion.Version.Build<22000;
     void UpdateCaptionButtons()
     {
         var maximized=WindowState==WindowState.Maximized;
+        WindowTopEdge.Visibility=DrawsOwnTopEdge&&!maximized?Visibility.Visible:Visibility.Collapsed;
         CaptionMaximize.Content=maximized?"":"";CaptionMaximize.ToolTip=maximized?"Восстановить":"Развернуть";
         AutomationProperties.SetName(CaptionMaximize,maximized?"Восстановить окно":"Развернуть окно");
     }

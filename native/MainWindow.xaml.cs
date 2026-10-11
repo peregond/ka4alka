@@ -25,6 +25,7 @@ public partial class MainWindow:Window
     {
         InitializeComponent();
         InitializeStatusToast();InitializeShareLinks();
+        if(FrameExperiment.Chrome)System.Windows.Shell.WindowChrome.SetWindowChrome(this,new System.Windows.Shell.WindowChrome{CaptionHeight=32,ResizeBorderThickness=new(6),GlassFrameThickness=new(0),CornerRadius=new(0),UseAeroCaptionButtons=false}); // TEMPORARY experiment
         onlineIndex=new(sourceClient,relays:new IndexRelays(sourceClient));sourceClient.TorrentRelay=onlineIndex.RelayTorrent;sharedCatalog=new(sourceClient);
         catalogRefreshTimer.Tick+=(_,_)=>
         {

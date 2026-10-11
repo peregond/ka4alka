@@ -73,7 +73,11 @@ public partial class MainWindow
             $"Narrow person layout never settled: hero layouts {heroLayouts-stallStart.hero}, biography updates {biographyUpdates-stallStart.bio}, window resizes {windowResizes-stallStart.resize}, compact layouts {compactLayouts-stallStart.compact}, last hero layout {heroLayoutTrace}, window layout passes {Volatile.Read(ref layoutPasses)}, dispatcher operations {string.Join(", ",operations.Select(x=>x.Key+" "+x.Value))}"+(File.Exists(Path.Combine(Preferences.DataDir,"error.log"))?"\nError log:\n"+string.Concat(File.ReadAllText(Path.Combine(Preferences.DataDir,"error.log")).TakeLast(3000)):"")+"\nDiagnostics:\n"+stallDiagnostics.Report());}catch(IOException){}}){IsBackground=true}.Start();
         MinWidth=620;Width=620;Height=720;await Task.Delay(150);
         // The caption-less window finishes a resize over more than one dispatcher turn; let its layout settle.
-        for(var pass=0;pass<3;pass++){UpdateLayout();await Dispatcher.InvokeAsync(()=>{},System.Windows.Threading.DispatcherPriority.ContextIdle);}
+        for(var pass=0;pass<3;pass++)
+        {
+            UpdateLayout();var settled=Dispatcher.InvokeAsync(()=>{},System.Windows.Threading.DispatcherPriority.ContextIdle).Task;
+            if(await Task.WhenAny(settled,Task.Delay(5000))!=settled)throw new Exception("Narrow person layout never settled after the shrink to 620 px\n"+stallDiagnostics.Report());
+        }
         Volatile.Write(ref narrowDone,true);Shot("person-narrow");AssertPersonPageLayout(true);
         // Every width around the poster and narrow/wide thresholds must settle. A column count or a narrow/wide switch that
         // followed the page's own scroll bar used to loop forever at one width (the 620 px client of a caption-less window).
@@ -85,6 +89,21 @@ public partial class MainWindow
             if(await Task.WhenAny(idle,Task.Delay(3000))!=idle)unsettled.Add(width);
         }
         if(unsettled.Count>0)throw new Exception("Person page layout never settled at window widths "+string.Join(", ",unsettled)+"\n"+stallDiagnostics.Report());
+        if(FrameExperiment.Sweep)
+        {
+            // TEMPORARY experiment: every point is reached from the oversized wide state, the history that triggered the loop.
+            var stalls=new List<string>();var points=0;
+            for(var height=680d;height<=800;height+=12)
+            for(var width=604d;width<=636;width+=4)
+            {
+                MinWidth=1440;Width=1440;Height=900;
+                var wide=Dispatcher.InvokeAsync(()=>{},System.Windows.Threading.DispatcherPriority.ContextIdle).Task;await Task.WhenAny(wide,Task.Delay(3000));
+                MinWidth=540;Width=width;Height=height;points++;
+                var idle=Dispatcher.InvokeAsync(()=>{},System.Windows.Threading.DispatcherPriority.ContextIdle).Task;
+                if(await Task.WhenAny(idle,Task.Delay(3000))!=idle)stalls.Add($"{width}x{height}");
+            }
+            if(stalls.Count>0)throw new Exception($"Person page layout never settled at {stalls.Count} of {points} sizes: "+string.Join(", ",stalls)+"\n"+stallDiagnostics.Report());
+        }
         MinWidth=620;Width=620;Height=720;await Task.Delay(150);UpdateLayout();AssertPersonPageLayout(true);
         var film=FindVisual<Button>(Body,x=>AutomationProperties.GetName(x)=="Открыть "+next.Title)??throw new Exception("Filmography action missing.");
         film.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));

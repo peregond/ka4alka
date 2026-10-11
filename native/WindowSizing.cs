@@ -47,7 +47,7 @@ public partial class MainWindow
     void EnableAdaptiveLayout()
     {
         SizeChanged+=(_,_)=>windowResizes++;
-        SourceInitialized+=(_,_)=>{var handle=new WindowInteropHelper(this).Handle;HwndSource.FromHwnd(handle)?.AddHook(WindowMessage);EnableCustomFrame(handle);SystemWindowTheme.Apply(this,prefs.Light,true);FitToMonitor(true);};
+        SourceInitialized+=(_,_)=>{var handle=new WindowInteropHelper(this).Handle;HwndSource.FromHwnd(handle)?.AddHook(WindowMessage);if(!FrameExperiment.Chrome)EnableCustomFrame(handle);SystemWindowTheme.Apply(this,prefs.Light,true);FitToMonitor(true);};
         LocationChanged+=(_,_)=>QueueMonitorFit();
         StateChanged+=(_,_)=>QueueMonitorFit();
         SizeChanged+=(_,_)=>ApplyCompactLayout();
@@ -140,7 +140,7 @@ public partial class MainWindow
         AddTorrentButton.Padding=new Thickness(tiny?0:narrow?14:18,0,tiny?0:narrow?14:18,0);AddTorrentButton.MinHeight=control;AddTorrentButton.Height=control;AddTorrentButton.MinWidth=tiny?control:0;AddTorrentButton.Margin=new Thickness(0,0,tiny?8:12,0);
         BackButton.Width=control;BackButton.Height=control;BackButton.Margin=new Thickness(0,0,tiny?8:12,0);ThemeButton.Width=control;ThemeButton.Height=control;
         // The top band is the window's caption (drag, snap, window buttons), so the header starts below it.
-        HeaderArea.Margin=new Thickness(gutter,CaptionBand+(veryShort?2:shortView?6:10),gutter,veryShort?6:shortView?8:20);
+        HeaderArea.Margin=new Thickness(gutter,(FrameExperiment.NoBand?0:CaptionBand)+(veryShort?2:shortView?6:10)+(FrameExperiment.NoBand?(veryShort?4:shortView?6:10):0),gutter,veryShort?6:shortView?8:20);
         if(ReferenceEquals(FiltersPanel.Parent,HeaderArea))FiltersPanel.Margin=new Thickness(0,shortView?6:12,0,0);
         CenterRegion.Margin=new Thickness(gutter,0,gutter,0);StatusToast.Margin=new Thickness(gutter,0,gutter,20);
         SearchBar.Margin=new Thickness(0,0,tiny?8:12,0);SearchBar.Height=control;Search.MinHeight=control;

@@ -51,7 +51,7 @@ public partial class MainWindow
     // never finishes the layout at that window width (the window stops responding to resizes).
     static double ScrollStableWidth(FrameworkElement element)
     {
-        if(Environment.GetEnvironmentVariable("KACHALKA_PLAIN_WIDTH")=="1")return element.ActualWidth; // TEMPORARY A/B probe
+        if(FrameExperiment.PlainWidth)return element.ActualWidth; // TEMPORARY experiment
         for(var node=VisualTreeHelper.GetParent(element);node!=null;node=VisualTreeHelper.GetParent(node))
         {
             if(node is not ScrollViewer scroll||scroll.VerticalScrollBarVisibility!=ScrollBarVisibility.Auto)continue;

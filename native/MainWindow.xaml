@@ -202,6 +202,7 @@
   </Border>
  </Grid>
  <!-- The window has no system caption (see WindowFrame.cs): its buttons sit in the top-right corner of the app. -->
+ <Border x:Name="WindowTopEdge" Height="1" VerticalAlignment="Top" Background="{DynamicResource Edge}" IsHitTestVisible="False" Visibility="Collapsed"/>
  <StackPanel x:Name="CaptionButtons" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
   <Button x:Name="CaptionMinimize" Style="{StaticResource CaptionButton}" Content="&#xE921;" Click="CaptionMinimizeClick" ToolTip="Свернуть" AutomationProperties.Name="Свернуть окно"/>
   <Button x:Name="CaptionMaximize" Style="{StaticResource CaptionButton}" Content="&#xE922;" Click="CaptionMaximizeClick" ToolTip="Развернуть" AutomationProperties.Name="Развернуть окно"/>

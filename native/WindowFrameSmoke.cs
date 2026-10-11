@@ -25,16 +25,18 @@ public partial class MainWindow
         var sidebarTop=SidePanel.TransformToAncestor(this).Transform(new Point()).Y;
         Check(Math.Abs(sidebarTop)<.5,$"the sidebar must run to the top edge (starts at {sidebarTop:F1}).");
         Check(new[]{CaptionMinimize,CaptionMaximize,CaptionClose}.All(button=>button.IsVisible&&button.ActualWidth>=40&&button.ActualHeight>=CaptionBand-.5),"the window buttons must be visible in the top-right corner.");
+        // Window.ActualWidth/Height include the side and bottom frame Windows keeps; the app's own surface is the client area.
+        var content=(FrameworkElement)Content;
         var closeRight=CaptionClose.TransformToAncestor(this).Transform(new Point(CaptionClose.ActualWidth,0));
-        Check(Math.Abs(closeRight.X-ActualWidth)<1.5&&Math.Abs(closeRight.Y)<.5,$"Close must sit in the very top-right corner ({closeRight}).");
-        var band=new Point((SidePanel.ActualWidth+ActualWidth-CaptionButtons.ActualWidth)/2,CaptionBand/2);
+        Check(Math.Abs(closeRight.X-content.ActualWidth)<1.5&&Math.Abs(closeRight.Y)<.5,$"Close must sit in the very top-right corner ({closeRight}).");
+        var band=new Point((SidePanel.ActualWidth+content.ActualWidth-CaptionButtons.ActualWidth)/2,CaptionBand/2);
         Check(HitAt(this,band)==HtCaption,"the empty top band above the content must drag the window (HTCAPTION).");
         Check(HitAt(BrandLogo,new Point(BrandLogo.ActualWidth/2,Math.Min(4,BrandLogo.ActualHeight/2)))==HtCaption||BrandLogo.TransformToAncestor(this).Transform(new Point()).Y>=CaptionBand,"the sidebar's logo inside the top band must drag the window.");
         foreach(var button in new[]{CaptionMinimize,CaptionMaximize,CaptionClose})
             Check(HitAt(button,new Point(button.ActualWidth/2,button.ActualHeight-4))==HtClient,"window button "+button.Name+" must stay clickable (HTCLIENT).");
         Check(Search.TransformToAncestor(this).Transform(new Point()).Y>=CaptionBand-.5,"the header must start below the top band.");
         Check(HitAt(Search,new Point(Search.ActualWidth/2,Search.ActualHeight/2))==HtClient,"the search field must stay clickable.");
-        Check(HitAt(this,new Point(ActualWidth/2,ActualHeight/2))==HtClient,"the page itself must stay client area.");
+        Check(HitAt(this,new Point(content.ActualWidth/2,content.ActualHeight/2))==HtClient,"the page itself must stay client area.");
         var middle=(window.Left+window.Right)/2;
         Check(Hit(middle,window.Top+1)==HtTop,"the top edge must resize the window (HTTOP).");
         Check(Hit(window.Left+2,(window.Top+window.Bottom)/2)==HtLeft,"the left edge must keep Windows' resize border (HTLEFT).");
@@ -51,7 +53,7 @@ public partial class MainWindow
             try
             {
                 var origin=new ScreenPoint();ClientToScreen(handle,ref origin);
-                var corner=new ScreenPoint{X=(int)Math.Round(ActualWidth*scaleX),Y=(int)Math.Round(ActualHeight*scaleY)};ClientToScreen(handle,ref corner);
+                var corner=new ScreenPoint{X=(int)Math.Round(content.ActualWidth*scaleX),Y=(int)Math.Round(content.ActualHeight*scaleY)};ClientToScreen(handle,ref corner);
                 maximized=new{Work=$"{info.Work.Left},{info.Work.Top}..{info.Work.Right},{info.Work.Bottom}",Client=$"{origin.X},{origin.Y}..{corner.X},{corner.Y}"};
                 Check(Math.Abs(origin.Y-info.Work.Top)<=1&&Math.Abs(origin.X-info.Work.Left)<=1,$"a maximized window's content must start at the work area's corner, not off screen ({JsonText(maximized)}).");
                 Check(Math.Abs(corner.X-info.Work.Right)<=1&&Math.Abs(corner.Y-info.Work.Bottom)<=1,$"a maximized window's content must fill the work area exactly ({JsonText(maximized)}).");
