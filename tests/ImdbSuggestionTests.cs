@@ -41,6 +41,22 @@ static class ImdbSuggestionTests
         Check(episode.SeasonLabel=="2 сезон, 5 серия"&&new DownloadItem{Name="Show Complete Series 1080p.mkv",MediaSection="Сериалы"}.SeasonLabel=="Несколько сезонов"&&new DownloadItem{Name="Show.1080p.mkv",MediaSection="Сериалы",MediaYear=2021}.YearSeasonLabel=="2021"
             &&new DownloadItem{Name="Movie.S01.mkv",MediaSection="Фильмы",MediaYear=2019}.YearSeasonLabel=="2019",
             "single episodes and packs are labelled, unknown seasons and films show only the year");
+        // TVmaze fills the empty card of a series the Russian catalog lacks.
+        var maze="""
+        {"id":38963,"name":"Solar Opposites","premiered":"2020-05-08","genres":["Comedy","Science-Fiction","Adult"],
+         "network":null,"webChannel":{"id":2,"name":"Hulu","country":null},"externals":{"tvrage":null,"thetvdb":368010,"imdb":"tt8910922"},
+         "image":{"medium":"https://static.tvmaze.com/uploads/images/medium_portrait/1/1.jpg","original":"https://static.tvmaze.com/uploads/images/original_untouched/1/1.jpg"},
+         "summary":"<p><b>Solar Opposites</b> follows a team of aliens &amp; their pet.<br>They escaped a doomed planet.</p><p>Season two.</p>"}
+        """u8.ToArray();
+        var mazeCast="""[{"person":{"id":1,"name":"Justin Roiland"},"character":{"name":"Korvo"}},{"person":{"id":2,"name":"Thomas Middleditch"},"character":{"name":"Terry"}},{"person":{"id":1,"name":"Justin Roiland"},"character":{"name":"Yumyulack"}}]"""u8.ToArray();
+        var filled=TvMazeMetadata.Apply(series,maze,mazeCast);
+        Check(filled.Description!.StartsWith("Solar Opposites follows a team of aliens & their pet.")&&!filled.Description.Contains('<')&&filled.Description.Contains("Season two."),"TVmaze text loses its markup but keeps its paragraphs");
+        Check(filled.Genre=="комедия, фантастика, для взрослых"&&filled.Year==2020&&filled.ImageUrl==series.ImageUrl&&filled.Id==series.Id&&filled.ImdbId==series.ImdbId,"genres are shown in Russian and the card keeps its identity and poster");
+        Check(filled.People.Length==2&&filled.People.All(x=>x.Role=="Актёры")&&filled.People[0].Name=="Justin Roiland","the cast lists each actor once");
+        var bare=TvMazeMetadata.Apply(series with{ImageUrl=null,Year=0},maze);
+        Check(bare.ImageUrl=="https://static.tvmaze.com/uploads/images/original_untouched/1/1.jpg"&&bare.Year==2020,"a missing poster and year come from TVmaze");
+        var other=series with{ImdbId="tt0000001"};
+        try{TvMazeMetadata.Apply(other,maze);Check(false,"a show with another IMDb id must be refused");}catch(InvalidDataException){Check(true,"a show with another IMDb id is refused");}
         var zona=new MediaItem(-5,"Во все тяжкие","Сериалы","",2008,"—","—","#526B69"){OriginalTitle="Breaking Bad",PageUrl=LiveCatalog.Base+"/tvseries/vo-vse-tyazhkie-2008"};
         var imdbBreakingBad=ImdbSuggestions.Parse("""{"d":[{"id":"tt0903747","l":"Breaking Bad","q":"TV series","y":2008}]}""","breaking bad");
         Check(ImdbSuggestions.Missing([zona],imdbBreakingBad).Length==0&&ImdbSuggestions.Missing([zona],found).Length==2,"a title the catalog already has is not added twice");

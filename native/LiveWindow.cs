@@ -42,8 +42,8 @@ public partial class MainWindow
     readonly OnlineIndexClient onlineIndex;
     Task<MediaItem> Metadata(MediaItem item,bool priority=false,CancellationToken ct=default,Action<MediaItem>? updated=null,bool force=false)
     {
-        // A title found only on IMDb has no catalog page to read; its card shows what the search returned.
-        if(ImdbSuggestions.IsImdbOnly(item))return Task.FromResult(item);
+        // A title found only on IMDb has no catalog page to read. An opened series asks TVmaze for its text and cast (shelf cards do not); a film shows what the search returned.
+        if(ImdbSuggestions.IsImdbOnly(item))return priority?ImdbMetadata(item,ct,updated,force):Task.FromResult(item);
         item=DownloadMetadata.EnrichMedia(item,new[]{sharedCatalog.Find(item)}.OfType<MediaItem>().Concat(BundledCatalog.Search(item.Section,item.Title)));
         if(!force&&MediaMetadata.HasFullDetails(item)){updated?.Invoke(item);return Task.FromResult(item);}
         if(force){cardMetadata.Remove(item.Id);resolvedPriorityMetadata.Remove(item.Id);}
@@ -80,6 +80,30 @@ public partial class MainWindow
             finally{if(priority)priorityMetadata.Remove(item.Id);}
         }
         task=Load();if(cardMetadata.Count>=100)cardMetadata.Remove(cardMetadata.Keys.First());cardMetadata[item.Id]=task;return task;
+    }
+    Task<MediaItem> ImdbMetadata(MediaItem item,CancellationToken ct,Action<MediaItem>? updated,bool force)
+    {
+        if(item.Section!="Сериалы"||string.IsNullOrWhiteSpace(item.ImdbId))return Task.FromResult(item);
+        if(force)cardMetadata.Remove(item.Id);
+        if(cardMetadata.TryGetValue(item.Id,out var cached))return cached;
+        if(!ct.CanBeCanceled)ct=metadataLifetime.Token;
+        async Task<MediaItem> Load()
+        {
+            await Task.Yield();
+            using var deadline=CancellationTokenSource.CreateLinkedTokenSource(ct);
+            deadline.CancelAfter(TimeSpan.FromSeconds(15));
+            try
+            {
+                var fresh=await TvMazeMetadata.Load(sourceClient,item,deadline.Token);
+                updated?.Invoke(fresh);return fresh;
+            }
+            catch(Exception) when(!ct.IsCancellationRequested)
+            {
+                // TVmaze is optional: an unknown show or a network failure keeps the search card, and the next opening asks again.
+                cardMetadata.Remove(item.Id);return item;
+            }
+        }
+        var task=Load();if(cardMetadata.Count>=100)cardMetadata.Remove(cardMetadata.Keys.First());cardMetadata[item.Id]=task;return task;
     }
     async Task UpdateCardRatings(MediaItem item)
     {
