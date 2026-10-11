@@ -6,13 +6,23 @@ on:
         description: Published version to capture
         required: true
         default: '0.40.18'
+      publish_reviewed:
+        description: Publish reviewed repository screenshots instead of capturing again
+        type: boolean
+        default: false
 permissions:
   contents: write
 concurrency:
   group: documentation-preview-${{ github.ref_name }}
   cancel-in-progress: true
 jobs:
+  publish-reviewed:
+    if: inputs.publish_reviewed
+    uses: ./.github/workflows/publish-screenshots.yml
+    with:
+      version: ${{ inputs.version }}
   screenshots:
+    if: ${{ !inputs.publish_reviewed }}
     runs-on: windows-latest
     timeout-minutes: 15
     env:
