@@ -92,7 +92,10 @@ public partial class MainWindow
         void CheckCrewTiles()
         {
             var frame=FindVisual<Border>(Body,x=>x.Name=="CinemaParticipants")!;
-            foreach(var button in VisualElements<Button>(frame).Where(x=>x.Name=="CinemaPersonTile"))
+            // Tiles behind "Ещё" are collapsed and not laid out yet; the visible row carries the checks.
+            var tiles=VisualElements<Button>(frame).Where(x=>x.Name=="CinemaPersonTile"&&x.IsVisible).ToArray();
+            if(tiles.Length==0)throw new Exception("No crew tile is visible.");
+            foreach(var button in tiles)
             {
                 if(button.BorderThickness!=new Thickness(0)||button.Background is not SolidColorBrush{Color.A:0})throw new Exception("Crew actions must not draw separate permanent cards.");
                 var portrait=FindVisual<Border>(button,x=>x.Name=="CinemaPersonPortrait")??throw new Exception("Crew photograph frame is missing.");
