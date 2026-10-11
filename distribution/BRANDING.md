@@ -4,7 +4,7 @@
 
 - `native/Assets/app-icon.png`: мастер 512 × 512 для экспорта.
 - `native/Assets/logo.png`: 256 × 256, логотип внутри приложения.
-- `native/Assets/app.ico`: 16, 20, 24, 32, 48, 64, 96, 128 и 256 px; EXE, окна, уведомления, установщик и удаление программы.
+- `native/Assets/app.ico`: 16, 20, 24, 32, 48, 64, 96, 128 и 256 px; EXE приложения и обновлятора, окна, уведомления, установщик и удаление программы.
 - `web-index/public/brand/`: тот же знак, favicon и Apple touch icon.
 - `web-index/public/favicon.ico` и `favicon.svg`: совместимые адреса для старых закладок и клиентов.
 
