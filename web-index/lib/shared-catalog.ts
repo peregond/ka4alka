@@ -1,6 +1,7 @@
 import { normalize, type Media, type Section } from "./catalog-source";
 
 const FEED="https://github.com/peregond/ka4alka/releases/download/catalog-data/catalog.json";
+export const MAX_SHARED_CATALOG_BYTES=32*1024*1024;
 type SharedIndex={items:Media[];generatedAtUtc:string};
 let cached:SharedIndex|null=null;
 let retryAfter=0;
@@ -32,6 +33,25 @@ export function parseSharedCatalog(value:unknown,now=Date.now()) {
   items.sort((a,b)=>Math.min(b.year,new Date(now).getUTCFullYear())-Math.min(a.year,new Date(now).getUTCFullYear()));
   return {items,generatedAtUtc:feed.generatedAtUtc!};
 }
+export async function readSharedCatalog(response:Response):Promise<SharedIndex> {
+  if(!response.ok||Number(response.headers.get("content-length"))>MAX_SHARED_CATALOG_BYTES) {
+    await response.body?.cancel();throw new Error("Catalog unavailable");
+  }
+  const reader=response.body?.getReader();
+  if(!reader)throw new Error("Empty catalog");
+  const decoder=new TextDecoder("utf-8",{fatal:true});
+  let received=0,text="";
+  try {
+    for(;;) {
+      const next=await reader.read();if(next.done)break;
+      received+=next.value.byteLength;
+      if(received>MAX_SHARED_CATALOG_BYTES)throw new Error("Oversized catalog");
+      text+=decoder.decode(next.value,{stream:true});
+    }
+    text+=decoder.decode();
+    return parseSharedCatalog(JSON.parse(text));
+  } finally {await reader.cancel();}
+}
 export async function sharedCatalogPage(section:Section,query:string,page:number) {
   if(checking)await checking;
   const now=Date.now();
@@ -40,9 +60,7 @@ export async function sharedCatalogPage(section:Section,query:string,page:number
       retryAfter=Date.now()+30*60_000;
       try {
         const response=await fetch(FEED,{signal:AbortSignal.timeout(6000),cache:"no-store"});
-        if(!response.ok||Number(response.headers.get("content-length"))>4*1024*1024)throw new Error("Catalog unavailable");
-        const bytes=await response.arrayBuffer();if(bytes.byteLength>4*1024*1024)throw new Error("Oversized catalog");
-        const fresh=parseSharedCatalog(JSON.parse(new TextDecoder().decode(bytes)));
+        const fresh=await readSharedCatalog(response);
         if(!cached||Date.parse(fresh.generatedAtUtc)>=Date.parse(cached.generatedAtUtc))cached=fresh;
       } catch { /* Preserve the previous complete catalog on a failed daily refresh. */ }
       return cached;
@@ -57,3 +75,4 @@ export async function sharedCatalogPage(section:Section,query:string,page:number
   const offset=query?0:(page-1)*40;
   return {items:rows.slice(offset,offset+(query?80:40)),indexCount:all.length,hasMore:!query&&offset+40<rows.length,updatedAt:cached.generatedAtUtc};
 }
+

@@ -10,6 +10,7 @@ try
 {
 Directory.CreateDirectory(root);Environment.SetEnvironmentVariable("KACHALKA_DATA",Path.Combine(root,"state"));
 if(args.Contains("--verify-failure-report"))throw new InvalidOperationException("Intentional test-runner failure probe.");
+await BundledCatalog.EnsureLoadedAsync();
 ErrorLog.Write(new InvalidOperationException("diagnostic-test",new IOException("nested-detail")));
 var diagnosticPath=Path.Combine(Preferences.DataDir,"error.log");
 if(!File.ReadAllText(diagnosticPath).Contains("nested-detail"))throw new Exception("Diagnostic log lost exception details.");

@@ -12,6 +12,8 @@ public partial class MainWindow:Window
     readonly Preferences prefs=Preferences.Load();
     readonly DownloadService downloads;
     readonly SharedCatalog sharedCatalog;
+    Task? sharedCatalogRefresh;
+    bool forceSharedCatalogRefresh;
     readonly DispatcherTimer catalogRefreshTimer=new(){Interval=TimeSpan.FromMinutes(5)};
     readonly DispatcherTimer refresh=new(){Interval=TimeSpan.FromSeconds(2)};
     readonly DispatcherTimer searchDelay=new(){Interval=TimeSpan.FromMilliseconds(350)};
@@ -28,13 +30,14 @@ public partial class MainWindow:Window
         {
             if(closed)return;
             _=MaintainCacheAsync();var expired=ExpireCatalogPages();
-            if(current==null&&(section is "Фильмы" or "Сериалы")&&!SearchActive&&!favoritesOnly&&(expired||CatalogSelection.IsDefault&&sharedCatalog.RefreshDue))
+            if(sharedCatalog.RefreshDue)_ = RefreshSharedCatalogAsync();
+            if(current==null&&(section is "Фильмы" or "Сериалы")&&!SearchActive&&!favoritesOnly&&expired)
             {
                 catalogPages.Clear();catalogLastPage=null;liveKey="";Render();
             }
         };
         catalogRefreshTimer.Start();
-        ContentRendered+=(_,_)=>{_=MaintainCacheAsync();};
+        ContentRendered+=(_,_)=>{_=MaintainCacheAsync();_=RefreshSharedCatalogAsync();};
         EnableAdaptiveLayout();
         EnableShortcuts();InitializeDownloadDrop();
         try{downloads=new(null,prefs.MaxDownloadKbps,prefs.MaxUploadKbps);}catch(Exception e){downloads=newEmpty(prefs.MaxDownloadKbps,prefs.MaxUploadKbps);Status.Text="Не удалось прочитать очередь: "+e.Message;}
@@ -47,6 +50,29 @@ public partial class MainWindow:Window
         Closing+=OnClosing;ready=true;ApplyLiteMode();ApplyTheme();ApplyCompactLayout();Render();
     }
     static DownloadService newEmpty(int down,int up){var path=Path.Combine(Preferences.DataDir,"queue.json");if(File.Exists(path))File.Move(path,path+".unreadable-"+DateTime.Now.Ticks);return new(null,down,up);}
+    Task RefreshSharedCatalogAsync(bool force=false)
+    {
+        forceSharedCatalogRefresh|=force;
+        if(sharedCatalogRefresh is {IsCompleted:false})return sharedCatalogRefresh;
+        return sharedCatalogRefresh=ApplyRefresh();
+        async Task ApplyRefresh()
+        {
+            try
+            {
+                await sharedCatalog.RestoreAsync(metadataLifetime.Token);
+                var checkForced=forceSharedCatalogRefresh;forceSharedCatalogRefresh=false;
+                var changed=await sharedCatalog.RefreshAsync(metadataLifetime.Token,checkForced);
+                // A manual request received during this check joins its result.
+                forceSharedCatalogRefresh=false;
+                if(!changed||closed)return;
+                catalogPages.Clear();cardMetadata.Clear();catalogLastPage=null;ResetDiscoveryData();
+                if(current==null&&activePerson==null&&(section is "Фильмы" or "Сериалы")&&!SearchActive&&!favoritesOnly&&(CatalogSelection.IsDefault||CatalogSelection.Collection.StartsWith("seasonal:",StringComparison.Ordinal)))
+                {liveKey="";Render();}
+            }
+            catch(OperationCanceledException) when(metadataLifetime.IsCancellationRequested){}
+            catch(Exception error){if(!closed)ErrorLog.Write(error);}
+        }
+    }
     static TextBlock Text(string value,double size=13,bool muted=false){var t=new TextBlock{Text=value,FontSize=size,TextWrapping=TextWrapping.Wrap,Margin=new(0,0,0,8)};t.SetResourceReference(TextBlock.ForegroundProperty,muted?"Muted":"Text");return t;}
     static Button Button(string label,Action action){var b=new Button{Content=label};b.Click+=(_,_)=>action();return b;}
     static Button AsyncButton(string label,Func<Task> action){var b=new Button{Content=label};b.Click+=async(_,_)=>{b.IsEnabled=false;try{await action();}catch(Exception e){MessageBox.Show(e.Message,"Качалка");}finally{b.IsEnabled=true;}};return b;}

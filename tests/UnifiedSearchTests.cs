@@ -15,5 +15,11 @@ static class UnifiedSearchTests
         using var cancel=new CancellationTokenSource();cancel.Cancel();bool cancelled=false;
         try{await UnifiedSearch.FindAsync("Искра",(_,token)=>Task.FromCanceled<IReadOnlyList<MediaItem>>(token),_=>[],cancel.Token);}catch(OperationCanceledException){cancelled=true;}
         Check(cancelled,"cancelled query cannot publish fallback results");
+        var remoteGate=new TaskCompletionSource<IReadOnlyList<MediaItem>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        SearchResult? immediate=null;
+        var pending=UnifiedSearch.FindAsync("Искра",(_,_)=>remoteGate.Task,kind=>kind=="Фильмы"?[film]:[series],default,updated:value=>immediate=value);
+        Check(immediate?.Items.Length==2&&!pending.IsCompleted,"local catalog results appear while remote search is still pending");
+        remoteGate.SetResult([]);await pending;
     }
 }
+
