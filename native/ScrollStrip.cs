@@ -85,6 +85,8 @@ public partial class MainWindow
     {
         strip.Entries.Add(new(radio.Tag?.ToString()??label,label,count,radio));
         radio.Checked+=(_,_)=>{strip.Pending=radio;FlushStripReveal(strip);};
+        // If nothing was arranged yet when the request was made, the first load of the segment repeats it.
+        radio.Loaded+=(_,_)=>FlushStripReveal(strip);
         strip.Items.Children.Add(radio);
         // The segment may have been checked before it joined the strip.
         if(radio.IsChecked==true)strip.Pending=radio;
@@ -118,7 +120,8 @@ public partial class MainWindow
     {
         if(strip.Pending is not {} radio)return;
         var scroller=strip.Scroller;
-        if(!radio.IsLoaded||radio.ActualWidth<=0||scroller.ViewportWidth<=0||!ReferenceEquals(VisualTreeHelper.GetParent(radio),strip.Items))return;
+        // ScrollChanged arrives during layout, before Loaded: a segment that has been arranged is enough.
+        if(radio.ActualWidth<=0||scroller.ViewportWidth<=0||!ReferenceEquals(VisualTreeHelper.GetParent(radio),strip.Items))return;
         strip.Pending=null;
         var target=StripLayout.Reveal(radio.TranslatePoint(new Point(),strip.Items).X,radio.ActualWidth,scroller.HorizontalOffset,scroller.ViewportWidth,scroller.ScrollableWidth);
         if(Math.Abs(target-scroller.HorizontalOffset)>.5)scroller.ScrollToHorizontalOffset(target);
