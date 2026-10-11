@@ -89,12 +89,12 @@ public partial class MainWindow
             if(await Task.WhenAny(idle,Task.Delay(3000))!=idle)unsettled.Add(width);
         }
         if(unsettled.Count>0)throw new Exception("Person page layout never settled at window widths "+string.Join(", ",unsettled)+"\n"+stallDiagnostics.Report());
-        if(FrameExperiment.Sweep)
         {
-            // TEMPORARY experiment: every point is reached from the oversized wide state, the history that triggered the loop.
+            // Widths and heights around the person page's thresholds, each reached from the oversized wide state. With
+            // widths that followed the page's own scroll bar, 632-636 x 740-800 never settled (Windows CI experiment).
             var stalls=new List<string>();var points=0;
-            for(var height=680d;height<=800;height+=12)
-            for(var width=604d;width<=636;width+=4)
+            for(var height=700d;height<=800;height+=20)
+            for(var width=612d;width<=652;width+=4)
             {
                 MinWidth=1440;Width=1440;Height=900;
                 var wide=Dispatcher.InvokeAsync(()=>{},System.Windows.Threading.DispatcherPriority.ContextIdle).Task;await Task.WhenAny(wide,Task.Delay(3000));

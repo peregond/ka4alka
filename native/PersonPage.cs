@@ -21,7 +21,7 @@ public partial class MainWindow
         });
         var body=new StackPanel{Margin=new(0,0,10,0)};
         var request=personRequest=new CancellationTokenSource();
-        var scroll=new ScrollViewer{Name="PersonPageScroll",Style=(Style)FindResource("PageScroll"),Content=body,VerticalScrollBarVisibility=FrameExperiment.BarVisible?ScrollBarVisibility.Visible:ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};Body.Children.Add(scroll);
+        var scroll=new ScrollViewer{Name="PersonPageScroll",Style=(Style)FindResource("PageScroll"),Content=body,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};Body.Children.Add(scroll);
         var hero=new Grid{Name="PersonHeroContent"};hero.ColumnDefinitions.Add(new(){Width=new(174)});hero.ColumnDefinitions.Add(new(){Width=new(1,GridUnitType.Star)});
         for(var row=0;row<3;row++)hero.RowDefinitions.Add(new(){Height=GridLength.Auto});
         var portrait=PersonPortrait(person,150,190,origin);portrait.Name="PersonPortrait";portrait.VerticalAlignment=VerticalAlignment.Top;portrait.HorizontalAlignment=HorizontalAlignment.Left;portrait.Margin=new(0,0,24,0);hero.Children.Add(portrait);

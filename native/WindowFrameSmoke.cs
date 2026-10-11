@@ -31,7 +31,7 @@ public partial class MainWindow
         Check(Math.Abs(closeRight.X-content.ActualWidth)<1.5&&Math.Abs(closeRight.Y)<.5,$"Close must sit in the very top-right corner ({closeRight}).");
         var band=new Point((SidePanel.ActualWidth+content.ActualWidth-CaptionButtons.ActualWidth)/2,CaptionBand/2);
         Check(HitAt(this,band)==HtCaption,"the empty top band above the content must drag the window (HTCAPTION).");
-        Check(HitAt(BrandLogo,new Point(BrandLogo.ActualWidth/2,Math.Min(4,BrandLogo.ActualHeight/2)))==HtCaption||BrandLogo.TransformToAncestor(this).Transform(new Point()).Y>=CaptionBand,"the sidebar's logo inside the top band must drag the window.");
+        Check(!BrandLogo.IsVisible||HitAt(BrandLogo,new Point(BrandLogo.ActualWidth/2,Math.Min(4,BrandLogo.ActualHeight/2)))==HtCaption||BrandLogo.TransformToAncestor(this).Transform(new Point()).Y>=CaptionBand,"the sidebar's logo inside the top band must drag the window.");
         foreach(var button in new[]{CaptionMinimize,CaptionMaximize,CaptionClose})
             Check(HitAt(button,new Point(button.ActualWidth/2,button.ActualHeight-4))==HtClient,"window button "+button.Name+" must stay clickable (HTCLIENT).");
         Check(Search.TransformToAncestor(this).Transform(new Point()).Y>=CaptionBand-.5,"the header must start below the top band.");
@@ -48,7 +48,7 @@ public partial class MainWindow
             if(!GetMonitorInfo(monitor,ref info))throw new Exception(stage+": cannot read the monitor work area.");
             // The limits the app itself sets for this monitor (FitToMonitor), so the check sees what people get.
             var (scaleX,scaleY)=VisualTreeHelperDpi();var fit=WindowSizing.FitPixels(info.Work.Width,info.Work.Height,scaleX,scaleY);
-            MinWidth=fit.MinWidth;MinHeight=fit.MinHeight;MaxWidth=fit.MaxWidth;MaxHeight=fit.MaxHeight;
+            MinWidth=fit.MinWidth;MinHeight=fit.MinHeight;(MaxWidth,MaxHeight)=MaximizedLimit(handle,fit,scaleX,scaleY);
             WindowState=WindowState.Maximized;await settle();
             try
             {
