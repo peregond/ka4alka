@@ -64,6 +64,8 @@ DownloadTests.Run();await ImdbSuggestionTests.Run();
 DownloadFolderTests.Run();
 ReleaseQualityTests.Run();
 FeaturePosterTests.Run();
+ZonaPosterTests.Run();
+ScrollStripTests.Run();
 PosterBlurTests.Run();
 AdditionalSourceTests.Run();
 await TorrentRelayTests.Run(root);

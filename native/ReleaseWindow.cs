@@ -155,13 +155,11 @@ public partial class MainWindow
         foreach(var group in pool.Where(x=>x.Quality!="Не указано").GroupBy(x=>x.Quality).OrderByDescending(x=>QualityRank(x.First())).ThenByDescending(x=>x.Count()))Segment(group.Key,group.Key,group.Count());
 
         // ---- series: season and episode strips drive the collapsed season/episode selectors ----
-        var seasonButtons=new Dictionary<string,RadioButton>();WrapPanel? episodeRow=null;StackPanel? episodeLine=null;
-        WrapPanel SeriesStrip(string caption,string name)
+        // Long series do not fit on one line: both strips scroll sideways and offer the whole list (see ScrollStrip.cs).
+        var seasonButtons=new Dictionary<string,RadioButton>();ScrollStrip? episodeStrip=null;
+        ScrollStrip SeriesStrip(string caption,string name)
         {
-            var line=new StackPanel{Orientation=Orientation.Horizontal,Margin=new(0,0,0,10)};
-            var label=new TextBlock{Text=caption,FontSize=12,FontWeight=FontWeights.SemiBold,Width=58,VerticalAlignment=VerticalAlignment.Center};label.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");line.Children.Add(label);
-            var frame=new Border{CornerRadius=new(12),BorderThickness=new(1),Padding=new(4),VerticalAlignment=VerticalAlignment.Center};frame.SetResourceReference(Border.BackgroundProperty,"Panel");frame.SetResourceReference(Border.BorderBrushProperty,"EdgeSoft");
-            AutomationProperties.SetName(frame,name);var row=new WrapPanel();frame.Child=row;line.Children.Add(frame);seriesRow.Children.Add(line);return row;
+            var strip=CreateScrollStrip(caption,name);seriesRow.Children.Add(strip.Line);return strip;
         }
         RadioButton SeriesButton(string group,string filterKey,string value,string label,int count)
         {
@@ -175,14 +173,14 @@ public partial class MainWindow
             var seasons=((string[])filters["Сезон"].ItemsSource).Where(x=>x!="Все").ToArray();
             if(seasons.Length>1)
             {
-                var seasonRow=SeriesStrip("Сезон","Сезоны сериала");
+                var seasonStrip=SeriesStrip("Сезон","Сезоны сериала");
                 foreach(var value in new[]{"Все"}.Concat(seasons))
                 {
                     var count=value=="Все"?pool.Length:pool.Count(x=>x.Series.SeasonLabel==value);
-                    var button=SeriesButton("ReleaseSeason","Сезон",value,value,count);seasonButtons[value]=button;seasonRow.Children.Add(button);
+                    var button=SeriesButton("ReleaseSeason","Сезон",value,value,count);seasonButtons[value]=button;AddStripItem(seasonStrip,button,value,count);
                 }
             }
-            episodeRow=SeriesStrip("Серия","Серии выбранного сезона");episodeLine=(StackPanel)((Border)episodeRow.Parent).Parent;
+            episodeStrip=SeriesStrip("Серия","Серии выбранного сезона");
         }
 
         // ---- Russian-audio switch ----
@@ -231,24 +229,24 @@ public partial class MainWindow
         // Episodes of the chosen season (or of the only season); hidden when there is nothing to choose between.
         void RefreshEpisodes()
         {
-            if(episodeRow==null||episodeLine==null)return;
+            if(episodeStrip==null)return;
             var season=filters["Сезон"].SelectedItem?.ToString()??"Все";
             var seasonCount=((string[])filters["Сезон"].ItemsSource).Count(x=>x!="Все");
             var inSeason=pool.Where(x=>season=="Все"||x.Series.SeasonLabel==season).ToArray();
             var episodes=inSeason.Select(x=>x.Series).OrderBy(x=>x.MultipleEpisodes||!x.Episode.HasValue?0:1).ThenBy(x=>x.Episode??0).Select(x=>x.EpisodeLabel).Distinct().ToArray();
             var visible=(season!="Все"||seasonCount<=1)&&episodes.Length>1;
-            episodeLine.Visibility=visible?Visibility.Visible:Visibility.Collapsed;
+            episodeStrip.Line.Visibility=visible?Visibility.Visible:Visibility.Collapsed;
             var chosen=filters["Серия"].SelectedItem?.ToString()??"Все";
             if(chosen!="Все"&&(!visible||!episodes.Contains(chosen)))
             {
                 var wasChanging=changingFilters;changingFilters=true;filters["Серия"].SelectedItem="Все";state.Filters["Серия"]="Все";changingFilters=wasChanging;chosen="Все";
             }
-            episodeRow.Children.Clear();if(!visible)return;
+            ClearStrip(episodeStrip);if(!visible)return;
             syncing=true;
             foreach(var value in new[]{"Все"}.Concat(episodes))
             {
                 var count=value=="Все"?inSeason.Length:inSeason.Count(x=>x.Series.EpisodeLabel==value);
-                var button=SeriesButton("ReleaseEpisode","Серия",value,value,count);button.IsChecked=value==chosen;episodeRow.Children.Add(button);
+                var button=SeriesButton("ReleaseEpisode","Серия",value,value,count);button.IsChecked=value==chosen;AddStripItem(episodeStrip,button,value,count);
             }
             syncing=false;
         }

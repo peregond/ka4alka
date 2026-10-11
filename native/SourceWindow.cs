@@ -143,7 +143,7 @@ public partial class MainWindow
                 if(closing||closed||!image.IsLoaded||!ReferenceEquals(image.DataContext,item)||CoverUrl(image.DataContext)!=url||CoverViewportFor(image)?.Measure(image).Near!=true)return;
                 var cachePath=item is MediaItem or DownloadItem?CoverPath(url):null;
                 var (bitmap,downloaded)=await CoverCache.Load(cachePath,1024*1024,
-                    ct=>sourceClient.Read(SourceClient.WebUri(url),1024*1024,ct),
+                    ct=>CoverBytes(url,1024*1024,ct),
                     bytes=>{using var stream=new MemoryStream(bytes);var result=new BitmapImage();result.BeginInit();result.CacheOption=BitmapCacheOption.OnLoad;result.DecodePixelWidth=item is MediaItem or DownloadItem?PosterDecodeWidth:100;result.StreamSource=stream;result.EndInit();result.Freeze();return result;},token);
                 token.ThrowIfCancellationRequested();
                 if(coverCache.Count>=48)coverCache.Remove(coverCache.Keys.First());coverCache[url]=bitmap;
@@ -151,8 +151,32 @@ public partial class MainWindow
             }
             finally{coverSlots.Release();}
         }
-        catch(Exception error){if(ReferenceEquals(state.Request,request)){state.LastFailure=error;state.RetryAfterUtc=DateTime.UtcNow.AddMinutes(2);}}
+        catch(Exception error)
+        {
+            if(ReferenceEquals(state.Request,request))
+            {
+                state.LastFailure=error;state.RetryAfterUtc=DateTime.UtcNow.AddMinutes(2);
+                // A missing cover used to leave no trace at all; the host and the reason are enough to tell a blocked image host from a bad address.
+                if(item is MediaItem or DownloadItem&&!token.IsCancellationRequested)
+                {
+                    var host=Uri.TryCreate(url,UriKind.Absolute,out var address)?address.Host:"invalid";var reason=error.GetType().Name+": "+error.Message;
+                    _=Task.Run(()=>DiagnosticLog.Write("cover-failed",new{Host=host,Error=reason}));
+                }
+            }
+        }
         finally{if(ReferenceEquals(state.Request,request))state.Request=null;request.Dispose();}
+    }
+    // Catalog covers come straight from the image host. Where that host is slow, blocked or refuses us, the same
+    // cover is asked from the site's proxy instead, as the website does; other covers have no second way.
+    async Task<byte[]> CoverBytes(string url,int max,CancellationToken ct)
+    {
+        if(url.StartsWith("//",StringComparison.Ordinal))url="https:"+url;
+        var proxied=ZonaPoster.ViaSite(url);
+        if(proxied==null)return await sourceClient.Read(SourceClient.WebUri(url),max,ct);
+        using var direct=CancellationTokenSource.CreateLinkedTokenSource(ct);direct.CancelAfter(TimeSpan.FromSeconds(8));
+        try{return await sourceClient.Read(SourceClient.WebUri(url),max,direct.Token);}
+        catch(Exception) when(!ct.IsCancellationRequested){}
+        return await onlineIndex.ReadSite(proxied,max,ct);
     }
     static string? CoverUrl(object? item)=>item switch{SourceEntry source=>source.ImageUrl,MediaItem media=>media.ImageUrl,DownloadItem download=>download.ImageUrl,_=>null};
     static string CoverPath(string url)=>Path.Combine(Preferences.DataDir,"covers",Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(url)))+".img");
