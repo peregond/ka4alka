@@ -78,6 +78,9 @@ public partial class MainWindow
                 Check(VisualElements<Button>(Body).Any(x=>x.Tag is SourceEntry e&&e.Id==indexed.Id)
                     &&!VisualElements<Button>(Body).Any(x=>x.Tag is SourceEntry e&&e.Id==direct.Id),name+": original audio filter is incorrect.");
                 audioType.SelectedItem="Все";await Settle();
+                RefreshDetailActions();
+                Check(FindVisual<Button>(Body,x=>x.Name=="DetailDownload")?.Tag is SourceEntry selected&&selected.Id==direct.Id,
+                    name+": periodic refresh lost the filtered recommendation.");
             }
             File.WriteAllText(Path.Combine(output,"checks.json"),JsonSerializer.Serialize(checks,new JsonSerializerOptions{WriteIndented=true}));
         }

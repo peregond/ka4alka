@@ -22,6 +22,7 @@ public partial class MainWindow
 
     void RenderLiveDetail(MediaItem item)
     {
+        detailFilteredReleases=null;
         if(requestedDetails.Add(item.Id))
         {
             var cached=catalogIndex.CachedReleaseSnapshot(item);
@@ -192,13 +193,22 @@ public partial class MainWindow
         var pick=ReleaseRecommendation.Pick(releases,QualityMinimum);
         return pick==null?"none":"pick:"+pick.Entry.Id+"|"+releases.Count;
     }
+    int detailFilteredMovieId;
+    SourceEntry[]? detailFilteredReleases;
+    void ApplyDetailReleaseFilters(int movieId,SourceEntry[] visible)
+    {
+        if(current?.Id!=movieId)return;
+        detailFilteredMovieId=movieId;detailFilteredReleases=visible;
+        if(DetailActionState(current,visible)!=detailActionState)BuildDetailActions(current,visible);
+    }
     void RefreshDetailActions()
     {
         if(current==null||detailActions==null||section is "Загрузки" or "Настройки"||activePerson!=null)return;
         liveReleases.TryGetValue(current.Id,out var known);
-        var state=DetailActionState(current,known??[]);
+        var choices=detailFilteredMovieId==current.Id&&detailFilteredReleases!=null?detailFilteredReleases:known??[];
+        var state=DetailActionState(current,choices);
         if(state==detailActionState)return;
-        BuildDetailActions(current,known??[]);
+        BuildDetailActions(current,choices);
     }
     void BuildDetailActions(MediaItem item,IReadOnlyList<SourceEntry> releases)
     {
