@@ -42,7 +42,7 @@ public partial class MainWindow
     readonly OnlineIndexClient onlineIndex;
     Task<MediaItem> Metadata(MediaItem item,bool priority=false,CancellationToken ct=default,Action<MediaItem>? updated=null,bool force=false)
     {
-        // A title found only on IMDb has no catalog page to read. An opened series asks TVmaze for its text and cast (shelf cards do not); a film shows what the search returned.
+        // A title found only on IMDb has no catalog page to read. An opened card asks the site for its text and cast, TheTVDB for series and TMDB for films (shelf cards do not); TVmaze backs up series.
         if(ImdbSuggestions.IsImdbOnly(item))return priority?ImdbMetadata(item,ct,updated,force):Task.FromResult(item);
         item=DownloadMetadata.EnrichMedia(item,new[]{sharedCatalog.Find(item)}.OfType<MediaItem>().Concat(BundledCatalog.Search(item.Section,item.Title)));
         if(!force&&MediaMetadata.HasFullDetails(item)){updated?.Invoke(item);return Task.FromResult(item);}
@@ -83,7 +83,7 @@ public partial class MainWindow
     }
     Task<MediaItem> ImdbMetadata(MediaItem item,CancellationToken ct,Action<MediaItem>? updated,bool force)
     {
-        if(item.Section!="Сериалы"||string.IsNullOrWhiteSpace(item.ImdbId))return Task.FromResult(item);
+        if(item.Section is not ("Фильмы" or "Сериалы")||string.IsNullOrWhiteSpace(item.ImdbId))return Task.FromResult(item);
         if(force)cardMetadata.Remove(item.Id);
         if(cardMetadata.TryGetValue(item.Id,out var cached))return cached;
         if(!ct.CanBeCanceled)ct=metadataLifetime.Token;
@@ -92,16 +92,18 @@ public partial class MainWindow
             await Task.Yield();
             using var deadline=CancellationTokenSource.CreateLinkedTokenSource(ct);
             deadline.CancelAfter(TimeSpan.FromSeconds(15));
-            try
+            var result=item;
+            // The site's answer (TheTVDB for series, TMDB for films) comes first; a series it could not describe falls back to TVmaze.
+            try{result=await onlineIndex.Title(item,deadline.Token);updated?.Invoke(result);}
+            catch(Exception) when(!ct.IsCancellationRequested){}
+            if(item.Section=="Сериалы"&&!MediaMetadata.HasDescription(result))
             {
-                var fresh=await TvMazeMetadata.Load(sourceClient,item,deadline.Token);
-                updated?.Invoke(fresh);return fresh;
+                try{result=await TvMazeMetadata.Load(sourceClient,result,deadline.Token);updated?.Invoke(result);}
+                catch(Exception) when(!ct.IsCancellationRequested){}
             }
-            catch(Exception) when(!ct.IsCancellationRequested)
-            {
-                // TVmaze is optional: an unknown show or a network failure keeps the search card, and the next opening asks again.
-                cardMetadata.Remove(item.Id);return item;
-            }
+            // Nothing found keeps the search card, and the next opening asks again.
+            if(ReferenceEquals(result,item))cardMetadata.Remove(item.Id);
+            return result;
         }
         var task=Load();if(cardMetadata.Count>=100)cardMetadata.Remove(cardMetadata.Keys.First());cardMetadata[item.Id]=task;return task;
     }

@@ -11,13 +11,6 @@ namespace Kachalka;
 // because TVmaze's score is not IMDb's or Kinopoisk's.
 public static class TvMazeMetadata
 {
-    static readonly Dictionary<string,string> Genres=new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["Action"]="боевик",["Adventure"]="приключения",["Anime"]="аниме",["Comedy"]="комедия",["Crime"]="криминал",["Drama"]="драма",["Family"]="семейный",
-        ["Fantasy"]="фэнтези",["History"]="история",["Horror"]="ужасы",["Medical"]="медицина",["Music"]="музыка",["Mystery"]="детектив",["Romance"]="мелодрама",
-        ["Science-Fiction"]="фантастика",["Sports"]="спорт",["Supernatural"]="мистика",["Thriller"]="триллер",["War"]="военный",["Western"]="вестерн",["Legal"]="юридический",
-        ["Espionage"]="шпионский",["Food"]="кулинария",["Nature"]="природа",["Travel"]="путешествия",["Adult"]="для взрослых",["Children"]="детский",["DIY"]="своими руками"
-    };
     const int Limit=2*1024*1024;
 
     public static async Task<MediaItem> Load(SourceClient client,MediaItem item,CancellationToken ct)
@@ -54,7 +47,7 @@ public static class TvMazeMetadata
             throw new InvalidDataException("TVmaze вернул другой сериал.");
         var description=Description(Text(root,"summary"));
         var genres=root.TryGetProperty("genres",out var list)&&list.ValueKind==JsonValueKind.Array
-            ?list.EnumerateArray().Where(x=>x.ValueKind==JsonValueKind.String).Select(x=>x.GetString()!).Where(x=>x.Length>0).Select(x=>Genres.TryGetValue(x,out var ru)?ru:x).Distinct().Take(4).ToArray():Array.Empty<string>();
+            ?list.EnumerateArray().Where(x=>x.ValueKind==JsonValueKind.String).Select(x=>x.GetString()!).Where(x=>x.Length>0).Select(TitleMetadata.Genre).Distinct().Take(4).ToArray():Array.Empty<string>();
         // A broadcaster names its country; web services (streaming) carry a null network and a webChannel instead.
         var country=Country(root,"network");
         if(country.Length==0)country=Country(root,"webChannel");
@@ -62,7 +55,7 @@ public static class TvMazeMetadata
         if(year<=0&&Text(root,"premiered") is {Length:>=4} premiered&&int.TryParse(premiered[..4],out var first)&&first is >=1880 and <=2100)year=first;
         string? poster=item.ImageUrl;
         if(string.IsNullOrWhiteSpace(poster)&&root.TryGetProperty("image",out var image)&&image.ValueKind==JsonValueKind.Object)poster=Picture(Text(image,"original")??Text(image,"medium"));
-        var people=cast==null?item.People:Cast(cast,item.People);
+        var people=cast==null||item.People.Any(x=>x.Role=="Актёры")?item.People:Cast(cast,item.People);
         return item with
         {
             Description=description??item.Description,
