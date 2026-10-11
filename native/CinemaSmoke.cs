@@ -65,7 +65,10 @@ public partial class MainWindow
             var missing=VisualElements<Image>(Body).Select(x=>new{Photo=AutomationProperties.GetName(x),x.IsLoaded,x.ActualWidth,x.ActualHeight,Bounds=x.TransformToAncestor(Body).TransformBounds(new Rect(new Point(),x.RenderSize)),Tooltip=(VisualTreeHelper.GetParent(VisualTreeHelper.GetParent(x)) as FrameworkElement)?.ToolTip?.ToString()});
             await File.WriteAllTextAsync(Path.Combine(output,"portrait-missing.json"),JsonSerializer.Serialize(missing));throw new Exception("Cached person photograph missing: "+JsonSerializer.Serialize(missing));
         }
-        designFixedViewport=true;MaxWidth=2000;MaxHeight=1200;MinWidth=1440;Width=1440;Height=900;await Task.Delay(150);Shot("person-wide");AssertPersonPageLayout(false);AssertPersonFilmGrid();MinWidth=620;Width=620;Height=720;await Task.Delay(150);Shot("person-narrow");AssertPersonPageLayout(true);
+        designFixedViewport=true;MaxWidth=2000;MaxHeight=1200;MinWidth=1440;Width=1440;Height=900;await Task.Delay(150);Shot("person-wide");AssertPersonPageLayout(false);AssertPersonFilmGrid();MinWidth=620;Width=620;Height=720;await Task.Delay(150);
+        // The caption-less window finishes a resize over more than one dispatcher turn; let its layout settle.
+        for(var pass=0;pass<3;pass++){UpdateLayout();await Dispatcher.InvokeAsync(()=>{},System.Windows.Threading.DispatcherPriority.ContextIdle);}
+        Shot("person-narrow");AssertPersonPageLayout(true);
         var film=FindVisual<Button>(Body,x=>AutomationProperties.GetName(x)=="Открыть "+next.Title)??throw new Exception("Filmography action missing.");
         film.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
         if(current?.Id!=next.Id||activePerson!=null)throw new Exception("Film → person → film navigation failed.");
