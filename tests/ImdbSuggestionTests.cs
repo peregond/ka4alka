@@ -26,6 +26,21 @@ static class ImdbSuggestionTests
         Check(series.ImageUrl=="https://m.media-amazon.com/images/M/MV5BSolar@._V1_QL75_UX400_.jpg","the poster is requested at card size");
         Check(series.Id<0&&series.Id==ImdbSuggestions.Parse(json,"solar opposites")[0].Id,"the card id is stable between searches");
         Check(!ImdbSuggestions.Applies("Солнечные противоположности")&&ImdbSuggestions.Applies("solar opposites")&&!ImdbSuggestions.Applies("  "),"only Latin queries ask IMDb");
+        // The report's second half: the queued Solar Opposites row could not be opened because only Zona pages had a card.
+        var queued=new DownloadItem{Name="Solar.Opposites.S06.1080p.WEB-DL.mkv",MediaTitle=series.Title,MediaSection=series.Section,MediaYear=series.Year,MediaPageUrl=series.PageUrl,ImageUrl=series.ImageUrl,
+            ReleaseTitle="Солнечные оппозиты / Solar Opposites / Сезон 6 (WEB-DL 1080p)"};
+        var queuedCard=DownloadMetadata.Card(queued);
+        Check(queued.HasMediaCard&&queuedCard!=null&&queuedCard.Id==series.Id&&queuedCard.ImdbId==series.ImdbId&&queuedCard.OriginalTitle==series.Title&&queuedCard.Section=="Сериалы"&&ImdbSuggestions.IsImdbOnly(queuedCard),
+            "a queued IMDb-only title reopens the same card the search showed");
+        Check(DownloadMetadata.Card(new DownloadItem{MediaSection="Сериалы",MediaPageUrl="https://www.imdb.com/name/nm0000001/"})==null&&
+            DownloadMetadata.Card(new DownloadItem{MediaSection="Сериалы",MediaPageUrl="https://www.imdb.com/title/tt8910922/?ref=x"})==null&&
+            DownloadMetadata.Card(new DownloadItem{MediaSection="Сериалы",MediaPageUrl="https://evil.example/title/tt8910922/"})==null,
+            "only a plain IMDb title page opens a card");
+        Check(queued.SeasonLabel=="6 сезон"&&queued.YearSeasonLabel=="2020 · 6 сезон","a series download names its season beside the year");
+        var episode=new DownloadItem{Name="Show.S02E05.mkv",MediaSection="Сериалы",MediaYear=2021};
+        Check(episode.SeasonLabel=="2 сезон, 5 серия"&&new DownloadItem{Name="Show Complete Series 1080p.mkv",MediaSection="Сериалы"}.SeasonLabel=="Несколько сезонов"&&new DownloadItem{Name="Show.1080p.mkv",MediaSection="Сериалы",MediaYear=2021}.YearSeasonLabel=="2021"
+            &&new DownloadItem{Name="Movie.S01.mkv",MediaSection="Фильмы",MediaYear=2019}.YearSeasonLabel=="2019",
+            "single episodes and packs are labelled, unknown seasons and films show only the year");
         var zona=new MediaItem(-5,"Во все тяжкие","Сериалы","",2008,"—","—","#526B69"){OriginalTitle="Breaking Bad",PageUrl=LiveCatalog.Base+"/tvseries/vo-vse-tyazhkie-2008"};
         var imdbBreakingBad=ImdbSuggestions.Parse("""{"d":[{"id":"tt0903747","l":"Breaking Bad","q":"TV series","y":2008}]}""","breaking bad");
         Check(ImdbSuggestions.Missing([zona],imdbBreakingBad).Length==0&&ImdbSuggestions.Missing([zona],found).Length==2,"a title the catalog already has is not added twice");
