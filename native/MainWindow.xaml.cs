@@ -24,7 +24,7 @@ public partial class MainWindow:Window
     public MainWindow()
     {
         InitializeComponent();
-        InitializeStatusToast();InitializeShareLinks();
+        InitializeStatusToast();InitializeShareLinks();ApplyFrameProbe();
         onlineIndex=new(sourceClient,relays:new IndexRelays(sourceClient));sourceClient.TorrentRelay=onlineIndex.RelayTorrent;sharedCatalog=new(sourceClient);
         catalogRefreshTimer.Tick+=(_,_)=>
         {
