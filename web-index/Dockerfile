@@ -3,9 +3,7 @@ FROM node:24-bookworm-slim AS build
 WORKDIR /app
 ENV SHARP_IGNORE_GLOBAL_LIBVIPS=1
 COPY package.json package-lock.json ./
-RUN --mount=type=secret,id=proxy_ca \
-    if [ -f /run/secrets/proxy_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
-    npm ci --include=dev --include=optional --no-audit --no-fund
+RUN npm ci --include=dev --include=optional --no-audit --no-fund
 COPY . .
 RUN ./node_modules/.bin/tsc --noEmit --incremental false && node tests/title-lookup.mjs && node tests/railway-db.mjs && npm run build:railway
 
