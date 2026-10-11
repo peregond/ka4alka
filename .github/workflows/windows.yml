@@ -10,6 +10,23 @@ concurrency:
   group: windows-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 jobs:
+  title-metadata:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install locked site dependencies
+        working-directory: web-index
+        run: npm ci --no-audit --no-fund
+      - name: Verify title lookup, authentication and response parsing
+        working-directory: web-index
+        run: node tests/title-lookup.mjs
+      - name: Type-check the site
+        working-directory: web-index
+        run: node node_modules/typescript/bin/tsc --noEmit --incremental false
   cinema-diagnostics:
     runs-on: windows-latest
     timeout-minutes: 5
@@ -61,6 +78,8 @@ jobs:
           restore-keys: nuget-${{ runner.os }}-
       - name: Install NSIS
         run: ./scripts/install-nsis.ps1
+      - name: Verify IMDb-only cards and metadata on Windows
+        run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --imdb-suggestions-only
       - name: Verify published TMDB backdrops through the desktop HTTP client
         run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --probe-backdrops
       - name: Validate installer and signed update on Windows

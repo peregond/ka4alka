@@ -51,6 +51,7 @@ if(args.Contains("--verify-cinema-source")){await CinemaSourceTests.Run();return
 if(args.Contains("--diagnose-cinema-source")){await CinemaSourceTests.Diagnostics();return;}
 if(args.Contains("--probe-portraits")){await PortraitSourceProbe.Run(root);return;}
 if(args.Contains("--metadata-only")){await MediaMetadataTests.Run();return;}
+if(args.Contains("--imdb-suggestions-only")){await ImdbSuggestionTests.Run();return;}
 if(args.Contains("--portraits-only")){await CinemaPortraitTests.Run();return;}
 if(args.Contains("--person-profile-only")){await PersonProfileLoadingTests.Run();return;}
 if(args.Contains("--professional-people-only")){await ProfessionalCinemaPeopleTests.Run();return;}

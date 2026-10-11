@@ -136,6 +136,11 @@ public partial class MainWindow
         var tmdbLogo=new Image{Name="TmdbLogo",Source=new System.Windows.Media.Imaging.BitmapImage(new Uri("pack://application:,,,/Assets/tmdb-logo.png")),Width=128,Height=17,Stretch=Stretch.Uniform,HorizontalAlignment=HorizontalAlignment.Left,Margin=new(0,18,0,8)};
         AutomationProperties.SetName(tmdbLogo,"The Movie Database — источник широких фонов");catalogue.Children.Add(tmdbLogo);
         var artworkAttribution=Hint("Широкие фоны — TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.");artworkAttribution.Name="TmdbAttribution";catalogue.Children.Add(artworkAttribution);
+        // TheTVDB's licence for small projects requires this credit with a direct link to the site.
+        var tvdbAttribution=Hint("Описания сериалов, которых нет в русском каталоге — ");tvdbAttribution.Name="TvdbAttribution";tvdbAttribution.Margin=new(0,8,0,0);
+        var tvdbLink=new System.Windows.Documents.Hyperlink(new System.Windows.Documents.Run("Metadata provided by TheTVDB"));tvdbLink.SetResourceReference(System.Windows.Documents.TextElement.ForegroundProperty,"Accent");
+        tvdbLink.Click+=(_,_)=>{try{System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://www.thetvdb.com/"){UseShellExecute=true});}catch(Exception){}};
+        tvdbAttribution.Inlines.Add(tvdbLink);tvdbAttribution.Inlines.Add(new System.Windows.Documents.Run("."));catalogue.Children.Add(tvdbAttribution);
         homeCountry.SelectionChanged+=(_,_)=>
         {
             if(homeCountry.SelectedItem is not CatalogChoice choice)return;

@@ -3,5 +3,6 @@ declare namespace Cloudflare {
     DB?: D1Database;
     BUCKET?: R2Bucket;
     TMDB_READ_TOKEN?: string;
+    TVDB_API_KEY?: string;
   }
 }

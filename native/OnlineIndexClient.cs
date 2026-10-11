@@ -42,7 +42,7 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null,Inde
     // (401/403, the country block) rests that copy for 15 minutes, a hung or
     // refused connection for 2 minutes, any other failure but 404 for 30 seconds,
     // and every failed copy at least 5 minutes once another copy has answered.
-    public async Task<byte[]> ReadSite(string path,int limit,CancellationToken ct,Action<byte[]>? validate=null)
+    public async Task<byte[]> ReadSite(string path,int limit,CancellationToken ct,Action<byte[]>? validate=null,bool restSites=true)
     {
         var failed=new List<Uri>();Exception? failure=null;
         await foreach(var site in Sites(ct))
@@ -56,7 +56,8 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null,Inde
             }
             catch(Exception error) when(!ct.IsCancellationRequested&&error is HttpRequestException or JsonException or IOException or InvalidDataException or OperationCanceledException)
             {
-                if(Rest(site,error))failed.Add(site);
+                // An optional lookup (restSites: false) never makes a copy of the site rest for the catalog and releases.
+                if(restSites&&Rest(site,error))failed.Add(site);
                 failure=error;
             }
         }
@@ -175,6 +176,21 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null,Inde
             Kinopoisk=fresh.Kinopoisk=="—"?item.Kinopoisk:fresh.Kinopoisk,
             Imdb=fresh.Imdb=="—"?item.Imdb:fresh.Imdb
         };
+    }
+
+    // Description, genres and cast of a title found only on IMDb: the site asks TheTVDB for series and TMDB for films.
+    // A refusal or a source that is not connected there is an answer about this title, not an outage of the site.
+    public async Task<MediaItem> Title(MediaItem item,CancellationToken ct)
+    {
+        var section=SectionKey(item.Section)??throw new ArgumentOutOfRangeException(nameof(item));
+        if(item.ImdbId==null||!Regex.IsMatch(item.ImdbId,@"^tt\d{5,10}$"))throw new InvalidDataException("У карточки нет идентификатора IMDb.");
+        JsonDocument? json=null;
+        await ReadSite("api/title?imdb="+item.ImdbId+"&section="+section,256*1024,ct,bytes=>json=JsonDocument.Parse(bytes),restSites:false);
+        using(json)
+        {
+            if(!json!.RootElement.TryGetProperty("item",out var row))throw new InvalidDataException("Сайт вернул неверные сведения о названии.");
+            return TitleMetadata.Apply(item,row);
+        }
     }
 
     static string? Torrent(string? value)

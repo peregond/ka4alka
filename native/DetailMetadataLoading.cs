@@ -16,7 +16,7 @@ public partial class MainWindow
 
     bool DetailMetadataLoading(int id)=>detailMetadataViews.TryGetValue(id,out var view)&&view.Loading;
     bool DetailMetadataNeedsRetry(int id)=>detailMetadataViews.TryGetValue(id,out var view)?!view.Loading&&view.Failed:current?.Id==id&&!ImdbSuggestions.IsImdbOnly(current)&&(!MediaMetadata.HasDescription(current)||current.People.Length==0);
-    string DetailDescriptionText(MediaItem item)=>MediaMetadata.HasDescription(item)?item.Description!:ImdbSuggestions.IsImdbOnly(item)?"Этого названия нет в русском каталоге, поэтому описания пока нет. Раздачи ищутся по оригинальному названию.":DetailMetadataLoading(item.Id)?"Загружаем описание…":"Описание пока недоступно.";
+    string DetailDescriptionText(MediaItem item)=>MediaMetadata.HasDescription(item)?item.Description!:ImdbSuggestions.IsImdbOnly(item)&&!DetailMetadataLoading(item.Id)?"Этого названия нет в русском каталоге, поэтому описания пока нет. Раздачи ищутся по оригинальному названию.":DetailMetadataLoading(item.Id)?"Загружаем описание…":"Описание пока недоступно.";
 
     void CancelDetailMetadata(bool restart=false)
     {

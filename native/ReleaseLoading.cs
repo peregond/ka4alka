@@ -77,6 +77,8 @@ public partial class MainWindow
             await releaseSlots.WaitAsync(token);entered=true;
             async Task<MediaItem> Resolved(CancellationToken ct)
             {
+                // An IMDb-only title is searched by the name it already has; TVmaze text must not delay the trackers.
+                if(ImdbSuggestions.IsImdbOnly(item))return item;
                 try{return await detailTask.WaitAsync(TimeSpan.FromSeconds(8),ct);}
                 catch(TimeoutException){return item;}
             }

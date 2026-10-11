@@ -173,6 +173,20 @@ public class DownloadItem : INotifyPropertyChanged
     [JsonIgnore] public string DisplayName=>string.IsNullOrWhiteSpace(MediaTitle)?Name:MediaTitle;
     [JsonIgnore] public string YearLabel=>MediaYear is >=1880 and <=2100?MediaYear.ToString(System.Globalization.CultureInfo.InvariantCulture):"";
     [JsonIgnore] public bool HasYear=>YearLabel.Length>0;
+    // A series download names the season it holds, taken from the release title (or the torrent name when the release is unknown).
+    [JsonIgnore] public string SeasonLabel
+    {
+        get
+        {
+            if(MediaSection!="Сериалы")return "";
+            var info=SeriesReleaseInfo.Parse(string.IsNullOrWhiteSpace(ReleaseTitle)?Name:ReleaseTitle);
+            if(!info.Season.HasValue&&!info.MultipleSeasons&&!string.IsNullOrWhiteSpace(ReleaseTitle))info=SeriesReleaseInfo.Parse(Name);
+            if(!info.Season.HasValue&&!info.MultipleSeasons)return "";
+            return info.Episode.HasValue&&!info.MultipleEpisodes?$"{info.SeasonLabel}, {info.EpisodeLabel}":info.SeasonLabel;
+        }
+    }
+    [JsonIgnore] public string YearSeasonLabel=>HasYear&&SeasonLabel.Length>0?YearLabel+" · "+SeasonLabel:HasYear?YearLabel:SeasonLabel;
+    [JsonIgnore] public bool HasYearSeason=>YearSeasonLabel.Length>0;
     [JsonIgnore] public bool HasMediaCard=>DownloadMetadata.Card(this)!=null;
     [JsonIgnore] public int MinimumQualityHeight {get;set;}=720;
     [JsonIgnore] public string PosterQuality=>ReleaseQuality.Label(new SourceEntry("",string.IsNullOrWhiteSpace(ReleaseTitle)?Name:ReleaseTitle,"","",null,null));

@@ -86,20 +86,27 @@ class CollectorTests(unittest.TestCase):
                       pageUrl='https://w6.zona.plus/tvseries/show-' + str(index)) for index in range(300)]
         with tempfile.TemporaryDirectory() as directory:
             previous, target = Path(directory) / 'previous.json', Path(directory) / 'catalog.json'
+            bundled = Path(directory) / 'seed.json'
+            bundled.write_text(json.dumps([self.item('primary-only'), self.item('movie-0', originalTitle='Original title', description='Старый сюжет')]), encoding='utf-8')
             previous.write_text(json.dumps({'schemaVersion': 1, 'items': rows}), encoding='utf-8')
             with patch('sys.argv', ['refresh-library.py', '--previous', str(previous), '--output', str(target)]), \
+                 patch.object(module, 'BUNDLED_CATALOG_PATH', bundled), \
                  patch.object(module, 'collect', return_value=[self.item('new')]), \
                  patch('library_metadata.enrich', side_effect=lambda current, **kwargs: current):
                 module.main()
             feed = json.loads(target.read_bytes())
-            self.assertEqual(len(feed['items']), 2301)
-            self.assertEqual(next(row for row in feed['items'] if row['id'] == 'movies:movie-0')['description'], 'Сохранённое описание')
+            self.assertEqual(len(feed['items']), 2302)
+            self.assertTrue(any(row['id'] == 'movies:primary-only' for row in feed['items']))
+            restored = next(row for row in feed['items'] if row['id'] == 'movies:movie-0')
+            self.assertEqual(restored['description'], 'Сохранённое описание')
+            self.assertEqual(restored['originalTitle'], 'Original title')
             snapshots = list(Path(directory).glob('catalog-*.json.gz'))
             self.assertEqual(len(snapshots), 1)
             self.assertEqual(gzip.decompress(snapshots[0].read_bytes()), target.read_bytes())
             self.assertTrue((Path(directory) / 'manifest.json').exists())
             target.write_bytes(b'last successful catalog')
             with patch('sys.argv', ['refresh-library.py', '--previous', str(previous), '--output', str(target)]), \
+                 patch.object(module, 'BUNDLED_CATALOG_PATH', bundled), \
                  patch.object(module, 'collect', side_effect=OSError('blocked source')):
                 with self.assertRaises(OSError):
                     module.main()

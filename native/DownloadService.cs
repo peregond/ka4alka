@@ -310,7 +310,23 @@ public sealed partial class DownloadService
     {
         if(stoppingTasks.TryGetValue(manager,out var stopping)&&!stopping.IsCompleted)return stopping;
         if(manager.State==TorrentState.Stopped)return Task.CompletedTask;
-        return stoppingTasks[manager]=manager.StopAsync(TimeSpan.FromSeconds(2));
+        return stoppingTasks[manager]=StopAfterStartup();
+        async Task StopAfterStartup()
+        {
+            // Metadata completion precedes MonoTorrent's automatic startup.
+            // Its final mode change must finish before a stop can persist.
+            try
+            {
+                while(!closeRequested&&manager.HasMetadata&&manager.State is (TorrentState.Metadata or TorrentState.Starting or TorrentState.Hashing or TorrentState.HashingPaused))
+                    await Task.Delay(25,lifetime.Token);
+            }
+            catch(OperationCanceledException)when(closeRequested)
+            {
+                // Close cancels startup waits, then still requests the real
+                // stop within its existing deadline before disposing engine.
+            }
+            if(manager.State!=TorrentState.Stopped)await manager.StopAsync(TimeSpan.FromSeconds(2));
+        }
     }
     public async Task Close()
     {

@@ -16,6 +16,8 @@
 
 Широкие фоны баннеров Windows-приложения: `/api/backdrop` сопоставляет карточку с TMDB, `/api/backdrop-image` отдаёт ограниченный JPEG. На сервере требуется секрет `TMDB_READ_TOKEN` (API Read Access Token); клиентам ключ не передаётся. Подключение и проверки описаны в [инструкции TMDB](../distribution/tmdb-backdrops.md).
 
+Описания, жанры и актёры названий, которых нет в русском каталоге: `/api/title` берёт сериалы из TheTVDB (секрет `TVDB_API_KEY`), фильмы — из TMDB (`TMDB_READ_TOKEN`). Подробности — в [инструкции](../distribution/title-descriptions.md).
+
 A clean full-stack starter running on [vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and Drizzle support.
 
 ## Prerequisites

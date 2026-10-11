@@ -42,8 +42,8 @@ public partial class MainWindow
     readonly OnlineIndexClient onlineIndex;
     Task<MediaItem> Metadata(MediaItem item,bool priority=false,CancellationToken ct=default,Action<MediaItem>? updated=null,bool force=false)
     {
-        // A title found only on IMDb has no catalog page to read; its card shows what the search returned.
-        if(ImdbSuggestions.IsImdbOnly(item))return Task.FromResult(item);
+        // A title found only on IMDb has no catalog page to read. An opened card asks the site for its text and cast, TheTVDB for series and TMDB for films (shelf cards do not); TVmaze backs up series.
+        if(ImdbSuggestions.IsImdbOnly(item))return priority?ImdbMetadata(item,ct,updated,force):Task.FromResult(item);
         item=DownloadMetadata.EnrichMedia(item,new[]{sharedCatalog.Find(item)}.OfType<MediaItem>().Concat(BundledCatalog.Search(item.Section,item.Title)));
         if(!force&&MediaMetadata.HasFullDetails(item)){updated?.Invoke(item);return Task.FromResult(item);}
         if(force){cardMetadata.Remove(item.Id);resolvedPriorityMetadata.Remove(item.Id);}
@@ -80,6 +80,32 @@ public partial class MainWindow
             finally{if(priority)priorityMetadata.Remove(item.Id);}
         }
         task=Load();if(cardMetadata.Count>=100)cardMetadata.Remove(cardMetadata.Keys.First());cardMetadata[item.Id]=task;return task;
+    }
+    Task<MediaItem> ImdbMetadata(MediaItem item,CancellationToken ct,Action<MediaItem>? updated,bool force)
+    {
+        if(item.Section is not ("Фильмы" or "Сериалы")||string.IsNullOrWhiteSpace(item.ImdbId))return Task.FromResult(item);
+        if(force)cardMetadata.Remove(item.Id);
+        if(cardMetadata.TryGetValue(item.Id,out var cached))return cached;
+        if(!ct.CanBeCanceled)ct=metadataLifetime.Token;
+        async Task<MediaItem> Load()
+        {
+            await Task.Yield();
+            using var deadline=CancellationTokenSource.CreateLinkedTokenSource(ct);
+            deadline.CancelAfter(TimeSpan.FromSeconds(15));
+            var result=item;
+            // The site's answer (TheTVDB for series, TMDB for films) comes first; a series it could not describe falls back to TVmaze.
+            try{result=await onlineIndex.Title(item,deadline.Token);updated?.Invoke(result);}
+            catch(Exception) when(!ct.IsCancellationRequested){}
+            if(item.Section=="Сериалы"&&!MediaMetadata.HasDescription(result))
+            {
+                try{result=await TvMazeMetadata.Load(sourceClient,result,deadline.Token);updated?.Invoke(result);}
+                catch(Exception) when(!ct.IsCancellationRequested){}
+            }
+            // Nothing found keeps the search card, and the next opening asks again.
+            if(ReferenceEquals(result,item))cardMetadata.Remove(item.Id);
+            return result;
+        }
+        var task=Load();if(cardMetadata.Count>=100)cardMetadata.Remove(cardMetadata.Keys.First());cardMetadata[item.Id]=task;return task;
     }
     async Task UpdateCardRatings(MediaItem item)
     {
