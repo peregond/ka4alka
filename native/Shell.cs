@@ -98,6 +98,7 @@ public partial class MainWindow
 
     // ----- Downloads widget in the sidebar -----
     TextBlock? widgetDown,widgetUp,widgetHeading;
+    Border? widgetBadge;
     FrameworkElement? widgetAll;
     Button? widgetOpen;
     StackPanel? widgetRowsHost;
@@ -117,7 +118,12 @@ public partial class MainWindow
         allRow.Children.Add(new Path{Data=(Geometry)FindResource("IconChevron"),Width=12,Height=12,Stretch=Stretch.Uniform,StrokeThickness=1.8,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,StrokeLineJoin=PenLineJoin.Round,Margin=new(2,0,0,0),VerticalAlignment=VerticalAlignment.Center});
         ((TextBlock)allRow.Children[0]).SetResourceReference(TextBlock.ForegroundProperty,"Muted");((Path)allRow.Children[1]).SetResourceReference(Shape.StrokeProperty,"Muted");
         widgetAll=allRow;DockPanel.SetDock(allRow,Dock.Right);head.Children.Add(allRow);
-        widgetHeading=new TextBlock{Text="Загрузки",FontSize=14,FontWeight=FontWeights.Bold,VerticalAlignment=VerticalAlignment.Center};widgetHeading.SetResourceReference(TextBlock.ForegroundProperty,"Text");head.Children.Add(widgetHeading);header.Children.Add(head);
+        widgetHeading=new TextBlock{Text="Загрузки",FontSize=14,FontWeight=FontWeights.Bold,VerticalAlignment=VerticalAlignment.Center};widgetHeading.SetResourceReference(TextBlock.ForegroundProperty,"Text");
+        // The same active-download count as on the Downloads button, which the widget replaces.
+        var badgeText=new TextBlock{FontSize=12,FontWeight=FontWeights.Bold,VerticalAlignment=VerticalAlignment.Center,HorizontalAlignment=HorizontalAlignment.Center};badgeText.SetResourceReference(TextBlock.ForegroundProperty,"Accent");
+        widgetBadge=new Border{Name="DownloadsWidgetCount",Child=badgeText,CornerRadius=new(11),Height=22,MinWidth=22,Padding=new(7,0,7,0),Margin=new(8,0,0,0),VerticalAlignment=VerticalAlignment.Center,Visibility=Visibility.Collapsed,IsHitTestVisible=false};widgetBadge.SetResourceReference(Border.BackgroundProperty,"AccentSoft");
+        var title=new StackPanel{Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center};title.Children.Add(widgetHeading);title.Children.Add(widgetBadge);
+        head.Children.Add(title);header.Children.Add(head);
         var speeds=new StackPanel{Orientation=Orientation.Horizontal};
         widgetDown=new TextBlock{FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=12,Margin=new(0,0,14,0)};widgetDown.SetResourceReference(TextBlock.ForegroundProperty,"Accent");
         widgetUp=new TextBlock{FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=12};widgetUp.SetResourceReference(TextBlock.ForegroundProperty,"Info");
@@ -147,6 +153,7 @@ public partial class MainWindow
         if(!visible){DownloadsWidget.Visibility=Visibility.Collapsed;return;}
         BuildDownloadsWidget();
         DownloadsWidget.Visibility=Visibility.Visible;
+        if(widgetBadge is {Child:TextBlock count}){count.Text=active.ToString();widgetBadge.Visibility=active>0?Visibility.Visible:Visibility.Collapsed;}
         long down=0,up=0;foreach(var item in items){down+=Math.Max(0,item.DownloadRate);up+=Math.Max(0,item.UploadRate);}
         widgetDown!.Text="↓ "+DownloadService.FormatBytes(down)+"/с";widgetUp!.Text="↑ "+DownloadService.FormatBytes(up)+"/с";
         widgetHeading!.Text=onDownloads?"Скорость сейчас":"Загрузки";widgetHeading.FontWeight=onDownloads?FontWeights.Medium:FontWeights.Bold;widgetHeading.FontSize=onDownloads?12:14;

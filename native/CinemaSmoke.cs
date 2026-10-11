@@ -121,12 +121,19 @@ public partial class MainWindow
             if(filmCard.ActualHeight-detailHero!.ActualHeight>64)throw new Exception("Participants stretched the movie card beyond its natural content height.");
         }
         CheckAlignedCrew();
-        var crewScroll=FindVisual<ScrollViewer>(participants,x=>x.Name=="CinemaPeopleScroll")!;
-        if(crewScroll.ScrollableHeight<=0)throw new Exception("A long crew list must scroll inside the aligned participant card.");
-        crewScroll.ScrollToBottom();await Task.Delay(100);UpdateLayout();CheckAlignedCrew();
-        if(crewScroll.VerticalOffset<=0)throw new Exception("Participant scrolling did not reach later rows.");
+        // A long crew list shows one row of portraits; "Ещё" opens the rest in place, with no scroll area inside the page.
+        int VisibleCrew()=>VisualElements<Button>(participants).Count(x=>x.Name=="CinemaPersonTile"&&x.IsVisible);
+        if(FindVisual<ScrollViewer>(participants,_=>true)!=null)throw new Exception("The participant card must not scroll inside the page.");
+        var crewMore=FindVisual<Button>(participants,x=>x.Name=="CinemaPeopleMore")??throw new Exception("A long crew list must offer \"Ещё\".");
+        var crewTotal=VisualElements<Button>(participants).Count(x=>x.Name=="CinemaPersonTile");
+        if(!crewMore.IsVisible||VisibleCrew()!=crew.Columns||crewMore.Content?.ToString()!="Ещё "+(crewTotal-crew.Columns))throw new Exception($"A long crew list must show exactly one row with \"Ещё\" for the rest (visible {VisibleCrew()}, columns {crew.Columns}, total {crewTotal}).");
+        var oneRow=participants.ActualHeight;
+        crewMore.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Task.Delay(100);UpdateLayout();CheckAlignedCrew();
+        if(VisibleCrew()!=crewTotal||crewMore.Content?.ToString()!="Свернуть"||participants.ActualHeight<=oneRow)throw new Exception("\"Ещё\" must reveal every participant in place.");
+        crewMore.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Task.Delay(100);UpdateLayout();
+        if(VisibleCrew()!=crew.Columns)throw new Exception("\"Свернуть\" must return to one row of participants.");
         var heading=FindVisual<TextBlock>(participants,x=>x.Name=="CinemaPeopleHeading")!;
-        if(heading.TransformToAncestor(participants).Transform(new Point()).Y<0)throw new Exception("Participant heading must remain visible while its list scrolls.");
+        if(heading.TransformToAncestor(participants).Transform(new Point()).Y<0)throw new Exception("Participant heading must stay visible.");
         current=original with{Description=string.Join(" ",Enumerable.Repeat("Развёрнутое описание для проверки высоты карточки фильма.",30))};descriptionExpanded=false;Render();await Task.Delay(150);UpdateLayout();
         cards=FindVisual<Grid>(Body,x=>x.Name=="CinemaCards")!;filmCard=FindVisual<Border>(Body,x=>x.Name=="CinemaFilm")!;participants=FindVisual<Border>(Body,x=>x.Name=="CinemaParticipants")!;
         var collapsedHeight=filmCard.ActualHeight;var expand=FindVisual<Button>(Body,x=>x.Name=="DescriptionToggle")!;
@@ -141,8 +148,8 @@ public partial class MainWindow
         if(Grid.GetRow(participants)!=1||Grid.GetColumn(participants)!=0)throw new Exception("Narrow layout did not stack participants.");
         if(!double.IsNaN(participants.Height))throw new Exception("Stacked participant card kept its wide-layout height binding.");
         CheckIdentityOrder();CheckCrewTiles();
-        crewScroll=FindVisual<ScrollViewer>(participants,x=>x.Name=="CinemaPeopleScroll")!;
-        if(crewScroll.ActualHeight>Body.ActualHeight*.7+1&&crewScroll.ActualHeight>220)throw new Exception("Stacked participant list does not fit the available viewport.");
+        crew=FindVisual<System.Windows.Controls.Primitives.UniformGrid>(participants,x=>x.Name=="CinemaPeopleGrid")!;
+        if(VisualElements<Button>(participants).Count(x=>x.Name=="CinemaPersonTile"&&x.IsVisible)!=crew.Columns)throw new Exception("Stacked participant list must still show one row until \"Ещё\".");
         MinWidth=620;Width=620;await Task.Delay(150);UpdateLayout();Shot("film-minimum");
         foreach(var element in VisualElements<FrameworkElement>(Body).Where(x=>x.IsVisible&&(x.Name is "DetailTitle" or "DetailOriginalTitle" or "DetailTraits" or "DetailRatings" or "DetailFavorite" or "DetailSynopsis")))
         {

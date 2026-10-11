@@ -41,7 +41,7 @@ public record TrackerHealth(int Total,int Responded,int Failed)
         :Summary+"Сейчас никто не подключён к этой раздаче. Число отдающих в поиске может быть устаревшим. Если ожидание затянется, попробуй другой вариант.";
 }
 
-public record DownloadSnapshot(TorrentState State,bool Paused,double Progress,long? TotalBytes,long DownloadRate,long UploadRate,int Connections,int Seeds,DateTime StartedUtc,DateTime? LastPayloadUtc,string? Error=null,TrackerHealth? Trackers=null);
+public record DownloadSnapshot(TorrentState State,bool Paused,double Progress,long? TotalBytes,long DownloadRate,long UploadRate,int Connections,int Seeds,DateTime StartedUtc,DateTime? LastPayloadUtc,string? Error=null,TrackerHealth? Trackers=null,int Sending=0);
 
 public static class DownloadPresentation
 {
@@ -55,7 +55,8 @@ public static class DownloadPresentation
         var up=!s.Paused&&(s.State is TorrentState.Downloading or TorrentState.Seeding)?Math.Max(0,s.UploadRate):0;
         item.Progress=progress;item.DownloadRate=down;item.UploadRate=up;item.TotalBytes=total;item.Remaining="";item.Hint="";
         item.Indeterminate=!s.Paused&&(s.State is TorrentState.Metadata or TorrentState.Hashing);
-        item.PeersText=s.Paused?"":$"Подключено: {Math.Max(0,s.Connections)} · отдают: {Math.Max(0,s.Seeds)}";
+        var sending=s.State==TorrentState.Downloading&&down>0?Math.Max(0,s.Sending):0;
+        item.PeersText=s.Paused?"":(sending>0?$"Качаем у {People(sending)} · подключено: ":"Подключено: ")+$"{Math.Max(0,s.Connections)} · отдают: {Math.Max(0,s.Seeds)}";
         var volume=total.HasValue?$"{DownloadService.FormatBytes(transferred)} из {DownloadService.FormatBytes(total.Value)}":"Размер станет известен после получения метаданных";
         if(s.Paused){item.Status="На паузе";item.Stats=$"{progress:F1}% · {volume}";return;}
         switch(s.State)
@@ -71,7 +72,7 @@ public static class DownloadPresentation
                 break;
             case TorrentState.Downloading:
                 item.Status=down>0?"Скачивание":idle?(s.Connections==0?"Ожидание участников":"Ожидание данных"):"Подключение к участникам…";
-                item.Stats=$"{progress:F1}% · {volume} · ↓ {DownloadService.FormatBytes(down)}/с · ↑ {DownloadService.FormatBytes(up)}/с";
+                item.Stats=$"{progress:F1}% · {volume} · ↓ {DownloadService.FormatBytes(down)}/с"+(sending>0?$" от {People(sending)}":"")+$" · ↑ {DownloadService.FormatBytes(up)}/с";
                 if(idle&&down==0)item.Hint=s.Connections==0?(s.Trackers?.WaitingHint??MissingPeers):"Участники подключены, но пока не передают файлы. Если ожидание затянется, попробуй раздачу, где больше отдающих.";
                 if(down>0&&total.HasValue&&progress<100)item.Remaining=Eta((total.Value-transferred)/(double)down);
                 break;
@@ -87,6 +88,8 @@ public static class DownloadPresentation
                 break;
         }
     }
+    // "1 человека", "3 человек", "5 человек": the genitive after "от" and "у".
+    public static string People(int count)=>count+(count%10==1&&count%100!=11?" человека":" человек");
     const string MissingPeers="Сейчас никто не подключён к этой раздаче. Попробуй вариант, где больше отдающих; скорость зависит от участников, которые раздают файлы.";
     static string Eta(double seconds)
     {

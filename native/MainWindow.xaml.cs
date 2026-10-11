@@ -119,15 +119,13 @@ public partial class MainWindow:Window
         StyleNav(SavedButton,section=="Сохранённое"||savedReturn!=null&&section!="Настройки");
         StyleNav(SettingsButton,section=="Настройки");
     }
-    // The description overlay stays out of layout until a card is hovered; with motion on it fades in while the cover zooms slightly.
+    // The year, genre and description overlay stays out of layout until a card is hovered; with motion on it fades in.
+    // The cover itself is never scaled, so the whole poster stays visible inside its frame.
     void PosterHoverIn(object sender,System.Windows.Input.MouseEventArgs e)=>PosterHover(sender,true);
     void PosterHoverOut(object sender,System.Windows.Input.MouseEventArgs e)=>PosterHover(sender,false);
     void PosterHover(object sender,bool over)
     {
         if(sender is not Button card||FindVisual<Border>(card,border=>border.Name=="PosterHover") is not {} overlay)return;
-        var cover=FindVisual<Image>(card,image=>image.Parent is Grid grid&&grid.Parent is Border{Name:"CardPoster"});
-        var ease=new System.Windows.Media.Animation.CubicEase{EasingMode=System.Windows.Media.Animation.EasingMode.EaseOut};
-        var duration=TimeSpan.FromMilliseconds(220);
         if(over)overlay.Visibility=Visibility.Visible;
         if(!Motion)
         {
@@ -135,13 +133,9 @@ public partial class MainWindow:Window
             if(!over)overlay.Visibility=Visibility.Collapsed;
             return;
         }
-        var fade=new System.Windows.Media.Animation.DoubleAnimation(over?1:0,duration){EasingFunction=ease};
+        var fade=new System.Windows.Media.Animation.DoubleAnimation(over?1:0,TimeSpan.FromMilliseconds(200)){EasingFunction=new System.Windows.Media.Animation.CubicEase{EasingMode=System.Windows.Media.Animation.EasingMode.EaseOut}};
         if(!over)fade.Completed+=(_,_)=>{if(!card.IsMouseOver)overlay.Visibility=Visibility.Collapsed;};
         overlay.BeginAnimation(UIElement.OpacityProperty,fade);
-        if(cover==null)return;
-        if(cover.RenderTransform is not System.Windows.Media.ScaleTransform zoom||zoom.IsFrozen)cover.RenderTransform=zoom=new System.Windows.Media.ScaleTransform();
-        var scale=new System.Windows.Media.Animation.DoubleAnimation(over?1.05:1,duration){EasingFunction=ease};
-        zoom.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleXProperty,scale);zoom.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty,scale);
     }
     void OpenCard(object sender,RoutedEventArgs e)
     {
@@ -191,10 +185,12 @@ public partial class MainWindow:Window
     void ApplyTheme()
     {
         ApplyInterfaceTheme(prefs.Light);
-        ThemeIcon.Data=(Geometry)FindResource(prefs.Light?"IconTheme":"IconMoon");
+        // A sun with rays in the light theme and a filled crescent in the dark one.
+        ThemeIcon.Data=(Geometry)FindResource(prefs.Light?"IconSun":"IconMoon");
+        if(prefs.Light)ThemeIcon.Fill=null;else ThemeIcon.SetResourceReference(System.Windows.Shapes.Shape.FillProperty,"Text");
         foreach(var item in downloads.Items)item.Refresh();
         SidePanel.SetResourceReference(Border.BackgroundProperty,"Sidebar");
-        SystemWindowTheme.Apply(this,prefs.Light);
+        SystemWindowTheme.Apply(this,prefs.Light,true);
     }
 
     bool closing;

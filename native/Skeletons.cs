@@ -5,10 +5,36 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 namespace Kachalka;
 
-// Static grey placeholders shown while a shelf, the catalog grid, the banner or the cast are still loading.
-// They only reserve the shape of the coming content; there is no animation or timer behind them.
+// Grey placeholders shown while a shelf, the catalog grid, the banner, the cast, the synopsis or the
+// releases are still loading. They reserve the shape of the coming content and breathe slowly; there is
+// no timer behind them, only one composited opacity animation per placeholder.
 public partial class MainWindow
 {
+    // Off in smoke tests and when Windows animations are turned off; the placeholder then stays still.
+    static T Breathe<T>(T placeholder) where T:UIElement
+    {
+        if(Motion)placeholder.BeginAnimation(UIElement.OpacityProperty,new System.Windows.Media.Animation.DoubleAnimation(1,.5,TimeSpan.FromSeconds(1.4))
+            {AutoReverse=true,RepeatBehavior=System.Windows.Media.Animation.RepeatBehavior.Forever,EasingFunction=new System.Windows.Media.Animation.SineEase{EasingMode=System.Windows.Media.Animation.EasingMode.EaseInOut}});
+        return placeholder;
+    }
+    // Three lines in place of the synopsis while the film's description is on its way.
+    static FrameworkElement SynopsisSkeleton()
+    {
+        var lines=new StackPanel{Name="DetailSynopsisSkeleton",IsHitTestVisible=false,Margin=new(0,4,0,4)};AutomationProperties.SetName(lines,"Загружаем описание");
+        foreach(var (right,opacity) in new[]{(0d,1d),(40d,1d),(160d,.7d)}){var bar=SkeletonBar(13,new(0,0,right,10),opacity);bar.SetResourceReference(Border.BackgroundProperty,"BannerChip");lines.Children.Add(bar);}
+        return Breathe(lines);
+    }
+    // Release rows while the first source has not answered yet.
+    static FrameworkElement ReleaseSkeleton()
+    {
+        var rows=new StackPanel{Name="ReleaseSkeleton",IsHitTestVisible=false};AutomationProperties.SetName(rows,"Ищем раздачи");
+        for(var index=0;index<3;index++)
+        {
+            var row=new Border{CornerRadius=new(16),Padding=new(20,18,20,18),Margin=new(0,0,0,10),BorderThickness=new(1)};row.SetResourceReference(Border.BackgroundProperty,"Panel");row.SetResourceReference(Border.BorderBrushProperty,"EdgeSoft");
+            var lines=new StackPanel();lines.Children.Add(SkeletonBar(14,new(0,0,index==1?220:120,12)));lines.Children.Add(SkeletonBar(10,new(0,0,index==2?300:260,0),.7));row.Child=lines;rows.Children.Add(row);
+        }
+        return Breathe(rows);
+    }
     static Border SkeletonBar(double height,Thickness margin,double opacity=1)
     {
         var bar=new Border{Height=height,CornerRadius=new(height/2),Margin=margin,Opacity=opacity};bar.SetResourceReference(Border.BackgroundProperty,"Raised");return bar;
@@ -28,7 +54,7 @@ public partial class MainWindow
                 cell.Children.Add(SkeletonBar(12,new(2,12,28,0)));cell.Children.Add(SkeletonBar(10,new(2,10,64,0),.7));grid.Children.Add(cell);
             }
         }
-        Fill();
+        Fill();Breathe(grid);
         // Only a real resize regroups the cards: a scroll bar appearing or disappearing (a few pixels) must not,
         // or the new height would toggle the scroll bar again and the layout would never settle.
         var measured=0d;
@@ -47,7 +73,7 @@ public partial class MainWindow
         var title=SkeletonBar(44,new(0,0,0,16));title.Width=420;title.HorizontalAlignment=HorizontalAlignment.Left;lines.Children.Add(title);
         var meta=SkeletonBar(14,new(0,0,0,22),.7);meta.Width=220;meta.HorizontalAlignment=HorizontalAlignment.Left;lines.Children.Add(meta);
         var action=new Border{Width=150,Height=52,CornerRadius=new(14),HorizontalAlignment=HorizontalAlignment.Left};action.SetResourceReference(Border.BackgroundProperty,"Raised");lines.Children.Add(action);
-        return frame;
+        return Breathe(frame);
     }
     // Round portraits with a name line, matching the participant tiles.
     FrameworkElement PeopleSkeleton()
@@ -61,6 +87,6 @@ public partial class MainWindow
         }
         var measured=0d;
         grid.SizeChanged+=(_,e)=>{if(!e.WidthChanged||Math.Abs(e.NewSize.Width-measured)<48)return;measured=e.NewSize.Width;var columns=Math.Clamp((int)Math.Floor(e.NewSize.Width/124),1,6);if(grid.Columns!=columns)grid.Columns=columns;};
-        return grid;
+        return Breathe(grid);
     }
 }
