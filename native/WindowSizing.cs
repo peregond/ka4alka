@@ -44,8 +44,36 @@ public partial class MainWindow
     [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr window,out NativeRect rect);
     [DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr window,IntPtr insertAfter,int x,int y,int width,int height,uint flags);
 
+    const double CaptionBand=32;
+    void CaptionMinimizeClick(object sender,RoutedEventArgs e)=>SystemCommands.MinimizeWindow(this);
+    void CaptionMaximizeClick(object sender,RoutedEventArgs e){if(WindowState==WindowState.Maximized)SystemCommands.RestoreWindow(this);else SystemCommands.MaximizeWindow(this);}
+    void CaptionCloseClick(object sender,RoutedEventArgs e)=>SystemCommands.CloseWindow(this);
+    // A maximized window is placed with its resize frame outside the monitor; without a system caption that
+    // frame would cover the app's own edges, so the content is inset by exactly the part outside the work area.
+    void FitMaximizedFrame()
+    {
+        var maximized=WindowState==WindowState.Maximized;
+        CaptionMaximize.Content=maximized?"\uE923":"\uE922";CaptionMaximize.ToolTip=maximized?"Восстановить":"Развернуть";
+        System.Windows.Automation.AutomationProperties.SetName(CaptionMaximize,maximized?"Восстановить окно":"Развернуть окно");
+        var inset=new Thickness(0);
+        var handle=new WindowInteropHelper(this).Handle;
+        if(maximized&&handle!=IntPtr.Zero&&GetWindowRect(handle,out var window))
+        {
+            var info=new MonitorInfo{Size=(uint)Marshal.SizeOf<MonitorInfo>()};
+            var monitor=MonitorFromWindow(handle,MonitorDefaultNearest);
+            if(monitor!=IntPtr.Zero&&GetMonitorInfo(monitor,ref info))
+            {
+                var dpi=VisualTreeHelper.GetDpi(this);
+                inset=new Thickness(Math.Max(0,info.Work.Left-window.Left)/dpi.DpiScaleX,Math.Max(0,info.Work.Top-window.Top)/dpi.DpiScaleY,
+                    Math.Max(0,window.Right-info.Work.Right)/dpi.DpiScaleX,Math.Max(0,window.Bottom-info.Work.Bottom)/dpi.DpiScaleY);
+            }
+        }
+        WindowFrame.Margin=inset;
+    }
     void EnableAdaptiveLayout()
     {
+        StateChanged+=(_,_)=>FitMaximizedFrame();
+        SizeChanged+=(_,_)=>{if(WindowState==WindowState.Maximized)FitMaximizedFrame();};
         SourceInitialized+=(_,_)=>{var handle=new WindowInteropHelper(this).Handle;HwndSource.FromHwnd(handle)?.AddHook(WindowMessage);SystemWindowTheme.Apply(this,prefs.Light,true);FitToMonitor(true);};
         LocationChanged+=(_,_)=>QueueMonitorFit();
         StateChanged+=(_,_)=>QueueMonitorFit();
@@ -137,7 +165,8 @@ public partial class MainWindow
         AddTorrentButton.Content=IconLabel(tiny?"":narrow?"Добавить":"Добавить торрент","IconMagnet",18);
         AddTorrentButton.Padding=new Thickness(tiny?0:narrow?14:18,0,tiny?0:narrow?14:18,0);AddTorrentButton.MinHeight=control;AddTorrentButton.Height=control;AddTorrentButton.MinWidth=tiny?control:0;AddTorrentButton.Margin=new Thickness(0,0,tiny?8:12,0);
         BackButton.Width=control;BackButton.Height=control;BackButton.Margin=new Thickness(0,0,tiny?8:12,0);ThemeButton.Width=control;ThemeButton.Height=control;
-        HeaderArea.Margin=new Thickness(gutter,veryShort?6:shortView?12:20,gutter,veryShort?6:shortView?8:20);
+        // The top band is the window's caption (drag, snap, window buttons), so the header starts below it.
+        HeaderArea.Margin=new Thickness(gutter,CaptionBand+(veryShort?2:shortView?6:10),gutter,veryShort?6:shortView?8:20);
         if(ReferenceEquals(FiltersPanel.Parent,HeaderArea))FiltersPanel.Margin=new Thickness(0,shortView?6:12,0,0);
         CenterRegion.Margin=new Thickness(gutter,0,gutter,0);StatusToast.Margin=new Thickness(gutter,0,gutter,20);
         SearchBar.Margin=new Thickness(0,0,tiny?8:12,0);SearchBar.Height=control;Search.MinHeight=control;
