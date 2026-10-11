@@ -69,7 +69,7 @@ public sealed class LanDownloadReceiver(DownloadService downloads,Preferences pr
         if(SafePage(value) is not {} page)return null;
         var host=new Uri(page).IdnHost;
         return host=="zonapic.com"||host.EndsWith(".zonapic.com",StringComparison.OrdinalIgnoreCase)||
-            host is "image.tmdb.org" or "st.kp.yandex.net" or "avatars.mds.yandex.net"?page:null;
+            host is "image.tmdb.org" or "artworks.thetvdb.com" or "st.kp.yandex.net" or "avatars.mds.yandex.net"?page:null;
     }
     static MediaItem? Media(LanMedia? media)
     {

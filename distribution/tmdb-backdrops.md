@@ -13,6 +13,10 @@
 
 В настройках приложения добавлены официальный логотип Primary short (blue) из [Logos & Attribution](https://www.themoviedb.org/about/logos-attribution), указание TMDB и обязательная фраза: «This product uses the TMDB API but is not endorsed or certified by TMDB». Исходный SVG, прозрачный PNG и сведения об источнике находятся в `native/Assets/`. Перед публичным выпуском подключённой интеграции нужно проверить условия использования и доступ к настоящему API.
 
+## Сериалы: TheTVDB
+
+Фоны фильмов берутся только из TMDB, фоны всех сериалов — только из TheTVDB (v4), независимо от региона и языка. Для сериалов нужен секрет **`TVDB_API_KEY`** (API key проекта TheTVDB) в среде опубликованного сайта; без него `/api/backdrop?id=series:...` отвечает 503. Серверный код — `web-index/lib/tvdb-backdrop.ts`, проверка — `node tests/tvdb-backdrop.mjs`. Сопоставление: по IMDb ID через `search/remote-id`, иначе точное название и год; фоны — artwork типа 3.
+
 ## Поиск и скорость
 
 - Ключ используется исключительно сервером в заголовке Authorization к фиксированному адресу TMDB. Приложение и пользователи получают публичные ссылки на изображения.

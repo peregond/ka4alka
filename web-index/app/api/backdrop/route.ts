@@ -3,13 +3,16 @@ import seed from "@/app/data/seed.json";
 import { getMedia } from "@/lib/index-store";
 import { sharedCatalogItem } from "@/lib/shared-catalog";
 import { backdropCache, fetchBackdrop, type BackdropIdentity } from "@/lib/tmdb-backdrop";
+import { fetchTvdbBackdrop } from "@/lib/tvdb-backdrop";
 
 export const runtime = "edge";
-const lookup = backdropCache(item => fetchBackdrop(item, env.TMDB_READ_TOKEN ?? ""));
+// TMDB serves movies only; TheTVDB serves every series.
+const lookup = backdropCache(item => item.section === "series" ? fetchTvdbBackdrop(item, env.TVDB_API_KEY ?? "") : fetchBackdrop(item, env.TMDB_READ_TOKEN ?? ""));
 export async function GET(request: Request) {
   const id = new URL(request.url).searchParams.get("id") ?? "";
   if (!/^(movies|series):[\p{L}\p{N}-]{1,120}$/u.test(id)) return Response.json({ error: "Неверная карточка." }, { status: 400 });
-  if (!env.TMDB_READ_TOKEN) return Response.json({ error: "Источник фонов пока не подключён." }, { status: 503, headers: { "Cache-Control": "no-store", "Retry-After": "60" } });
+  const configured = id.startsWith("series:") ? env.TVDB_API_KEY : env.TMDB_READ_TOKEN;
+  if (!configured) return Response.json({ error: "Источник фонов пока не подключён." }, { status: 503, headers: { "Cache-Control": "no-store", "Retry-After": "60" } });
   try {
     // Accept only identities from the stored catalog. Caller-supplied titles/URLs are never queried.
     const stored = await getMedia(id).catch(() => null);

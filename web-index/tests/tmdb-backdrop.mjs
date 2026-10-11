@@ -29,8 +29,8 @@ const fake = async (url, options) => {
 assert.equal((await api.fetchBackdrop(movie, 'fixture-token', fake)).tmdbId, 2);
 assert(calls[0].includes('search/movie') && calls[1].includes('movie/2/images'));
 calls = [];
-assert.equal((await api.fetchBackdrop({ ...movie, section: 'series', imdbId: 'tt1234567' }, 'fixture-token', fake)).tmdbId, 4);
-assert(calls[0].includes('/find/tt1234567') && calls[1].includes('/tv/4/images'));
+assert.equal(await api.fetchBackdrop({ ...movie, section: 'series', imdbId: 'tt1234567' }, 'fixture-token', fake), null);
+assert.equal(calls.length, 0, 'TMDB must not be queried for series');
 let noIdentityCalls = 0;
 assert.equal(await api.fetchBackdrop({ ...movie, imdbId: 'tt1234567' }, 'fixture-token', async () => { noIdentityCalls++; return Response.json({ movie_results: [] }); }), null);
 assert.equal(noIdentityCalls, 1);
