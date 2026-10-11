@@ -13,6 +13,8 @@ namespace Kachalka;
 public partial class MainWindow
 {
     readonly Dictionary<string,BitmapImage> portraitCache=[];
+    // Completes when the open film's first release search settles, or after 1.5 s at the latest.
+    Task castAfterReleases=Task.CompletedTask;
     Border PersonPortrait(CinemaPerson person,double width,double height,MediaItem? origin=null)
     {
         var grid=new Grid();var fallback=new StackPanel{HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center,IsHitTestVisible=false};
@@ -66,6 +68,8 @@ public partial class MainWindow
             bool unavailable=false;
             try
             {
+                // On a film page the title, poster and releases come first; cast photographs follow a moment later.
+                if(origin!=null)await castAfterReleases.WaitAsync(pending.Token);
                 for(var attempt=0;attempt<2;attempt++)
                 {
                     try

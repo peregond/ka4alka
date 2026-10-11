@@ -122,6 +122,8 @@ public partial class MainWindow
         detailDescription=new StackPanel{Name="DetailDescription",Margin=new(0,0,0,16)};detailInfo.Children.Add(detailDescription);
         detailSynopsis=new TextBlock{Name="DetailSynopsis",Text=DetailDescriptionText(item),FontSize=15,LineHeight=23,LineStackingStrategy=LineStackingStrategy.BlockLineHeight,Foreground=(Brush)FindResource("BannerMuted"),TextWrapping=TextWrapping.Wrap,TextTrimming=TextTrimming.CharacterEllipsis,MaxHeight=descriptionExpanded?double.PositiveInfinity:69};
         detailDescription.Children.Add(detailSynopsis);
+        // While the description is on its way its place breathes instead of saying "loading".
+        if(!MediaMetadata.HasDescription(item)&&DetailMetadataLoading(item.Id)){detailSynopsis.Visibility=Visibility.Collapsed;detailDescription.Children.Add(SynopsisSkeleton());}
         descriptionToggle=Button(descriptionExpanded?"Свернуть описание":"Читать дальше",()=>
         {
             if(descriptionItemId!=item.Id||detailSynopsis==null)return;
@@ -151,7 +153,7 @@ public partial class MainWindow
         {
             releaseCountLabel.Text="";
             var checking=releaseViews.TryGetValue(item.Id,out var scan)&&scan.Checking;
-            if(checking){FinishDetailRender();return;}
+            if(checking){panel.Children.Add(ReleaseSkeleton());FinishDetailRender();return;}
             var empty=new StackPanel{Margin=new(2,16,2,20)};var noReleases=Text("Подходящих раздач пока нет",17);noReleases.FontWeight=FontWeights.SemiBold;empty.Children.Add(noReleases);empty.Children.Add(Text("Можно обновить поиск раздач или вернуться позже.",13,true));
             panel.Children.Add(empty);FinishDetailRender();return;
         }

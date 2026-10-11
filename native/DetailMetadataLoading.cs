@@ -15,8 +15,8 @@ public partial class MainWindow
     CancellationTokenSource metadataLifetime=new();
 
     bool DetailMetadataLoading(int id)=>detailMetadataViews.TryGetValue(id,out var view)&&view.Loading;
-    bool DetailMetadataNeedsRetry(int id)=>detailMetadataViews.TryGetValue(id,out var view)?!view.Loading&&view.Failed:current?.Id==id&&(!MediaMetadata.HasDescription(current)||current.People.Length==0);
-    string DetailDescriptionText(MediaItem item)=>MediaMetadata.HasDescription(item)?item.Description!:DetailMetadataLoading(item.Id)?"Загружаем описание…":"Описание пока недоступно.";
+    bool DetailMetadataNeedsRetry(int id)=>detailMetadataViews.TryGetValue(id,out var view)?!view.Loading&&view.Failed:current?.Id==id&&!ImdbSuggestions.IsImdbOnly(current)&&(!MediaMetadata.HasDescription(current)||current.People.Length==0);
+    string DetailDescriptionText(MediaItem item)=>MediaMetadata.HasDescription(item)?item.Description!:ImdbSuggestions.IsImdbOnly(item)?"Этого названия нет в русском каталоге, поэтому описания пока нет. Раздачи ищутся по оригинальному названию.":DetailMetadataLoading(item.Id)?"Загружаем описание…":"Описание пока недоступно.";
 
     void CancelDetailMetadata(bool restart=false)
     {
@@ -56,7 +56,7 @@ public partial class MainWindow
             {
                 data=await Metadata(item,true,view.Request.Token,Publish,force);
                 if(!IsCurrent())return data;
-                view.Failed=!MediaMetadata.HasDescription(data)||data.People.Length==0;
+                view.Failed=!ImdbSuggestions.IsImdbOnly(data)&&(!MediaMetadata.HasDescription(data)||data.People.Length==0);
                 view.Loading=false;Publish(data);
                 if(prefs.LiveFavorites.Any(x=>x.Id==data.Id)){prefs.LiveFavorites=prefs.LiveFavorites.Select(x=>x.Id==data.Id?MediaMetadata.Merge(x,data):x).ToList();prefs.Save();}
                 try{await catalogIndex.AddAsync([data],view.Request.Token);}catch(IOException){}catch(UnauthorizedAccessException){}

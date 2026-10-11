@@ -5,7 +5,7 @@ on:
       version:
         description: Version of the verified draft release to publish
         required: true
-        default: '0.40.11'
+        default: '0.40.12'
   # Called by "Prepare signed Windows release" once all of its checks pass.
   workflow_call:
     inputs:
@@ -21,7 +21,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
-      RELEASE_VERSION: ${{ inputs.version || '0.40.11' }}
+      RELEASE_VERSION: ${{ inputs.version || '0.40.12' }}
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
     steps:
       - uses: actions/checkout@v4
@@ -43,6 +43,15 @@ jobs:
           foreach($name in $names | Where-Object {$_ -like 'preview-*'}){gh release delete-asset $tag $name --yes; if($LASTEXITCODE -ne 0){throw ('Cannot remove '+$name)}}
           gh release edit $tag --draft=false --latest
           if($LASTEXITCODE -ne 0){throw 'Cannot publish release'}
+      - name: Use the release notes from the repository
+        shell: pwsh
+        run: |
+          # Re-running this workflow for a published version only refreshes its text.
+          $tag='v'+$env:RELEASE_VERSION
+          $notes='distribution/RELEASE-NOTES-'+$env:RELEASE_VERSION+'.md'
+          if(-not (Test-Path $notes)){Write-Output 'No notes file for this version; the release text stays as is.';exit 0}
+          gh release edit $tag --notes-file $notes
+          if($LASTEXITCODE -ne 0){throw 'Cannot update the release notes'}
       - name: Verify the public release without authentication
         shell: pwsh
         env:

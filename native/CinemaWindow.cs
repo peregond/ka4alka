@@ -10,16 +10,11 @@ namespace Kachalka;
 
 public partial class MainWindow
 {
-    sealed class CrewViewportHeight:IValueConverter
-    {
-        public object Convert(object value,Type targetType,object parameter,System.Globalization.CultureInfo culture)=>
-            Math.Clamp(value is double height?height*.7:280,220,520);
-        public object ConvertBack(object value,Type targetType,object parameter,System.Globalization.CultureInfo culture)=>throw new NotSupportedException();
-    }
-    static readonly CrewViewportHeight crewViewportHeight=new();
+    // The film whose full cast list is open; other films start with one row of portraits.
+    int? crewExpanded;
     Border RenderCinemaConnections(StackPanel panel,MediaItem item,Panel? participantsHost=null)
     {
-        var people=new StackPanel();
+        var people=new StackPanel();Action limitCrew=()=>{};
         if(item.People.Length==0)
         {
             if(DetailMetadataLoading(item.Id))people.Children.Add(PeopleSkeleton());else people.Children.Add(Text("Участники пока недоступны у источника.",12,true));
@@ -28,7 +23,7 @@ public partial class MainWindow
         if(item.People.Length>0)
         {
             var row=new UniformGrid{Name="CinemaPeopleGrid",Columns=3,Margin=new(0,0,-12,0)};people.Children.Add(row);
-            row.SizeChanged+=(_,_)=>{var columns=Math.Clamp((int)Math.Floor(row.ActualWidth/124),1,8);if(row.Columns!=columns)row.Columns=columns;};
+            row.SizeChanged+=(_,_)=>{var columns=Math.Clamp((int)Math.Floor(row.ActualWidth/124),1,8);if(row.Columns!=columns){row.Columns=columns;limitCrew();}};
             foreach(var person in item.People)
             {
                 var button=Button(person.Name,()=>OpenPerson(person,item));button.Name="CinemaPersonTile";button.Tag=person;button.Style=(Style)FindResource("PersonTileButton");
@@ -38,10 +33,25 @@ public partial class MainWindow
                 AutomationProperties.SetName(button,"Открыть карточку: "+person.Name+", "+person.Role);row.Children.Add(button);
             }
         }
-        var participantContent=new Grid();participantContent.RowDefinitions.Add(new(){Height=GridLength.Auto});participantContent.RowDefinitions.Add(new(){Height=new GridLength(1,GridUnitType.Star)});
-        var heading=Text("Актёры и съёмочная группа",18);heading.Name="CinemaPeopleHeading";heading.FontWeight=FontWeights.Bold;heading.Margin=new(0,0,0,16);participantContent.Children.Add(heading);
-        var participantScroll=new ScrollViewer{Name="CinemaPeopleScroll",Style=(Style)FindResource("PageScroll"),Content=people,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};Grid.SetRow(participantScroll,1);participantContent.Children.Add(participantScroll);
-        BindingOperations.SetBinding(participantScroll,FrameworkElement.MaxHeightProperty,new Binding(nameof(ActualHeight)){Source=Body,Converter=crewViewportHeight,Mode=BindingMode.OneWay});
+        var participantContent=new Grid();participantContent.RowDefinitions.Add(new(){Height=GridLength.Auto});participantContent.RowDefinitions.Add(new(){Height=GridLength.Auto});
+        // One row of portraits; "Ещё" opens the rest in place instead of a scroll area inside the page.
+        var headingRow=new DockPanel{Margin=new(0,0,0,16)};
+        var more=new Button{Name="CinemaPeopleMore",Style=(Style)FindResource("QuietButton"),MinHeight=32,Height=32,Padding=new(10,0,10,0),FontSize=14,FontWeight=FontWeights.SemiBold,VerticalAlignment=VerticalAlignment.Center,Visibility=Visibility.Collapsed};
+        more.SetResourceReference(Control.ForegroundProperty,"Accent");DockPanel.SetDock(more,Dock.Right);headingRow.Children.Add(more);
+        var heading=Text("Актёры и съёмочная группа",18);heading.Name="CinemaPeopleHeading";heading.FontWeight=FontWeights.Bold;heading.Margin=new(0);heading.VerticalAlignment=VerticalAlignment.Center;headingRow.Children.Add(heading);
+        participantContent.Children.Add(headingRow);Grid.SetRow(people,1);participantContent.Children.Add(people);
+        void LimitCrew()
+        {
+            if(FindVisual<UniformGrid>(people,x=>x.Name=="CinemaPeopleGrid") is not {} grid)return;
+            var expanded=crewExpanded==item.Id;var shown=Math.Max(1,grid.Columns);
+            for(var index=0;index<grid.Children.Count;index++)grid.Children[index].Visibility=expanded||index<shown?Visibility.Visible:Visibility.Collapsed;
+            var hidden=grid.Children.Count-shown;
+            more.Visibility=hidden>0?Visibility.Visible:Visibility.Collapsed;
+            more.Content=expanded?"Свернуть":"Ещё "+hidden;
+            AutomationProperties.SetName(more,expanded?"Свернуть список участников":"Показать всех участников: ещё "+hidden);
+        }
+        more.Click+=(_,_)=>{crewExpanded=crewExpanded==item.Id?null:item.Id;LimitCrew();};
+        limitCrew=LimitCrew;LimitCrew();
         var participants=new Border{Name="CinemaParticipants",Child=participantContent,CornerRadius=new(20),Padding=new(24),BorderThickness=new(1),VerticalAlignment=VerticalAlignment.Top};
         participants.SetResourceReference(Border.BackgroundProperty,"Panel");participants.SetResourceReference(Border.BorderBrushProperty,"EdgeSoft");
         if(participantsHost!=null)participantsHost.Children.Add(participants);else panel.Children.Add(participants);

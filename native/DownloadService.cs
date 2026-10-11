@@ -9,6 +9,8 @@ public sealed partial class DownloadService
     ClientEngine? engine;
     readonly Dictionary<string,TorrentManager> managers=[];
     readonly Dictionary<string,(PayloadMeter Down,PayloadMeter Up)> meters=[];
+    // Peers that sent file data in the last moments, counted off the engine's loop; the row shows the latest count.
+    readonly Dictionary<string,int> sendingPeers=[];readonly HashSet<string> countingPeers=[];
     readonly Dictionary<TorrentManager,Task> stoppingTasks=[];
     readonly HashSet<string> pendingResume=[];
     readonly Dictionary<string,(string State,DateTime Utc)> diagnosticStates=[];
@@ -260,6 +262,14 @@ public sealed partial class DownloadService
         }
         finally{item.Busy=false;item.Refresh();gate.Release();}
     }
+    async void CountSendingPeers(string id,TorrentManager manager)
+    {
+        if(manager.State!=TorrentState.Downloading){sendingPeers.Remove(id);return;}
+        if(!countingPeers.Add(id))return;
+        try{var peers=await manager.GetPeersAsync();sendingPeers[id]=peers.Count(peer=>peer.Monitor.DownloadRate>0);}
+        catch(Exception){sendingPeers.Remove(id);}
+        finally{countingPeers.Remove(id);}
+    }
     public void Update()
     {
         var now=DateTime.UtcNow;
@@ -267,7 +277,8 @@ public sealed partial class DownloadService
             item.Name=m.Torrent?.Name??item.Name;SnapshotFiles(item,m);
             var meter=meters[item.Id];var rate=meter.Down.Sample(now,item.LastStartedUtc,m.Monitor.DataBytesReceived);
             var upload=meter.Up.Sample(now,item.LastStartedUtc,m.Monitor.DataBytesSent);
-            DownloadPresentation.Apply(item,new(m.State,item.Paused,m.Progress,m.Torrent?.Size,rate,upload,m.OpenConnections,m.Peers.Seeds,item.LastStartedUtc,meter.Down.LastPayloadUtc,m.Error?.Exception?.Message,TrackerHealth.From(m)),now);
+            CountSendingPeers(item.Id,m);sendingPeers.TryGetValue(item.Id,out var sending);
+            DownloadPresentation.Apply(item,new(m.State,item.Paused,m.Progress,m.Torrent?.Size,rate,upload,m.OpenConnections,m.Peers.Seeds,item.LastStartedUtc,meter.Down.LastPayloadUtc,m.Error?.Exception?.Message,TrackerHealth.From(m),sending),now);
             ApplyReliabilityStatus(item);
             ObserveNotices(item,m);
             var health=TrackerHealth.From(m);

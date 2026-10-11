@@ -28,6 +28,12 @@ static class DownloadTests
         Apply(snapshot with{Connections=3,DownloadRate=1024,LastPayloadUtc=now});
         Check(item.Status=="Скачивание"&&item.Remaining.Contains("мин")&&item.Hint=="","file transfer has ETA and clears waiting warning");
         Check(item.DownloadRate==1024&&item.UploadRate==0&&item.TotalBytes==1024*1024,"active file telemetry supplies numeric speed and size sort keys");
+        Apply(snapshot with{Connections=12,Seeds=30,DownloadRate=1024,LastPayloadUtc=now,Sending=5});
+        Check(item.Stats.Contains("/с от 5 человек")&&item.PeersText.StartsWith("Качаем у 5 человек · подключено: 12",StringComparison.Ordinal),"the row names how many people the file is coming from");
+        Apply(snapshot with{Connections=12,DownloadRate=1024,LastPayloadUtc=now,Sending=1});
+        Check(item.Stats.Contains("от 1 человека")&&DownloadPresentation.People(21)=="21 человека"&&DownloadPresentation.People(11)=="11 человек","the sending count reads naturally in Russian");
+        Apply(snapshot with{Connections=12,LastPayloadUtc=null,Sending=4});
+        Check(!item.Stats.Contains("человек")&&item.PeersText.StartsWith("Подключено: 12",StringComparison.Ordinal),"no sending count is claimed while nothing is being received");
         Apply(snapshot with{State=TorrentState.Metadata,DownloadRate=10000});
         Check(item.Indeterminate&&item.Remaining==""&&!item.Stats.Contains("/с")&&!item.Stats.Contains("50"),"metadata does not pretend to transfer movie bytes");
         Apply(snapshot with{State=TorrentState.Metadata,Trackers=new TrackerHealth(3,0,3)});

@@ -16,9 +16,9 @@ public partial class MainWindow
         var content=new StackPanel();
         var label=Text("Ищем раздачи…",11);label.Margin=new(0,0,0,4);
         label.SetResourceReference(TextBlock.ForegroundProperty,"Accent");content.Children.Add(label);
-        var progress=new ProgressBar{IsIndeterminate=true,Height=3,BorderThickness=new(0)};
-        progress.SetResourceReference(Control.ForegroundProperty,"Accent");progress.SetResourceReference(Control.BackgroundProperty,"Edge");
-        AutomationProperties.SetName(progress,"Поиск раздач: прогресс");content.Children.Add(progress);
+        // A calm breathing line instead of a running bar; the release rows below breathe the same way.
+        var progress=new Border{Name="ReleaseLoadingPulse",Height=3,CornerRadius=new(1.5)};progress.SetResourceReference(Border.BackgroundProperty,"Accent");
+        AutomationProperties.SetName(progress,"Поиск раздач: прогресс");content.Children.Add(Breathe(progress));
         releaseLoadingIndicator=new Border{Child=content,Width=108,Margin=new(10,5,0,5),VerticalAlignment=VerticalAlignment.Center,Visibility=Visibility.Collapsed};
         AutomationProperties.SetName(releaseLoadingIndicator,"Поиск раздач");target.Children.Add(releaseLoadingIndicator);
         RefreshReleaseLoadingIndicator();
@@ -38,6 +38,8 @@ public partial class MainWindow
         var detailTask=FetchDetailMetadata(item);
         if(!releaseViews.TryGetValue(item.Id,out var view))releaseViews[item.Id]=view=new();
         view.Request?.Cancel();view.Request?.Dispose();var request=view.Request=new CancellationTokenSource();var token=request.Token;
+        var releasesSettled=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        if(current?.Id==item.Id)castAfterReleases=Task.WhenAny(releasesSettled.Task,Task.Delay(1500));
         var prior=view.Sources.GroupBy(x=>x.Name).ToDictionary(x=>x.Key,x=>x.Last().LastSuccessUtc);
         var saved=liveReleases.GetValueOrDefault(item.Id)?.ToArray()??[];
         var fresh=new List<SourceEntry>();var checks=new Dictionary<string,SourceCheck>();
@@ -67,8 +69,8 @@ public partial class MainWindow
                 checks[group.Key]=Remember(new(group.Key,rowState,group.Count()));
             }
         }
-        IndexRows(saved,SourceState.Saved);checks["Онлайн-индекс"]=Remember(new("Онлайн-индекс",SourceState.Searching));view.Sources=checks.Values.ToArray();
-        await Task.Yield();if(!IsCurrent())return;
+        IndexRows(saved,SourceState.Saved);if(!ImdbSuggestions.IsImdbOnly(item))checks["Онлайн-индекс"]=Remember(new("Онлайн-индекс",SourceState.Searching));view.Sources=checks.Values.ToArray();
+        await Task.Yield();if(!IsCurrent()){releasesSettled.TrySetResult();return;}
         var entered=false;
         try
         {
@@ -79,7 +81,8 @@ public partial class MainWindow
                 catch(TimeoutException){return item;}
             }
             // Supplement cached/indexed rows concurrently: a single screen copy must not suppress better sources.
-            var providers=new[]{new ReleaseSource("Онлайн-индекс",ct=>onlineIndex.Releases(item,ct,allowRelay:true))}
+            // The online index only knows catalog titles; an IMDb-only title goes straight to the trackers.
+            var providers=(ImdbSuggestions.IsImdbOnly(item)?[]:new[]{new ReleaseSource("Онлайн-индекс",ct=>onlineIndex.Releases(item,ct,allowRelay:true))})
                 .Concat(NativeReleaseSources.Create(sourceClient,Resolved,item.Section=="Сериалы"));
             var settled=false;
             void Apply(ReleaseSearchUpdate update)
@@ -99,6 +102,6 @@ public partial class MainWindow
         }
         catch(OperationCanceledException) when(token.IsCancellationRequested){}
         catch(Exception) when(!token.IsCancellationRequested){checks["Поиск источников"]=new("Поиск источников",SourceState.Unavailable,CheckedUtc:DateTime.UtcNow);}
-        finally{if(entered)releaseSlots.Release();if(IsCurrent()){view.Checking=false;Publish();}}
+        finally{releasesSettled.TrySetResult();if(entered)releaseSlots.Release();if(IsCurrent()){view.Checking=false;Publish();}}
     }
 }
