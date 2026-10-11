@@ -124,6 +124,10 @@ static class DownloadReliabilityTests
                 var pending=await magnetic.Add(magnet,Path.Combine(root,"reliability-metadata-download"));var metadata=Managers(magnetic)[pending.Id];
                 await metadata.AddPeerAsync(new PeerInfo(new Uri($"ipv4://127.0.0.1:{seedPort}")));
                 await Until(()=>pending.LowSpacePaused&&magneticNotices.Count(n=>n.Kind==DownloadNoticeKind.LowSpace)==1,"magnet pauses immediately after discovering a payload that exceeds the available budget");
+                await Until(()=>metadata.State==TorrentState.Stopped&&!Managers(magnetic).ContainsKey(pending.Id),"metadata disk pause stops the real manager and releases its idle engine");
+                var stoppedBytes=metadata.Monitor.DataBytesReceived;
+                await Task.Delay(500);
+                Check(metadata.Monitor.DataBytesReceived==stoppedBytes,"metadata disk pause prevents further payload transfer after startup finishes");
                 Check(pending.Files.Count==2&&pending.Paused&&pending.Progress<100&&magneticNotices.Count(n=>n.Kind==DownloadNoticeKind.LowSpace)==1,"magnet shortage retains file metadata and emits exactly one low-space notice");
                 free=4L*1024*1024*1024;Check(await magnetic.RecoverConnectionsAsync(true,force:true)==0&&pending.Paused,"network recovery never resumes a task paused for disk space");
             }
