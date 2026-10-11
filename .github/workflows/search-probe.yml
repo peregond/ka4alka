@@ -1,0 +1,14 @@
+name: Probe title search sources
+on:
+  push:
+    branches: [claude/compassionate-einstein-peg0a1]
+    paths: [scripts/probe-search.py, .github/workflows/search-probe.yml]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -X utf8 scripts/probe-search.py
