@@ -1,27 +1,14 @@
-name: Publish catalog and application 0.40.13
+name: Catalog publication moved to 0.40.14
 on:
   push:
     branches: [release/0.40.13]
-  workflow_dispatch:
 permissions:
-  contents: write
-  actions: read
+  contents: read
 concurrency:
   group: publish-catalog-app-0.40.13
   cancel-in-progress: true
 jobs:
-  catalog:
-    uses: ./.github/workflows/catalog-daily.yml
-    with:
-      # Reuse the metadata already refreshed for this publication; daily runs
-      # retain their normal 1000-record / 600-second enrichment budget.
-      detail_limit: '0'
-      metadata_budget_seconds: '0'
-    secrets: inherit
-  application:
-    needs: catalog
-    uses: ./.github/workflows/release.yml
-    with:
-      version: '0.40.13'
-      publish: true
-    secrets: inherit
+  moved:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo 'This publication has moved to release/0.40.14; 0.40.13 is managed separately.'
