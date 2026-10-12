@@ -46,7 +46,7 @@ public static class GameReleaseSources
             }
             ct.ThrowIfCancellationRequested();throw last??new IOException("RuTor недоступен.");
         }
-        return new[]{new ReleaseSource("RuTor · игры",Rutor),new ReleaseSource("RuTracker · через Knaben",ct=>KnabenSource.Search(game,ct))}
-            .Concat(configured.Take(3).Select(source=>new ReleaseSource(source.Name,async ct=>(await client.SearchTorznab(source,game.OriginalTitle??game.Title,ct,4010)).Where(row=>Matches(game,row)).ToArray()))).DistinctBy(source=>source.Name).ToArray();
+        return new[]{new ReleaseSource("RuTor · игры",ct=>Task.Run(()=>Rutor(ct),ct)),new ReleaseSource("RuTracker · через Knaben",ct=>Task.Run(()=>KnabenSource.Search(game,ct),ct))}
+            .Concat(configured.Take(3).Select(source=>new ReleaseSource(source.Name,ct=>Task.Run<IReadOnlyList<SourceEntry>>(async ()=>(await client.SearchTorznab(source,game.OriginalTitle??game.Title,ct,4010)).Where(row=>Matches(game,row)).ToArray(),ct)))).DistinctBy(source=>source.Name).ToArray();
     }
 }

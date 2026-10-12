@@ -47,7 +47,7 @@ public partial class MainWindow
             var button=Button(label,()=>{gameNewest=newest;gamePage=1;gameKey="";Render();});button.Style=(Style)FindResource("PillButton");button.SetResourceReference(Control.BackgroundProperty,gameNewest==newest?"Selected":"Panel");controls.Children.Add(button);
         }
         controls.Children.Add(ActionButton("Обновить","IconRefresh",()=>{gameKey="";Render();},"QuietButton"));PageHeader.Children.Add(controls);
-        var visible=gameItems.Where(item=>!HiddenCatalog.TitleHidden(item,prefs.HiddenTitles)).ToArray();ShowCatalog(visible);catalogList!.ItemTemplate=(DataTemplate)FindResource("GameRow");
+        var visible=gameItems.Where(item=>gameQuery.Length>0||!HiddenCatalog.TitleHidden(item,prefs.HiddenTitles)).ToArray();ShowCatalog(visible);catalogList!.ItemTemplate=(DataTemplate)FindResource("GameRow");
         var pages=new WrapPanel();
         if(gamePage>1)pages.Children.Add(Button("← Назад",()=>{gamePage--;gameKey="";ResetCatalogNavigationPosition();Render();}));
         pages.Children.Add(Text("Страница "+gamePage,13,true));
