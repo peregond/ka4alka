@@ -24,6 +24,8 @@ public static class WindowSizing
     }
     // A poster cell is 144 wide plus a 16 gap, so rows hold as many whole cards as fit.
     public static int PosterColumns(double contentWidth)=>Math.Clamp((int)Math.Floor(contentWidth/160),1,10);
+    // Game cards are wide capsules, so a cell is 190 wide plus the same 16 gap.
+    public static int GameColumns(double contentWidth)=>Math.Clamp((int)Math.Floor(contentWidth/190),1,8);
 }
 
 public partial class MainWindow
@@ -139,7 +141,7 @@ public partial class MainWindow
         BrandLogo.Width=narrow?32:36;BrandLogo.Height=narrow?32:36;BrandLogo.Margin=new Thickness(0,0,narrow?0:12,0);
         BrandText.Visibility=narrow?Visibility.Collapsed:Visibility.Visible;
         LibraryLabel.Visibility=narrow||shortView?Visibility.Collapsed:Visibility.Visible;
-        foreach(var nav in Navigation.Children.OfType<Button>()){var name=nav.Tag?.ToString()??"";nav.Content=NavContent(name,name=="Фильмы"?"IconFilm":"IconTv",narrow);}
+        foreach(var nav in Navigation.Children.OfType<Button>()){var name=nav.Tag?.ToString()??"";nav.Content=NavContent(name,NavIcon(name),narrow);}
         SavedButton.Content=NavContent("Сохранённое","IconHeart",narrow,1);DownloadsButton.Content=NavContent("Загрузки","IconDownload",narrow,2);SettingsButton.Content=NavContent("Настройки","IconSettings",narrow);
         foreach(var nav in Navigation.Children.OfType<Button>().Concat(new[]{SavedButton,DownloadsButton,SettingsButton}))
         {
@@ -168,7 +170,7 @@ public partial class MainWindow
     }
     void UpdateFilterRail()
     {
-        var visible=inlineCatalogFilterScroll!=null&&catalogToolbar!=null&&current==null&&activePerson==null&&section is "Фильмы" or "Сериалы" or "Сохранённое";
+        var visible=(inlineCatalogFilterScroll!=null&&catalogToolbar!=null||section=="Игры"&&gameFilterRow!=null)&&current==null&&activePerson==null&&section is "Фильмы" or "Сериалы" or "Сохранённое" or "Игры";
         FiltersPanel.Visibility=visible?Visibility.Visible:Visibility.Collapsed;
         if(!visible||inlineCatalogFilters==null)return;
         var width=FiltersPanel.ActualWidth>0?FiltersPanel.ActualWidth:Math.Max(1,ActualWidth-(compactWidth?64:236)-2*contentGutter);
@@ -208,20 +210,23 @@ public partial class MainWindow
         // The list's own presenter clips at its edge, which cut the first column's hover and focus rings
         // (they reach 4 px outside a card). Widen the list by 6 px on each side and inset its rows by as much.
         var rowStyle=((Style)FindResource(typeof(ListBox))).Setters.OfType<Setter>().FirstOrDefault(x=>x.Property==ItemsControl.ItemContainerStyleProperty)?.Value as Style;
-        catalogList=new ListBox{ItemTemplate=(DataTemplate)FindResource("MediaRow"),Margin=new(-6,0,-6,0),
+        catalogList=new ListBox{ItemTemplate=(DataTemplate)FindResource(GameGrid?"GameRow":"MediaRow"),Margin=new(-6,0,-6,0),
             ItemContainerStyle=new Style(typeof(ListBoxItem),rowStyle){Setters={new Setter(FrameworkElement.MarginProperty,new Thickness(6,0,6,0))}}};
         Body.Children.Add(catalogList);
         UpdateCatalogColumns(true);
     }
+    // Games, and the saved games tab, lay out wide capsules instead of portrait posters.
+    bool GameGrid=>section=="Игры"||section=="Сохранённое"&&savedCategory=="Игры";
     void UpdateCatalogColumns(bool force=false)
     {
-        if(catalogList==null)return;
+        // The games home has shelves but no list, so it still follows the window width.
+        if(catalogList==null&&!(section=="Игры"&&discoveryShelves.Count>0))return;
         var width=Body.ActualWidth>0?Body.ActualWidth:Math.Max(1,Width-(compactWidth?64:236)-2*contentGutter);
-        var columns=WindowSizing.PosterColumns(width);
+        var columns=GameGrid?WindowSizing.GameColumns(width):WindowSizing.PosterColumns(width);
         if(!force&&columns==catalogColumns)return;
         var position=CaptureCatalogReflow();
         catalogColumns=columns;
-        catalogList.ItemsSource=catalogDisplay.Chunk(columns).Select(x=>new CatalogRow(x,columns)).ToArray();ApplyPosterDownloads(catalogDisplay);
+        if(catalogList!=null){catalogList.ItemsSource=catalogDisplay.Chunk(columns).Select(x=>new CatalogRow(x,columns)).ToArray();ApplyPosterDownloads(catalogDisplay);}
         UpdateDiscoveryLayout();
         RestoreCatalogReflow(position);
     }

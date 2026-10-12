@@ -44,7 +44,8 @@ public record MediaItem(int Id, string Title, string Section, string Genre, int 
         PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(DownloadPercent)));PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(HasDownloadProgress)));PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(IsDownloaded)));
     }
     // Under a poster's title: the year and the first genre. The film page lists every genre.
-    [JsonIgnore] public string CardMeta=>string.Join(" · ",new[]{Year>0?Year.ToString():"",AllGenres.Split(", ")[0]}.Where(x=>x.Length>0));
+    // A game from a catalog list only knows "Windows" as its genre, which says nothing under every card: its year and genre show once the store details are known.
+    [JsonIgnore] public string CardMeta=>string.Join(" · ",new[]{Year>0?Year.ToString():"",Section=="Игры"&&AllGenres=="Windows"?"":AllGenres.Split(", ")[0]}.Where(x=>x.Length>0));
     [JsonIgnore] public string AllGenres=>InlineMetadata(liveGenre??Genre);
     [JsonIgnore] public string CardRatingSource => KpAvailable?"Кинопоиск":ImdbAvailable?"IMDb":"Оценка пока недоступна";
     static string InlineMetadata(string? value)=>string.Join(", ",(value??"").Split(',').Select(part=>Regex.Replace(part,@"\s+"," ").Trim()).Where(part=>part.Length>0));

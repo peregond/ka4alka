@@ -186,7 +186,8 @@ internal static class Program
         await Until(()=>Field(window,"liveLoading") is false&&Field(window,"liveItems") is IEnumerable rows&&rows.Cast<object>().Any(),TimeSpan.FromSeconds(70),"Actual series source catalogue did not load.");
         await Task.Delay(2000);await WaitPosters(window,"Series catalogue");Save(window,"series-dark.png");
         Call(window,"ShowGames");await Settle(window);
-        await Until(()=>Field(window,"gameLoading") is false&&Field(window,"gameItems") is IEnumerable games&&games.Cast<object>().Any(),TimeSpan.FromSeconds(60),"Actual Steam game catalogue did not load.");
+        // 0.42.0 opened a plain list; later releases open a home page whose shelves hold the games.
+        await Until(()=>Field(window,"gameLoading") is false&&!(Field(window,"gameShelfLoading") is IEnumerable loadingShelves&&loadingShelves.Cast<object>().Any())&&(Field(window,"gameItems") is IEnumerable games&&games.Cast<object>().Any()||Field(window,"gameShelfItems") is IDictionary shelves&&shelves.Count>0),TimeSpan.FromSeconds(60),"Actual Steam game catalogue did not load.");
         await WaitPosters(window,"Steam game catalogue");Save(window,"games-dark.png");
         Call(window,"ToggleTheme",window,new RoutedEventArgs());await Settle(window);await WaitPosters(window,"Light game catalogue");Save(window,"games-light.png");
         Call(window,"ToggleTheme",window,new RoutedEventArgs());await Settle(window);

@@ -104,6 +104,24 @@ public partial class MainWindow
         return LanDownloadAction(entry);
     }
 
+    // Shared by the film and the game release lists.
+    FrameworkElement RecommendedPill()
+    {
+        var pill=new Border{CornerRadius=new(11),Padding=new(9,0,9,0),Height=22,Margin=new(0,0,10,6),HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center};pill.SetResourceReference(Border.BackgroundProperty,"AccentSoft");
+        var label=new TextBlock{Text="★ Рекомендуем",FontSize=11,FontWeight=FontWeights.Bold,VerticalAlignment=VerticalAlignment.Center};label.SetResourceReference(TextBlock.ForegroundProperty,"Accent");pill.Child=label;return pill;
+    }
+    FrameworkElement ReasonLine(string reason)
+    {
+        var row=new StackPanel{Orientation=Orientation.Horizontal,Margin=new(0,4,0,0)};
+        var icon=new System.Windows.Shapes.Path{Data=(Geometry)FindResource("IconInfo"),Width=14,Height=14,Stretch=Stretch.Uniform,StrokeThickness=1.6,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,Margin=new(0,0,6,0),VerticalAlignment=VerticalAlignment.Center};icon.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty,"Muted");row.Children.Add(icon);
+        var text=new TextBlock{Text=reason,FontSize=12,VerticalAlignment=VerticalAlignment.Center};text.SetResourceReference(TextBlock.ForegroundProperty,"Muted");row.Children.Add(text);return row;
+    }
+    FrameworkElement LowSeedLine()
+    {
+        var row=new StackPanel{Orientation=Orientation.Horizontal,Margin=new(0,4,0,0)};
+        var icon=new System.Windows.Shapes.Path{Data=(Geometry)FindResource("IconAlert"),Width=14,Height=14,Stretch=Stretch.Uniform,StrokeThickness=1.6,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,Margin=new(0,0,6,0),VerticalAlignment=VerticalAlignment.Center};icon.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty,"Danger");row.Children.Add(icon);
+        var text=new TextBlock{Text="Мало отдающих — загрузка может идти медленно",FontSize=12,VerticalAlignment=VerticalAlignment.Center};text.SetResourceReference(TextBlock.ForegroundProperty,"Danger");row.Children.Add(text);return row;
+    }
     int releasePickerRenders;
     void RenderReleasePicker(StackPanel panel,IReadOnlyList<SourceEntry> releases)
     {
@@ -311,17 +329,6 @@ public partial class MainWindow
             var card=new Border{Child=body,CornerRadius=new(16),Padding=new(16),Margin=new(0,0,0,8),BorderThickness=new(1)};
             card.SetResourceReference(Border.BackgroundProperty,isBest?"AccentFaint":"Panel");card.SetResourceReference(Border.BorderBrushProperty,isBest?"AccentLine":"EdgeSoft");return card;
         }
-        FrameworkElement RecommendedPill()
-        {
-            var pill=new Border{CornerRadius=new(11),Padding=new(9,0,9,0),Height=22,Margin=new(0,0,10,6),HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center};pill.SetResourceReference(Border.BackgroundProperty,"AccentSoft");
-            var label=new TextBlock{Text="★ Рекомендуем",FontSize=11,FontWeight=FontWeights.Bold,VerticalAlignment=VerticalAlignment.Center};label.SetResourceReference(TextBlock.ForegroundProperty,"Accent");pill.Child=label;return pill;
-        }
-        FrameworkElement ReasonLine(string reason)
-        {
-            var row=new StackPanel{Orientation=Orientation.Horizontal,Margin=new(0,4,0,0)};
-            var icon=new System.Windows.Shapes.Path{Data=(Geometry)FindResource("IconInfo"),Width=14,Height=14,Stretch=Stretch.Uniform,StrokeThickness=1.6,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,Margin=new(0,0,6,0),VerticalAlignment=VerticalAlignment.Center};icon.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty,"Muted");row.Children.Add(icon);
-            var text=new TextBlock{Text=reason,FontSize=12,VerticalAlignment=VerticalAlignment.Center};text.SetResourceReference(TextBlock.ForegroundProperty,"Muted");row.Children.Add(text);return row;
-        }
         // The recommended release on top of the list: larger, with its reason and one primary
         // download button. It stays in the list below too, with its row actions and details.
         FrameworkElement BestRelease(ReleaseRecommendation.Choice pick)
@@ -356,12 +363,6 @@ public partial class MainWindow
             card.SetResourceReference(Border.BackgroundProperty,"AccentFaint");card.SetResourceReference(Border.BorderBrushProperty,"AccentLine");
             AutomationProperties.SetName(card,"Рекомендованная раздача: "+entry.Title);
             return card;
-        }
-        FrameworkElement LowSeedLine()
-        {
-            var row=new StackPanel{Orientation=Orientation.Horizontal,Margin=new(0,4,0,0)};
-            var icon=new System.Windows.Shapes.Path{Data=(Geometry)FindResource("IconAlert"),Width=14,Height=14,Stretch=Stretch.Uniform,StrokeThickness=1.6,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,Margin=new(0,0,6,0),VerticalAlignment=VerticalAlignment.Center};icon.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty,"Danger");row.Children.Add(icon);
-            var text=new TextBlock{Text="Мало отдающих — загрузка может идти медленно",FontSize=12,VerticalAlignment=VerticalAlignment.Center};text.SetResourceReference(TextBlock.ForegroundProperty,"Danger");row.Children.Add(text);return row;
         }
         void Show()
         {

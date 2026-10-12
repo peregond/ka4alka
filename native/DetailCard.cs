@@ -221,6 +221,7 @@ public partial class MainWindow
     }
     void RefreshDetailActions()
     {
+        if(current?.Section=="Игры"){RefreshGameActions();return;}
         if(current==null||detailActions==null||section is "Загрузки" or "Настройки"||activePerson!=null)return;
         liveReleases.TryGetValue(current.Id,out var known);
         var choices=detailFilteredMovieId==current.Id&&detailFilteredReleases!=null?detailFilteredReleases:known??[];
