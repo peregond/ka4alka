@@ -24,6 +24,8 @@ public partial class MainWindow
     }
     public async Task StartupPerformanceSmokeTest(string output)
     {
+        // Local performance fixtures must not be replaced by a late startup catalog refresh.
+        section="Настройки";metadataLifetime.Cancel();
         Directory.CreateDirectory(output);var ui=Environment.CurrentManagedThreadId;var beats=0;
         var heartbeat=new DispatcherTimer(DispatcherPriority.Input){Interval=TimeSpan.FromMilliseconds(15)};
         heartbeat.Tick+=(_,_)=>beats++;heartbeat.Start();

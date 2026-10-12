@@ -83,6 +83,8 @@ public partial class MainWindow
 
     public async Task CoverViewportSmokeTest(string output)
     {
+        // Local performance fixtures must not be replaced by a late startup catalog refresh.
+        section="Настройки";metadataLifetime.Cancel();
         Directory.CreateDirectory(output);liveRequest?.Cancel();liveLoading=false;searchDelay.Stop();personRequest?.Cancel();catalogRefreshTimer.Stop();
         // A local IO fixture must not inherit a live catalog's startup shelves,
         // loading panel, navigation restore or monitor-dependent page height.
@@ -202,6 +204,10 @@ public partial class MainWindow
         host.Child=null;await Until(()=>unloadToken.IsCancellationRequested,"Unloading did not cancel pending image IO.");fixture.Release(20);await Task.Delay(100);
         if(recycled.Source!=null)throw new Exception("An unloaded image received a late poster response.");
 
+        failureState=()=>new{Tracked=coverViewport?.TrackedCount,Sweeps=coverViewport?.SweepCount,Slots=coverSlots.CurrentCount,
+            CurrentUrl=CoverUrl(recycled.DataContext),recycled.IsLoaded,recycled.IsVisible,Source=recycled.Source!=null,
+            Position=coverViewport?.Measure(recycled),Requests21=fixture.Count(21),Requests22=fixture.Count(22),
+            Pending=ObserveDownloadCover(recycled).Request!=null,Failure=ObserveDownloadCover(recycled).LastFailure?.ToString()};
         fixture.Hold(21);recycled.DataContext=Card(21,url+"21.png");host.Child=recycled;
         await Until(()=>fixture.Count(21)>0,"Recycled context fixture did not start.");var staleToken=ObserveDownloadCover(recycled).Request!.Token;
         recycled.DataContext=Card(22,url+"22.png");await Until(()=>recycled.Source!=null,"A recycled poster did not load the replacement context.");var replacement=recycled.Source;
