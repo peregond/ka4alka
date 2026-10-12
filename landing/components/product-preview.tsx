@@ -4,10 +4,10 @@ import { useState } from "react";
 import { ArrowUpRight, Film, Download, Sun, Rows3 } from "lucide-react";
 
 const screens = [
-  { id: "catalog", label: "Каталог", icon: Film, file: "catalog-dark.png", alt: "Каталог Качалки: подборки фильмов, постеры, рейтинги и фильтры в тёмной теме", caption: "Подборки, поиск и фильтры — чтобы найти кино под настроение." },
-  { id: "detail", label: "Карточка фильма", icon: Rows3, file: "detail-wide-dark.png", alt: "Карточка фильма в Качалке с описанием, рейтингами и вариантами загрузки", caption: "Описание, оценки и варианты раздач — рядом с выбранным фильмом." },
-  { id: "downloads", label: "Загрузки", icon: Download, file: "downloads-dark.png", alt: "Очередь загрузок в Качалке с прогрессом, скоростью и управлением задачами", caption: "Очередь, прогресс и управление загрузками — в отдельном разделе." },
-  { id: "light", label: "Светлая тема", icon: Sun, file: "catalog-light.png", alt: "Каталог Качалки в светлой теме", caption: "Предпочитаешь светлую тему? Она тоже есть — и выбор сохраняется." },
+  { id: "catalog", label: "Каталог", icon: Film, file: "catalog-dark.png", width: 1424, height: 892, alt: "Каталог Качалки: подборки фильмов, постеры, рейтинги и фильтры в тёмной теме", caption: "Подборки, поиск и фильтры — чтобы найти кино под настроение." },
+  { id: "detail", label: "Карточка фильма", icon: Rows3, file: "detail-wide-dark.png", width: 1424, height: 892, alt: "Карточка фильма в Качалке с описанием, рейтингами и вариантами загрузки", caption: "Описание, оценки и варианты раздач — рядом с выбранным фильмом." },
+  { id: "downloads", label: "Загрузки", icon: Download, file: "downloads-dark.png", width: 1760, height: 950, alt: "Очередь загрузок в Качалке с прогрессом, скоростью и управлением задачами", caption: "Очередь, прогресс и управление загрузками — в отдельном разделе." },
+  { id: "light", label: "Светлая тема", icon: Sun, file: "catalog-light.png", width: 1424, height: 892, alt: "Каталог Качалки в светлой теме", caption: "Предпочитаешь светлую тему? Она тоже есть — и выбор сохраняется." },
 ];
 
 export function ProductPreview() {
@@ -26,9 +26,9 @@ export function ProductPreview() {
       </div>
       <span className="preview-live"><span />Реальный интерфейс</span>
     </div>
-    <div id="preview-panel" role="tabpanel" aria-labelledby={`preview-tab-${screen.id}`} tabIndex={0} className="preview-image">
-      <img src={`/app/${screen.file}`} alt={screen.alt} width="1744" height="911" fetchPriority={selected === 0 ? "high" : "auto"} />
+    <div id="preview-panel" role="tabpanel" aria-labelledby={`preview-tab-${screen.id}`} tabIndex={0} className="preview-image" style={{ aspectRatio: `${screen.width}/${screen.height}` }}>
+      <img src={`/app/${screen.file}?v=0.41.3`} alt={screen.alt} width={screen.width} height={screen.height} fetchPriority={selected === 0 ? "high" : "auto"} />
     </div>
-    <div className="preview-caption"><p>{screen.caption}</p><a href="https://github.com/peregond/ka4alka/tree/v0.40.4/distribution/assets/0.40" target="_blank" rel="noreferrer">Скриншоты из GitHub <ArrowUpRight size={14} aria-hidden="true" /></a></div>
+    <div className="preview-caption"><p>{screen.caption}</p><a href="https://github.com/peregond/ka4alka/tree/370fcf1be62bf795ab86d9e68518d63b18b76966/distribution/assets/0.40" target="_blank" rel="noreferrer">Скриншоты из GitHub <ArrowUpRight size={14} aria-hidden="true" /></a></div>
   </div>;
 }

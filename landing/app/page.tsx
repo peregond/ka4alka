@@ -26,8 +26,8 @@ export default async function Home() {
     <main id="main">
       <section className="hero section-wrap" aria-labelledby="hero-title">
         <a className="release-badge" href={release.releaseUrl} target="_blank" rel="noreferrer"><span className="status-dot" />Версия {release.version}<span className="badge-divider" />Уже на GitHub<ArrowUpRight size={13} aria-hidden="true" /></a>
-        <h1 id="hero-title">Твой вечер.<br /><span>Твоё кино. Качалка.</span></h1>
-        <p className="hero-description">Фильмы, сериалы и загрузки — в одном приложении для Windows.<br className="desktop-break" /> Найди, что посмотреть, выбери раздачу и добавь в очередь.</p>
+        <h1 id="hero-title">Твой вечер.<br /><span>Играй, смотри, качай.</span></h1>
+        <p className="hero-description">Фильмы, сериалы, игры и загрузки — в одном приложении для Windows.<br className="desktop-break" /> Выбери, во что играть или что смотреть, и добавь загрузку в очередь.</p>
         <div className="hero-actions"><a className="button button-download" href="/download"><WindowsIcon />Скачать для Windows<ArrowDownToLine size={21} aria-hidden="true" /></a><a className="button button-telegram" href="https://t.me/ka4alkacc" target="_blank" rel="noopener noreferrer"><TelegramIcon />Мы в Telegram<ArrowUpRight size={16} aria-hidden="true" /></a></div>
         <div className="hero-feature-link"><a className="button-secondary" href="#features">Что умеет Качалка<ArrowDown size={17} aria-hidden="true" /></a></div>
         <p className="download-meta">Бесплатно и без рекламы<span />Windows 10 / 11 · x64<span />Установщик · {size} МБ</p>
@@ -36,9 +36,9 @@ export default async function Home() {
       </section>
 
       <section id="features" className="features section-wrap" aria-labelledby="features-title">
-        <div className="section-heading"><div><p className="eyebrow">ОТ ВЫБОРА ДО ЗАГРУЗКИ</p><h2 id="features-title">Меньше переключений.<br />Больше хорошего кино.</h2></div><p className="section-description">Каталог, поиск раздач и торрент-клиент работают вместе. Всё нужное — под рукой.</p></div>
+        <div className="section-heading"><div><p className="eyebrow">ОТ ВЫБОРА ДО ЗАГРУЗКИ</p><h2 id="features-title">Меньше переключений.<br />Больше кино и игр.</h2></div><p className="section-description">Каталог, поиск раздач и торрент-клиент работают вместе. Всё нужное — под рукой.</p></div>
         <div className="steps-grid">
-          <article className="feature-step"><div className="step-top"><span>01 / НАЙДИ</span><Search size={23} aria-hidden="true" /></div><h3>Что посмотреть?</h3><p>Фильмы и сериалы, подборки, оценки и описания. Ищи по названию или выбирай по жанру, году, стране и рейтингу.</p><div className="feature-tags"><span>Фильмы</span><span>Сериалы</span><span>Подборки</span></div></article>
+          <article className="feature-step"><div className="step-top"><span>01 / НАЙДИ</span><Search size={23} aria-hidden="true" /></div><h3>Что посмотреть? Во что играть?</h3><p>Находи фильмы, сериалы и игры по названию. Для кино — подборки, оценки, описания и фильтры по жанру, году, стране и рейтингу.</p><div className="feature-tags"><span>Фильмы</span><span>Сериалы</span><span>Игры</span></div></article>
           <article className="feature-step"><div className="step-top"><span>02 / ВЫБЕРИ</span><Settings2 size={23} aria-hidden="true" /></div><h3>Твоя раздача.</h3><p>Сравни качество, размер и число сидов. Отфильтруй озвучку, субтитры и кодек, чтобы загрузить подходящий вариант.</p><div className="feature-tags"><span>HD</span><span>Full HD</span><span>4K</span></div></article>
           <article className="feature-step"><div className="step-top"><span>03 / ЗАГРУЗИ</span><ArrowDownToLine size={23} aria-hidden="true" /></div><h3>Дальше — очередь.</h3><p>Скачивай через magnet и .torrent прямо в Качалке. Следи за скоростью и прогрессом, ставь на паузу и продолжай позже.</p><div className="feature-tags"><span>Magnet</span><span>.torrent</span><span>Пауза / продолжение</span></div></article>
         </div>
@@ -58,7 +58,7 @@ export default async function Home() {
       </section>
 
       <section id="download" className="download-section section-wrap" aria-labelledby="download-title">
-        <div className="download-panel"><img className="download-app-icon" src="/brand/logo.png" alt="" width="88" height="88" /><p className="eyebrow">КАЧАЛКА ДЛЯ WINDOWS</p><h2 id="download-title">Пора выбрать кино.</h2><p>Установи приложение, выбери папку для загрузок —<br className="desktop-break" /> и начинай собирать свой вечер.</p><a className="button button-download" href="/download"><WindowsIcon />Скачать для Windows<ArrowDownToLine size={21} aria-hidden="true" /></a><div className="download-options"><span>Версия {release.version} · Windows x64</span><a href="/download?format=zip">Скачать ZIP<ArrowUpRight size={14} aria-hidden="true" /></a><a href={release.releaseUrl} target="_blank" rel="noreferrer">Что нового<ArrowUpRight size={14} aria-hidden="true" /></a></div></div>
+        <div className="download-panel"><img className="download-app-icon" src="/brand/logo.png" alt="" width="88" height="88" /><p className="eyebrow">КАЧАЛКА ДЛЯ WINDOWS</p><h2 id="download-title">Пора выбрать кино или игру.</h2><p>Установи приложение, выбери папку для загрузок —<br className="desktop-break" /> и выбирай, как провести свой вечер.</p><a className="button button-download" href="/download"><WindowsIcon />Скачать для Windows<ArrowDownToLine size={21} aria-hidden="true" /></a><div className="download-options"><span>Версия {release.version} · Windows x64</span><a href="/download?format=zip">Скачать ZIP<ArrowUpRight size={14} aria-hidden="true" /></a><a href={release.releaseUrl} target="_blank" rel="noreferrer">Что нового<ArrowUpRight size={14} aria-hidden="true" /></a></div></div>
       </section>
 
       <section id="installation" className="installation section-wrap" aria-labelledby="installation-title">
@@ -79,6 +79,6 @@ export default async function Home() {
         <details><summary>Как получать новые версии?<Plus size={20} aria-hidden="true" /></summary><p>Приложение проверяет обновления с GitHub. Управлять проверкой и установкой можно в настройках. Очередь и пользовательские настройки сохраняются при обновлении.</p></details>
       </div></section>
     </main>
-    <footer className="site-footer section-wrap"><a className="brand" href="#"><img src="/brand/logo.png" width="32" height="32" alt="" /><span>Качалка</span></a><p>Твой вечер. Твоё кино.</p><a className="footer-github" href="https://github.com/peregond/ka4alka" target="_blank" rel="noreferrer"><Code2 size={17} aria-hidden="true" />Исходный код<ArrowUpRight size={14} aria-hidden="true" /></a></footer>
+    <footer className="site-footer section-wrap"><a className="brand" href="#"><img src="/brand/logo.png" width="32" height="32" alt="" /><span>Качалка</span></a><p>Твой вечер. Играй, смотри, качай.</p><a className="footer-github" href="https://github.com/peregond/ka4alka" target="_blank" rel="noreferrer"><Code2 size={17} aria-hidden="true" />Исходный код<ArrowUpRight size={14} aria-hidden="true" /></a></footer>
   </>;
 }
