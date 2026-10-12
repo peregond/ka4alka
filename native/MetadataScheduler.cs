@@ -1,9 +1,9 @@
 namespace Kachalka;
 
 // An opened film must not wait behind the ratings for every card in the catalog.
-public sealed class MetadataScheduler
+public sealed class MetadataScheduler(int? backgroundConcurrency=null)
 {
-    readonly SemaphoreSlim catalog=new(2),detail=new(2);
+    readonly SemaphoreSlim catalog=new(backgroundConcurrency??(PerformanceBudget.Constrained?1:2)),detail=new(2);
     public async Task<T> Run<T>(bool priority,Func<Task<T>> load,CancellationToken ct=default)
     {
         var slots=priority?detail:catalog;

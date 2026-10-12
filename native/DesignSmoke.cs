@@ -51,7 +51,7 @@ public partial class MainWindow
                     {
                         using var stream=File.OpenRead(path);
                         var image=new BitmapImage();image.BeginInit();image.CacheOption=BitmapCacheOption.OnLoad;image.DecodePixelWidth=280;image.StreamSource=stream;image.EndInit();image.Freeze();
-                        coverCache[item.ImageUrl]=image;designCachedPosters++;loaded=true;
+                        coverCache.Put(item.ImageUrl+"|"+PosterDecodeWidth,image);designCachedPosters++;loaded=true;
                     }
                     catch(Exception error) when(error is IOException or NotSupportedException or System.IO.FileFormatException){ }
                 }
@@ -349,7 +349,7 @@ public partial class MainWindow
             if(downloads.Items.Count!=0||downloads.EngineCreated)throw new Exception("Design smoke unexpectedly created a download.");
             Shot("downloads-empty");
             var fixtureNow=DateTime.UtcNow;
-            var downloadCards=liveItems.Where(x=>x.ImageUrl!=null&&coverCache.ContainsKey(x.ImageUrl)).Concat(liveItems).DistinctBy(x=>x.Id).Take(3).ToArray();
+            var downloadCards=liveItems.Where(x=>x.ImageUrl!=null&&coverCache.ContainsKey(x.ImageUrl+"|"+PosterDecodeWidth)).Concat(liveItems).DistinctBy(x=>x.Id).Take(3).ToArray();
             DownloadItem VisualDownload(string name,int index)
             {
                 var card=downloadCards.ElementAtOrDefault(index);

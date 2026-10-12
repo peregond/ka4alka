@@ -50,6 +50,7 @@ if(args.Contains("--probe-public"))
 if(args.Contains("--verify-cinema-source")){await CinemaSourceTests.Run();return;}
 if(args.Contains("--diagnose-cinema-source")){await CinemaSourceTests.Diagnostics();return;}
 if(args.Contains("--probe-portraits")){await PortraitSourceProbe.Run(root);return;}
+if(args.Contains("--performance-only")){await PerformanceResourcesTests.Run();await CoverCachePerformanceTests.Run(root);await UnifiedSearchTests.Run();await ReleaseSearchTests.Run();return;}
 if(args.Contains("--metadata-only")){await MediaMetadataTests.Run();return;}
 if(args.Contains("--imdb-suggestions-only")){await ImdbSuggestionTests.Run();return;}
 if(args.Contains("--portraits-only")){await CinemaPortraitTests.Run();return;}

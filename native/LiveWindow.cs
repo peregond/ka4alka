@@ -47,6 +47,7 @@ public partial class MainWindow
         item=DownloadMetadata.EnrichMedia(item,new[]{sharedCatalog.Find(item)}.OfType<MediaItem>().Concat(BundledCatalog.Search(item.Section,item.Title)));
         if(!force&&MediaMetadata.HasFullDetails(item)){updated?.Invoke(item);return Task.FromResult(item);}
         if(force){cardMetadata.Remove(item.Id);resolvedPriorityMetadata.Remove(item.Id);}
+        if(cardMetadata.TryGetValue(item.Id,out var failed)&&(failed.IsCanceled||failed.IsFaulted))cardMetadata.Remove(item.Id);
         if(cardMetadata.TryGetValue(item.Id,out var task)&&(!priority||task.IsCompletedSuccessfully&&(resolvedPriorityMetadata.Contains(item.Id)||MediaMetadata.HasFullDetails(task.Result))||priorityMetadata.Contains(item.Id)))return task;
         if(!ct.CanBeCanceled)ct=metadataLifetime.Token;
         async Task<MediaItem> Load()
@@ -107,11 +108,37 @@ public partial class MainWindow
         }
         var task=Load();if(cardMetadata.Count>=100)cardMetadata.Remove(cardMetadata.Keys.First());cardMetadata[item.Id]=task;return task;
     }
-    async Task UpdateCardRatings(MediaItem item)
+    sealed class RatingLookup
     {
-        var task=Metadata(item);
-        try{var data=await task;if(!closed)item.SetScores(data.Kinopoisk,data.Imdb,data.Genre);}
-        catch{if(cardMetadata.TryGetValue(item.Id,out var latest)&&ReferenceEquals(task,latest))cardMetadata.Remove(item.Id); /* A missing rating stays unavailable. */ }
+        public readonly CancellationTokenSource Request=new();
+        public Task<MediaItem> Task=null!;
+        public int Subscribers;
+    }
+    readonly Dictionary<int,RatingLookup> ratingLookups=[];
+    async Task UpdateCardRatings(MediaItem item,CancellationToken ct=default)
+    {
+        if(!ratingLookups.TryGetValue(item.Id,out var lookup)||lookup.Request.IsCancellationRequested)
+        {
+            lookup=new();ratingLookups[item.Id]=lookup;
+            lookup.Task=Metadata(item,ct:lookup.Request.Token);
+        }
+        lookup.Subscribers++;
+        try{var data=await lookup.Task.WaitAsync(ct);if(!closed&&!ct.IsCancellationRequested)item.SetScores(data.Kinopoisk,data.Imdb,data.Genre);}
+        catch{ /* A missing rating stays unavailable. */ }
+        finally
+        {
+            if(--lookup.Subscribers==0)
+            {
+                if(ratingLookups.TryGetValue(item.Id,out var active)&&ReferenceEquals(active,lookup))ratingLookups.Remove(item.Id);
+                if(!lookup.Task.IsCompleted)
+                {
+                    lookup.Request.Cancel();
+                    if(!priorityMetadata.Contains(item.Id)&&cardMetadata.TryGetValue(item.Id,out var latest)&&ReferenceEquals(lookup.Task,latest))cardMetadata.Remove(item.Id);
+                }
+                else if(!lookup.Task.IsCompletedSuccessfully&&cardMetadata.TryGetValue(item.Id,out var latest)&&ReferenceEquals(lookup.Task,latest))cardMetadata.Remove(item.Id);
+                _=lookup.Task.ContinueWith(task=>{_=task.Exception;lookup.Request.Dispose();},CancellationToken.None,TaskContinuationOptions.ExecuteSynchronously,TaskScheduler.Default);
+            }
+        }
     }
     string catalogGenre="",catalogCountry="",catalogCollection="all",catalogRegion="";
     int catalogRating;

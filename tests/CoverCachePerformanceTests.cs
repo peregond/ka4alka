@@ -43,5 +43,23 @@ public static class CoverCachePerformanceTests
             try{await CoverCache.Load(latePath,128,_=>Task.FromResult(valid),bytes=>{cancellation.Cancel();return bytes;},cancellation.Token);throw new Exception("Canceled decode was published");}catch(OperationCanceledException){}
             Check(!File.Exists(latePath),"cancellation during decoding prevents publishing or storing an obsolete image");
         }
+        var posterPath=Path.Combine(root,"thumbnail-original.img");var posterFetches=0;
+        var bitmap=System.Windows.Media.Imaging.BitmapSource.Create(420,630,96,96,System.Windows.Media.PixelFormats.Bgra32,null,new byte[420*630*4],420*4);bitmap.Freeze();
+        var png=new System.Windows.Media.Imaging.PngBitmapEncoder();png.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));using var output=new MemoryStream();png.Save(output);var posterBytes=output.ToArray();
+        Task<byte[]> FetchPoster(CancellationToken token){Interlocked.Increment(ref posterFetches);return Task.FromResult(posterBytes);}
+        // The implementation is internal to the app; invoke through a public
+        // test seam in the same native assembly via reflection.
+        var posterCache=typeof(CoverCache).Assembly.GetType("Kachalka.PosterBitmapCache")!;
+        var load=posterCache.GetMethod("Load",System.Reflection.BindingFlags.Static|System.Reflection.BindingFlags.NonPublic)!;
+        async Task<System.Windows.Media.Imaging.BitmapImage> Poster(int width)
+        {
+            var task=(Task<(System.Windows.Media.Imaging.BitmapImage Image,bool Downloaded)>)load.Invoke(null,[posterPath,width,(Func<CancellationToken,Task<byte[]>>)FetchPoster,CancellationToken.None])!;
+            return (await task).Image;
+        }
+        var small=await Poster(100);var repeated=await Poster(100);var large=await Poster(280);
+        Check(posterFetches==1&&small.PixelWidth==100&&repeated.PixelWidth==100&&large.PixelWidth==280&&small.IsFrozen&&large.IsFrozen,
+            "disk thumbnails survive repeated loads and DPI variants reuse one original download");
+        await File.WriteAllBytesAsync(posterPath+".w100.png",[9]);var repairedThumbnail=await Poster(100);
+        Check(posterFetches==1&&repairedThumbnail.PixelWidth==100,"a corrupt thumbnail regenerates from the original without another network request");
     }
 }

@@ -1,0 +1,48 @@
+name: Verify bounded background work and image loading
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  performance:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        processors: [2, 4]
+    env:
+      DOTNET_PROCESSOR_COUNT: ${{ matrix.processors }}
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+      - name: Verify memory budgets, shared cancellation, persisted thumbnails and incremental search
+        run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --performance-only
+      - name: Verify actual WPF viewport loading and responsive person profiles
+        shell: pwsh
+        run: |
+          foreach ($mode in @('cover-viewport','person-performance','startup-performance')) {
+            $env:KACHALKA_DATA=Join-Path $PWD "test-output/performance/$mode/profile"
+            $folder=Join-Path $env:KACHALKA_DATA 'downloads'
+            New-Item -ItemType Directory -Force $folder | Out-Null
+            @{Folder=$folder;FolderConfigured=$true;AutoResumeDownloads=$false;CheckForUpdates=$false;AutoUpdate=$false;LiteMode=$false;LiteModeConfigured=$true} | ConvertTo-Json | Set-Content (Join-Path $env:KACHALKA_DATA 'settings.json') -Encoding utf8NoBOM
+            $output=Join-Path $PWD "test-output/performance/$mode/render"
+            $app=Start-Process (Join-Path $PWD 'native/bin/Release/net10.0-windows/Kachalka.exe') -ArgumentList @("--$mode-smoke-test",('"'+$output+'"')) -PassThru
+            if(-not $app.WaitForExit(120000)){$app.Kill($true);throw "$mode timed out"}
+            if(Test-Path (Join-Path $output 'error.txt')){throw (Get-Content (Join-Path $output 'error.txt') -Raw)}
+            if($app.ExitCode -ne 0 -or -not(Test-Path (Join-Path $output 'checks.json'))){throw "$mode checks missing"}
+            Get-Content (Join-Path $output 'checks.json')
+          }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: performance-${{ matrix.processors }}cpu-${{ github.sha }}
+          path: test-output/performance/
+          if-no-files-found: ignore

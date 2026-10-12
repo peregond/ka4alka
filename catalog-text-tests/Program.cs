@@ -9,6 +9,7 @@ await BundledCatalogTests.Run();
 await TransportTests.Run();
 SeasonalCatalogTests.Run();
 await UnifiedSearchTests.Run();
+await PerformanceResourcesTests.Run();
 var previousDataDir = Environment.GetEnvironmentVariable("KACHALKA_DATA");
 var testDataDir = Path.Combine(Path.GetTempPath(), "kachalka-catalog-tests-" + Guid.NewGuid().ToString("N"));
 Directory.CreateDirectory(testDataDir);

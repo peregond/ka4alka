@@ -110,7 +110,7 @@ public partial class MainWindow
                         using var stream=new MemoryStream(bytes);var result=new BitmapImage();result.BeginInit();result.CacheOption=BitmapCacheOption.OnLoad;result.DecodePixelWidth=1280;result.StreamSource=stream;result.EndInit();if(!FeatureBackdrop.Landscape(result.PixelWidth,result.PixelHeight))throw new InvalidDataException("Источник вернул постер вместо широкого фона.");result.Freeze();return result;
                     },timeout.Token);
                     timeout.Token.ThrowIfCancellationRequested();
-                    if(coverCache.Count>=48)coverCache.Remove(coverCache.Keys.First());coverCache[url]=bitmap;
+                    coverCache.Put(url,bitmap);
                 }
                 else _=Task.Run(()=>CacheFiles.Touch(path),timeout.Token);
                 timeout.Token.ThrowIfCancellationRequested();

@@ -18,7 +18,7 @@ static class ReleaseSearchTests
     public static async Task Run()
     {
         void Check(bool value,string name){if(!value)throw new Exception(name);Console.WriteLine("PASS: "+name);}
-        var scheduler=new MetadataScheduler();
+        var scheduler=new MetadataScheduler(backgroundConcurrency:2);
         var hold=new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
         var background=new[]{scheduler.Run(false,()=>hold.Task),scheduler.Run(false,()=>hold.Task)};
         var queued=scheduler.Run(false,()=>Task.FromResult("another rating"));

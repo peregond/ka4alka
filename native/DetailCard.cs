@@ -28,13 +28,7 @@ public partial class MainWindow
         detailFilteredReleases=null;detailReleaseRowsHost=null;
         if(requestedDetails.Add(item.Id))
         {
-            var cached=catalogIndex.CachedReleaseSnapshot(item);
-            if(cached is {Items.Length:>0}&&!liveReleases.ContainsKey(item.Id))
-            {
-                liveReleases[item.Id]=cached.Items;cachedReleaseViews.Add(item.Id);
-                releaseViews[item.Id]=new(){Saved=true,SavedUtc=cached.SavedUtc,Sources=cached.Sources??[]};
-            }
-            _ = FetchDetails(item);
+            _ = RestoreAndFetchDetails(item);
         }
         ApplyKnownQuality(item);
         if(descriptionItemId!=item.Id){descriptionItemId=item.Id;descriptionExpanded=false;}

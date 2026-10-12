@@ -31,6 +31,32 @@ public partial class MainWindow
         RefreshReleaseSourceStatus();
     }
 
+    async Task RestoreAndFetchDetails(MediaItem item)
+    {
+        var cached=await Task.Run(()=>catalogIndex.CachedReleaseSnapshot(item));
+        if(closing||closed||current?.Id!=item.Id||activePerson!=null){requestedDetails.Remove(item.Id);return;}
+        if(cached is {Items.Length:>0}&&!liveReleases.ContainsKey(item.Id))
+        {
+            liveReleases[item.Id]=cached.Items;cachedReleaseViews.Add(item.Id);
+            releaseViews[item.Id]=new(){Saved=true,SavedUtc=cached.SavedUtc,Sources=cached.Sources??[]};
+            QueueDetailRefresh(item.Id,releasesOnly:true);
+        }
+        await FetchDetails(item);
+    }
+
+    void CancelStaleDetailWork()
+    {
+        var active=activePerson==null&&(section is "Фильмы" or "Сериалы")?current?.Id:null;
+        foreach(var pair in releaseViews.Where(pair=>pair.Key!=active&&pair.Value.Checking).ToArray())
+        {
+            pair.Value.Request?.Cancel();pair.Value.Checking=false;requestedDetails.Remove(pair.Key);
+        }
+        foreach(var pair in detailMetadataViews.Where(pair=>pair.Key!=active&&pair.Value.Loading).ToArray())
+        {
+            pair.Value.Request.Cancel();detailMetadataViews.Remove(pair.Key);cardMetadata.Remove(pair.Key);resolvedPriorityMetadata.Remove(pair.Key);
+        }
+    }
+
     async Task FetchDetails(MediaItem item)
     {
         // Movie information has its own request and lifetime; source retries or

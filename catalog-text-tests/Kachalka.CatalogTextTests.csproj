@@ -10,6 +10,8 @@
     <Compile Include="../native/SharedCatalog.cs" Link="SharedCatalog.cs" />
     <Compile Include="../native/BundledCatalog.cs" Link="BundledCatalog.cs" />
     <Compile Include="../native/SeasonalCatalog.cs" Link="SeasonalCatalog.cs" />
+    <Compile Include="../native/PerformanceResources.cs" Link="PerformanceResources.cs" />
+    <Compile Include="../tests/PerformanceResourcesTests.cs" Link="PerformanceResourcesTests.cs" />
     <Compile Include="../native/UnifiedSearch.cs" Link="UnifiedSearch.cs" />
     <Compile Include="../native/MediaIdentity.cs" Link="MediaIdentity.cs" />
     <Compile Include="../tests/SharedCatalogTests.cs" Link="SharedCatalogTests.cs" />

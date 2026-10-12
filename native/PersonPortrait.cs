@@ -12,7 +12,7 @@ namespace Kachalka;
 
 public partial class MainWindow
 {
-    readonly Dictionary<string,BitmapImage> portraitCache=[];
+    readonly WeightedLruCache<string,BitmapImage> portraitCache=new(PerformanceBudget.Constrained?4L*1024*1024:8L*1024*1024,image=>(long)image.PixelWidth*image.PixelHeight*4);
     // Completes when the open film's first release search settles, or after 1.5 s at the latest.
     Task castAfterReleases=Task.CompletedTask;
     Border PersonPortrait(CinemaPerson person,double width,double height,MediaItem? origin=null)
@@ -97,7 +97,7 @@ public partial class MainWindow
                                 using var download=CancellationTokenSource.CreateLinkedTokenSource(pending.Token);download.CancelAfter(TimeSpan.FromSeconds(12));
                                 var (bitmap,_)=await CoverCache.Load(portraitPath,2*1024*1024,
                                     ct=>sourceClient.Read(new Uri(url),2*1024*1024,ct),bytes=>{using var stream=new MemoryStream(bytes);var result=new BitmapImage();result.BeginInit();result.CacheOption=BitmapCacheOption.OnLoad;result.DecodePixelWidth=pixels;result.StreamSource=stream;result.EndInit();result.Freeze();return result;},download.Token);
-                                if(portraitCache.Count>=48)portraitCache.Remove(portraitCache.Keys.First());portraitCache[memoryKey]=bitmap;
+                                portraitCache.Put(memoryKey,bitmap);
                                 if(image.IsLoaded&&!pending.IsCancellationRequested){image.Source=bitmap;FitFace();fallback.Visibility=Visibility.Collapsed;frame.ToolTip=person.Name;}
                                 return;
                             }

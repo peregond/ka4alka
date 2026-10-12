@@ -20,6 +20,17 @@ static class UnifiedSearchTests
         var pending=UnifiedSearch.FindAsync("Искра",(_,_)=>remoteGate.Task,kind=>kind=="Фильмы"?[film]:[series],default,updated:value=>immediate=value);
         Check(immediate?.Items.Length==2&&!pending.IsCompleted,"local catalog results appear while remote search is still pending");
         remoteGate.SetResult([]);await pending;
+        var slowSeries=new TaskCompletionSource<IReadOnlyList<MediaItem>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var fastFilm=new TaskCompletionSource<SearchResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var streaming=UnifiedSearch.FindAsync("Искра",(kind,_)=>kind=="Фильмы"?Task.FromResult<IReadOnlyList<MediaItem>>([film]):slowSeries.Task,_=>[],default,
+            updated:update=>{if(update.Items.Any(x=>x.Section=="Фильмы"))fastFilm.TrySetResult(update);});
+        try{await fastFilm.Task.WaitAsync(TimeSpan.FromSeconds(2));Check(!streaming.IsCompleted,"fast movie results appear without waiting for the series catalog");}
+        finally{slowSeries.TrySetResult([series]);}
+        Check((await streaming).Items.Length==2,"streamed results retain both categories after the slow reply");
+        using var obsolete=new CancellationTokenSource();var never=new TaskCompletionSource<IReadOnlyList<MediaItem>>(TaskCreationOptions.RunContinuationsAsynchronously);var publishes=0;
+        var obsoleteSearch=UnifiedSearch.FindAsync("Искра",(_,_)=>never.Task,_=>[],obsolete.Token,updated:_=>publishes++);
+        obsolete.Cancel();try{await obsoleteSearch.WaitAsync(TimeSpan.FromSeconds(2));throw new Exception("Obsolete search remained alive");}catch(OperationCanceledException){}
+        never.SetResult([film]);await Task.Delay(20);Check(publishes==0,"canceled searches stop waiting even when a provider ignores cancellation and never publish late rows");
     }
 }
 

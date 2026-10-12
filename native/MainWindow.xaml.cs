@@ -24,6 +24,7 @@ public partial class MainWindow:Window
     public MainWindow()
     {
         InitializeComponent();
+        prefs.LiteMode=PerformanceBudget.DefaultLiteMode(prefs.LiteModeConfigured,prefs.LiteMode);
         InitializeStatusToast();InitializeShareLinks();
         onlineIndex=new(sourceClient,relays:new IndexRelays(sourceClient));sourceClient.TorrentRelay=onlineIndex.RelayTorrent;sharedCatalog=new(sourceClient);
         catalogRefreshTimer.Tick+=(_,_)=>
@@ -97,7 +98,8 @@ public partial class MainWindow:Window
     void PosterResized(object sender,SizeChangedEventArgs e){if(sender is Border poster){if(e.WidthChanged&&e.NewSize.Width>0){var height=e.NewSize.Width*1.5;if(double.IsNaN(poster.Height)||Math.Abs(poster.Height-height)>1)poster.Height=height;}ClipPoster(poster);}}
     // Decorative motion follows the Windows "animate controls" setting and is off in smoke tests.
     public static bool MotionAllowed {get;set;}=true;
-    static bool Motion=>MotionAllowed&&SystemParameters.ClientAreaAnimation;
+    static bool lightweightMotion;
+    static bool Motion=>MotionAllowed&&!lightweightMotion&&SystemParameters.ClientAreaAnimation;
     string? lastViewKey;
     // A new section, card or person page fades in; refreshing the same view does not.
     void AnimateViewChange()
@@ -113,6 +115,7 @@ public partial class MainWindow:Window
     void Render()
     {
         if(!ready)return;renderCount++;if(!MotionAllowed)lastRenderCaller=Environment.StackTrace;BeginCatalogNavigationRender();savedScroll=null;personRequest?.Cancel();personRequest?.Dispose();personRequest=null;
+        CancelStaleDetailWork();
         SyncDiscoveryContext();
         if(activePerson!=null&&(section!=personSection||current?.Id!=personOrigin?.Id))activePerson=null;
         if(current==null&&activePerson==null&&section is not ("Настройки" or "Загрузки"))downloadReturnItem=null;
