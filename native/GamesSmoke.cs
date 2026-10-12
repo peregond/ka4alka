@@ -118,6 +118,10 @@ public partial class MainWindow
         await Settle();Shot("game-detail-dark");
         gameScroll!.ScrollToVerticalOffset(gameScroll.ScrollableHeight);await Settle();Shot("game-detail-releases");gameScroll.ScrollToVerticalOffset(0);await Settle();
         await Size(700,900);Shot("game-detail-narrow");
+        // A wide window lays the releases out as a table with sortable columns instead of cards.
+        await Size(1760,900);gameScroll!.ScrollToVerticalOffset(0);await Settle();Shot("game-detail-wide");
+        Check(VisualElements<Button>(Body).Any(b=>b.Content is string heading&&heading.StartsWith("ОТДАЮТ"))&&VisualElements<Button>(Body).Any(b=>b.Content is string heading&&heading.StartsWith("РАЗМЕР")),"a wide page lists releases in a table with sortable columns");
+        gameScroll.ScrollToVerticalOffset(gameScroll.ScrollableHeight);await Settle();Shot("game-detail-releases-wide");gameScroll.ScrollToVerticalOffset(0);
         await Size(1280,900);
         var old=prefs.LiveFavorites.ToList();var oldIds=new HashSet<int>(prefs.Favorites);
         try{ToggleSaved(current!);Check(SavedItems().Any(item=>item.Section=="Игры"&&item.Id==game.Id),"saved collection includes a game alongside films and series");}
