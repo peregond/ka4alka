@@ -6,6 +6,8 @@
 
 **[Скачать последнюю опубликованную версию](https://github.com/peregond/ka4alka/releases/latest)** · [Скриншоты](distribution/README.md) · [Новости](https://t.me/ka4alkacc) · [Чат поддержки](https://t.me/+6sT2ocaKvLxlNmRi)
 
+[![Игры для Windows в Качалке](distribution/assets/0.42/games-dark.png)](distribution/README.md)
+
 ## Фильмы и сериалы
 
 Каталог с постерами, горизонтальными баннерами, описаниями, оценками и участниками при наличии данных. Общий поиск находит фильмы и сериалы по русским, английским и альтернативным названиям; результаты можно ограничить одним разделом.
@@ -64,4 +66,4 @@ Windows CI проверяет установщик, сохранение нас�
 
 [История выпусков](https://github.com/peregond/ka4alka/releases) · [Документация сайта](web-index/README.md) · [Получение скриншотов](scripts/screenshots/README.md)
 
-Качалка использует [MonoTorrent](https://github.com/alanmcgovern/monotorrent), шрифт [Inter](https://rsms.me/inter/) по [SIL OFL 1.1](native/Fonts/LICENSE.txt) и официальные [некоммерческие наборы оценок IMDb](https://developer.imdb.com/non-commercial-datasets/). Лицензии зависимостей включены в сборку.
+Качалка использует [MonoTorrent](https://github.com/alanmcgovern/monotorrent), шрифты [Onest](native/Fonts/Onest-OFL.txt), [Unbounded](native/Fonts/Unbounded-OFL.txt) и [JetBrains Mono](native/Fonts/JetBrainsMono-OFL.txt) по SIL OFL 1.1 и официальные [некоммерческие наборы оценок IMDb](https://developer.imdb.com/non-commercial-datasets/). Лицензии зависимостей включены в сборку.

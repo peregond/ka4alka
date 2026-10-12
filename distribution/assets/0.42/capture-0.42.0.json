@@ -1,0 +1,192 @@
+{
+  "Version": "0.42.0",
+  "ReleaseArchiveSha256": "59eff2bf3e708fe39515a004d849f0966725200005390bf0814a2b398024c1bf",
+  "ReleaseDllSha256": "4ab7cf1dc5c9c6de352c1d92f97b55ce46873372502f7dba36c6071c3cef7004",
+  "Captures": [
+    {
+      "File": "catalog-dark.png",
+      "Width": 1424,
+      "Height": 892,
+      "LoadedVisiblePosters": 15,
+      "PendingVisiblePosters": 0,
+      "Titles": [
+        "Курьер",
+        "Последний богатырь. Колобок",
+        "Холоп 3",
+        "Унабомбер",
+        "Обитель зла",
+        "Сердце зверя",
+        "Мэйдэй",
+        "Мангуст",
+        "Комната внизу",
+        "Арахнид",
+        "Не стесняйся!",
+        "Твоя мать, твоя мать, твоя мать",
+        "Водитель-каскадёр"
+      ],
+      "CaptureRunId": 38296965559
+    },
+    {
+      "File": "catalog-light.png",
+      "Width": 1424,
+      "Height": 892,
+      "LoadedVisiblePosters": 15,
+      "PendingVisiblePosters": 0,
+      "Titles": [
+        "Курьер",
+        "Последний богатырь. Колобок",
+        "Холоп 3",
+        "Унабомбер",
+        "Обитель зла",
+        "Сердце зверя",
+        "Мэйдэй",
+        "Мангуст",
+        "Комната внизу",
+        "Арахнид",
+        "Не стесняйся!",
+        "Твоя мать, твоя мать, твоя мать",
+        "Водитель-каскадёр"
+      ],
+      "CaptureRunId": 38296965559
+    },
+    {
+      "File": "detail-dark.png",
+      "Width": 1424,
+      "Height": 892,
+      "LoadedVisiblePosters": 2,
+      "PendingVisiblePosters": 0,
+      "Titles": [
+        "Курьер"
+      ],
+      "CaptureRunId": 38296965559
+    },
+    {
+      "File": "series-dark.png",
+      "Width": 1424,
+      "Height": 892,
+      "LoadedVisiblePosters": 11,
+      "PendingVisiblePosters": 0,
+      "Titles": [
+        "Гангстерленд",
+        "Тёмная материя",
+        "Фоллаут",
+        "Этернавт",
+        "Хорошая американская семья",
+        "Девять тел в мексиканском морге",
+        "Нулевой день",
+        "Первозданная Америка",
+        "Мунай"
+      ],
+      "CaptureRunId": 38296965559
+    },
+    {
+      "File": "games-dark.png",
+      "Width": 1424,
+      "Height": 892,
+      "LoadedVisiblePosters": 28,
+      "PendingVisiblePosters": 0,
+      "Titles": [
+        "AION 2",
+        "STAR WARS: Galactic Racer™",
+        "Counter-Strike 2",
+        "Risk of Rain 2",
+        "ARC Raiders",
+        "Planet Zoo 2",
+        "Hood Warfare 2",
+        "Gears of War: E-Day",
+        "WARDOGS",
+        "Dota 2",
+        "Clive Barker's Hellraiser: Revival",
+        "Marvel Rivals",
+        "Dressmaker",
+        "Aniimo",
+        "Call of Duty®: Modern Warfare® 4",
+        "Dragon's Dogma 2",
+        "Warframe",
+        "ACE COMBAT 8: WINGS OF THEVE",
+        "Overwatch®",
+        "Apex Legends™",
+        "Dead by Daylight",
+        "Destiny 2",
+        "EA SPORTS FC™ 27",
+        "HELLDIVERS™ 2",
+        "EA SPORTS™ Madden NFL 27",
+        "Tom Clancy's Rainbow Six Siege",
+        "MapleStory",
+        "Wuthering Waves"
+      ],
+      "CaptureRunId": 38296965559
+    },
+    {
+      "File": "games-light.png",
+      "Width": 1424,
+      "Height": 892,
+      "LoadedVisiblePosters": 28,
+      "PendingVisiblePosters": 0,
+      "Titles": [
+        "AION 2",
+        "STAR WARS: Galactic Racer™",
+        "Counter-Strike 2",
+        "Risk of Rain 2",
+        "ARC Raiders",
+        "Planet Zoo 2",
+        "Hood Warfare 2",
+        "Gears of War: E-Day",
+        "WARDOGS",
+        "Dota 2",
+        "Clive Barker's Hellraiser: Revival",
+        "Marvel Rivals",
+        "Dressmaker",
+        "Aniimo",
+        "Call of Duty®: Modern Warfare® 4",
+        "Dragon's Dogma 2",
+        "Warframe",
+        "ACE COMBAT 8: WINGS OF THEVE",
+        "Overwatch®",
+        "Apex Legends™",
+        "Dead by Daylight",
+        "Destiny 2",
+        "EA SPORTS FC™ 27",
+        "HELLDIVERS™ 2",
+        "EA SPORTS™ Madden NFL 27",
+        "Tom Clancy's Rainbow Six Siege",
+        "MapleStory",
+        "Wuthering Waves"
+      ],
+      "CaptureRunId": 38296965559
+    },
+    {
+      "File": "game-detail-dark.png",
+      "Width": 1424,
+      "Height": 892,
+      "LoadedVisiblePosters": 1,
+      "PendingVisiblePosters": 0,
+      "Titles": [
+        "Counter-Strike 2"
+      ],
+      "CaptureRunId": 38296965559
+    },
+    {
+      "File": "downloads-dark.png",
+      "Width": 1424,
+      "Height": 892,
+      "LoadedVisiblePosters": 0,
+      "PendingVisiblePosters": 0,
+      "Titles": [],
+      "CaptureRunId": 38296138864
+    },
+    {
+      "File": "settings-dark.png",
+      "Width": 1424,
+      "Height": 892,
+      "LoadedVisiblePosters": 0,
+      "PendingVisiblePosters": 0,
+      "Titles": [],
+      "CaptureRunId": 38296965559
+    }
+  ],
+  "CaptureEvidence": {
+    "38296965559": "https://github.com/peregond/ka4alka/actions/runs/38296965559",
+    "38296138864": "https://github.com/peregond/ka4alka/actions/runs/38296138864"
+  }
+}

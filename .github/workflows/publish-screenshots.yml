@@ -28,7 +28,7 @@ jobs:
           RELEASE_VERSION: ${{ inputs.version }}
         run: |
           python3 - <<'PY'
-          import json, os, re, shutil, subprocess, tempfile
+          import json, os, re, shutil, subprocess, tempfile, zipfile
           from pathlib import Path
           version = os.environ['RELEASE_VERSION']
           if not re.fullmatch(r'\d+\.\d+\.\d+', version):
@@ -62,6 +62,15 @@ jobs:
                   asset = Path(tmp) / ('screenshot-' + target + '.png')
                   shutil.copyfile(path, asset)
                   uploads.append(str(asset))
+              landing = Path(tmp) / ('landing-media-' + version + '.zip')
+              with zipfile.ZipFile(landing, 'w', zipfile.ZIP_DEFLATED) as bundle:
+                  for source in files.values():
+                      bundle.write(folder / (source + '.png'), 'screenshots/' + source + '.png')
+                  bundle.write(folder / ('capture-' + version + '.json'), 'capture-info.json')
+                  bundle.write('distribution/LANDING-COPY.md', 'LANDING-COPY.md')
+                  bundle.write('distribution/README.md', 'README.md')
+                  bundle.write('native/Assets/logo.png', 'logo.png')
+              uploads.append(str(landing))
               # These explicit names can replace screenshots only, never update packages.
               subprocess.run(['gh', 'release', 'upload', tag, *uploads, '--clobber'], check=True)
           subprocess.run(['gh', 'release', 'edit', tag, '--notes-file', str(notes)], check=True)
