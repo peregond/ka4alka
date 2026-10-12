@@ -29,6 +29,8 @@ A clean full-stack starter running on [vinext](https://github.com/cloudflare/vin
 
 ## Sites Lifecycle
 
+Исходники текущего проекта Sites связаны с `appgprj_6ac6006f8d248191acac74b581afe7ba` через `.openai/hosting.json`, D1 сохраняет привязку `DB`. GitHub Actions **Prepare verified Sites source** проверяет изменения `web-index/` в ветке `claude/quirky-hopper-1vlmj6` и подготавливает архив точного коммита. Публикацию выполняет задача с доступом к Sites; настройка описана в [инструкции обновления из GitHub](../distribution/SITES-GITHUB-UPDATE.md).
+
 The Sites initializer copies the shared starter and selects managed-linux only when `SITES_MANAGED_LINUX_CONTAINER=1`; otherwise it selects portable. It saves the selection only in ignored `.sites-runtime/execution-profile.json`. Both profiles copy/configure first, then use the plugin's separate `install-dependencies.mjs` step to measure installation independently. Edit source under `app/` and follow the Sites skill for installation, preview, builds, and publishing.
 
 Run `node <plugin-root>/scripts/configure-execution-profile.mjs` only when the profile is unknown for the current checkout and environment. Profile changes do not alter tracked source or require reinstalling otherwise-valid dependencies; restart an existing preview to use the new selection. Do not commit or upload `.sites-runtime/`.

@@ -1,0 +1,51 @@
+name: Prepare verified Sites source
+on:
+  push:
+    branches: [claude/quirky-hopper-1vlmj6]
+    paths:
+      - 'web-index/**'
+      - 'scripts/prepare-sites-source.mjs'
+      - '.github/workflows/sites-source.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: sites-source-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  prepare:
+    if: github.ref == 'refs/heads/claude/quirky-hopper-1vlmj6'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: web-index/package-lock.json
+      - name: Install locked dependencies
+        working-directory: web-index
+        run: npm run install:ci
+      - name: Verify title lookup and release search
+        working-directory: web-index
+        run: |
+          node tests/title-lookup.mjs
+          node tests/release-performance.mjs
+          node node_modules/typescript/bin/tsc --noEmit --incremental false
+      - name: Build for Sites
+        working-directory: web-index
+        run: npm run build
+      - name: Package the exact committed source
+        run: node scripts/prepare-sites-source.mjs "$RUNNER_TEMP/sites-source"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sites-source-${{ github.sha }}
+          path: ${{ runner.temp }}/sites-source/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Describe the publication candidate
+        run: |
+          echo "Verified Sites source: $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+          echo 'Existing project: appgprj_6ac6006f8d248191acac74b581afe7ba; DB binding preserved.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Source is ready for the Sites publishing task. This workflow does not publish the Site.' >> "$GITHUB_STEP_SUMMARY"
