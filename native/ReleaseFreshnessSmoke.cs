@@ -44,6 +44,7 @@ public partial class MainWindow
         {
             foreach(var (light,width,name) in new[]{(false,1500d,"release-freshness-dark"),(true,900d,"release-freshness-light-compact")})
             {
+                liveReleases[movie.Id]=[direct,indexed,legacy];qualitySnapshots.Remove(movie.Id);
                 prefs.Light=light;ApplyTheme();MinWidth=width;Width=width;Height=760;Render();await Settle();
                 var texts=VisualElements<TextBlock>(Body).ToArray();var misses=new List<string>();
                 void Expect(bool good,string message){if(!good)misses.Add(message);}
@@ -81,6 +82,8 @@ public partial class MainWindow
                 RefreshDetailActions();
                 Check(FindVisual<Button>(Body,x=>x.Name=="DetailDownload")?.Tag is SourceEntry selected&&selected.Id==direct.Id,
                     name+": periodic refresh lost the filtered recommendation.");
+                var changedRelease=direct with{Title=direct.Title.Replace("1080p","2160p")};
+                liveReleases[movie.Id]=[changedRelease,indexed,legacy];qualitySnapshots.Remove(movie.Id);ApplyKnownQuality(current!);
                 var beforeBatch=renderCount;var beforePicker=releasePickerRenders;
                 var banner=FindVisual<Grid>(Body,x=>x.Name=="CinemaCards");
                 for(var i=0;i<32;i++)QueueDetailRefresh(movie.Id,releasesOnly:true);
@@ -90,7 +93,9 @@ public partial class MainWindow
                 var pickerRenders=releasePickerRenders-beforePicker;
                 Check(batchRenders==0&&pickerRenders is >=1 and <=2,name+": burst notifications rebuilt the full card or were not coalesced.");
                 Check(ReferenceEquals(banner,FindVisual<Grid>(Body,x=>x.Name=="CinemaCards")),name+": release updates replaced the banner and actor controls.");
-                checks.Add(new{Stage=name+"-refresh-batch",Requests=32,FullCardRenders=batchRenders,ReleasePickerRenders=pickerRenders,BannerPreserved=true});
+                Check(detailMetaRow!.Children.OfType<Border>().Any(x=>Equals(x.Tag,"DetailQualityBadge")&&x.Child is TextBlock t&&t.Text=="4K"),name+": partial release refresh left the quality badges stale.");
+                Check(FindVisual<Button>(Body,x=>x.Name=="DetailDownload")?.Tag is SourceEntry offered&&offered.Title==changedRelease.Title,name+": same-ID updated release left a stale download action.");
+                checks.Add(new{Stage=name+"-refresh-batch",Requests=32,FullCardRenders=batchRenders,ReleasePickerRenders=pickerRenders,BannerPreserved=true,QualityBadgesCurrent=true,SameIdDownloadUpdated=true});
             }
             File.WriteAllText(Path.Combine(output,"checks.json"),JsonSerializer.Serialize(checks,new JsonSerializerOptions{WriteIndented=true}));
         }

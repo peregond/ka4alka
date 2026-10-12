@@ -18,6 +18,8 @@ public partial class MainWindow
     TextBlock? releaseCountLabel;
     StackPanel? releaseControlsHost;
     StackPanel? detailReleaseRowsHost;
+    StackPanel? detailPoorQualitySlot;
+    SourceEntry? detailRecommendedEntry;
     string detailActionState="";
     static readonly string[] VideoExtensions=[".mkv",".mp4",".avi",".mov",".m4v",".wmv",".ts",".webm",".mpg",".mpeg"];
 
@@ -96,9 +98,8 @@ public partial class MainWindow
         // Every genre is listed here; a poster's caption shows only the first.
         var traits=string.Join(" · ",new[]{item.AllGenres,item.Country}.Where(x=>!string.IsNullOrWhiteSpace(x)));
         if(traits.Length>0)detailMetaRow.Children.Add(new TextBlock{Name="DetailTraits",Text=traits,FontSize=14,Foreground=(Brush)FindResource("BannerMuted"),TextWrapping=TextWrapping.Wrap,VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,12,4)});
-        foreach(var quality in item.ReleaseResolutions.OrderByDescending(x=>x).Select(x=>x>=2160?"4K":x+"p").Take(4))
-            detailMetaRow.Children.Add(new Border{BorderBrush=(Brush)FindResource("BannerBadgeEdge"),BorderThickness=new(1),CornerRadius=new(6),Padding=new(6,2,6,2),Margin=new(0,0,8,4),VerticalAlignment=VerticalAlignment.Center,Child=new TextBlock{Text=quality,FontSize=11,FontWeight=FontWeights.Bold,Foreground=(Brush)FindResource("BannerText")}});
-        if(item.OnlyPoorQuality){var poor=PoorQualityBadge(item.PosterQuality);poor.Foreground=(Brush)FindResource("BannerText");detailInfo.Children.Add(poor);}
+        detailPoorQualitySlot=new StackPanel();detailInfo.Children.Add(detailPoorQualitySlot);
+        UpdateDetailQuality(item);
         // credits, only those already known
         var directors=item.People.Where(x=>x.Role=="Режиссёры").Take(2).ToArray();
         var cast=item.People.Where(x=>x.Role=="Актёры").Take(5).ToArray();
@@ -164,10 +165,20 @@ public partial class MainWindow
         var rows=new StackPanel();detailReleaseRowsHost.Children.Add(rows);RenderReleasePicker(rows,releases);
         FinishDetailRender();
     }
+    void UpdateDetailQuality(MediaItem item)
+    {
+        if(detailMetaRow==null||detailPoorQualitySlot==null)return;
+        foreach(var badge in detailMetaRow.Children.OfType<FrameworkElement>().Where(x=>Equals(x.Tag,"DetailQualityBadge")).ToArray())detailMetaRow.Children.Remove(badge);
+        foreach(var quality in item.ReleaseResolutions.OrderByDescending(x=>x).Select(x=>x>=2160?"4K":x+"p").Take(4))
+            detailMetaRow.Children.Add(new Border{Tag="DetailQualityBadge",BorderBrush=(Brush)FindResource("BannerBadgeEdge"),BorderThickness=new(1),CornerRadius=new(6),Padding=new(6,2,6,2),Margin=new(0,0,8,4),VerticalAlignment=VerticalAlignment.Center,Child=new TextBlock{Text=quality,FontSize=11,FontWeight=FontWeights.Bold,Foreground=(Brush)FindResource("BannerText")}});
+        detailPoorQualitySlot.Children.Clear();
+        if(item.OnlyPoorQuality){var poor=PoorQualityBadge(item.PosterQuality);poor.Foreground=(Brush)FindResource("BannerText");detailPoorQualitySlot.Children.Add(poor);}
+    }
     bool RefreshDetailReleaseRows(int id)
     {
         if(current?.Id!=id||detailReleaseRowsHost==null||releaseControlsHost==null||
             !liveReleases.TryGetValue(id,out var releases)||releases.Count==0)return false;
+        UpdateDetailQuality(current);
         releaseControlsHost.Children.Clear();detailReleaseRowsHost.Children.Clear();
         // Each slice owns its SizeChanged handler. Drop the entire old slice rather than retaining its closures.
         var rows=new StackPanel();detailReleaseRowsHost.Children.Add(rows);RenderReleasePicker(rows,releases);
@@ -206,11 +217,13 @@ public partial class MainWindow
     }
     int detailFilteredMovieId;
     SourceEntry[]? detailFilteredReleases;
+    bool DetailRecommendationChanged(MediaItem item,IReadOnlyList<SourceEntry> choices)
+        =>!Equals(detailRecommendedEntry,DownloadsOf(item).Length==0?ReleaseRecommendation.Pick(choices,QualityMinimum)?.Entry:null);
     void ApplyDetailReleaseFilters(int movieId,SourceEntry[] visible)
     {
         if(current?.Id!=movieId)return;
         detailFilteredMovieId=movieId;detailFilteredReleases=visible;
-        if(DetailActionState(current,visible)!=detailActionState)BuildDetailActions(current,visible);
+        if(DetailActionState(current,visible)!=detailActionState||DetailRecommendationChanged(current,visible))BuildDetailActions(current,visible);
     }
     void RefreshDetailActions()
     {
@@ -218,7 +231,7 @@ public partial class MainWindow
         liveReleases.TryGetValue(current.Id,out var known);
         var choices=detailFilteredMovieId==current.Id&&detailFilteredReleases!=null?detailFilteredReleases:known??[];
         var state=DetailActionState(current,choices);
-        if(state==detailActionState)return;
+        if(state==detailActionState&&!DetailRecommendationChanged(current,choices))return;
         BuildDetailActions(current,choices);
     }
     void BuildDetailActions(MediaItem item,IReadOnlyList<SourceEntry> releases)
@@ -226,6 +239,7 @@ public partial class MainWindow
         if(detailActions==null)return;
         detailActions.Children.Clear();detailActionState=DetailActionState(item,releases);
         var owned=DownloadsOf(item);var done=owned.FirstOrDefault(x=>x.Completed);var active=owned.FirstOrDefault(x=>!x.Completed);
+        detailRecommendedEntry=owned.Length==0?ReleaseRecommendation.Pick(releases,QualityMinimum)?.Entry:null;
         FrameworkElement Spaced(FrameworkElement element){element.Margin=new(0,0,10,8);return element;}
         Button Action(string text,string icon,bool primary,Action click)
         {
@@ -242,14 +256,14 @@ public partial class MainWindow
         {
             detailActions.Children.Add(Spaced(DownloadProgressButton(active)));
         }
-        else if(ReleaseRecommendation.Pick(releases,QualityMinimum) is {} pick)
+        else if(detailRecommendedEntry is {} choice)
         {
-            var button=new Button{Name="DetailDownload",Style=(Style)FindResource("PrimaryButton"),Tag=pick.Entry,Height=52,MinHeight=52,Padding=new(22,0,22,0),FontSize=15,Margin=new(0,0,10,8),ToolTip="Скачать рекомендованную раздачу: "+pick.Entry.Title};
+            var button=new Button{Name="DetailDownload",Style=(Style)FindResource("PrimaryButton"),Tag=choice,Height=52,MinHeight=52,Padding=new(22,0,22,0),FontSize=15,Margin=new(0,0,10,8),ToolTip="Скачать рекомендованную раздачу: "+choice.Title};
             var row=new StackPanel{Orientation=Orientation.Horizontal};
             row.Children.Add(IconLabel("Скачать","IconDownload",18));
-            var detail=string.Join(" · ",new[]{(ReleaseQuality.Height(pick.Entry) is int h?h+"p":pick.Entry.Quality),pick.Entry.Size.HasValue?DownloadService.FormatBytes(pick.Entry.Size.Value):""}.Where(x=>x.Length>0));
+            var detail=string.Join(" · ",new[]{(ReleaseQuality.Height(choice) is int h?h+"p":choice.Quality),choice.Size.HasValue?DownloadService.FormatBytes(choice.Size.Value):""}.Where(x=>x.Length>0));
             row.Children.Add(new TextBlock{Text=detail,FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=14,FontWeight=FontWeights.Medium,Opacity=.75,Margin=new(10,0,0,0),VerticalAlignment=VerticalAlignment.Center});
-            button.Content=row;AutomationProperties.SetName(button,"Скачать раздачу: "+pick.Entry.Title);button.Click+=SourceDownload;detailActions.Children.Add(button);
+            button.Content=row;AutomationProperties.SetName(button,"Скачать раздачу: "+choice.Title);button.Click+=SourceDownload;detailActions.Children.Add(button);
         }
         else
         {
