@@ -33,8 +33,8 @@ jobs:
               except Exception: continue
               for m in re.finditer(r'search_capsule"><img src="([^"?]+)/capsule_231x87\.jpg',d.get('results_html','')):
                   base=m.group(1)
-                  mid=re.search(r'/apps/(\d+)',base).group(1)
-                  bases[mid]=base
+                  found=re.search(r'/apps/(\d+)',base)
+                  if found: bases[found.group(1)]=base
           ids=list(bases)[:90]
           def head(url):
               try:
