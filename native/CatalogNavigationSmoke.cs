@@ -193,6 +193,10 @@ public partial class MainWindow
         catalogPages["Фильмы|sort-date|1"]=new(defaultCards,false,CatalogChoices.Genres,CatalogChoices.Countries);
         catalogPages["Фильмы||1"]=new(defaultCards,false,CatalogChoices.Genres,CatalogChoices.Countries);
         PrepareDiscoverySmokeRegions("Фильмы",defaultCards);
+        // Explicit navigation resets the transient quality state. Persist the
+        // fixture's download evidence just as an earlier app session would.
+        foreach(var item in defaultCards)
+            await catalogIndex.CacheReleasesAsync(item,qualitySnapshots[item.Id].Items,[new("Fixture",SourceState.Ready,1,DateTime.UtcNow,DateTime.UtcNow)]);
         var moviesNavigation=Navigation.Children.OfType<Button>().First(button=>Equals(button.Tag,"Фильмы"));
         Click(moviesNavigation);deadline=DateTime.UtcNow.AddSeconds(5);while(liveLoading&&DateTime.UtcNow<deadline)await Task.Delay(40);await Settle();
         Check(DiscoveryCatalog&&catalogDisplay.Count==40,"default route fixture contains its real discovery shelves and paged catalog");
