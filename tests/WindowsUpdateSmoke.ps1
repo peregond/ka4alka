@@ -29,7 +29,7 @@ try{
  if($LASTEXITCODE -ne 0){throw 'Updater tests failed'}
  ./tests/StableUpdateComponents.ps1
  ./build.ps1 -Test -OutputDir ('dist/Kachalka-'+$short)
- foreach($scenario in @('dpi','close','cache','download-reliability','person-performance','cover-viewport','catalog-navigation','release-freshness','interface-polish','bug-report','lan')){
+ foreach($scenario in @('dpi','close','cache','download-reliability','person-performance','startup-performance','cover-viewport','home-availability','games','catalog-navigation','release-freshness','interface-polish','bug-report','lan')){
    $scenarioDirectory=if($scenario -in @('dpi','close','cache')){$scenario+'-reliability'}elseif($scenario -eq 'lan'){'lan-ui'}else{$scenario}
    $scenarioEvidence=Join-Path $root ('test-output/'+$scenarioDirectory)
    $scenarioUi=Start-Process (Join-Path $root ('dist/Kachalka-'+$short+'/Kachalka.exe')) -ArgumentList @('--'+$scenario+'-smoke-test',('"'+$scenarioEvidence+'"')) -PassThru
@@ -104,6 +104,17 @@ try{
  $limit=(Get-Date).AddSeconds(30)
  while(-not $old.HasExited -and $old.MainWindowHandle -eq 0 -and (Get-Date) -lt $limit){Start-Sleep -Milliseconds 250;$old.Refresh()}
  if($old.HasExited -or $old.MainWindowHandle -eq 0){throw 'Installed WPF window did not open'}
+ # kachalka:// links open the installed copy, and a second copy started by a link hands it to the running window.
+ $linkCommand=(Get-ItemProperty 'HKCU:/Software/Classes/kachalka/shell/open/command').'(default)'
+ $expectedCommand='"'+[System.IO.Path]::GetFullPath((Join-Path $install 'Kachalka.exe'))+'" "%1"'
+ if($linkCommand -ne $expectedCommand){throw ('kachalka:// opens '+$linkCommand+' instead of '+$expectedCommand)}
+ $linked=Start-Process (Join-Path $install 'Kachalka.exe') -ArgumentList '"kachalka://movie/share-link-install-smoke?title=Proverka&year=2026"' -PassThru
+ if(-not $linked.WaitForExit(15000)){throw 'A copy started by a link did not hand it to the running window and exit'}
+ $diagnosticLog=Join-Path $state 'diagnostic.log';$limit=(Get-Date).AddSeconds(15)
+ while(-not (Select-String -LiteralPath $diagnosticLog -Pattern 'share-link-install-smoke' -Quiet -ErrorAction SilentlyContinue) -and (Get-Date) -lt $limit){Start-Sleep -Milliseconds 250}
+ if(-not (Select-String -LiteralPath $diagnosticLog -Pattern 'share-link-install-smoke' -Quiet -ErrorAction SilentlyContinue)){throw 'The running window did not open the card from a kachalka:// link'}
+ if($old.HasExited){throw 'The running window closed after receiving a link'}
+ 'PASS: kachalka:// opens the installed copy, and a link reaches the window already running' | Add-Content (Join-Path $evidence 'checks.txt')
  $id=[Guid]::NewGuid().ToString('N');$work=Join-Path $state ('updates/'+$id);New-Item -ItemType Directory -Force $work | Out-Null
  # Real component client with local HTTP Range fixture; never stage the full package.
  [System.IO.File]::WriteAllText((Join-Path $install 'obsolete-component.txt'),'old component')
@@ -131,6 +142,10 @@ try{
  $limit=(Get-Date).AddSeconds(20)
  while((Test-Path (Join-Path $install 'Kachalka.exe')) -and (Get-Date) -lt $limit){Start-Sleep -Milliseconds 250}
  if(Test-Path (Join-Path $install 'Kachalka.exe')){throw 'Application was not removed'}
+ # The uninstaller runs from a temporary copy and clears the registry after the files, so wait for it as for the files.
+ $limit=(Get-Date).AddSeconds(20)
+ while((Test-Path 'HKCU:/Software/Classes/kachalka') -and (Get-Date) -lt $limit){Start-Sleep -Milliseconds 250}
+ if(Test-Path 'HKCU:/Software/Classes/kachalka'){throw 'Uninstaller left the kachalka:// registration'}
  if(-not(Test-Path (Join-Path $state 'settings.json'))){throw 'Uninstaller removed settings'}
  'PASS: uninstall removes executable and preserves user state' | Add-Content (Join-Path $evidence 'checks.txt')
  Get-Content (Join-Path $evidence 'checks.txt')

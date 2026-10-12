@@ -7,7 +7,7 @@ using HtmlAgilityPack;
 namespace Kachalka;
 public sealed class LiveCatalog(SourceClient client)
 {
-    record DetailSnapshot(string Kinopoisk,string Imdb,string Description,string? OriginalTitle=null,string Genre="",string Country="",string[]? GenreKeys=null,string[]? CountryKeys=null,CinemaPerson[]? People=null,CinemaCollection[]? Collections=null,bool CountryKeysComplete=true);
+    record DetailSnapshot(string Kinopoisk,string Imdb,string Description,string? OriginalTitle=null,string Genre="",string Country="",string[]? GenreKeys=null,string[]? CountryKeys=null,CinemaPerson[]? People=null,CinemaCollection[]? Collections=null,bool CountryKeysComplete=true,string? ImageUrl=null);
     public const string Base="https://w6.zona.plus";
     static HtmlDocument Html(byte[] b){var h=new HtmlDocument();h.LoadHtml(Encoding.UTF8.GetString(b));return h;}
     static string Text(HtmlNode? n)=>HtmlEntity.DeEntitize(n?.InnerText??"").Trim();
@@ -30,7 +30,8 @@ public sealed class LiveCatalog(SourceClient client)
         }
         return new(rows,hasNext&&page<CatalogPaging.Limit,Choices("genre"),Choices("country"));
     }
-    public async Task<CatalogPage> BrowsePage(string section,int page,CatalogSelection selection,CancellationToken ct,bool forceRefresh=false)
+    public Task<CatalogPage> BrowsePage(string section,int page,CatalogSelection selection,CancellationToken ct,bool forceRefresh=false)=>Task.Run(()=>BrowsePageCore(section,page,selection,ct,forceRefresh),ct);
+    async Task<CatalogPage> BrowsePageCore(string section,int page,CatalogSelection selection,CancellationToken ct,bool forceRefresh=false)
     {
         var path=section=="Сериалы"?"/tvseries":"/movies";
         var filter=selection.Filter;
@@ -65,7 +66,8 @@ public sealed class LiveCatalog(SourceClient client)
             return new MediaItem(id,title,section,"",year,"—","—","#526B69"){PageUrl=url,ImageUrl=n.SelectSingleNode(".//meta[@itemprop='image']")?.GetAttributeValue("content","")};
         }).Where(x=>x!=null).Cast<MediaItem>().Take(CatalogPaging.SourceSize).ToArray();
     }
-    public async Task<IReadOnlyList<MediaItem>> Browse(string section,string query,int page,CancellationToken ct)
+    public Task<IReadOnlyList<MediaItem>> Browse(string section,string query,int page,CancellationToken ct)=>Task.Run(()=>BrowseCore(section,query,page,ct),ct);
+    async Task<IReadOnlyList<MediaItem>> BrowseCore(string section,string query,int page,CancellationToken ct)
     {
         var path=section=="Сериалы"?"/tvseries":"/movies";
         var url=string.IsNullOrWhiteSpace(query)?Base+path+"/filter/sort-date?page="+page:Base+"/search-form?query="+Uri.EscapeDataString(query);
@@ -73,7 +75,8 @@ public sealed class LiveCatalog(SourceClient client)
         try{var bytes=await client.Read(new Uri(url),4*1024*1024,ct);var parsed=Parse(bytes,section);if(parsed.Count>0){System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(cache)!);await CacheFiles.WriteAllBytesAsync(cache,bytes,ct);}return parsed;}
         catch(Exception) when(!ct.IsCancellationRequested&&System.IO.File.Exists(cache)){return Parse(await CacheFiles.ReadAllBytesAsync(cache,ct),section);}
     }
-    public async Task<MediaItem> Detail(MediaItem item,CancellationToken ct)
+    public Task<MediaItem> Detail(MediaItem item,CancellationToken ct)=>Task.Run(()=>DetailCore(item,ct),ct);
+    async Task<MediaItem> DetailCore(MediaItem item,CancellationToken ct)
     {
         var key=Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(item.PageUrl!)));
         var cache=System.IO.Path.Combine(Preferences.DataDir,"details",key+".json");
@@ -86,7 +89,7 @@ public sealed class LiveCatalog(SourceClient client)
                 var snapshot=JsonSerializer.Deserialize<DetailSnapshot>(await CacheFiles.ReadAllTextAsync(cache,ct));
                 if(snapshot!=null)
                 {
-                    var restored=item with{Kinopoisk=ValidScore(snapshot.Kinopoisk),Imdb=ValidScore(snapshot.Imdb),Description=snapshot.Description,OriginalTitle=snapshot.OriginalTitle,Genre=snapshot.Genre,Country=snapshot.Country,GenreKeys=snapshot.GenreKeys??[],CountryKeys=snapshot.CountryKeys??[],CountryKeysComplete=snapshot.CountryKeysComplete,People=snapshot.People??[],Collections=snapshot.Collections??[]};
+                    var restored=item with{Kinopoisk=ValidScore(snapshot.Kinopoisk),Imdb=ValidScore(snapshot.Imdb),Description=snapshot.Description,OriginalTitle=snapshot.OriginalTitle,Genre=snapshot.Genre,Country=snapshot.Country,GenreKeys=snapshot.GenreKeys??[],CountryKeys=snapshot.CountryKeys??[],CountryKeysComplete=snapshot.CountryKeysComplete,People=snapshot.People??[],Collections=snapshot.Collections??[],ImageUrl=string.IsNullOrWhiteSpace(item.ImageUrl)?ZonaPoster.Normalize(snapshot.ImageUrl):item.ImageUrl};
                     if(MediaMetadata.Useful(restored))saved=MediaMetadata.Merge(item,restored);
                 }
             }
@@ -119,7 +122,7 @@ public sealed class LiveCatalog(SourceClient client)
             if(!MediaMetadata.Useful(result))throw new InvalidDataException("Источник вернул страницу без сведений о фильме.");
             var prior=saved??item;
             result=MediaMetadata.Merge(prior,result) with{People=ZonaMovieMetadata.MergePeople(prior.People,result.People)};
-            try{System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(cache)!);await CacheFiles.WriteAllTextAsync(cache,JsonSerializer.Serialize(new DetailSnapshot(result.Kinopoisk,result.Imdb,result.Description??"",result.OriginalTitle,result.Genre,result.Country,result.GenreKeys,result.CountryKeys,result.People,result.Collections,result.CountryKeysComplete)),ct);}catch(System.IO.IOException){}
+            try{System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(cache)!);await CacheFiles.WriteAllTextAsync(cache,JsonSerializer.Serialize(new DetailSnapshot(result.Kinopoisk,result.Imdb,result.Description??"",result.OriginalTitle,result.Genre,result.Country,result.GenreKeys,result.CountryKeys,result.People,result.Collections,result.CountryKeysComplete,result.ImageUrl)),ct);}catch(System.IO.IOException){}
             return result;
             MediaItem ParseHtml(byte[] body)
             {
@@ -130,7 +133,7 @@ public sealed class LiveCatalog(SourceClient client)
                 var genres=(h.DocumentNode.SelectNodes("//*[@itemprop='genre']")??new HtmlNodeCollection(null)).Select(InlineText).Where(x=>x.Length>0).Distinct().ToArray();
                 HtmlNode[] Links(string prefix)=>(h.DocumentNode.SelectNodes("//a[contains(@href,'/filter/"+prefix+"-')]")??new HtmlNodeCollection(null)).ToArray();
                 string[] Keys(string prefix)=>Links(prefix).Select(n=>n.GetAttributeValue("href","").Split("/filter/"+prefix+"-")[1]).Distinct().ToArray();
-                return item with{Kinopoisk=Score("entity-rating-kp"),Imdb=Score("entity-rating-imdb"),Description=Text(h.DocumentNode.SelectSingleNode("//*[@itemprop='description' and not(self::meta)]")),OriginalTitle=original.Length==0?null:original,Genre=string.Join(", ",genres),Country=string.Join(", ",Links("country").Select(InlineText).Where(x=>x.Length>0).Distinct()),GenreKeys=Keys("genre"),CountryKeys=Keys("country"),CountryKeysComplete=true,People=CinemaMetadata.People(body),Collections=CinemaMetadata.Collections(body)};
+                return item with{ImageUrl=string.IsNullOrWhiteSpace(item.ImageUrl)?ZonaPoster.FromPage(body):item.ImageUrl,Kinopoisk=Score("entity-rating-kp"),Imdb=Score("entity-rating-imdb"),Description=Text(h.DocumentNode.SelectSingleNode("//*[@itemprop='description' and not(self::meta)]")),OriginalTitle=original.Length==0?null:original,Genre=string.Join(", ",genres),Country=string.Join(", ",Links("country").Select(InlineText).Where(x=>x.Length>0).Distinct()),GenreKeys=Keys("genre"),CountryKeys=Keys("country"),CountryKeysComplete=true,People=CinemaMetadata.People(body),Collections=CinemaMetadata.Collections(body)};
             }
         }
         catch(Exception) when(!ct.IsCancellationRequested&&saved!=null)
@@ -162,7 +165,8 @@ public sealed class LiveCatalog(SourceClient client)
         }
         catch(Exception) when(!ct.IsCancellationRequested&&saved!=null){return saved;}
     }
-    public async Task<IReadOnlyList<SourceEntry>> Releases(string title,CancellationToken ct)
+    public Task<IReadOnlyList<SourceEntry>> Releases(string title,CancellationToken ct)=>Task.Run(()=>ReleasesCore(title,ct),ct);
+    async Task<IReadOnlyList<SourceEntry>> ReleasesCore(string title,CancellationToken ct)
     {
         Exception? failure=null;
         foreach(var host in new[]{"rutor.info","rutor.is"})
@@ -183,13 +187,14 @@ public sealed class LiveCatalog(SourceClient client)
     {
         static string Normalize(string value)=>Regex.Replace(Regex.Replace(value.Replace('ё','е').Replace('Ё','Е').ToLowerInvariant(),@"[^\p{L}\p{N}]+"," ").Trim(),@"\s+"," ");
         var title=Normalize(item.Title);var original=Normalize(item.OriginalTitle??"");
+        var expectedNames=MediaIdentity.Names(item).Select(Normalize).ToArray();
         if(title.Length==0)return false;
         var candidate=Regex.Replace(entry.Title,@"^(?:\s*\[[^\]]{1,40}\]\s*)+","");
         var names=Regex.Split(candidate,@"\s+[/|]\s+").Select(Normalize).ToArray();
         if(item.Section=="Фильмы"&&item.Year>0)
         {
             foreach(var name in names)
-            foreach(var expected in new[]{title,original}.Where(x=>x.Length>0))
+            foreach(var expected in expectedNames)
             {
                 if(!name.StartsWith(expected+" ",StringComparison.Ordinal))continue;
                 var metadata=name[(expected.Length+1)..];var alias=expected==title?original:title;
@@ -210,10 +215,10 @@ public sealed class LiveCatalog(SourceClient client)
                 if(item.Section=="Сериалы")return Regex.IsMatch(tail,@"^\d{1,2}\s+(?:сезон|season)\b")||Regex.IsMatch(tail,@"^\d{3,4}\b");
                 return Regex.IsMatch(tail,@"^\d{4}\b");
             }
-            if(other.Length>0&&(tail==other||tail.StartsWith(other+" ",StringComparison.Ordinal)))return true;
+            if(expectedNames.Any(otherName=>otherName!=expected&&(tail==otherName||tail.StartsWith(otherName+" ",StringComparison.Ordinal))))return true;
             return Regex.IsMatch(tail,@"^(?:s\d{1,2}(?:e\d{1,3})?|e\d{1,3}|season|сезон|серия|серии|episode|ep|complete|полный|все|web|hdtv|dvdrip|hdrip|bdrip|bluray|remux|720p|1080p|2160p|4k|x264|x265|h264|h265|hevc|avc|mkv|mp4|avi|repack)\b");
         }
-        if(!names.Any(name=>MatchName(name,title)||original.Length>0&&MatchName(name,original)))return false;
+        if(!names.Any(name=>expectedNames.Any(expected=>MatchName(name,expected))))return false;
         return item.Section=="Сериалы"||entry.Source!="RuTor"||item.Year<=0||Regex.IsMatch(entry.Title,@"(?<!\d)"+item.Year+@"(?!\d)");
     }
     public static IReadOnlyList<SourceEntry> ParseRutor(byte[] bytes)

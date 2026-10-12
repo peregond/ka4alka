@@ -83,10 +83,12 @@ public partial class MainWindow
             var button=new Button{Style=(Style)FindResource("RoundIconButton"),Width=40,Height=40,Margin=new(6,0,0,0)};button.Foreground=(Brush)FindResource("BannerText");
             button.Content=IconLabel("",icon,16);AutomationProperties.SetName(button,name);button.ToolTip=name;return button;
         }
-        var previous=Arrow("IconChevronLeft","Предыдущий фильм");var next=Arrow("IconChevron","Следующий фильм");controls.Children.Add(previous);controls.Children.Add(next);
+        var games=section=="Игры";
+        var previous=Arrow("IconChevronLeft",games?"Предыдущая игра":"Предыдущий фильм");var next=Arrow("IconChevron",games?"Следующая игра":"Следующий фильм");controls.Children.Add(previous);controls.Children.Add(next);
         if(slides.Length<2){dots.Visibility=Visibility.Collapsed;previous.Visibility=Visibility.Collapsed;next.Visibility=Visibility.Collapsed;}
 
         var view=new FeatureCarouselView{Slides=slides,Frame=frame,Poster=image,Eyebrow=eyebrow,Title=title,People=people,Meta=meta,Dots=dots,About=aboutAction,Favorite=favorite,Previous=previous,Next=next,LiteCover=liteCover,PosterHost=posterHost};
+        frame.ContextMenu=new ContextMenu();frame.ContextMenuOpening+=(_,_)=>{if(view.Bound!=null)frame.ContextMenu=CatalogPersonalMenu(view.Bound);};
         carousel=view;
         previous.Click+=(_,_)=>ShowFeatureSlide(view,(view.Index+view.Slides.Length-1)%view.Slides.Length);
         next.Click+=(_,_)=>ShowFeatureSlide(view,(view.Index+1)%view.Slides.Length);
@@ -111,7 +113,7 @@ public partial class MainWindow
         var item=view.Slides[index];
         DetachFeatureWatch(view);view.Bound=item;
         view.Poster.DataContext=item;if(view.LiteCover.Tag is Image lite)lite.DataContext=item;
-        view.Eyebrow.Text=index==0?"В центре внимания":"Стоит посмотреть";
+        view.Eyebrow.Text=index==0?"В центре внимания":item.Section=="Игры"?"Стоит поиграть":"Стоит посмотреть";
         view.Title.Text=item.Title;view.Title.ToolTip=item.Title;
         view.About.Tag=item;view.Frame.Tag=item;
         AutomationProperties.SetName(view.About,"Подробнее: "+item.Title);
@@ -125,6 +127,19 @@ public partial class MainWindow
         TextBlock Label(string text,bool bold=false)
         {
             var label=new TextBlock{Text=text,FontSize=14,FontWeight=bold?FontWeights.Bold:FontWeights.Normal,Foreground=(Brush)FindResource("BannerMuted"),VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,12,4)};return label;
+        }
+        Border Badge(string text)=>new(){BorderBrush=(Brush)FindResource("BannerBadgeEdge"),BorderThickness=new(1),CornerRadius=new(6),Padding=new(6,2,6,2),Margin=new(0,0,8,4),VerticalAlignment=VerticalAlignment.Center,Child=new TextBlock{Text=text,FontSize=11,FontWeight=FontWeights.Bold,Foreground=(Brush)FindResource("BannerText")}};
+        if(item.Section=="Игры")
+        {
+            // Year and genre arrive with the store details; until then the slide only knows its title.
+            gameDetails.TryGetValue(item.Id,out var game);var info=game?.Item??item;
+            if(game is {Metacritic:>0})view.Meta.Children.Add(new TextBlock{Text="Metacritic "+game.Metacritic,FontSize=14,FontWeight=FontWeights.Bold,Foreground=(Brush)FindResource("BannerText"),VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,12,4),ToolTip="Оценка критиков на Metacritic"});
+            view.Meta.Children.Add(Label("Игра"));
+            if(info.Year>0)view.Meta.Children.Add(Label(info.Year.ToString()));
+            if(info.Genre.Length>0&&info.Genre!="Windows")view.Meta.Children.Add(Label(info.CardGenre));
+            view.Meta.Children.Add(Badge("Windows"));
+            if(game is {Price.Length:>0})view.Meta.Children.Add(Badge(game.Price));
+            return;
         }
         if(item.HasCardRating)
         {
@@ -145,6 +160,12 @@ public partial class MainWindow
     }
     void UpdateFeaturePeople(FeatureCarouselView view,MediaItem item)
     {
+        if(item.Section=="Игры")
+        {
+            // A game's studio comes with its details, which the games home loads for the banner slides.
+            var studio=gameDetails.TryGetValue(item.Id,out var game)?game.Developers:"";
+            view.People.Text=studio.Length>0?"Разработчик "+studio:"";view.People.Visibility=studio.Length>0&&!featureCompactText?Visibility.Visible:Visibility.Collapsed;return;
+        }
         // Only credits that the item already carries; no extra requests are made for the banner.
         var director=item.People.Where(x=>x.Role=="Режиссёры").Select(x=>x.Name).Take(1).ToArray();
         var cast=item.People.Where(x=>x.Role=="Актёры").Select(x=>x.Name).Take(2).ToArray();
@@ -180,8 +201,8 @@ public partial class MainWindow
         view.Title.FontSize=tiny?28:narrow?34:44;view.Title.LineHeight=tiny?30:narrow?36:46;view.Title.MaxHeight=view.Title.LineHeight*2;
         featureCompactText=narrow;
         if(view.Bound!=null)UpdateFeaturePeople(view,view.Bound);
-        // The lite-mode portrait stays clear of text in narrow layouts.
-        view.PosterHost.Visibility=prefs.LiteMode&&width>=860?Visibility.Visible:Visibility.Collapsed;
+        // The lite-mode portrait stays clear of text in narrow layouts; a game's wide capsule has no portrait to show.
+        view.PosterHost.Visibility=prefs.LiteMode&&width>=860&&section!="Игры"?Visibility.Visible:Visibility.Collapsed;
         if(view.Frame.Child is Grid grid&&grid.Children.OfType<StackPanel>().FirstOrDefault(x=>x.Name=="FeatureContent") is {} content)content.Margin=tiny?new(20,20,20,20):narrow?new(24,24,24,22):new(36,28,36,26);
         view.About.Padding=new(tiny?16:22,0,tiny?16:22,0);
     }

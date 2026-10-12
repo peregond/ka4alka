@@ -1,0 +1,13 @@
+{
+  "scenario": "prepared local identity search",
+  "environment": "Linux .NET 10 portable scoring harness, warmed index",
+  "records": 4210,
+  "queries": 9,
+  "oldMilliseconds": 460.635426,
+  "preparedMilliseconds": 93.856764,
+  "oldAllocatedBytes": 24122120,
+  "preparedAllocatedBytes": 7290336,
+  "matchedRecordsAcrossQueries": 200,
+  "sameResultsForCommonQueries": true,
+  "scope": "Actual native/MediaIdentity.cs scoring; model adapters for portable execution. Not a whole-application or Windows latency measurement."
+}

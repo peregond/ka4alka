@@ -16,6 +16,8 @@ public partial class MainWindow
         public ContentControl Row=>row;
         public MediaItem[] Items=>items;
         public Action<MediaItem[]>? Changed {get;init;}
+        // Poster shelves show one row; the wider game capsules fill two.
+        public int Rows {get;init;}=1;
         public void Set(MediaItem[] source,bool loading)
         {
             items=source.DistinctBy(item=>item.Id).Take(40).ToArray();
@@ -33,7 +35,7 @@ public partial class MainWindow
         }
         void Render()
         {
-            var next=items.Take(columns).ToArray();
+            var next=items.Take(columns*Rows).ToArray();
             if(row.Content is CatalogRow prior&&prior.Columns==columns&&prior.Items.SequenceEqual(next))return;
             row.Content=new CatalogRow(next,columns);Changed?.Invoke(next);
         }
@@ -41,7 +43,7 @@ public partial class MainWindow
     string DiscoveryShelfTitle(DiscoveryShelfKind kind)=>kind switch
     {
         DiscoveryShelfKind.Popular=>"Популярное",
-        DiscoveryShelfKind.New=>section=="Фильмы"?"Новые фильмы":"Новые сериалы",
+        DiscoveryShelfKind.New=>section=="Фильмы"?"Новые фильмы":section=="Игры"?"Новые игры":"Новые сериалы",
         DiscoveryShelfKind.Foreign=>section=="Фильмы"?"Иностранные фильмы":"Иностранные сериалы",
         _=>section=="Фильмы"?"Отечественные фильмы":"Отечественные сериалы"
     };
@@ -59,12 +61,14 @@ public partial class MainWindow
         chevron.SetBinding(System.Windows.Shapes.Shape.StrokeProperty,new System.Windows.Data.Binding("Foreground"){Source=all});allRow.Children.Add(chevron);all.Content=allRow;
         all.Click+=(_,_)=>OpenDiscoveryShelf(kind);AutomationProperties.SetName(all,"Все: "+title);header.Children.Add(all);
         var state=Text("Загружаем подборку…",13,true);state.Margin=new(0,0,0,16);sectionPanel.Children.Add(state);
-        var skeleton=PosterSkeleton(1,"Discovery"+kind+"Skeleton");skeleton.Visibility=Visibility.Collapsed;sectionPanel.Children.Add(skeleton);
-        var row=new ContentControl{Name="Discovery"+kind+"Row",ContentTemplate=(DataTemplate)FindResource("MediaRow"),Margin=new(0,0,0,0)};sectionPanel.Children.Add(row);
-        return new(row,state,all,skeleton){Changed=ApplyPosterDownloads};
+        var games=section=="Игры";
+        var skeleton=PosterSkeleton(games?2:1,"Discovery"+kind+"Skeleton");skeleton.Visibility=Visibility.Collapsed;sectionPanel.Children.Add(skeleton);
+        var row=new ContentControl{Name="Discovery"+kind+"Row",ContentTemplate=(DataTemplate)FindResource(games?"GameRow":"MediaRow"),Margin=new(0,0,0,0)};sectionPanel.Children.Add(row);
+        return new(row,state,all,skeleton){Changed=ApplyPosterDownloads,Rows=games?2:1};
     }
     void OpenDiscoveryShelf(DiscoveryShelfKind kind)
     {
+        if(section=="Игры"){OpenGameList(kind==DiscoveryShelfKind.New?"new":"popular");return;}
         if(kind==DiscoveryShelfKind.New)
         {
             CancelCatalogPositionRestoreForUserJump();
@@ -80,9 +84,9 @@ public partial class MainWindow
     DiscoveryRegionalPage DiscoveryRegionalItems(string category,string homeCountry,MediaItem[] cards)
     {
         discoveryRegions.TryGetValue(category+"|"+homeCountry,out var saved);
-        var foreign=(saved?.Foreign??[]).Concat(cards).Where(item=>CatalogRegions.IsForeign(item,homeCountry)&&!NoDownloads(item)&&CatalogQualityMatches(item)).DistinctBy(item=>item.Id).Take(40).ToArray();
-        var native=(saved?.Native??[]).Concat(cards).Where(item=>CatalogRegions.IsNative(item,homeCountry)&&!NoDownloads(item)&&CatalogQualityMatches(item)).DistinctBy(item=>item.Id).Take(40).ToArray();
-        return new(foreign,native,saved?.Loading??false);
+        var foreign=(saved?.Foreign??[]).Concat(cards).Where(item=>CatalogRegions.IsForeign(item,homeCountry)&&!NoDownloads(item)&&RecommendableTitle(item)&&PersonallyVisible(item)&&CatalogQualityMatches(item)).DistinctBy(item=>item.Id).Take(40).ToArray();
+        var native=(saved?.Native??[]).Concat(cards).Where(item=>CatalogRegions.IsNative(item,homeCountry)&&!NoDownloads(item)&&RecommendableTitle(item)&&PersonallyVisible(item)&&CatalogQualityMatches(item)).DistinctBy(item=>item.Id).Take(40).ToArray();
+        return new(foreign,native,(saved?.Loading??false)||CatalogQualityChecking);
     }
     void SetDiscoveryRegionalItems(string category,string homeCountry,MediaItem[] foreign,MediaItem[] native,bool loading=false)
     {

@@ -14,6 +14,6 @@ public partial class MainWindow
     }
     void StartDiscoveryQualityCheck()
     {
-        if(DiscoveryCatalog&&prefs.CatalogQualityHeight!=0)StartCatalogQualityCheck(liveItems.ToArray());
+        if(DiscoveryCatalog)StartCatalogQualityCheck(liveItems.ToArray());
     }
 }

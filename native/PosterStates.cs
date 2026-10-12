@@ -26,7 +26,7 @@ public partial class MainWindow
     }
     void ApplyPosterDownloads()
     {
-        if(section is not ("Фильмы" or "Сериалы" or "Сохранённое")||current!=null)return;
+        if(section is not ("Фильмы" or "Сериалы" or "Игры" or "Сохранённое")||current!=null)return;
         IEnumerable<MediaItem> shown=catalogDisplay;
         foreach(var shelf in discoveryShelves.Values)shown=shown.Concat(shelf.Items);
         if(carousel!=null)shown=shown.Concat(carousel.Slides);

@@ -14,12 +14,17 @@ export async function GET(request:Request) {
     const key=`releases:v4:${id}`;
     let updated=false;
     if(Date.now()-await lastSynced(key)>4*3600_000) {
-      if(!item.originalTitle) {
-        try {const detail=await fetchDetail(item);await updateMediaDetail(id,detail);item={...item,...Object.fromEntries(Object.entries(detail).filter(([,value])=>value))};} catch { /* Search with the known title. */ }
+      const known=item;
+      const aliases=!known.originalTitle?()=>fetchDetail(known).then(async detail=>{
+        await updateMediaDetail(id,detail);
+        return {...known,...Object.fromEntries(Object.entries(detail).filter(([,value])=>value))};
+      }).catch(()=>known):undefined;
+      const found=await collectReleases(known,aliases);
+      if(found.length) {
+        await upsertReleases(found);
+        await markSynced(key);
       }
-      const found=await collectReleases(item);
-      if(found.length)await upsertReleases(found);
-      await markSynced(key);updated=true;
+      updated=true;
     }
     const releases=await readReleases(id);
     return Response.json({items:releases,updated,sourceCount:new Set(releases.map(x=>x.source)).size},{headers:{"Cache-Control":"no-store"}});

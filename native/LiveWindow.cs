@@ -34,7 +34,7 @@ public partial class MainWindow
     CancellationTokenSource? liveRequest;
     readonly Dictionary<int,IReadOnlyList<SourceEntry>> liveReleases=[];
     readonly HashSet<int> cachedReleaseViews=[];
-    readonly CatalogIndex catalogIndex=new(Preferences.DataDir);
+    readonly CatalogIndex catalogIndex=new(Preferences.DataDir,deferRestore:true);
     readonly HashSet<int> requestedDetails=[];
     readonly Dictionary<int,Task<MediaItem>> cardMetadata=[];
     readonly MetadataScheduler metadataScheduler=new();
@@ -42,11 +42,12 @@ public partial class MainWindow
     readonly OnlineIndexClient onlineIndex;
     Task<MediaItem> Metadata(MediaItem item,bool priority=false,CancellationToken ct=default,Action<MediaItem>? updated=null,bool force=false)
     {
-        // A title found only on IMDb has no catalog page to read; its card shows what the search returned.
-        if(ImdbSuggestions.IsImdbOnly(item))return Task.FromResult(item);
+        // A title found only on IMDb has no catalog page to read. An opened card asks the site for its text and cast, TheTVDB for series and TMDB for films (shelf cards do not); TVmaze backs up series.
+        if(ImdbSuggestions.IsImdbOnly(item))return priority?ImdbMetadata(item,ct,updated,force):Task.FromResult(item);
         item=DownloadMetadata.EnrichMedia(item,new[]{sharedCatalog.Find(item)}.OfType<MediaItem>().Concat(BundledCatalog.Search(item.Section,item.Title)));
         if(!force&&MediaMetadata.HasFullDetails(item)){updated?.Invoke(item);return Task.FromResult(item);}
         if(force){cardMetadata.Remove(item.Id);resolvedPriorityMetadata.Remove(item.Id);}
+        if(cardMetadata.TryGetValue(item.Id,out var failed)&&(failed.IsCanceled||failed.IsFaulted))cardMetadata.Remove(item.Id);
         if(cardMetadata.TryGetValue(item.Id,out var task)&&(!priority||task.IsCompletedSuccessfully&&(resolvedPriorityMetadata.Contains(item.Id)||MediaMetadata.HasFullDetails(task.Result))||priorityMetadata.Contains(item.Id)))return task;
         if(!ct.CanBeCanceled)ct=metadataLifetime.Token;
         async Task<MediaItem> Load()
@@ -81,11 +82,63 @@ public partial class MainWindow
         }
         task=Load();if(cardMetadata.Count>=100)cardMetadata.Remove(cardMetadata.Keys.First());cardMetadata[item.Id]=task;return task;
     }
-    async Task UpdateCardRatings(MediaItem item)
+    Task<MediaItem> ImdbMetadata(MediaItem item,CancellationToken ct,Action<MediaItem>? updated,bool force)
     {
-        var task=Metadata(item);
-        try{var data=await task;if(!closed)item.SetScores(data.Kinopoisk,data.Imdb,data.Genre);}
-        catch{if(cardMetadata.TryGetValue(item.Id,out var latest)&&ReferenceEquals(task,latest))cardMetadata.Remove(item.Id); /* A missing rating stays unavailable. */ }
+        if(item.Section is not ("Фильмы" or "Сериалы")||string.IsNullOrWhiteSpace(item.ImdbId))return Task.FromResult(item);
+        if(force)cardMetadata.Remove(item.Id);
+        if(cardMetadata.TryGetValue(item.Id,out var cached))return cached;
+        if(!ct.CanBeCanceled)ct=metadataLifetime.Token;
+        async Task<MediaItem> Load()
+        {
+            await Task.Yield();
+            using var deadline=CancellationTokenSource.CreateLinkedTokenSource(ct);
+            deadline.CancelAfter(TimeSpan.FromSeconds(15));
+            var result=item;
+            // The site's answer (TheTVDB for series, TMDB for films) comes first; a series it could not describe falls back to TVmaze.
+            try{result=await onlineIndex.Title(item,deadline.Token);updated?.Invoke(result);}
+            catch(Exception) when(!ct.IsCancellationRequested){}
+            if(item.Section=="Сериалы"&&!MediaMetadata.HasDescription(result))
+            {
+                try{result=await TvMazeMetadata.Load(sourceClient,result,deadline.Token);updated?.Invoke(result);}
+                catch(Exception) when(!ct.IsCancellationRequested){}
+            }
+            // Nothing found keeps the search card, and the next opening asks again.
+            if(ReferenceEquals(result,item))cardMetadata.Remove(item.Id);
+            return result;
+        }
+        var task=Load();if(cardMetadata.Count>=100)cardMetadata.Remove(cardMetadata.Keys.First());cardMetadata[item.Id]=task;return task;
+    }
+    sealed class RatingLookup
+    {
+        public readonly CancellationTokenSource Request=new();
+        public Task<MediaItem> Task=null!;
+        public int Subscribers;
+    }
+    readonly Dictionary<int,RatingLookup> ratingLookups=[];
+    async Task UpdateCardRatings(MediaItem item,CancellationToken ct=default)
+    {
+        if(!ratingLookups.TryGetValue(item.Id,out var lookup)||lookup.Request.IsCancellationRequested)
+        {
+            lookup=new();ratingLookups[item.Id]=lookup;
+            lookup.Task=Metadata(item,ct:lookup.Request.Token);
+        }
+        lookup.Subscribers++;
+        try{var data=await lookup.Task.WaitAsync(ct);if(!closed&&!ct.IsCancellationRequested){item.SetScores(data.Kinopoisk,data.Imdb,data.Genre);if(prefs.HiddenGenres.Count>0&&!PersonallyVisible(item))ScheduleCatalogEvidenceRefresh();}}
+        catch{ /* A missing rating stays unavailable. */ }
+        finally
+        {
+            if(--lookup.Subscribers==0)
+            {
+                if(ratingLookups.TryGetValue(item.Id,out var active)&&ReferenceEquals(active,lookup))ratingLookups.Remove(item.Id);
+                if(!lookup.Task.IsCompleted)
+                {
+                    lookup.Request.Cancel();
+                    if(!priorityMetadata.Contains(item.Id)&&cardMetadata.TryGetValue(item.Id,out var latest)&&ReferenceEquals(lookup.Task,latest))cardMetadata.Remove(item.Id);
+                }
+                else if(!lookup.Task.IsCompletedSuccessfully&&cardMetadata.TryGetValue(item.Id,out var latest)&&ReferenceEquals(lookup.Task,latest))cardMetadata.Remove(item.Id);
+                _=lookup.Task.ContinueWith(task=>{_=task.Exception;lookup.Request.Dispose();},CancellationToken.None,TaskContinuationOptions.ExecuteSynchronously,TaskScheduler.Default);
+            }
+        }
     }
     string catalogGenre="",catalogCountry="",catalogCollection="all",catalogRegion="";
     int catalogRating;
@@ -166,13 +219,13 @@ public partial class MainWindow
         IEnumerable<MediaItem> shown=favoritesOnly?prefs.LiveFavorites.Where(x=>x.Section==section&&x.Title.Contains(submittedQuery,StringComparison.CurrentCultureIgnoreCase)).DistinctBy(x=>x.Id).Where(selection.Matches):SearchActive?UnifiedSearch.Filter(liveItems,searchCategory).Where(selection.Matches):liveItems;
         if(favoritesOnly)shown=catalogOrder=="По рейтингу"?shown.OrderByDescending(CatalogPaging.Rating):shown.OrderByDescending(x=>x.Year);
         var local=favoritesOnly||SearchActive;
-        var all=shown.Where(x=>favoritesOnly||SearchActive||!NoDownloads(x)).ToArray();
+        var all=shown.Where(x=>favoritesOnly||SearchActive||!NoDownloads(x)&&PersonallyVisible(x)).ToArray();
         if(local&&!liveLoading){catalogLastPage=Math.Max(1,(all.Length+CatalogPaging.Size-1)/CatalogPaging.Size);livePage=Math.Min(livePage,catalogLastPage.Value);catalogHasNext=livePage<catalogLastPage;}
         var rawPage=local?all.Skip((livePage-1)*CatalogPaging.Size).Take(CatalogPaging.Size).ToArray():all;
         StartCatalogQualityCheck(rawPage);
-        var cards=rawPage.Where(CatalogQualityMatches).ToArray();
+        var cards=rawPage.Where(item=>(!DiscoveryCatalog||RecommendableTitle(item))&&CatalogQualityMatches(item)).ToArray();
         ShowCatalog(cards);
-        var list=catalogList!;
+        var list=catalogList!;list.Opacity=liveLoading&&cards.Length>0?.65:1;
         Body.Children.Remove(list);ScrollViewer.SetVerticalScrollBarVisibility(list,ScrollBarVisibility.Disabled);ScrollViewer.SetHorizontalScrollBarVisibility(list,ScrollBarVisibility.Disabled);WheelScroll.SetIsEnabled(list,false);
         // The scroll viewer extends 6 px past the gutter so hover rings and focus rings are not clipped.
         var content=new StackPanel{Margin=new(6,6,6,0)};RenderPeopleSearchResults(content,false);
@@ -184,8 +237,8 @@ public partial class MainWindow
         else if(cards.Length==0)
         {
             var empty=new StackPanel{HorizontalAlignment=HorizontalAlignment.Center,MaxWidth=370,Margin=new(24)};
-            var label=Text(liveLoading?"Загружаем подборку…":CatalogQualityChecking?"Проверяем качество раздач…":liveError.Length>0?"Каталог пока недоступен":SearchActive&&peopleSearchItems.Length>0?"Фильмы и сериалы не найдены":"Ничего не найдено",23);label.FontWeight=FontWeights.SemiBold;label.TextAlignment=TextAlignment.Center;empty.Children.Add(label);
-            var hint=Text(liveLoading?"Это займёт несколько секунд.":CatalogQualityChecking?"Фильмы появятся по мере проверки источников.":favoritesOnly?"Сохраняй фильмы и сериалы из карточки — они останутся под рукой.":"Попробуй другую страницу, запрос или сбрось фильтры.",13,true);hint.TextAlignment=TextAlignment.Center;empty.Children.Add(hint);
+            var label=Text(liveLoading?"Загружаем подборку…":CatalogQualityChecking?(prefs.CatalogQualityHeight==0?"Проверяем варианты загрузки…":"Проверяем качество раздач…"):liveError.Length>0?"Каталог пока недоступен":SearchActive&&peopleSearchItems.Length>0?"Фильмы и сериалы не найдены":"Ничего не найдено",23);label.FontWeight=FontWeights.SemiBold;label.TextAlignment=TextAlignment.Center;empty.Children.Add(label);
+            var hint=Text(liveLoading?"Это займёт несколько секунд.":CatalogQualityChecking?"Фильмы появятся по мере проверки источников.":favoritesOnly?"Сохраняй фильмы и сериалы из карточки — они останутся под рукой.":!SearchActive&&(prefs.HiddenTitles.Count>0||prefs.HiddenGenres.Count>0)?"Проверь скрытые названия и жанры в настройках или выбери другую страницу.":"Попробуй другую страницу, запрос или сбрось фильтры.",13,true);hint.TextAlignment=TextAlignment.Center;empty.Children.Add(hint);
             if(!liveLoading){var retry=ActionButton("Сбросить фильтры","IconRefresh",()=>ChangeCatalogFilter(()=>{favoritesOnly=false;ResetCatalogFilters();prefs.HidePoorQuality=false;prefs.CatalogQualityHeight=0;ResetCatalogQualityChecks();prefs.Save();}));retry.HorizontalAlignment=HorizontalAlignment.Center;empty.Children.Add(retry);}
             content.Children.Add(empty);
         }
@@ -269,7 +322,7 @@ public partial class MainWindow
         liveRequest?.Cancel();liveRequest?.Dispose();liveRequest=new();var token=liveRequest.Token;liveLoading=true;liveError="";
         var request=liveRequest;var selection=CatalogSelection;var forceRefresh=catalogRefreshRequested;catalogRefreshRequested=false;
         bool IsCurrent()=>ReferenceEquals(liveRequest,request)&&!token.IsCancellationRequested&&liveKey==key&&submittedQuery==query;
-        liveItems=[];catalogHasNext=false;
+        if(!forceRefresh){liveItems=[];catalogHasNext=false;}
         var cacheKey=category+"|"+selection.Filter+"|"+page+(selection.Region.Length>0?"|region:"+selection.Region+"|home:"+CatalogRegions.HomeCountry(selection.HomeCountry):"")+(selection.Collection.StartsWith("seasonal:",StringComparison.Ordinal)?"|"+selection.Collection:"");
         await Task.Yield();
         try
@@ -315,11 +368,11 @@ public partial class MainWindow
             }
             else
             {
-                await sharedCatalog.RestoreAsync(token);
+                await Task.WhenAll(sharedCatalog.RestoreAsync(token),catalogIndex.RestoreAsync(token));
                 var result=await UnifiedSearch.FindAsync(query,
                     (kind,t)=>searchProvider!=null?searchProvider(kind,query,t):CatalogBatches.ReadPage(c=>onlineIndex.Browse(kind,query,1,c),c=>new LiveCatalog(sourceClient).Browse(kind,query,1,c),false,t),
                     kind=>catalogIndex.Search(kind,query).Concat(sharedCatalog.Search(kind,query)).Concat(BundledCatalog.Search(kind,query)).ToArray(),token,
-                    searchProvider!=null?null:t=>ImdbSuggestions.SearchAsync(query,t),updated=>
+                    searchProvider!=null?null:t=>SearchSupplement(query,t),updated=>
                     {
                         if(!IsCurrent())return;
                         liveItems=updated.Items;
@@ -328,11 +381,30 @@ public partial class MainWindow
                 items=result.Items;if(result.Offline)liveError="Часть источников недоступна · добавлены результаты из сохранённого каталога";
             }
             try{await catalogIndex.AddAsync(items,token);}catch(IOException){}catch(UnauthorizedAccessException){}
-            if(IsCurrent()){liveItems=items;if(items.Count==0)liveError="Ничего не найдено. Измени запрос или фильтры.";else if(!SearchActive&&prefs.CatalogQualityHeight==0)_ = CheckCatalogAvailability(items,key,category,token,forceRefresh);}
+            if(IsCurrent()){liveItems=items;if(items.Count==0)liveError="Ничего не найдено. Измени запрос или фильтры.";else if(!SearchActive&&!DiscoveryCatalog&&prefs.CatalogQualityHeight==0)_ = CheckCatalogAvailability(items,key,category,token,forceRefresh);}
         }
         catch(OperationCanceledException){}
         catch(Exception){if(IsCurrent())liveError="Источник временно недоступен. Повтори загрузку или выбери другую страницу.";}
         finally{if(IsCurrent()){liveLoading=false;if(!closed&&current==null&&activePerson==null&&section==category&&!favoritesOnly)Render();}}
+    }
+
+    async Task<IReadOnlyList<MediaItem>> SearchSupplement(string query,CancellationToken ct)
+    {
+        var found=await ImdbSuggestions.SearchAsync(MediaIdentity.OriginalQuery(query),ct);
+        using var slots=new SemaphoreSlim(2,2);
+        using var deadline=CancellationTokenSource.CreateLinkedTokenSource(ct);deadline.CancelAfter(TimeSpan.FromSeconds(3));
+        return await Task.WhenAll(found.Select(async (value,index)=>
+        {
+            var item=MediaIdentity.Enrich(value);
+            var saved=catalogIndex.FindByImdb(item.Section,item.ImdbId);
+            if(saved!=null)return MediaMetadata.Merge(item,saved);
+            // Known aliases already identify the work. Only unresolved top matches need an upstream lookup.
+            if(item.TitleAliases.Length>0||index>=4)return item;
+            var entered=false;
+            try{await slots.WaitAsync(deadline.Token);entered=true;return await onlineIndex.Title(item,deadline.Token);}
+            catch(Exception) when(!ct.IsCancellationRequested){return item;}
+            finally{if(entered)slots.Release();}
+        }));
     }
 }
 

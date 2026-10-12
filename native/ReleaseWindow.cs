@@ -48,9 +48,15 @@ public partial class MainWindow
     // Small helpers shared by the table rows and the compact cards.
     FrameworkElement ReleaseTag(string text,bool accent=false,string? tooltip=null)
     {
-        var label=new TextBlock{Text=text,FontSize=12,FontWeight=FontWeights.Medium,VerticalAlignment=VerticalAlignment.Center};
+        var label=new TextBlock{Text=text,FontSize=12,FontWeight=FontWeights.Medium,VerticalAlignment=VerticalAlignment.Center,MaxWidth=260,TextWrapping=TextWrapping.Wrap};
         label.SetResourceReference(TextBlock.ForegroundProperty,accent?"Accent":"Muted");
         var tag=new Border{Child=label,CornerRadius=new(6),Padding=new(8,2,8,2),Margin=new(0,0,6,4),MinHeight=22,ToolTip=tooltip};tag.SetResourceReference(Border.BackgroundProperty,"Raised");return tag;
+    }
+    IEnumerable<FrameworkElement> AudioTags(SourceEntry entry)
+    {
+        var audio=ReleaseFreshness.AudioTrack(entry);
+        if(audio!="Не указано")yield return ReleaseTag(audio,RussianAudio.Rank(entry)==3,ReleaseFreshness.AudioNote);
+        foreach(var studio in ReleaseAudio.StudioNames(entry))yield return ReleaseTag(studio,false,ReleaseFreshness.AudioNote);
     }
     FrameworkElement SeedHealth(SourceEntry entry)
     {
@@ -98,8 +104,28 @@ public partial class MainWindow
         return LanDownloadAction(entry);
     }
 
+    // Shared by the film and the game release lists.
+    FrameworkElement RecommendedPill()
+    {
+        var pill=new Border{CornerRadius=new(11),Padding=new(9,0,9,0),Height=22,Margin=new(0,0,10,6),HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center};pill.SetResourceReference(Border.BackgroundProperty,"AccentSoft");
+        var label=new TextBlock{Text="★ Рекомендуем",FontSize=11,FontWeight=FontWeights.Bold,VerticalAlignment=VerticalAlignment.Center};label.SetResourceReference(TextBlock.ForegroundProperty,"Accent");pill.Child=label;return pill;
+    }
+    FrameworkElement ReasonLine(string reason)
+    {
+        var row=new StackPanel{Orientation=Orientation.Horizontal,Margin=new(0,4,0,0)};
+        var icon=new System.Windows.Shapes.Path{Data=(Geometry)FindResource("IconInfo"),Width=14,Height=14,Stretch=Stretch.Uniform,StrokeThickness=1.6,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,Margin=new(0,0,6,0),VerticalAlignment=VerticalAlignment.Center};icon.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty,"Muted");row.Children.Add(icon);
+        var text=new TextBlock{Text=reason,FontSize=12,VerticalAlignment=VerticalAlignment.Center};text.SetResourceReference(TextBlock.ForegroundProperty,"Muted");row.Children.Add(text);return row;
+    }
+    FrameworkElement LowSeedLine()
+    {
+        var row=new StackPanel{Orientation=Orientation.Horizontal,Margin=new(0,4,0,0)};
+        var icon=new System.Windows.Shapes.Path{Data=(Geometry)FindResource("IconAlert"),Width=14,Height=14,Stretch=Stretch.Uniform,StrokeThickness=1.6,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,Margin=new(0,0,6,0),VerticalAlignment=VerticalAlignment.Center};icon.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty,"Danger");row.Children.Add(icon);
+        var text=new TextBlock{Text="Мало отдающих — загрузка может идти медленно",FontSize=12,VerticalAlignment=VerticalAlignment.Center};text.SetResourceReference(TextBlock.ForegroundProperty,"Danger");row.Children.Add(text);return row;
+    }
+    int releasePickerRenders;
     void RenderReleasePicker(StackPanel panel,IReadOnlyList<SourceEntry> releases)
     {
+        releasePickerRenders++;
         var filmId=current?.Id??0;
         var state=ReleaseSelection(filmId);
         var host=releaseControlsHost??panel;
@@ -125,7 +151,8 @@ public partial class MainWindow
         var isSeries=current?.Section=="Сериалы";
         if(isSeries){Filter("Сезон",releases.Select(x=>x.Series).OrderBy(x=>x.Season??int.MaxValue).Select(x=>x.SeasonLabel),hidden,false);Filter("Серия",releases.Select(x=>x.Series).OrderBy(x=>x.Episode??int.MaxValue).Select(x=>x.EpisodeLabel),hidden,false);}
         Filter("Качество",releases.Select(x=>x.Quality),hidden,false);
-        Filter("Озвучка",releases.Select(ReleaseFreshness.Audio),more,true);
+        Filter("Студия озвучки",releases.SelectMany(ReleaseAudio.StudioOptions).OrderBy(x=>x),top,true);
+        Filter("Тип озвучки",releases.SelectMany(ReleaseAudio.TypeOptions).OrderBy(x=>x),top,true);
         Filter("Субтитры",releases.Select(x=>x.Subs),more,true);
         Filter("Источник",releases.Select(x=>x.Source),more,true);
         Filter("Тип",releases.Select(x=>x.Type),more,true);
@@ -155,13 +182,11 @@ public partial class MainWindow
         foreach(var group in pool.Where(x=>x.Quality!="Не указано").GroupBy(x=>x.Quality).OrderByDescending(x=>QualityRank(x.First())).ThenByDescending(x=>x.Count()))Segment(group.Key,group.Key,group.Count());
 
         // ---- series: season and episode strips drive the collapsed season/episode selectors ----
-        var seasonButtons=new Dictionary<string,RadioButton>();WrapPanel? episodeRow=null;StackPanel? episodeLine=null;
-        WrapPanel SeriesStrip(string caption,string name)
+        // Long series do not fit on one line: both strips scroll sideways and offer the whole list (see ScrollStrip.cs).
+        var seasonButtons=new Dictionary<string,RadioButton>();ScrollStrip? episodeStrip=null;
+        ScrollStrip SeriesStrip(string caption,string name)
         {
-            var line=new StackPanel{Orientation=Orientation.Horizontal,Margin=new(0,0,0,10)};
-            var label=new TextBlock{Text=caption,FontSize=12,FontWeight=FontWeights.SemiBold,Width=58,VerticalAlignment=VerticalAlignment.Center};label.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");line.Children.Add(label);
-            var frame=new Border{CornerRadius=new(12),BorderThickness=new(1),Padding=new(4),VerticalAlignment=VerticalAlignment.Center};frame.SetResourceReference(Border.BackgroundProperty,"Panel");frame.SetResourceReference(Border.BorderBrushProperty,"EdgeSoft");
-            AutomationProperties.SetName(frame,name);var row=new WrapPanel();frame.Child=row;line.Children.Add(frame);seriesRow.Children.Add(line);return row;
+            var strip=CreateScrollStrip(caption,name);seriesRow.Children.Add(strip.Line);return strip;
         }
         RadioButton SeriesButton(string group,string filterKey,string value,string label,int count)
         {
@@ -175,14 +200,14 @@ public partial class MainWindow
             var seasons=((string[])filters["Сезон"].ItemsSource).Where(x=>x!="Все").ToArray();
             if(seasons.Length>1)
             {
-                var seasonRow=SeriesStrip("Сезон","Сезоны сериала");
+                var seasonStrip=SeriesStrip("Сезон","Сезоны сериала");
                 foreach(var value in new[]{"Все"}.Concat(seasons))
                 {
                     var count=value=="Все"?pool.Length:pool.Count(x=>x.Series.SeasonLabel==value);
-                    var button=SeriesButton("ReleaseSeason","Сезон",value,value,count);seasonButtons[value]=button;seasonRow.Children.Add(button);
+                    var button=SeriesButton("ReleaseSeason","Сезон",value,value,count);seasonButtons[value]=button;AddStripItem(seasonStrip,button,value,count);
                 }
             }
-            episodeRow=SeriesStrip("Серия","Серии выбранного сезона");episodeLine=(StackPanel)((Border)episodeRow.Parent).Parent;
+            episodeStrip=SeriesStrip("Серия","Серии выбранного сезона");
         }
 
         // ---- Russian-audio switch ----
@@ -216,7 +241,7 @@ public partial class MainWindow
         ApplyMore();
         void UpdateActions()
         {
-            var additional=new[]{"Озвучка","Источник","Тип","Кодек","HDR","Субтитры"}.Count(x=>filters[x].SelectedItem?.ToString()!="Все");
+            var additional=new[]{"Источник","Тип","Кодек","HDR","Субтитры"}.Count(x=>filters[x].SelectedItem?.ToString()!="Все");
             toggle.Content=ChipContent((state.More?"Скрыть фильтры":"Ещё фильтры")+(additional>0?$" · {additional}":""),true);StyleChip(toggle,additional>0);
             AutomationProperties.SetName(toggle,state.More?"Скрыть дополнительные фильтры раздач":"Показать дополнительные фильтры раздач");
             reset.Visibility=prefs.HidePoorQuality||state.OnlyRussian||filters.Values.Any(x=>x.SelectedItem?.ToString()!="Все")||sort.SelectedIndex!=0?Visibility.Visible:Visibility.Collapsed;
@@ -231,24 +256,24 @@ public partial class MainWindow
         // Episodes of the chosen season (or of the only season); hidden when there is nothing to choose between.
         void RefreshEpisodes()
         {
-            if(episodeRow==null||episodeLine==null)return;
+            if(episodeStrip==null)return;
             var season=filters["Сезон"].SelectedItem?.ToString()??"Все";
             var seasonCount=((string[])filters["Сезон"].ItemsSource).Count(x=>x!="Все");
             var inSeason=pool.Where(x=>season=="Все"||x.Series.SeasonLabel==season).ToArray();
             var episodes=inSeason.Select(x=>x.Series).OrderBy(x=>x.MultipleEpisodes||!x.Episode.HasValue?0:1).ThenBy(x=>x.Episode??0).Select(x=>x.EpisodeLabel).Distinct().ToArray();
             var visible=(season!="Все"||seasonCount<=1)&&episodes.Length>1;
-            episodeLine.Visibility=visible?Visibility.Visible:Visibility.Collapsed;
+            episodeStrip.Line.Visibility=visible?Visibility.Visible:Visibility.Collapsed;
             var chosen=filters["Серия"].SelectedItem?.ToString()??"Все";
             if(chosen!="Все"&&(!visible||!episodes.Contains(chosen)))
             {
                 var wasChanging=changingFilters;changingFilters=true;filters["Серия"].SelectedItem="Все";state.Filters["Серия"]="Все";changingFilters=wasChanging;chosen="Все";
             }
-            episodeRow.Children.Clear();if(!visible)return;
+            ClearStrip(episodeStrip);if(!visible)return;
             syncing=true;
             foreach(var value in new[]{"Все"}.Concat(episodes))
             {
                 var count=value=="Все"?inSeason.Length:inSeason.Count(x=>x.Series.EpisodeLabel==value);
-                var button=SeriesButton("ReleaseEpisode","Серия",value,value,count);button.IsChecked=value==chosen;episodeRow.Children.Add(button);
+                var button=SeriesButton("ReleaseEpisode","Серия",value,value,count);button.IsChecked=value==chosen;AddStripItem(episodeStrip,button,value,count);
             }
             syncing=false;
         }
@@ -276,7 +301,7 @@ public partial class MainWindow
             var summary=new WrapPanel{Margin=new(0,0,0,6)};
             if(ReleaseQuality.Poor(entry,QualityMinimum))summary.Children.Add(PoorQualityBadge(ReleaseQuality.Label(entry)));
             if(entry.Quality!="Не указано")summary.Children.Add(ReleaseTag(entry.Quality,true));
-            if(ReleaseFreshness.Audio(entry)!="Не указано")summary.Children.Add(ReleaseTag(ReleaseFreshness.Audio(entry),RussianAudio.Rank(entry)==3,ReleaseFreshness.AudioNote));
+            foreach(var audioTag in AudioTags(entry))summary.Children.Add(audioTag);
             if(isSeries){summary.Children.Add(ReleaseTag(entry.Series.SeasonLabel));summary.Children.Add(ReleaseTag(entry.Series.EpisodeLabel));}
             summary.Children.Add(ReleaseTag(entry.Size.HasValue?DownloadService.FormatBytes(entry.Size.Value):"Размер не указан"));
             summary.Children.Add(ReleaseTag(entry.Seeds switch{>0=> $"Отдают: {entry.Seeds.Value}",0=>"Отдают: 0 по данным источника",_=>"Отдают: неизвестно"},false,ReleaseFreshness.ConnectionNote));
@@ -304,17 +329,6 @@ public partial class MainWindow
             var card=new Border{Child=body,CornerRadius=new(16),Padding=new(16),Margin=new(0,0,0,8),BorderThickness=new(1)};
             card.SetResourceReference(Border.BackgroundProperty,isBest?"AccentFaint":"Panel");card.SetResourceReference(Border.BorderBrushProperty,isBest?"AccentLine":"EdgeSoft");return card;
         }
-        FrameworkElement RecommendedPill()
-        {
-            var pill=new Border{CornerRadius=new(11),Padding=new(9,0,9,0),Height=22,Margin=new(0,0,10,6),HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center};pill.SetResourceReference(Border.BackgroundProperty,"AccentSoft");
-            var label=new TextBlock{Text="★ Рекомендуем",FontSize=11,FontWeight=FontWeights.Bold,VerticalAlignment=VerticalAlignment.Center};label.SetResourceReference(TextBlock.ForegroundProperty,"Accent");pill.Child=label;return pill;
-        }
-        FrameworkElement ReasonLine(string reason)
-        {
-            var row=new StackPanel{Orientation=Orientation.Horizontal,Margin=new(0,4,0,0)};
-            var icon=new System.Windows.Shapes.Path{Data=(Geometry)FindResource("IconInfo"),Width=14,Height=14,Stretch=Stretch.Uniform,StrokeThickness=1.6,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,Margin=new(0,0,6,0),VerticalAlignment=VerticalAlignment.Center};icon.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty,"Muted");row.Children.Add(icon);
-            var text=new TextBlock{Text=reason,FontSize=12,VerticalAlignment=VerticalAlignment.Center};text.SetResourceReference(TextBlock.ForegroundProperty,"Muted");row.Children.Add(text);return row;
-        }
         // The recommended release on top of the list: larger, with its reason and one primary
         // download button. It stays in the list below too, with its row actions and details.
         FrameworkElement BestRelease(ReleaseRecommendation.Choice pick)
@@ -326,7 +340,7 @@ public partial class MainWindow
             var title=Text(entry.Title,17);title.FontWeight=FontWeights.SemiBold;title.TextWrapping=TextWrapping.Wrap;title.MaxHeight=48;title.TextTrimming=TextTrimming.CharacterEllipsis;title.ToolTip=entry.Title;title.Margin=new(0,2,0,10);info.Children.Add(title);
             var tags=new WrapPanel();
             tags.Children.Add(ReleaseTag(QualityLabel(entry),true));
-            if(ReleaseFreshness.Audio(entry)!="Не указано")tags.Children.Add(ReleaseTag(ReleaseFreshness.Audio(entry),RussianAudio.Rank(entry)==3,ReleaseFreshness.AudioNote));
+            foreach(var audioTag in AudioTags(entry))tags.Children.Add(audioTag);
             if(entry.Size.HasValue)tags.Children.Add(ReleaseTag(DownloadService.FormatBytes(entry.Size.Value)));
             if(entry.Seeds>0)tags.Children.Add(ReleaseTag($"Отдают: {entry.Seeds.Value}",false,ReleaseFreshness.ConnectionNote));
             tags.Children.Add(ReleaseTag(ReleaseFreshness.SourceName(entry)));
@@ -350,27 +364,22 @@ public partial class MainWindow
             AutomationProperties.SetName(card,"Рекомендованная раздача: "+entry.Title);
             return card;
         }
-        FrameworkElement LowSeedLine()
-        {
-            var row=new StackPanel{Orientation=Orientation.Horizontal,Margin=new(0,4,0,0)};
-            var icon=new System.Windows.Shapes.Path{Data=(Geometry)FindResource("IconAlert"),Width=14,Height=14,Stretch=Stretch.Uniform,StrokeThickness=1.6,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,Margin=new(0,0,6,0),VerticalAlignment=VerticalAlignment.Center};icon.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty,"Danger");row.Children.Add(icon);
-            var text=new TextBlock{Text="Мало отдающих — загрузка может идти медленно",FontSize=12,VerticalAlignment=VerticalAlignment.Center};text.SetResourceReference(TextBlock.ForegroundProperty,"Danger");row.Children.Add(text);return row;
-        }
         void Show()
         {
             SaveSelection();UpdateActions();results.Children.Clear();
             IEnumerable<SourceEntry> filtered=releases;
             if(prefs.HidePoorQuality)filtered=filtered.Where(x=>!ReleaseQuality.Poor(x,QualityMinimum));
-            foreach(var key in new[]{"Источник","Сезон","Серия","Качество","Тип","Озвучка","Субтитры","Кодек","HDR"})
+            foreach(var key in new[]{"Источник","Сезон","Серия","Качество","Тип","Студия озвучки","Тип озвучки","Субтитры","Кодек","HDR"})
             {
                 if(!filters.ContainsKey(key))continue;
                 var value=state.Filters[key];if(value=="Все")continue;
-                filtered=key switch{"Источник"=>filtered.Where(x=>x.Source==value),"Сезон"=>filtered.Where(x=>x.Series.SeasonLabel==value),"Серия"=>filtered.Where(x=>x.Series.EpisodeLabel==value),"Качество"=>filtered.Where(x=>x.Quality==value),"Тип"=>filtered.Where(x=>x.Type==value),"Озвучка"=>filtered.Where(x=>ReleaseFreshness.Audio(x)==value),"Субтитры"=>filtered.Where(x=>x.Subs==value),"Кодек"=>filtered.Where(x=>x.Codec==value),_=>filtered.Where(x=>x.Hdr==value)};
+                filtered=key switch{"Источник"=>filtered.Where(x=>x.Source==value),"Сезон"=>filtered.Where(x=>x.Series.SeasonLabel==value),"Серия"=>filtered.Where(x=>x.Series.EpisodeLabel==value),"Качество"=>filtered.Where(x=>x.Quality==value),"Тип"=>filtered.Where(x=>x.Type==value),"Студия озвучки"=>filtered.Where(x=>ReleaseAudio.MatchesStudio(x,value)),"Тип озвучки"=>filtered.Where(x=>ReleaseAudio.MatchesType(x,value)),"Субтитры"=>filtered.Where(x=>x.Subs==value),"Кодек"=>filtered.Where(x=>x.Codec==value),_=>filtered.Where(x=>x.Hdr==value)};
             }
             if(state.OnlyRussian)filtered=filtered.Where(x=>RussianAudio.Rank(x)==3);
             filtered=state.Sort switch{"Русская озвучка"=>RussianAudio.Order(filtered),"Русские источники"=>filtered.OrderByDescending(RussianSource).ThenByDescending(SeedRank),"Меньше размер"=>filtered.OrderBy(x=>x.Size??long.MaxValue),"Выше качество"=>filtered.OrderByDescending(QualityRank).ThenByDescending(SeedRank),"По названию"=>filtered.OrderBy(x=>x.Title,StringComparer.CurrentCultureIgnoreCase),"По сезону и серии"=>filtered.OrderBy(x=>x.Series.Season??int.MaxValue).ThenBy(x=>x.Series.Episode??int.MaxValue),"По видео"=>filtered.OrderBy(x=>x.Type=="Не указано").ThenBy(x=>x.Type),"По субтитрам"=>filtered.OrderBy(x=>x.Subs=="Не указано").ThenBy(x=>x.Subs),"По озвучке"=>filtered.OrderByDescending(x=>RussianAudio.Rank(x)).ThenBy(x=>ReleaseFreshness.Audio(x)),_=>filtered.OrderByDescending(SeedRank)};
             if(state.Reverse)filtered=filtered.Reverse();
             var visible=filtered.ToArray();var displayed=visible.Take(state.VisibleCount).ToArray();
+            ApplyDetailReleaseFilters(filmId,visible);
             if(releaseCountLabel!=null)releaseCountLabel.Text=visible.Length.ToString();
             // The count already sits next to the section title and the list ends with "Показать ещё", so no extra notes here;
             // the seed disclaimer stays in the row tooltips.
@@ -424,7 +433,7 @@ public partial class MainWindow
                 var title=new TextBlock{Text=entry.Title,FontSize=14,FontWeight=FontWeights.SemiBold,TextTrimming=TextTrimming.CharacterEllipsis,ToolTip=entry.Title,VerticalAlignment=VerticalAlignment.Center};titleLine.Children.Add(title);identity.Children.Add(titleLine);
                 var tags=new WrapPanel{Margin=new(0,6,0,0)};
                 if(ReleaseQuality.Poor(entry,QualityMinimum))tags.Children.Add(PoorQualityBadge(ReleaseQuality.Label(entry)));
-                if(ReleaseFreshness.Audio(entry)!="Не указано")tags.Children.Add(ReleaseTag(ReleaseFreshness.Audio(entry),RussianAudio.Rank(entry)==3,ReleaseFreshness.AudioNote));
+                foreach(var audioTag in AudioTags(entry))tags.Children.Add(audioTag);
                 if(entry.Subs!="Не указано")tags.Children.Add(ReleaseTag("Субтитры"));
                 if(VideoLabel(entry)!="Не указано")tags.Children.Add(ReleaseTag(VideoLabel(entry)));
                 if(isSeries)tags.Children.Add(ReleaseTag(entry.Series.SeasonLabel+" · "+entry.Series.EpisodeLabel));

@@ -1,0 +1,32 @@
+{
+  "Version": "0.41.0",
+  "WindowsRun": 38188737318,
+  "Artifact": 11720961060,
+  "NativeBatches": [
+    {
+      "Stage": "release-freshness-dark-refresh-batch",
+      "Requests": 32,
+      "FullCardRenders": 0,
+      "ReleasePickerRenders": 1,
+      "BannerPreserved": true,
+      "QualityBadgesCurrent": true,
+      "SameIdDownloadUpdated": true
+    },
+    {
+      "Stage": "release-freshness-light-compact-refresh-batch",
+      "Requests": 32,
+      "FullCardRenders": 0,
+      "ReleasePickerRenders": 1,
+      "BannerPreserved": true,
+      "QualityBadgesCurrent": true,
+      "SameIdDownloadUpdated": true
+    }
+  ],
+  "ServerChecks": {
+    "ConcurrentRequests": 32,
+    "SourceSearches": 1,
+    "MetadataLookups": 1,
+    "CacheEntriesLimit": 64,
+    "CacheTtlSeconds": 30
+  }
+}

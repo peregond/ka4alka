@@ -1,5 +1,7 @@
 import { decodeHtml, normalize, type Media } from "./catalog-source";
 import type { Release } from "./release";
+import { createReleaseLookup } from "./release-cache";
+import { enrichMedia, mediaNames } from "./catalog-identity";
 
 const text=(value:string)=>decodeHtml(value.replace(/<[^>]*>/g," ").replace(/\s+/g," ")).trim();
 async function read(url:string,max=4_000_000) {
@@ -28,7 +30,7 @@ const episode=(title:string)=>{const m=/\bS(\d{1,2})[. _-]*E(\d{1,3})\b/i.exec(t
 const make=(media:Media,source:string,id:string,title:string,pageUrl:string|null,torrentUrl:string|null,size:number|null,seeds:number|null):Release=>({id:`${source}:${id}`,mediaId:media.id,title,source,pageUrl,torrentUrl,size,seeds,quality:quality(title),...episode(title)});
 
 export function matches(media:Media,title:string,source:string) {
-  const names=[media.title,media.originalTitle??""].map(normalize).filter(Boolean);
+  const names=mediaNames(enrichMedia(media)).map(normalize);
   const candidates=title.replace(/^(?:\s*\[[^\]]{1,40}\]\s*)+/,"").split(/\s+[\/|]\s+/).map(normalize);
   const hit=candidates.some(candidate=>names.some(name=>{
     if(candidate===name)return true;
@@ -43,7 +45,10 @@ export function matches(media:Media,title:string,source:string) {
 }
 
 export async function knaben(media:Media):Promise<Release[]> {
-  const query=media.originalTitle||media.title;
+  const groups=await Promise.allSettled(mediaNames(media).slice(0,4).map(query=>knabenTitle(media,query)));
+  return groups.flatMap(group=>group.status==="fulfilled"?group.value:[]);
+}
+async function knabenTitle(media:Media,query:string):Promise<Release[]> {
   const response=await fetch("https://api.knaben.org/v1",{
     method:"POST",headers:{"Content-Type":"application/json","Accept":"application/json","User-Agent":"KachalkaIndex/0.2"},
     body:JSON.stringify({query,search_field:"title",search_type:"100%",order_by:"seeders",order_direction:"desc",size:75,hide_unsafe:true,hide_xxx:true}),
@@ -68,7 +73,7 @@ export async function knaben(media:Media):Promise<Release[]> {
 }
 
 export async function pirateBay(media:Media):Promise<Release[]> {
-  const queries=[media.originalTitle,media.title].filter((value,index,all):value is string=>Boolean(value)&&all.indexOf(value)===index).slice(0,2);
+  const queries=mediaNames(media).slice(0,4);
   const category=media.section==="movies"?"201,202,207":"205,208";
   const responses=await Promise.allSettled(queries.map(async query=>JSON.parse(await read(`https://apibay.org/q.php?q=${encodeURIComponent(query)}&cat=${category}`,2_000_000)) as {id:string;name:string;info_hash:string;seeders:string;size:string;category:string}[]));
   const results:Release[]=[];
@@ -104,9 +109,9 @@ export async function yts(media:Media):Promise<Release[]> {
 }
 
 export async function rutor(media:Media):Promise<Release[]> {
-  const queries=[media.title,...(media.originalTitle&&media.originalTitle!==media.title?[media.originalTitle]:[])];
-  const results:Release[]=[];
-  for(const query of queries) {
+  const queries=mediaNames(media).slice(0,4);
+  const groups=await Promise.all(queries.map(async query=>{
+    const results:Release[]=[];
     try {
       const html=await read(`https://rutor.info/search/0/0/000/0/${encodeURIComponent(query)}`);
       for(const row of html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)) {
@@ -122,12 +127,13 @@ export async function rutor(media:Media):Promise<Release[]> {
         results.push(make(media,"RuTor",hashFrom(cleanMagnet)??pageUrl,title,pageUrl,cleanMagnet,size,seeds));
       }
     } catch { /* Other sources remain available. */ }
-  }
-  return results;
+    return results;
+  }));
+  return groups.flat();
 }
 
 export async function nnmClub(media:Media):Promise<Release[]> {
-  const queries=[media.title,media.originalTitle].filter((value,index,all):value is string=>Boolean(value)&&all.indexOf(value)===index).slice(0,2);
+  const queries=mediaNames(media).slice(0,4);
   const groups=await Promise.allSettled(queries.map(query=>readWindows1251(`https://nnmclub.to/forum/tracker.php?nm=${encodeURIComponent(query)}`)));
   const results:Release[]=[];const seen=new Set<string>();
   for(const group of groups) {
@@ -149,7 +155,7 @@ export async function nnmClub(media:Media):Promise<Release[]> {
 }
 
 export async function megaPeer(media:Media):Promise<Release[]> {
-  const queries=[media.title,media.originalTitle].filter((value,index,all):value is string=>Boolean(value)&&all.indexOf(value)===index).slice(0,2);
+  const queries=mediaNames(media).slice(0,4);
   const groups=await Promise.allSettled(queries.map(query=>readWindows1251(`https://megapeer.vip/browse.php?search=${encodeWindows1251(query)}&stype=0`)));
   const results:Release[]=[];const seen=new Set<string>();
   for(const group of groups) {
@@ -198,7 +204,7 @@ export function parseBigFanGroup(html:string,media:Media):Release[] {
 }
 
 export async function bigFanGroup(media:Media):Promise<Release[]> {
-  const queries=[media.title,media.originalTitle].filter((value,index,all):value is string=>Boolean(value)&&all.indexOf(value)===index).slice(0,2);
+  const queries=mediaNames(media).slice(0,4);
   const groups=await Promise.allSettled(queries.map(query=>readWindows1251(`https://bigfangroup.org/browse.php?ajax=1&search=${encodeWindows1251(query)}&cat=0&incldead=1&year=0&format=0&s=seed&d=desc`)));
   if(groups.every(group=>group.status==="rejected"))throw new Error("BigFanGroup недоступен");
   const unique=new Map<string,Release>();
@@ -250,8 +256,25 @@ export async function archive(media:Media):Promise<Release[]> {
   return (data.response?.docs??[]).filter(x=>matches(media,x.title,"Internet Archive")).map(x=>make(media,"Internet Archive",x.identifier,x.title,`https://archive.org/details/${encodeURIComponent(x.identifier)}`,null,null,null));
 }
 
-export async function collectReleases(media:Media) {
-  const sources=[rutor(media),nnmClub(media),megaPeer(media),bigFanGroup(media),pirateBay(media),knaben(media),archive(media),...(media.section==="series"?[eztv(media),nyaa(media)]:[yts(media)])];
+const lookupReleases=createReleaseLookup();
+export function collectReleases(media:Media,aliases?:Promise<Media>|(()=>Promise<Media>)) {
+  media=enrichMedia(media);
+  const key=JSON.stringify([media.id,media.title,media.originalTitle,media.year,media.section,media.aliases]);
+  return lookupReleases(key,()=>collectUncachedReleases(media,typeof aliases==="function"?aliases():aliases));
+}
+async function collectUncachedReleases(media:Media,aliases?:Promise<Media>) {
+  const russian=(item:Media)=>[rutor(item),nnmClub(item),megaPeer(item),bigFanGroup(item)];
+  // Search known Russian titles immediately; preserve original-title searches after metadata resolves.
+  const resolved=(aliases??Promise.resolve(media)).then(enrichMedia);
+  const knownNames=new Set(mediaNames(media).map(normalize));
+  const extraRussian=aliases?resolved.then(async item=>{
+    const added=mediaNames(item).filter(name=>!knownNames.has(normalize(name))).slice(0,Math.max(0,4-knownNames.size));
+    const groups=await Promise.all(added.flatMap(name=>russian({...item,title:name,originalTitle:null,aliases:[name]})));
+    return groups.flat();
+  }):Promise.resolve([]);
+  const sources=[...russian(media),extraRussian,
+    resolved.then(pirateBay),resolved.then(knaben),resolved.then(archive),
+    ...(media.section==="series"?[resolved.then(eztv),resolved.then(nyaa)]:[resolved.then(yts)])];
   const groups=await Promise.allSettled(sources);const rows=groups.flatMap(group=>group.status==="fulfilled"?group.value:[]);
   const unique=new Map<string,Release>();
   for(const item of rows){const key=(hashFrom(item.torrentUrl??"")??item.pageUrl??item.id).toUpperCase();if(!unique.has(key))unique.set(key,item);}

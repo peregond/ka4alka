@@ -1,30 +1,39 @@
 name: Prepare signed Windows release
 on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
+      publish:
+        type: boolean
+        default: true
+        required: false
   workflow_dispatch:
     inputs:
       version:
         description: Version matching native/Kachalka.csproj
         required: true
-        default: '0.40.13'
+        default: '0.42.0'
       publish:
         description: Publish the release as soon as every release check passes
         type: boolean
         default: true
   push:
-    branches: [release/0.37.0, release/0.38.0, release/0.39.0, release/0.40.0, release/0.40.1, release/0.40.2, release/0.40.3, release/0.40.4, release/0.40.5, release/0.40.6, release/0.40.7, release/0.40.8, release/0.40.9, release/0.40.10, release/0.40.11, release/0.40.12, release/0.40.13]
+    branches: [release/0.37.0, release/0.38.0, release/0.39.0, release/0.40.0, release/0.40.1, release/0.40.2, release/0.40.3, release/0.40.4, release/0.40.5, release/0.40.6, release/0.40.7, release/0.40.8, release/0.40.9, release/0.40.10, release/0.40.11, release/0.40.12]
     paths: [.github/workflows/release.yml, 'native/**', 'lan-core/**', 'lan-tests/**', 'update-core/**', 'updater/**', 'update-tests/**', 'tests/**', 'installer/**', scripts/bundle-catalog.py, scripts/test-bundle-catalog.py, scripts/catalog_snapshot.py, scripts/catalog_collections.py, scripts/refresh-library.py, scripts/catalog-collections.json, build-release.ps1, package-release.ps1]
 permissions:
   contents: write
   actions: read
 concurrency:
-  group: kachalka-release-0.40.13
+  group: kachalka-release-0.42.0
   cancel-in-progress: false
 jobs:
   release:
     runs-on: windows-latest
     timeout-minutes: 25
     env:
-      RELEASE_VERSION: ${{ inputs.version || '0.40.13' }}
+      RELEASE_VERSION: ${{ inputs.version || '0.42.0' }}
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
     steps:
       - uses: actions/checkout@v4
@@ -36,6 +45,23 @@ jobs:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
           restore-keys: nuget-${{ runner.os }}-
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify server release search and metadata
+        working-directory: web-index
+        shell: pwsh
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          if($LASTEXITCODE -ne 0){throw 'Locked web dependencies failed'}
+          node tests/release-performance.mjs
+          if($LASTEXITCODE -ne 0){throw 'Server release search performance checks failed'}
+          node tests/title-identity.mjs
+          if($LASTEXITCODE -ne 0){throw 'Server multilingual identity checks failed'}
+          node tests/title-lookup.mjs
+          if($LASTEXITCODE -ne 0){throw 'Title lookup checks failed'}
+          node node_modules/typescript/bin/tsc --noEmit --incremental false
+          if($LASTEXITCODE -ne 0){throw 'Server type check failed'}
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -100,7 +126,7 @@ jobs:
         if: steps.tested.outputs.verified != 'true'
         run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --probe-affected-films
       - name: Verify public replacement site
-        if: steps.tested.outputs.verified != 'true'
+        # The live backend can change independently of a previously tested desktop tree.
         shell: pwsh
         run: |
           try { ./tests/PublishedSiteProbe.ps1 }
@@ -140,12 +166,13 @@ jobs:
         run: |
           $env:KACHALKA_DATA=Join-Path $env:RUNNER_TEMP 'kachalka-cinema-smoke'
           $output=Join-Path $pwd 'test-output/cinema-ui'
-          $process=Start-Process dist/Kachalka-0.40/Kachalka.exe -ArgumentList @('--cinema-smoke-test',$output) -PassThru
+          $application=Join-Path $pwd ('dist/Kachalka-'+([Version]$env:RELEASE_VERSION).ToString(2)+'/Kachalka.exe')
+          $process=Start-Process $application -ArgumentList @('--cinema-smoke-test',$output) -PassThru
           if(-not $process.WaitForExit(60000)){$process.Kill();throw 'Person card UI smoke timed out'}
           if($process.ExitCode -ne 0 -or (Test-Path "$output/error.txt") -or -not (Test-Path "$output/checks.json")){throw 'Person card UI smoke failed'}
-      - name: Verify upgrade from previously published 0.40.12
+      - name: Verify upgrade from previously published 0.41.3
         shell: pwsh
-        run: ./tests/WindowsPublishedUpgrade.ps1 -FromVersion 0.40.12 -ReleaseDirectory ('dist/release-'+$env:RELEASE_VERSION)
+        run: ./tests/WindowsPublishedUpgrade.ps1 -FromVersion 0.41.3 -ReleaseDirectory ('dist/release-'+$env:RELEASE_VERSION)
       - name: Upload verified files to draft GitHub Release
         shell: pwsh
         env:
@@ -221,6 +248,7 @@ jobs:
             test-output/cache-reliability/*
             test-output/download-reliability/*
             test-output/person-performance/*
+            test-output/startup-performance/*
             test-output/cover-viewport/*
             test-output/catalog-navigation/*
             test-output/release-freshness/*

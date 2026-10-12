@@ -5,12 +5,33 @@ public static class ReleaseAvailability
     public static bool Downloadable(SourceEntry entry)=>!string.IsNullOrWhiteSpace(entry.TorrentUrl)||entry.Source=="Internet Archive";
     public static bool ConfirmedEmpty(IEnumerable<SourceEntry> entries,IReadOnlyList<SourceCheck>? checks)=>
         !entries.Any(Downloadable)&&checks is {Count:>0}&&checks.All(x=>x.State==SourceState.Empty);
+    public static bool Recommended(ReleaseCache? cache,DateTime now)=>cache!=null&&cache.SavedUtc>now.AddDays(-7)&&cache.SavedUtc<=now.AddMinutes(5)&&cache.Items.Any(Downloadable);
     public static bool Hidden(ReleaseCache? cache,DateTime now)=>cache!=null&&cache.SavedUtc>now.AddDays(-1)&&cache.SavedUtc<=now.AddMinutes(5)&&ConfirmedEmpty(cache.Items,cache.Sources);
 }
 
 public partial class MainWindow
 {
-    bool NoDownloads(MediaItem item)=>ReleaseAvailability.Hidden(catalogIndex.CachedReleaseSnapshot(item),DateTime.UtcNow);
+    bool ReceivedDownloadOptions(MediaItem item,ReleaseCache? evidence)
+    {
+        if(!releaseViews.TryGetValue(item.Id,out var view)||!liveReleases.TryGetValue(item.Id,out var rows))return false;
+        var received=view.ReceivedUtc??view.SavedUtc;var now=DateTime.UtcNow;
+        return received>now.AddDays(-7)&&received<=now.AddMinutes(5)&&(evidence==null||received>=evidence.SavedUtc)&&rows.Any(ReleaseAvailability.Downloadable);
+    }
+    bool NoDownloads(MediaItem item)
+    {
+        var remembered=catalogIndex.RememberedReleases(item);
+        return !ReceivedDownloadOptions(item,remembered)&&ReleaseAvailability.Hidden(remembered,DateTime.UtcNow);
+    }
+    ReleaseCache? CatalogReleaseEvidence(MediaItem item)
+    {
+        var quality=qualitySnapshots.GetValueOrDefault(item.Id);var remembered=catalogIndex.RememberedReleases(item);
+        return remembered!=null&&(quality==null||remembered.SavedUtc>=quality.SavedUtc)?remembered:quality;
+    }
+    bool RecommendableTitle(MediaItem item)
+    {
+        var evidence=CatalogReleaseEvidence(item);
+        return ReceivedDownloadOptions(item,evidence)||ReleaseAvailability.Recommended(evidence,DateTime.UtcNow);
+    }
     async Task CheckCatalogAvailability(IReadOnlyList<MediaItem> items,string key,string category,CancellationToken token,bool force=false)
     {
         // Scan just the current page, never all thousands of metadata records.

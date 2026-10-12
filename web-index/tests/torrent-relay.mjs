@@ -70,8 +70,11 @@ response=await get('https://nnmclub.to/forum/download.php?id=7');assert.equal(re
 
 // BigFanGroup: the real public rows used by the Windows tests parse identically on the site.
 const catalogSource=load('../lib/catalog-source.ts');
-const sources=load('../lib/release-sources.ts',{'./catalog-source':catalogSource});
-const fixture=name=>fs.readFileSync(new URL(`../../tests/Fixtures/${name}.html`,import.meta.url),'utf8');
+const identity=load('../lib/catalog-identity.ts',{'@/app/data/title-aliases.json':JSON.parse(fs.readFileSync(new URL('../app/data/title-aliases.json',import.meta.url),'utf8'))});
+const cache=load('../lib/release-cache.ts');
+const sources=load('../lib/release-sources.ts',{'./catalog-source':catalogSource,'./catalog-identity':identity,'./release-cache':cache});
+// Keep website tests runnable when web-index/ is exported without the desktop project.
+const fixture=name=>fs.readFileSync(new URL(`./fixtures/${name}.html`,import.meta.url),'utf8');
 const film={id:'movies:interstellar',section:'movies',title:'Интерстеллар',originalTitle:'Interstellar',year:2014,pageUrl:'https://w6.zona.plus/movies/interstellar'};
 const series={id:'series:south-park',section:'series',title:'Южный парк',originalTitle:'South Park',year:1997,pageUrl:'https://w6.zona.plus/tvseries/south-park'};
 const films=sources.parseBigFanGroup(fixture('bigfangroup-film'),film);
@@ -90,7 +93,7 @@ assert.equal(sources.parseBigFanGroup('<html>Доступ ограничен</ht
 const params=value=>new URLSearchParams(value);
 const searchCatalog=load('../lib/catalog-source.ts');
 let pages={};
-const searchSources=load('../lib/release-sources.ts',{'./catalog-source':searchCatalog},{fetch:async url=>{const page=Object.entries(pages).find(([prefix])=>String(url).startsWith(prefix));if(!page)throw new TypeError('offline');return new Response(page[1]);}});
+const searchSources=load('../lib/release-sources.ts',{'./catalog-source':searchCatalog,'./catalog-identity':identity,'./release-cache':cache},{fetch:async url=>{const page=Object.entries(pages).find(([prefix])=>String(url).startsWith(prefix));if(!page)throw new TypeError('offline');return new Response(page[1]);}});
 const search=load('../lib/release-search.ts',{'./catalog-source':searchCatalog,'./release-sources':searchSources});
 const card=search.searchMedia(params('id=movies:interstellar&title=Интерстеллар&original=Interstellar&year=2014'));
 assert.deepEqual({...card},{id:'movies:interstellar',section:'movies',title:'Интерстеллар',originalTitle:'Interstellar',year:2014,pageUrl:'https://w6.zona.plus/movies/interstellar'});

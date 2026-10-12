@@ -89,14 +89,27 @@ public partial class MainWindow
     {
         ct.ThrowIfCancellationRequested();
         if(prefs.LiteMode)return;
-        var id=OnlineIndexClient.IdFor(item);
-        if(id==null)return;
-        var url=await FeaturePosterUrl(id,ct);
+        // Films and series ask the site for a TMDB backdrop; a game's wide picture comes straight from Steam's image host.
+        string? url;Func<CancellationToken,Task<byte[]>> fetch;
+        if(item.Section=="Игры")
+        {
+            url=GameCatalog.HeroImage(item);
+            if(url==null)return;
+            var address=new Uri(url);fetch=c=>sourceClient.Read(address,3*1024*1024,c);
+        }
+        else
+        {
+            var id=OnlineIndexClient.IdFor(item);
+            if(id==null)return;
+            url=await FeaturePosterUrl(id,ct);
+            if(url!=null){var proxy="api/backdrop-image?file="+Uri.EscapeDataString(new Uri(url).Segments.Last().Insert(0,"/"));fetch=c=>onlineIndex.ReadSite(proxy,2*1024*1024,c);}
+            else fetch=_=>Task.FromException<byte[]>(new InvalidOperationException());
+        }
         ct.ThrowIfCancellationRequested();
         if(url==null||closing||closed||!image.IsLoaded||!ReferenceEquals(image.DataContext,item)||CoverViewportFor(image)?.Measure(image).Near!=true)return;
         try
         {
-            using var timeout=CancellationTokenSource.CreateLinkedTokenSource(ct);timeout.CancelAfter(TimeSpan.FromSeconds(6));
+            using var timeout=CancellationTokenSource.CreateLinkedTokenSource(ct);timeout.CancelAfter(TimeSpan.FromSeconds(item.Section=="Игры"?10:6));
             await coverSlots.WaitAsync(timeout.Token);
             try
             {
@@ -104,13 +117,12 @@ public partial class MainWindow
                 var path=Path.Combine(Preferences.DataDir,"covers",Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(url)))+".img");
                 if(!coverCache.TryGetValue(url,out var bitmap))
                 {
-                    var proxy="api/backdrop-image?file="+Uri.EscapeDataString(new Uri(url).Segments.Last().Insert(0,"/"));
-                    (bitmap,_)=await CoverCache.Load(path,2*1024*1024,ct=>onlineIndex.ReadSite(proxy,2*1024*1024,ct),bytes=>
+                    (bitmap,_)=await CoverCache.Load(path,3*1024*1024,fetch,bytes=>
                     {
-                        using var stream=new MemoryStream(bytes);var result=new BitmapImage();result.BeginInit();result.CacheOption=BitmapCacheOption.OnLoad;result.DecodePixelWidth=1280;result.StreamSource=stream;result.EndInit();if(!FeatureBackdrop.Landscape(result.PixelWidth,result.PixelHeight))throw new InvalidDataException("Источник вернул постер вместо широкого фона.");result.Freeze();return result;
+                        using var stream=new MemoryStream(bytes);var result=new BitmapImage();result.BeginInit();result.CacheOption=BitmapCacheOption.OnLoad;result.DecodePixelWidth=1280;result.StreamSource=stream;result.EndInit();if(!FeatureBackdrop.Landscape(result.PixelWidth,result.PixelHeight,item.Section=="Игры"?3.4:2.5))throw new InvalidDataException("Источник вернул постер вместо широкого фона.");result.Freeze();return result;
                     },timeout.Token);
                     timeout.Token.ThrowIfCancellationRequested();
-                    if(coverCache.Count>=48)coverCache.Remove(coverCache.Keys.First());coverCache[url]=bitmap;
+                    coverCache.Put(url,bitmap);
                 }
                 else _=Task.Run(()=>CacheFiles.Touch(path),timeout.Token);
                 timeout.Token.ThrowIfCancellationRequested();

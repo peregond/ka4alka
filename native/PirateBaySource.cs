@@ -8,7 +8,7 @@ public sealed class PirateBaySource(SourceClient client)
     public static Uri QueryUri(string title,bool series)=>new("https://apibay.org/q.php?q="+Uri.EscapeDataString(title.Trim())+"&cat="+(series?"205,208":"201,202,207"));
     public async Task<IReadOnlyList<SourceEntry>> Search(MediaItem item,CancellationToken ct)
     {
-        var groups=await Task.WhenAll(new[]{item.Title,item.OriginalTitle}.Where(x=>!string.IsNullOrWhiteSpace(x)).Cast<string>().Distinct(StringComparer.OrdinalIgnoreCase).Take(2).Select(async title=>
+        var groups=await Task.WhenAll(MediaIdentity.Queries(item).Where(x=>!string.IsNullOrWhiteSpace(x)).Cast<string>().Distinct(StringComparer.OrdinalIgnoreCase).Take(4).Select(async title=>
         {
             try{return (Items:Parse(await client.Read(QueryUri(title,item.Section=="Сериалы"),2_000_000,ct),item),Error:(Exception?)null);}
             catch(Exception error) when(!ct.IsCancellationRequested){return (Items:(IReadOnlyList<SourceEntry>)[],Error:error);}

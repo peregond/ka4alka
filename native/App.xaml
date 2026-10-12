@@ -20,6 +20,7 @@
   <SolidColorBrush x:Key="PosterBadge" Color="#CC0A0C0F" po:Freeze="True"/><SolidColorBrush x:Key="BannerText" Color="#EEF1F4" po:Freeze="True"/><SolidColorBrush x:Key="BannerMuted" Color="#C9D0D8" po:Freeze="True"/><SolidColorBrush x:Key="BannerDot" Color="#59EEF1F4" po:Freeze="True"/><SolidColorBrush x:Key="BannerChip" Color="#1AEEF1F4" po:Freeze="True"/><SolidColorBrush x:Key="BannerBadgeEdge" Color="#47EEF1F4" po:Freeze="True"/><SolidColorBrush x:Key="BannerEdge" Color="#29EEF1F4" po:Freeze="True"/><SolidColorBrush x:Key="BannerButtonFill" Color="#990A0C0F" po:Freeze="True"/>
   <!-- Use native screen metrics and honor Windows antialiasing at fractional monitor DPI. -->
   <Style TargetType="Window">
+   <Setter Property="Icon" Value="pack://application:,,,/Assets/app.ico"/>
    <Setter Property="Background" Value="{DynamicResource Bg}"/><Setter Property="Foreground" Value="{DynamicResource Text}"/><Setter Property="FontFamily" Value="{StaticResource InterfaceFont}"/><Setter Property="FontSize" Value="14"/><Setter Property="UseLayoutRounding" Value="True"/><Setter Property="TextOptions.TextFormattingMode" Value="Display"/><Setter Property="TextOptions.TextRenderingMode" Value="Auto"/>
   </Style>
 

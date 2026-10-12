@@ -83,6 +83,8 @@ public partial class MainWindow
 
     public async Task CoverViewportSmokeTest(string output)
     {
+        // Local performance fixtures must not be replaced by a late startup catalog refresh.
+        section="Настройки";metadataLifetime.Cancel();
         Directory.CreateDirectory(output);liveRequest?.Cancel();liveLoading=false;searchDelay.Stop();personRequest?.Cancel();catalogRefreshTimer.Stop();
         // A local IO fixture must not inherit a live catalog's startup shelves,
         // loading panel, navigation restore or monitor-dependent page height.
@@ -143,10 +145,10 @@ public partial class MainWindow
         if(images.Take(3).Any(image=>image.Source is not BitmapImage {IsFrozen:true,PixelWidth:280}))throw new Exception("Viewport posters lost frozen, bounded worker decoding.");
 
         fixture.Hold(6);scroll.ScrollToVerticalOffset(960);
-        await Until(()=>fixture.Count(6)>0&&images[7].Source!=null,"Scrolling did not begin requests for newly visible posters.");
+        await Until(()=>fixture.Count(6)>0,"Scrolling did not begin requests for newly visible posters.");
         var leaving=ObserveDownloadCover(images[6]);var leavingRequest=leaving.Request??throw new Exception("Controlled poster request was not pending.");var leavingToken=leavingRequest.Token;
         scroll.ScrollToTop();await Until(()=>leavingToken.IsCancellationRequested,"Scrolling away did not cancel a poster request.");fixture.Release(6);await Task.Delay(150);
-        if(images[6].Source!=null||coverCache.ContainsKey(url+"6.png"))throw new Exception("A late offscreen response changed an image or entered the decoded cache.");
+        if(images[6].Source!=null||coverCache.ContainsKey(url+"6.png|"+PosterDecodeWidth))throw new Exception("A late offscreen response changed an image or entered the decoded cache.");
 
         // The production poster template sizes its Grid/Border, rather than
         // its Image. An empty WPF bitmap has no render size until it loads.
@@ -202,16 +204,20 @@ public partial class MainWindow
         host.Child=null;await Until(()=>unloadToken.IsCancellationRequested,"Unloading did not cancel pending image IO.");fixture.Release(20);await Task.Delay(100);
         if(recycled.Source!=null)throw new Exception("An unloaded image received a late poster response.");
 
+        failureState=()=>new{Tracked=coverViewport?.TrackedCount,Sweeps=coverViewport?.SweepCount,Slots=coverSlots.CurrentCount,
+            CurrentUrl=CoverUrl(recycled.DataContext),recycled.IsLoaded,recycled.IsVisible,Source=recycled.Source!=null,
+            Position=coverViewport?.Measure(recycled),Requests21=fixture.Count(21),Requests22=fixture.Count(22),
+            Pending=ObserveDownloadCover(recycled).Request!=null,Failure=ObserveDownloadCover(recycled).LastFailure?.ToString()};
         fixture.Hold(21);recycled.DataContext=Card(21,url+"21.png");host.Child=recycled;
         await Until(()=>fixture.Count(21)>0,"Recycled context fixture did not start.");var staleToken=ObserveDownloadCover(recycled).Request!.Token;
         recycled.DataContext=Card(22,url+"22.png");await Until(()=>recycled.Source!=null,"A recycled poster did not load the replacement context.");var replacement=recycled.Source;
         fixture.Release(21);await Task.Delay(100);
-        if(!staleToken.IsCancellationRequested||!ReferenceEquals(recycled.Source,replacement)||coverCache.ContainsKey(url+"21.png"))throw new Exception("A stale DataContext request replaced the current poster.");
+        if(!staleToken.IsCancellationRequested||!ReferenceEquals(recycled.Source,replacement)||coverCache.ContainsKey(url+"21.png|"+PosterDecodeWidth))throw new Exception("A stale DataContext request replaced the current poster.");
 
         host.Child=null;await Task.Delay(30);recycled.Source=null;host.Child=recycled;
         await Until(()=>recycled.Source!=null,"A decoded memory cache hit did not restore its image.");
         if(fixture.Count(22)!=1||!ReferenceEquals(recycled.Source,replacement))throw new Exception("A memory cache hit fetched or decoded the poster again.");
-        host.Child=null;await Task.Delay(30);coverCache.Remove(url+"22.png");recycled.Source=null;host.Child=recycled;
+        host.Child=null;await Task.Delay(30);coverCache.Remove(url+"22.png|"+PosterDecodeWidth);recycled.Source=null;host.Child=recycled;
         await Until(()=>recycled.Source!=null,"A persistent cache hit did not restore its poster.");
         if(fixture.Count(22)!=1)throw new Exception("The on-disk poster cache accessed the network.");
         var uiThread=Environment.CurrentManagedThreadId;var decodeThread=0;

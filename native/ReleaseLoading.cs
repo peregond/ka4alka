@@ -31,6 +31,32 @@ public partial class MainWindow
         RefreshReleaseSourceStatus();
     }
 
+    async Task RestoreAndFetchDetails(MediaItem item)
+    {
+        var cached=await Task.Run(()=>catalogIndex.CachedReleaseSnapshot(item));
+        if(closing||closed||current?.Id!=item.Id||activePerson!=null){requestedDetails.Remove(item.Id);return;}
+        if(cached is {Items.Length:>0}&&!liveReleases.ContainsKey(item.Id))
+        {
+            liveReleases[item.Id]=cached.Items;cachedReleaseViews.Add(item.Id);
+            releaseViews[item.Id]=new(){Saved=true,SavedUtc=cached.SavedUtc,Sources=cached.Sources??[]};
+            QueueDetailRefresh(item.Id,releasesOnly:true);
+        }
+        await FetchDetails(item);
+    }
+
+    void CancelStaleDetailWork()
+    {
+        var active=activePerson==null&&(section is "Фильмы" or "Сериалы")?current?.Id:null;
+        foreach(var pair in releaseViews.Where(pair=>pair.Key!=active&&pair.Value.Checking).ToArray())
+        {
+            pair.Value.Request?.Cancel();pair.Value.Checking=false;requestedDetails.Remove(pair.Key);
+        }
+        foreach(var pair in detailMetadataViews.Where(pair=>pair.Key!=active&&pair.Value.Loading).ToArray())
+        {
+            pair.Value.Request.Cancel();detailMetadataViews.Remove(pair.Key);cardMetadata.Remove(pair.Key);resolvedPriorityMetadata.Remove(pair.Key);
+        }
+    }
+
     async Task FetchDetails(MediaItem item)
     {
         // Movie information has its own request and lifetime; source retries or
@@ -46,16 +72,23 @@ public partial class MainWindow
         view.Saved=saved.Length>0;view.SavedUtc??=view.ReceivedUtc;view.ReceivedUtc=null;view.Checking=true;
         bool IsCurrent()=>!closed&&!token.IsCancellationRequested&&ReferenceEquals(view.Request,request);
         SourceCheck Remember(SourceCheck check)=>check.LastSuccessUtc.HasValue?check:check with{LastSuccessUtc=prior.GetValueOrDefault(check.Name)};
+        var releaseRowsDirty=true;var publishedChecking=view.Checking;
         void Publish()
         {
             if(!IsCurrent())return;
-            var keys=fresh.Select(ReleaseSearch.Identity).ToHashSet();
-            view.Saved=saved.Any(x=>!keys.Contains(ReleaseSearch.Identity(x)));
-            if(view.Saved)cachedReleaseViews.Add(item.Id);else cachedReleaseViews.Remove(item.Id);
-            liveReleases[item.Id]=ReleaseSearch.WithSaved(fresh,saved);view.Sources=checks.Values.ToArray();
-            qualitySnapshots.Remove(item.Id);ApplyKnownQuality(item);if(current?.Id==item.Id)ApplyKnownQuality(current);
-            foreach(var card in liveItems.Concat(prefs.LiveFavorites).Concat(catalogDisplay).Where(x=>x.Id==item.Id))ApplyKnownQuality(card);
-            RefreshDetail(item.Id);
+            view.Sources=checks.Values.ToArray();
+            if(releaseRowsDirty)
+            {
+                var keys=fresh.Select(ReleaseSearch.Identity).ToHashSet();
+                view.Saved=saved.Any(x=>!keys.Contains(ReleaseSearch.Identity(x)));
+                if(view.Saved)cachedReleaseViews.Add(item.Id);else cachedReleaseViews.Remove(item.Id);
+                liveReleases[item.Id]=ReleaseSearch.WithSaved(fresh,saved);
+                qualitySnapshots.Remove(item.Id);ApplyKnownQuality(item);if(current?.Id==item.Id)ApplyKnownQuality(current);
+                foreach(var card in liveItems.Concat(prefs.LiveFavorites).Concat(catalogDisplay).Where(x=>x.Id==item.Id))ApplyKnownQuality(card);
+            }
+            if(releaseRowsDirty||publishedChecking!=view.Checking)QueueDetailRefresh(item.Id,releasesOnly:true);
+            else RefreshReleaseLoadingIndicator();
+            releaseRowsDirty=false;publishedChecking=view.Checking;
             if(!view.Checking&&(prefs.HidePoorQuality||prefs.CatalogQualityHeight!=0)&&current==null&&(section is "Фильмы" or "Сериалы")&&liveItems.Concat(prefs.LiveFavorites).Any(x=>x.Id==item.Id))RenderCatalogKeepingPosition();
         }
         void IndexRows(IEnumerable<SourceEntry> rows,SourceState state)
@@ -75,19 +108,29 @@ public partial class MainWindow
         try
         {
             await releaseSlots.WaitAsync(token);entered=true;
-            async Task<MediaItem> Resolved(CancellationToken ct)
+            Task<MediaItem> Resolved(CancellationToken ct)
             {
+                ct.ThrowIfCancellationRequested();
+                // Descriptions and cast can be slow. Trackers can search the known title immediately.
+                return Task.FromResult(detailTask.IsCompletedSuccessfully?detailTask.Result:item);
+            }
+            async Task<MediaItem> Aliases(CancellationToken ct)
+            {
+                // English-only sources need an original title only when the known name is Cyrillic.
+                // Russian providers start immediately and do not join this wait.
+                var known=await Resolved(ct);
+                if(ImdbSuggestions.IsImdbOnly(known)||!string.IsNullOrWhiteSpace(known.OriginalTitle)||!known.Title.Any(c=>c is >= '\u0400' and <= '\u04FF'))return known;
                 try{return await detailTask.WaitAsync(TimeSpan.FromSeconds(8),ct);}
-                catch(TimeoutException){return item;}
+                catch(TimeoutException){return known;}
             }
             // Supplement cached/indexed rows concurrently: a single screen copy must not suppress better sources.
             // The online index only knows catalog titles; an IMDb-only title goes straight to the trackers.
             var providers=(ImdbSuggestions.IsImdbOnly(item)?[]:new[]{new ReleaseSource("Онлайн-индекс",ct=>onlineIndex.Releases(item,ct,allowRelay:true))})
-                .Concat(NativeReleaseSources.Create(sourceClient,Resolved,item.Section=="Сериалы"));
+                .Concat(NativeReleaseSources.Create(sourceClient,Resolved,item.Section=="Сериалы",Aliases));
             var settled=false;
             void Apply(ReleaseSearchUpdate update)
             {
-                fresh.Clear();fresh.AddRange(update.Items);
+                if(!fresh.SequenceEqual(update.Items)){fresh.Clear();fresh.AddRange(update.Items);releaseRowsDirty=true;}
                 foreach(var source in update.Sources)checks[source.Name]=Remember(source);
                 if(update.Items.Length>0)view.ReceivedUtc=update.Items.Select(x=>x.DataReceivedUtc).Max();
                 IndexRows(update.Items,SourceState.Ready);Publish();

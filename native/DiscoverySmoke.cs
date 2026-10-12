@@ -10,6 +10,9 @@ public partial class MainWindow
     // of a remote source while exercising each shelf's real poster template.
     void PrepareDiscoverySmokeRegions(string category,IEnumerable<MediaItem> cards)
     {
+        // Explicit fixture evidence, not a production bypass of availability.
+        foreach(var item in cards)
+            if(!qualitySnapshots.TryGetValue(item.Id,out var evidence)||evidence.Items.Length==0)qualitySnapshots[item.Id]=new(DateTime.UtcNow,[new("fixture-"+item.Id,"Проверенная тестовая раздача","Fixture","","magnet:?xt=urn:btih:"+new string('a',40),null)]);
         var home=CatalogRegions.HomeCountry(prefs.HomeCountry);var away=home=="ssha"?"rossiia":"ssha";
         var items=cards.Take(16).Select((item,index)=>item with{CountryKeys=[index%2==0?home:away],CountryKeysComplete=true}).ToArray();
         SetDiscoveryRegionalItems(category,home,items.Where(item=>CatalogRegions.IsForeign(item,home)).ToArray(),items.Where(item=>CatalogRegions.IsNative(item,home)).ToArray());

@@ -45,6 +45,24 @@ public partial class MainWindow
             else if(e.Key==Key.Escape&&Search.IsKeyboardFocusWithin&&Search.Text.Length>0){ClearSearch(Search,e);e.Handled=true;}
         };
     }
+    // The width an element has while its page's vertical scroll bar is shown, whether or not the bar is shown now.
+    // Columns or a narrow/wide switch based on the plain width can loop: another column shortens the page, the bar
+    // goes away, the wider element takes one more column, the page grows, the bar comes back, and so on. WPF then
+    // never finishes the layout at that window width (the window stops responding to resizes).
+    static double ScrollStableWidth(FrameworkElement element)
+    {
+        for(var node=VisualTreeHelper.GetParent(element);node!=null;node=VisualTreeHelper.GetParent(node))
+        {
+            if(node is not ScrollViewer scroll||scroll.VerticalScrollBarVisibility!=ScrollBarVisibility.Auto)continue;
+            if(scroll.ComputedVerticalScrollBarVisibility==Visibility.Visible)return element.ActualWidth;
+            // The bar's slot is what layout gives it: the theme's MinWidth (17) wins over the style's Width (12).
+            var bar=scroll.Template?.FindName("PART_VerticalScrollBar",scroll) as System.Windows.Controls.Primitives.ScrollBar;
+            var set=bar!=null&&double.IsFinite(bar.Width)?bar.Width:SystemParameters.VerticalScrollBarWidth;
+            var slot=bar==null?set:Math.Max(bar.MinWidth,Math.Min(set,bar.MaxWidth))+bar.Margin.Left+bar.Margin.Right;
+            return Math.Max(0,element.ActualWidth-slot);
+        }
+        return element.ActualWidth;
+    }
     static void ClipPoster(Border poster)
     {
         if(poster.ActualWidth>0&&poster.ActualHeight>0)poster.Clip=new RectangleGeometry(new Rect(0,0,poster.ActualWidth,poster.ActualHeight),poster.CornerRadius.TopLeft,poster.CornerRadius.TopLeft);

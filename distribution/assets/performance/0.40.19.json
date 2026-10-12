@@ -1,0 +1,17 @@
+{
+  "DeferredCatalogPreserved": true,
+  "ClearNotRepopulated": true,
+  "CatalogWorker": true,
+  "ReleaseWorker": true,
+  "NativeInputWhileLoading": true,
+  "HeartbeatTicks": 47,
+  "SearchResultsUnchanged": true,
+  "Queries": 9,
+  "Records": 4228,
+  "Search": {
+    "PreviousMs": 111.7372,
+    "PreparedMs": 6.973,
+    "PreviousAllocatedBytes": 25719736,
+    "PreparedAllocatedBytes": 5906800
+  }
+}

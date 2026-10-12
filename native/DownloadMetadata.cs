@@ -12,7 +12,10 @@ public static class DownloadMetadata
     public static MediaItem? Card(DownloadItem item)
     {
         var section=item.MediaSection;
-        if(section is not ("Фильмы" or "Сериалы")||!Uri.TryCreate(item.MediaPageUrl,UriKind.Absolute,out var page)||page.Scheme!="https"||page.Host!="w6.zona.plus"||!page.IsDefaultPort||page.UserInfo.Length>0||page.Query.Length>0||page.Fragment.Length>0)return null;
+        if(section=="Игры"&&GameCatalog.TryId(item.MediaPageUrl,out var gameId))return GameCatalog.Item(gameId,item.DisplayName,item.ImageUrl) with{Year=item.MediaYear};
+        if(section is not ("Фильмы" or "Сериалы")||!Uri.TryCreate(item.MediaPageUrl,UriKind.Absolute,out var page)||page.Scheme!="https"||!page.IsDefaultPort||page.UserInfo.Length>0||page.Query.Length>0||page.Fragment.Length>0)return null;
+        if(page.Host=="www.imdb.com")return ImdbCard(item,section,page);
+        if(page.Host!="w6.zona.plus")return null;
         var prefix=section=="Фильмы"?"/movies/":"/tvseries/";
         if(!page.AbsolutePath.StartsWith(prefix,StringComparison.Ordinal))return null;
         var slug=Uri.UnescapeDataString(page.AbsolutePath[prefix.Length..].TrimEnd('/'));
@@ -20,6 +23,17 @@ public static class DownloadMetadata
         var id=-(BitConverter.ToInt32(SHA256.HashData(Encoding.UTF8.GetBytes(page.AbsoluteUri)),0)&int.MaxValue);
         return new(id,item.DisplayName,section,"",item.MediaYear,"—","—","#526B69")
         {PageUrl=page.AbsoluteUri,OnlineId=(section=="Фильмы"?"movies:":"series:")+slug,ImageUrl=item.ImageUrl};
+    }
+    // A title that exists only on IMDb (not in the Russian catalog) is stored with its IMDb page.
+    // Rebuild the same minimal card the search made, with the same id, so the card, its releases and its queue state match.
+    static MediaItem? ImdbCard(DownloadItem item,string section,Uri page)
+    {
+        var match=Regex.Match(page.AbsolutePath,@"^/title/(?<id>tt\d{5,10})/?$");
+        if(!match.Success)return null;
+        var imdbId=match.Groups["id"].Value;
+        var hash=SHA256.HashData(Encoding.UTF8.GetBytes("imdb:"+imdbId));
+        return new(-(BitConverter.ToInt32(hash,0)&int.MaxValue),item.DisplayName,section,"",item.MediaYear,"—","—","#526B69")
+        {PageUrl="https://www.imdb.com/title/"+imdbId+"/",ImdbId=imdbId,OriginalTitle=item.DisplayName,ImageUrl=item.ImageUrl};
     }
     static readonly JsonSerializerOptions Json=new(){PropertyNameCaseInsensitive=true};
     static readonly Regex Year=new(@"^(?:19|20)\d{2}\b",RegexOptions.CultureInvariant);

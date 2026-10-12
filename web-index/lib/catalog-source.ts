@@ -2,7 +2,7 @@ export type Section = "movies" | "series";
 export type Media = {
   id:string; section:Section; title:string; originalTitle?:string|null; year:number;
   poster?:string|null; pageUrl:string; description?:string|null;
-  kinopoisk?:string|null; imdb?:string|null;
+  kinopoisk?:string|null; imdb?:string|null; imdbId?:string|null; aliases?:string[];
 };
 
 const ZONA="https://w6.zona.plus";

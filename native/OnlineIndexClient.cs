@@ -42,7 +42,7 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null,Inde
     // (401/403, the country block) rests that copy for 15 minutes, a hung or
     // refused connection for 2 minutes, any other failure but 404 for 30 seconds,
     // and every failed copy at least 5 minutes once another copy has answered.
-    public async Task<byte[]> ReadSite(string path,int limit,CancellationToken ct,Action<byte[]>? validate=null)
+    public async Task<byte[]> ReadSite(string path,int limit,CancellationToken ct,Action<byte[]>? validate=null,bool restSites=true)
     {
         var failed=new List<Uri>();Exception? failure=null;
         await foreach(var site in Sites(ct))
@@ -56,7 +56,8 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null,Inde
             }
             catch(Exception error) when(!ct.IsCancellationRequested&&error is HttpRequestException or JsonException or IOException or InvalidDataException or OperationCanceledException)
             {
-                if(Rest(site,error))failed.Add(site);
+                // An optional lookup (restSites: false) never makes a copy of the site rest for the catalog and releases.
+                if(restSites&&Rest(site,error))failed.Add(site);
                 failure=error;
             }
         }
@@ -124,20 +125,21 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null,Inde
         if(!Slug(slug)||onlineId!=SectionKey(section)+":"+slug)return null;
         var url=page.AbsoluteUri;
         var hash=SHA256.HashData(Encoding.UTF8.GetBytes(url));var id=-(BitConverter.ToInt32(hash,0)&int.MaxValue);
-        return new MediaItem(id,title,section,String(row,"genre")??"",Integer(row,"year"),Score(String(row,"kinopoisk")),Score(String(row,"imdb")),"#526B69")
+        return MediaIdentity.Enrich(new MediaItem(id,title,section,String(row,"genre")??"",Integer(row,"year"),Score(String(row,"kinopoisk")),Score(String(row,"imdb")),"#526B69")
         {
             OnlineId=onlineId,PageUrl=url,ImageUrl=Https(String(row,"poster")),
-            OriginalTitle=String(row,"originalTitle"),ImdbId=String(row,"imdbId"),Description=String(row,"description"),
+            TitleAliases=MetadataArray<string>(row,"aliases").Take(16).ToArray(),OriginalTitle=String(row,"originalTitle"),ImdbId=String(row,"imdbId"),Description=String(row,"description"),
             GenreKeys=MetadataArray<string>(row,"genreKeys").Where(x=>!string.IsNullOrWhiteSpace(x)).Distinct().ToArray(),
             Country=String(row,"country")??"",CountryKeys=CatalogRegions.CountryKeys(MetadataArray<string>(row,"countryKeys")),
             CountryKeysComplete=!row.TryGetProperty("countryKeysComplete",out var completeCountries)||completeCountries.ValueKind!=JsonValueKind.False,
             People=MetadataArray<CinemaPerson>(row,"people").Where(x=>!string.IsNullOrWhiteSpace(x.Name)&&!string.IsNullOrWhiteSpace(x.Role)&&(x.PageUrl==""||CinemaMetadata.CatalogUrl(x.PageUrl,"/persons/","/person/","/people/")!=null)).ToArray(),
             Awards=MetadataArray<CinemaAward>(row,"awards").Where(x=>!string.IsNullOrWhiteSpace(x.Name)&&!string.IsNullOrWhiteSpace(x.Category)&&x.Year>0).ToArray(),
             Collections=MetadataArray<CinemaCollection>(row,"collections").Where(x=>!string.IsNullOrWhiteSpace(x.Name)&&CinemaMetadata.CatalogUrl(x.PageUrl,"/collections/","/franchise/")!=null).ToArray()
-        };
+        });
     }
 
-    public async Task<IReadOnlyList<MediaItem>> Browse(string section,string query,int page,CancellationToken ct)
+    public Task<IReadOnlyList<MediaItem>> Browse(string section,string query,int page,CancellationToken ct)=>Task.Run(()=>BrowseCore(section,query,page,ct),ct);
+    async Task<IReadOnlyList<MediaItem>> BrowseCore(string section,string query,int page,CancellationToken ct)
     {
         var key=SectionKey(section)??throw new ArgumentOutOfRangeException(nameof(section));
         var path="api/catalog?section="+key+"&q="+Uri.EscapeDataString(query.Trim())+"&page="+Math.Clamp(page,1,CatalogPaging.Limit);
@@ -146,7 +148,8 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null,Inde
         return items.EnumerateArray().Take(80).Where(x=>x.ValueKind==JsonValueKind.Object).Select(x=>Media(x,section)).OfType<MediaItem>().DistinctBy(x=>x.Id).ToArray();
     }
 
-    public async Task<CatalogPage> BrowsePage(string section,int page,CancellationToken ct)
+    public Task<CatalogPage> BrowsePage(string section,int page,CancellationToken ct)=>Task.Run(()=>BrowsePageCore(section,page,ct),ct);
+    async Task<CatalogPage> BrowsePageCore(string section,int page,CancellationToken ct)
     {
         var key=SectionKey(section)??throw new ArgumentOutOfRangeException(nameof(section));
         using var json=await Get("api/catalog?section="+key+"&page="+Math.Clamp(page,1,CatalogPaging.Limit),ct);
@@ -156,7 +159,8 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null,Inde
         return new(items,hasNext&&page<CatalogPaging.Limit,[],[]);
     }
 
-    public async Task<MediaItem> Detail(MediaItem item,CancellationToken ct)
+    public Task<MediaItem> Detail(MediaItem item,CancellationToken ct)=>Task.Run(()=>DetailCore(item,ct),ct);
+    async Task<MediaItem> DetailCore(MediaItem item,CancellationToken ct)
     {
         var id=IdFor(item)??throw new InvalidDataException("Карточка не связана с онлайн-индексом.");
         using var json=await Get("api/media?id="+Uri.EscapeDataString(id),ct);
@@ -175,6 +179,22 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null,Inde
             Kinopoisk=fresh.Kinopoisk=="—"?item.Kinopoisk:fresh.Kinopoisk,
             Imdb=fresh.Imdb=="—"?item.Imdb:fresh.Imdb
         };
+    }
+
+    // Description, genres and cast of a title found only on IMDb: the site asks TheTVDB for series and TMDB for films.
+    // A refusal or a source that is not connected there is an answer about this title, not an outage of the site.
+    public Task<MediaItem> Title(MediaItem item,CancellationToken ct)=>Task.Run(()=>TitleCore(item,ct),ct);
+    async Task<MediaItem> TitleCore(MediaItem item,CancellationToken ct)
+    {
+        var section=SectionKey(item.Section)??throw new ArgumentOutOfRangeException(nameof(item));
+        if(item.ImdbId==null||!Regex.IsMatch(item.ImdbId,@"^tt\d{5,10}$"))throw new InvalidDataException("У карточки нет идентификатора IMDb.");
+        JsonDocument? json=null;
+        await ReadSite("api/title?imdb="+item.ImdbId+"&section="+section,256*1024,ct,bytes=>json=JsonDocument.Parse(bytes),restSites:false);
+        using(json)
+        {
+            if(!json!.RootElement.TryGetProperty("item",out var row))throw new InvalidDataException("Сайт вернул неверные сведения о названии.");
+            return TitleMetadata.Apply(item,row);
+        }
     }
 
     static string? Torrent(string? value)
@@ -255,7 +275,9 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null,Inde
 
     // Catalog-wide quality checks read the site only. An opened card may also ask
     // a standalone relay when the site does not answer (allowRelay).
-    public async Task<IReadOnlyList<SourceEntry>> Releases(MediaItem item,CancellationToken ct,bool allowRelay=false)
+    public Task<IReadOnlyList<SourceEntry>> Releases(MediaItem item,CancellationToken ct,bool allowRelay=false)
+        =>Task.Run(()=>ReleasesCore(item,ct,allowRelay),ct);
+    async Task<IReadOnlyList<SourceEntry>> ReleasesCore(MediaItem item,CancellationToken ct,bool allowRelay)
     {
         var id=IdFor(item)??throw new InvalidDataException("Карточка не связана с онлайн-индексом.");
         try

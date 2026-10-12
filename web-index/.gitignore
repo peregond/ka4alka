@@ -44,3 +44,10 @@ next-env.d.ts
 /.codex/
 /outputs/
 /work/
+
+# Railway local database
+/data/
+*.sqlite*
+
+# Ignore local TypeScript incremental output.
+*.tsbuildinfo

@@ -1,11 +1,12 @@
 param(
- [string]$Version='0.40.13',
- [string]$ArchivePath='dist/Kachalka-0.40.zip',
+ [string]$Version='0.42.0',
+ [string]$ArchivePath='',
  [string]$Repository='peregond/ka4alka',
  [string]$SigningKeyPath=$env:KACHALKA_SIGNING_KEY
 )
 $ErrorActionPreference='Stop'
 if($Version -notmatch '^\d+\.\d+\.\d+$'){throw 'Version must have three numeric components'}
+if([string]::IsNullOrWhiteSpace($ArchivePath)){$ArchivePath='dist/Kachalka-'+([Version]$Version).ToString(2)+'.zip'}
 if($Repository -notmatch '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$'){throw 'Invalid repository name'}
 if($Repository -ne 'peregond/ka4alka'){throw 'Repository differs from the update trust policy'}
 if(-not $SigningKeyPath){throw 'Supply -SigningKeyPath with the private release-signing PEM file'}

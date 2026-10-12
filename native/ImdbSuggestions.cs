@@ -71,19 +71,6 @@ public static partial class ImdbSuggestions
         return marker>0&&url.EndsWith(".jpg",StringComparison.OrdinalIgnoreCase)?url[..marker]+"._V1_QL75_UX400_.jpg":url;
     }
 
-    // Supplements keep catalog cards first and add only titles the catalog does not already have.
-    public static MediaItem[] Missing(IEnumerable<MediaItem> catalog,IEnumerable<MediaItem> found)
-    {
-        static string Key(string title,int year)=>string.Join(" ",Words(title))+"|"+year;
-        var known=new HashSet<string>();
-        foreach(var item in catalog)
-        {
-            known.Add(Key(item.Title,item.Year));
-            if(!string.IsNullOrWhiteSpace(item.OriginalTitle))known.Add(Key(item.OriginalTitle,item.Year));
-        }
-        return found.Where(item=>!known.Contains(Key(item.Title,item.Year))).ToArray();
-    }
-
     static string[] Words(string value)=>NonWord().Split(value.ToLowerInvariant()).Where(x=>x.Length>0).ToArray();
     static string? Text(JsonElement row,string name)=>row.TryGetProperty(name,out var value)&&value.ValueKind==JsonValueKind.String?value.GetString():null;
     [GeneratedRegex("[a-zA-Z]")] private static partial Regex Latin();

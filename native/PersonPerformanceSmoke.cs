@@ -36,6 +36,8 @@ public partial class MainWindow
 
     public async Task PersonPerformanceSmokeTest(string output)
     {
+        // Local performance fixtures must not be replaced by a late startup catalog refresh.
+        section="Настройки";metadataLifetime.Cancel();
         Directory.CreateDirectory(output);liveRequest?.Cancel();searchDelay.Stop();personRequest?.Cancel();
         var uiThread=Environment.CurrentManagedThreadId;var beats=0;
         var heartbeat=new DispatcherTimer(DispatcherPriority.Input){Interval=TimeSpan.FromMilliseconds(15)};

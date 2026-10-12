@@ -92,7 +92,7 @@ public partial class MainWindow
             await downloads.Toggle(active);var restored=new DownloadService();var restoredItem=restored.Items.Single();
             if(restored.EngineCreated||restoredItem.MediaTitle!=movie.Title||restoredItem.ImageUrl!=posterUrl||restoredItem.MediaPageUrl!=movie.PageUrl||restoredItem.ReleaseTitle!=release.Title||restoredItem.Name!=active.Name)throw new Exception("Queue restart lost the selected card metadata.");
             downloads.Items.Remove(active);downloads.Items.Add(restoredItem);Render();UpdateLayout();
-            if(coverCache.ContainsKey(posterUrl))throw new Exception("Poster probe was satisfied before restoring the queue.");posterReady.SetResult();
+            if(coverCache.ContainsKey(posterUrl+"|"+PosterDecodeWidth))throw new Exception("Poster probe was satisfied before restoring the queue.");posterReady.SetResult();
             deadline=DateTime.UtcNow.AddSeconds(10);Image? queuePoster=null;
             while(DateTime.UtcNow<deadline)
             {

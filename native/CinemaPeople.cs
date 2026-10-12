@@ -195,7 +195,7 @@ public sealed partial class CinemaPeople(SourceClient client)
             var candidates=works
                 .Where(work=>!films.Any(film=>MatchesWork(film,work)))
                 .OrderByDescending(x=>x.Year).Take(MaximumLookups).ToArray();
-            var catalog=new LiveCatalog(client);var index=new OnlineIndexClient(client);using var slots=new SemaphoreSlim(5);
+            var catalog=new LiveCatalog(client);var index=new OnlineIndexClient(client);using var slots=new SemaphoreSlim(PerformanceBudget.FilmographyWorkers);
             async Task<T> Lookup<T>(Func<CancellationToken,Task<T>> read)
             {
                 using var request=CancellationTokenSource.CreateLinkedTokenSource(token);request.CancelAfter(TimeSpan.FromSeconds(8));

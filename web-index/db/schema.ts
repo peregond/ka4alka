@@ -1,4 +1,4 @@
-import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 export const media = sqliteTable("media", {
   id: text("id").primaryKey(),
@@ -39,3 +39,10 @@ export const syncState = sqliteTable("sync_state", {
   key: text("key").primaryKey(),
   refreshedAt: integer("refreshed_at").notNull(),
 });
+
+export const titleMetadata = sqliteTable("title_metadata", {
+  section: text("section").notNull(),
+  imdbId: text("imdb_id").notNull(),
+  payload: text("payload").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+}, table => [primaryKey({columns:[table.section,table.imdbId]})]);

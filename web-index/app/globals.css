@@ -95,3 +95,7 @@ body { font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFon
 .mobile-nav-list button { display:flex; align-items:center; gap:12px; width:100%; min-height:48px; padding:0 15px; border-radius:12px; color:#c2d0e1; text-align:left; font-size:15px; cursor:pointer; }
 .mobile-nav-list button:hover,.mobile-nav-list button:focus-visible { background:#26384f; color:#fff; outline:none; }
 .mobile-nav-list button[aria-current=page] { background:#354cbd; color:#fff; font-weight:700; }
+
+/* The shared brand artwork supplies its own colour and transparent outline. */
+.brand-header .brand-mark { margin-top:0; background:transparent; box-shadow:none; }
+.brand-mark img { display:block; width:100%; height:100%; object-fit:contain; }

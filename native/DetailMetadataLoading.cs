@@ -16,7 +16,7 @@ public partial class MainWindow
 
     bool DetailMetadataLoading(int id)=>detailMetadataViews.TryGetValue(id,out var view)&&view.Loading;
     bool DetailMetadataNeedsRetry(int id)=>detailMetadataViews.TryGetValue(id,out var view)?!view.Loading&&view.Failed:current?.Id==id&&!ImdbSuggestions.IsImdbOnly(current)&&(!MediaMetadata.HasDescription(current)||current.People.Length==0);
-    string DetailDescriptionText(MediaItem item)=>MediaMetadata.HasDescription(item)?item.Description!:ImdbSuggestions.IsImdbOnly(item)?"Этого названия нет в русском каталоге, поэтому описания пока нет. Раздачи ищутся по оригинальному названию.":DetailMetadataLoading(item.Id)?"Загружаем описание…":"Описание пока недоступно.";
+    string DetailDescriptionText(MediaItem item)=>MediaMetadata.HasDescription(item)?item.Description!:ImdbSuggestions.IsImdbOnly(item)&&!DetailMetadataLoading(item.Id)?"Этого названия нет в русском каталоге, поэтому описания пока нет. Раздачи ищутся по оригинальному названию.":DetailMetadataLoading(item.Id)?"Загружаем описание…":"Описание пока недоступно.";
 
     void CancelDetailMetadata(bool restart=false)
     {
@@ -47,7 +47,7 @@ public partial class MainWindow
             if(current?.Id==item.Id){current=MediaMetadata.Merge(current,fresh);ApplyKnownQuality(current);}
             if(personOrigin?.Id==fresh.Id)personOrigin=MediaMetadata.Merge(personOrigin,fresh);
             if(returnPerson is {} previous&&previous.Origin?.Id==fresh.Id)returnPerson=(previous.Person,MediaMetadata.Merge(previous.Origin!,fresh));
-            RefreshDetail(item.Id);
+            QueueDetailRefresh(item.Id);
         }
         async Task<MediaItem> Load()
         {
@@ -66,7 +66,7 @@ public partial class MainWindow
             {
                 if(IsCurrent()){view.Failed=true;cardMetadata.Remove(item.Id);resolvedPriorityMetadata.Remove(item.Id);ErrorLog.Write(error);}
             }
-            finally{if(IsCurrent()){view.Loading=false;RefreshDetail(item.Id);}}
+            finally{if(IsCurrent()){view.Loading=false;QueueDetailRefresh(item.Id);}}
             return data;
         }
         view.Task=Load();return view.Task;

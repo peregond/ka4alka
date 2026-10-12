@@ -13,17 +13,21 @@ public partial class MainWindow
     sealed record SavedReturn(string Category,int Page,double Offset);
     SavedReturn? savedReturn;
 
-    bool IsSaved(MediaItem item)=>prefs.Favorites.Contains(item.Id)||prefs.LiveFavorites.Any(saved=>saved.Id==item.Id);
+    bool IsSaved(MediaItem item)=>prefs.Favorites.Contains(item.Id)||prefs.LiveFavorites.Any(saved=>saved.Id==item.Id||MediaIdentity.Same(saved,item));
     void ToggleSaved(MediaItem item)
     {
-        if(IsSaved(item)){prefs.Favorites.Remove(item.Id);prefs.LiveFavorites.RemoveAll(saved=>saved.Id==item.Id);}
+        if(IsSaved(item))
+        {
+            var ids=prefs.LiveFavorites.Where(saved=>saved.Id==item.Id||MediaIdentity.Same(saved,item)).Select(saved=>saved.Id).Append(item.Id).ToHashSet();
+            prefs.Favorites.ExceptWith(ids);prefs.LiveFavorites.RemoveAll(saved=>ids.Contains(saved.Id));
+        }
         else{prefs.Favorites.Add(item.Id);prefs.LiveFavorites.RemoveAll(saved=>saved.Id==item.Id);prefs.LiveFavorites.Add(item);}
         prefs.Save();
     }
-    MediaItem[] SavedItems()=>prefs.LiveFavorites.AsEnumerable().Reverse()
+    MediaItem[] SavedItems()=>MediaIdentity.Merge(prefs.LiveFavorites.AsEnumerable().Reverse()
         .Concat(liveItems.Concat(catalogIndex.Recent("Фильмы",200)).Concat(catalogIndex.Recent("Сериалы",200)).Concat(Catalog.Items)
             .Where(item=>prefs.Favorites.Contains(item.Id)))
-        .Where(item=>item.Section is "Фильмы" or "Сериалы").DistinctBy(item=>item.Id).ToArray();
+        .Where(item=>item.Section is "Фильмы" or "Сериалы" or "Игры").DistinctBy(item=>item.Id));
     void ShowSaved(object sender,RoutedEventArgs e)
     {
         searchDelay.Stop();liveRequest?.Cancel();liveLoading=false;
@@ -52,7 +56,7 @@ public partial class MainWindow
         var title=Text("Сохранённое",compactHeight?22:28);title.FontWeight=FontWeights.SemiBold;title.Margin=new(0);heading.Children.Add(title);PageHeader.Children.Add(heading);
         var toolbar=new DockPanel();catalogToolbar=toolbar;
         var filters=inlineCatalogFilters=new StackPanel{Orientation=Orientation.Horizontal};
-        foreach(var (key,label) in new[]{("","Все"),("Фильмы","Фильмы"),("Сериалы","Сериалы")})
+        foreach(var (key,label) in new[]{("","Все"),("Фильмы","Фильмы"),("Сериалы","Сериалы"),("Игры","Игры")})
         {
             var total=saved.Count(item=>key.Length==0||item.Section==key);
             var button=Button(label+" · "+total,()=>{savedCategory=key;savedPage=1;Render();});button.Style=(Style)FindResource("PillButton");
@@ -67,7 +71,8 @@ public partial class MainWindow
         toolbar.Children.Add(inlineCatalogFilterScroll);FilterControls.Children.Add(toolbar);UpdateFilterRail();
         ShowCatalog(filtered.Skip((savedPage-1)*CatalogPaging.Size).Take(CatalogPaging.Size).ToArray());
         var list=catalogList!;Body.Children.Remove(list);ScrollViewer.SetVerticalScrollBarVisibility(list,ScrollBarVisibility.Disabled);ScrollViewer.SetHorizontalScrollBarVisibility(list,ScrollBarVisibility.Disabled);WheelScroll.SetIsEnabled(list,false);
-        var content=new StackPanel();content.Children.Add(list);
+        // As on the catalog page, the scroll viewer extends 6 px past the gutter so hover and focus rings are not clipped.
+        var content=new StackPanel{Margin=new(6,6,6,0)};content.Children.Add(list);
         if(filtered.Length==0)
         {
             var empty=new StackPanel{HorizontalAlignment=HorizontalAlignment.Center,MaxWidth=380,Margin=new(20,28,20,20)};
@@ -87,7 +92,7 @@ public partial class MainWindow
             }
             Page("Назад",savedPage-1,savedPage>1);foreach(var page in CatalogPaging.Numbers(savedPage,pageCount))Page(page.ToString(),page,true);Page("Далее",savedPage+1,savedPage<pageCount);content.Children.Add(pages);
         }
-        var scroll=savedScroll=new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=content,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};Body.Children.Add(scroll);
+        var scroll=savedScroll=new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=content,Margin=new(-6,-6,-6,0),VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};Body.Children.Add(scroll);
         if(restoreSavedOffset is {} offset)
         {
             restoreSavedOffset=null;scroll.Loaded+=(_,_)=>Dispatcher.BeginInvoke(DispatcherPriority.Loaded,new Action(()=>{if(ReferenceEquals(savedScroll,scroll))scroll.ScrollToVerticalOffset(offset);}));

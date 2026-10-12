@@ -24,7 +24,8 @@ public partial class MainWindow:Window
     public MainWindow()
     {
         InitializeComponent();
-        InitializeStatusToast();
+        prefs.LiteMode=PerformanceBudget.DefaultLiteMode(prefs.LiteModeConfigured,prefs.LiteMode);
+        InitializeStatusToast();InitializeShareLinks();
         onlineIndex=new(sourceClient,relays:new IndexRelays(sourceClient));sourceClient.TorrentRelay=onlineIndex.RelayTorrent;sharedCatalog=new(sourceClient);
         catalogRefreshTimer.Tick+=(_,_)=>
         {
@@ -37,19 +38,25 @@ public partial class MainWindow:Window
             }
         };
         catalogRefreshTimer.Start();
-        ContentRendered+=(_,_)=>{_=MaintainCacheAsync();_=RefreshSharedCatalogAsync();};
+        ContentRendered+=(_,_)=>{_=RestoreCatalogIndexAsync();_=MaintainCacheAsync();_=RefreshSharedCatalogAsync();};
         EnableAdaptiveLayout();
         EnableShortcuts();InitializeDownloadDrop();
         try{downloads=new(null,prefs.MaxDownloadKbps,prefs.MaxUploadKbps);}catch(Exception e){downloads=newEmpty(prefs.MaxDownloadKbps,prefs.MaxUploadKbps);Status.Text="Не удалось прочитать очередь: "+e.Message;}
         InitializeDownloadReliability();
         InitializeLanDevices();
-        foreach(var name in new[]{"Фильмы","Сериалы"}) { var n=name;var b=ActionButton(n,n=="Фильмы"?"IconMovies":"IconSeries",()=>ShowCatalogSection(n),"NavButton");b.Tag=n;b.ToolTip=n;b.HorizontalContentAlignment=HorizontalAlignment.Left;b.Margin=new(0,0,0,5);Navigation.Children.Add(b); }
+        foreach(var name in new[]{"Фильмы","Сериалы","Игры"}) { var n=name;var b=ActionButton(n,NavIcon(n),()=>{if(n=="Игры")ShowGames();else ShowCatalogSection(n);},"NavButton");b.Tag=n;b.ToolTip=n;b.HorizontalContentAlignment=HorizontalAlignment.Left;b.Margin=new(0,0,0,5);Navigation.Children.Add(b); }
         refresh.Tick+=(_,_)=>RefreshDownloadsReliably();
         ContentRendered+=async(_,_)=>{if(!prefs.AutoResumeDownloads||downloads.PendingResumeCount==0)return;Status.Text="Продолжаем загрузки…";var resumed=await downloads.ResumePendingAsync();Status.Text=resumed>0?$"Продолжено загрузок: {resumed}":"Не удалось продолжить загрузки. Проверь очередь.";if(!closed){SyncTimer();if(section=="Загрузки")Render();}};
         StateChanged+=(_,_)=>SyncTimer();searchDelay.Tick+=(_,_)=>{searchDelay.Stop();if(section is "Фильмы" or "Сериалы"){current=null;Render();}};
         Closing+=OnClosing;ready=true;ApplyLiteMode();ApplyTheme();ApplyCompactLayout();Render();
     }
     static DownloadService newEmpty(int down,int up){var path=Path.Combine(Preferences.DataDir,"queue.json");if(File.Exists(path))File.Move(path,path+".unreadable-"+DateTime.Now.Ticks);return new(null,down,up);}
+    async Task RestoreCatalogIndexAsync()
+    {
+        try{await catalogIndex.RestoreAsync(metadataLifetime.Token);}
+        catch(OperationCanceledException) when(metadataLifetime.IsCancellationRequested){}
+        catch(Exception error){if(!closed)ErrorLog.Write(error);}
+    }
     Task RefreshSharedCatalogAsync(bool force=false)
     {
         forceSharedCatalogRefresh|=force;
@@ -91,7 +98,8 @@ public partial class MainWindow:Window
     void PosterResized(object sender,SizeChangedEventArgs e){if(sender is Border poster){if(e.WidthChanged&&e.NewSize.Width>0){var height=e.NewSize.Width*1.5;if(double.IsNaN(poster.Height)||Math.Abs(poster.Height-height)>1)poster.Height=height;}ClipPoster(poster);}}
     // Decorative motion follows the Windows "animate controls" setting and is off in smoke tests.
     public static bool MotionAllowed {get;set;}=true;
-    static bool Motion=>MotionAllowed&&SystemParameters.ClientAreaAnimation;
+    static bool lightweightMotion;
+    static bool Motion=>MotionAllowed&&!lightweightMotion&&SystemParameters.ClientAreaAnimation;
     string? lastViewKey;
     // A new section, card or person page fades in; refreshing the same view does not.
     void AnimateViewChange()
@@ -107,6 +115,7 @@ public partial class MainWindow:Window
     void Render()
     {
         if(!ready)return;renderCount++;if(!MotionAllowed)lastRenderCaller=Environment.StackTrace;BeginCatalogNavigationRender();savedScroll=null;personRequest?.Cancel();personRequest?.Dispose();personRequest=null;
+        CancelStaleDetailWork();CancelGameWork();
         SyncDiscoveryContext();
         if(activePerson!=null&&(section!=personSection||current?.Id!=personOrigin?.Id))activePerson=null;
         if(current==null&&activePerson==null&&section is not ("Настройки" or "Загрузки"))downloadReturnItem=null;
@@ -115,18 +124,21 @@ public partial class MainWindow:Window
         if(activePerson!=null||current!=null||section is not ("Фильмы" or "Сериалы"))CancelCatalogQualityCheck();
         if(activePerson!=null||current!=null||section is not ("Фильмы" or "Сериалы")||!SearchActive)CancelPeopleSearch(!SearchActive);
         try{catalogList=null;detailHero=null;detailMetaRow=null;detailRatings=null;detailInfo=null;detailPoster=null;detailSynopsis=null;detailTitle=null;detailDescription=null;descriptionToggle=null;inlineCatalogFilters=null;inlineCatalogFilterScroll=null;catalogToolbar=null;catalogRefreshButton=null;catalogFilterBack=null;catalogFilterForward=null;catalogFiltersCompact=null;catalogFilterCaptions.Clear();catalogRailPreview=null;discoveryHero=null;if(carousel!=null)DetachFeatureWatch(carousel);carousel=null;discoveryShelf=null;ReturnFiltersPanel();FilterControls.Children.Clear();PageHeader.Children.Clear();ClearBack();AddTorrentButton.Visibility=section=="Загрузки"?Visibility.Collapsed:Visibility.Visible;Body.Children.Clear();Body.RowDefinitions.Clear();SyncTimer();UpdateFilterRail();
-        SearchBar.Visibility=current!=null||section is "Фильмы" or "Сериалы" or "Сохранённое" or "Загрузки"?Visibility.Visible:Visibility.Collapsed;
+        SearchBar.Visibility=current!=null||section is "Фильмы" or "Сериалы" or "Игры" or "Сохранённое" or "Загрузки"?Visibility.Visible:Visibility.Collapsed;
+        SearchPlaceholder.Text=compactSearch?"Поиск":section=="Игры"?"Найти игру для Windows":"Найти фильм, сериал или человека";
         ContextLabel.Visibility=SearchBar.Visibility==Visibility.Visible||section is "Загрузки" or "Настройки"?Visibility.Collapsed:Visibility.Visible;ContextLabel.Text=section;
         downloadView=null;downloadList=null;
         RenderNavSelection();UpdateDownloadsWidget();
         if(section=="Настройки"){RenderSettings();return;}
         if(section=="Источники"){RenderSources();return;}
         if(activePerson!=null){RenderPerson(activePerson,personOrigin);return;}
+        if(current?.Section=="Игры"){RenderGameDetail(current);return;}
         if(current?.IsLive==true){RenderLiveDetail(current);return;}
         if(current!=null){Detail(current);return;}
         if(section=="Сохранённое"){RenderSaved();return;}
         if(!demoCatalog&&section is "Фильмы" or "Сериалы"){RenderLiveCatalog();return;}
-        if(!demoCatalog&&section is "Музыка" or "Игры" or "Программы"){RenderArchive();return;}
+        if(section=="Игры"){RenderGames();return;}
+        if(!demoCatalog&&section is "Музыка" or "Программы"){RenderArchive();return;}
         if(!demoCatalog&&section is "ТВ-каналы" or "Радио" or "Спорт"){RenderBroadcast();return;}
         if(section=="Загрузки"){RenderDownloads();return;}
         PageHeader.Children.Add(Text(section,25));
@@ -144,24 +156,6 @@ public partial class MainWindow:Window
         StyleNav(DownloadsButton,section=="Загрузки");
         StyleNav(SavedButton,section=="Сохранённое"||savedReturn!=null&&section!="Настройки");
         StyleNav(SettingsButton,section=="Настройки");
-    }
-    // The year, genre and description overlay stays out of layout until a card is hovered; with motion on it fades in.
-    // The cover itself is never scaled, so the whole poster stays visible inside its frame.
-    void PosterHoverIn(object sender,System.Windows.Input.MouseEventArgs e)=>PosterHover(sender,true);
-    void PosterHoverOut(object sender,System.Windows.Input.MouseEventArgs e)=>PosterHover(sender,false);
-    void PosterHover(object sender,bool over)
-    {
-        if(sender is not Button card||FindVisual<Border>(card,border=>border.Name=="PosterHover") is not {} overlay)return;
-        if(over)overlay.Visibility=Visibility.Visible;
-        if(!Motion)
-        {
-            overlay.BeginAnimation(UIElement.OpacityProperty,null);overlay.Opacity=over?1:0;
-            if(!over)overlay.Visibility=Visibility.Collapsed;
-            return;
-        }
-        var fade=new System.Windows.Media.Animation.DoubleAnimation(over?1:0,TimeSpan.FromMilliseconds(200)){EasingFunction=new System.Windows.Media.Animation.CubicEase{EasingMode=System.Windows.Media.Animation.EasingMode.EaseOut}};
-        if(!over)fade.Completed+=(_,_)=>{if(!card.IsMouseOver)overlay.Visibility=Visibility.Collapsed;};
-        overlay.BeginAnimation(UIElement.OpacityProperty,fade);
     }
     void OpenCard(object sender,RoutedEventArgs e)
     {
@@ -224,7 +218,7 @@ public partial class MainWindow:Window
     {
         if(closed)return;e.Cancel=true;if(closing)return;closing=true;StopCoverViewport();
         DiagnosticLog.Write("closing",new{QueueCount=downloads.Items.Count});Status.Text="Сохраняем загрузки и закрываем приложение…";
-        IsEnabled=false;StopDownloadReliability();var lanStopped=StopLanDevicesAsync();personRequest?.Cancel();updateCancellation.Cancel();catalogRefreshTimer.Stop();refresh.Stop();searchDelay.Stop();liveRequest?.Cancel();sourceRequest?.Cancel();archiveRequest?.Cancel();broadcastRequest?.Cancel();
+        IsEnabled=false;StopDownloadReliability();var lanStopped=StopLanDevicesAsync();personRequest?.Cancel();updateCancellation.Cancel();catalogRefreshTimer.Stop();refresh.Stop();searchDelay.Stop();liveRequest?.Cancel();sourceRequest?.Cancel();archiveRequest?.Cancel();gameCatalogRequest?.Cancel();gameDetailRequest?.Cancel();broadcastRequest?.Cancel();
         ResetDiscoveryData();CancelDetailMetadata();CancelCatalogQualityCheck();CancelPeopleSearch();foreach(var view in releaseViews.Values)view.Request?.Cancel();
         bool saved=false;
         try{prefs.Save();await downloads.Close();await lanStopped;saved=true;DiagnosticLog.Write("closed",new{QueueSaved=true});}

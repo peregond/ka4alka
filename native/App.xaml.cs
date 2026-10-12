@@ -3,12 +3,19 @@ namespace Kachalka;
 public partial class App : Application
 {
     Mutex? instance, installPresence;
+    CancellationTokenSource? shareLinks;
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
         var key=Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(Preferences.DataDir)))[..16];
         instance=new Mutex(true,@"Local\Kachalka-"+key,out bool first);
-        if(!first){if(!e.Args.Contains("--startup"))MessageBox.Show("Качалка уже запущена.","Качалка");Shutdown();return;}
+        // A click on a kachalka:// link starts the app with the link as its only argument.
+        var shareLink=e.Args.Length==1&&ShareLink.Parse(e.Args[0])!=null?e.Args[0]:null;
+        if(!first)
+        {
+            if(shareLink!=null&&ShareLinkPipe.Send(key,shareLink)){Shutdown();return;}
+            if(!e.Args.Contains("--startup"))MessageBox.Show("Качалка уже запущена.","Качалка");Shutdown();return;
+        }
         installPresence=new Mutex(false,@"Local\Kachalka-Install");
         DispatcherUnhandledException += (_, args) => { ErrorLog.Write(args.Exception); MessageBox.Show(args.Exception.Message, "Качалка"); args.Handled = true; };
         var window=new MainWindow();
@@ -33,6 +40,11 @@ public partial class App : Application
         {
             bool prompted=false;
             window.ContentRendered+=async(_,_)=>{if(prompted)return;prompted=true;window.EnsureFirstRunSetup();await window.CheckUpdatesAsync();};
+            try{WindowsIntegration.RegisterShareLinks();}
+            catch(Exception error) when(error is UnauthorizedAccessException or System.Security.SecurityException or System.IO.IOException){ErrorLog.Write(error);}
+            shareLinks=new CancellationTokenSource();var listening=shareLinks.Token;
+            _=Task.Run(()=>ShareLinkPipe.Listen(key,link=>window.Dispatcher.BeginInvoke(new Action(()=>window.ReceiveShareLink(link))),listening));
+            if(shareLink!=null){bool opened=false;window.ContentRendered+=(_,_)=>{if(opened)return;opened=true;window.OpenShareLink(shareLink);};}
         }
         if(e.Args.Length==2&&e.Args[0]=="--design-smoke-test"){bool running=false;window.ContentRendered+=async(_,_)=>{if(running)return;running=true;try{await window.DesignSmokeTest(e.Args[1]);}catch(Exception error){System.IO.Directory.CreateDirectory(e.Args[1]);System.IO.File.WriteAllText(System.IO.Path.Combine(e.Args[1],"error.txt"),error.ToString());window.Close();}};}
         if(e.Args.Length==2&&e.Args[0]=="--live-smoke-test"){bool running=false;window.ContentRendered+=async(_,_)=>{if(running)return;running=true;try{await window.LiveSmokeTest(e.Args[1]);}catch(Exception error){System.IO.Directory.CreateDirectory(e.Args[1]);System.IO.File.WriteAllText(System.IO.Path.Combine(e.Args[1],"error.txt"),error.ToString());window.Close();}};}
@@ -58,6 +70,9 @@ public partial class App : Application
                 catch(Exception error){System.IO.Directory.CreateDirectory(e.Args[1]);System.IO.File.WriteAllText(System.IO.Path.Combine(e.Args[1],"error.txt"),error.ToString());window.Close();}
             };
         }
+        RegisterSmoke("--games-smoke-test",window.GamesSmokeTest);
+        RegisterSmoke("--home-availability-smoke-test",window.HomeAvailabilitySmokeTest);
+        RegisterSmoke("--startup-performance-smoke-test",window.StartupPerformanceSmokeTest);
         RegisterSmoke("--cover-viewport-smoke-test",window.CoverViewportSmokeTest);
         RegisterSmoke("--catalog-navigation-smoke-test",window.CatalogNavigationSmokeTest);
         RegisterSmoke("--release-freshness-smoke-test",window.ReleaseFreshnessSmokeTest);
@@ -67,5 +82,5 @@ public partial class App : Application
         RegisterSmoke("--text-rendering-smoke-test",window.TextRenderingSmokeTest);
         window.Show();
     }
-    protected override void OnExit(ExitEventArgs e){installPresence?.Dispose();instance?.Dispose();base.OnExit(e);}
+    protected override void OnExit(ExitEventArgs e){shareLinks?.Cancel();installPresence?.Dispose();instance?.Dispose();base.OnExit(e);}
 }

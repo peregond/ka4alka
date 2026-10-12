@@ -40,6 +40,7 @@ public partial class MainWindow
             return "catalog|"+section+"|"+CurrentCatalogKey+"|page:"+livePage+"|category:"+searchCategory+
                 "|selection:"+CatalogSelection.Filter+"|collection:"+catalogCollection+"|region:"+catalogRegion+
                 "|poor:"+prefs.HidePoorQuality+"|favorites:"+favoritesOnly;
+        if(section=="Игры")return "games|"+gameQuery+"|"+gamePage+"|"+gameShelf;
         return "page|"+section;
     }
 

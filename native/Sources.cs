@@ -16,7 +16,7 @@ public record SourceEntry(string Id,string Title,string Source,string PageUrl,st
     public SeriesReleaseInfo Series => SeriesReleaseInfo.Parse(Title);
     public string Quality => System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(2160[pi]?\b|\b4[ .-]?K\b|\bUHD\b)")?"4K":System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(1080[pi]?\b|\bFull[ .-]?HD\b)")?"Full HD":System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(720p?\b|HD[ .-]?Ready\b)")?"HD Ready":"Не указано";
     public string Type => System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(Blu.?Ray|BDRip|BDRemux)")?"BluRay":System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(WEB.?DL|WEBRip)")?"WEB-DL":"Не указано";
-    public string Voice => System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(дубляж|дублирован|DUB)")?"Дубляж":System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(многоголос|MVO)")?"Многоголосая":System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(оригинал|Original|ENG)")?"Оригинал":"Не указано";
+    public string Voice => ReleaseAudio.TypeLabel(this);
     public string Subs => System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(субтитр|subs|subbed)")?"Есть":"Не указано";
     public string Codec => System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(H[. ]?265|x265|HEVC)")?"H.265":System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(H[. ]?264|x264|AVC)")?"H.264":"Не указано";
     public string Hdr => System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(Dolby.?Vision|\bDV\b)")?"Dolby Vision":System.Text.RegularExpressions.Regex.IsMatch(Title,@"(?i)(HDR10|\bHDR\b)")?"HDR":"Не указано";
@@ -68,20 +68,21 @@ public sealed partial class SourceClient : IDisposable
         foreach(var file in files.EnumerateArray()){var name=file.GetProperty("name").GetString()!;if(name.EndsWith(".torrent",StringComparison.OrdinalIgnoreCase))return entry with{TorrentUrl="https://archive.org/download/"+Uri.EscapeDataString(entry.Id)+"/"+Uri.EscapeDataString(name)};}
         throw new InvalidOperationException("У этой записи нет доступного torrent-файла. Выбери другую запись.");
     }
-    public async Task<IReadOnlyList<SourceEntry>> SearchTorznab(SourceConfig source,string query,CancellationToken ct)
+    public async Task<IReadOnlyList<SourceEntry>> SearchTorznab(SourceConfig source,string query,CancellationToken ct,int? category=null)
     {
         var endpoint=WebUri(source.Endpoint);
         var sep=string.IsNullOrEmpty(endpoint.Query)?"?":"&";
-        var uri=new Uri(endpoint.AbsoluteUri+sep+"t=search&q="+Uri.EscapeDataString(query)+"&limit=50&apikey="+Uri.EscapeDataString(source.ApiKey));
-        return ParseTorznab(await Read(uri,4*1024*1024,ct),source.Name);
+        var uri=new Uri(endpoint.AbsoluteUri+sep+"t=search&q="+Uri.EscapeDataString(query)+(category is {} cat?"&cat="+cat:"")+"&limit=50&apikey="+Uri.EscapeDataString(source.ApiKey));
+        return ParseTorznab(await Read(uri,4*1024*1024,ct),source.Name,category);
     }
-    public static IReadOnlyList<SourceEntry> ParseTorznab(byte[] data,string source)
+    public static IReadOnlyList<SourceEntry> ParseTorznab(byte[] data,string source,int? category=null)
     {
         using var stream=new MemoryStream(data);using var reader=XmlReader.Create(stream,new XmlReaderSettings{DtdProcessing=DtdProcessing.Prohibit,XmlResolver=null,MaxCharactersInDocument=4*1024*1024});var xml=XDocument.Load(reader);
         if(xml.Root?.Name.LocalName=="error")throw new InvalidOperationException("Индексатор отклонил запрос. Проверь API-ключ и адрес.");
         if(xml.Root?.Name.LocalName!="rss")throw new InvalidDataException("Источник вернул не Torznab RSS.");
         return xml.Descendants("item").Take(50).Select(x=>{
             string? Attr(string name)=>x.Elements().FirstOrDefault(a=>a.Name.LocalName=="attr"&&(string?)a.Attribute("name")==name)?.Attribute("value")?.Value;
+            if(category is {} expected&&!x.Elements().Any(a=>a.Name.LocalName=="attr"&&(string?)a.Attribute("name")=="category"&&(string?)a.Attribute("value")==expected.ToString()))return null;
             var title=(string?)x.Element("title")??"Без названия";
             var link=Attr("magneturl")??(string?)x.Element("enclosure")?.Attribute("url")??(string?)x.Element("link");
             if(!Uri.TryCreate(link,UriKind.Absolute,out var uri)||uri.Scheme is not ("magnet" or "http" or "https"))return null;

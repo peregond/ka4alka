@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Threading;
 
 namespace Kachalka;
 
@@ -28,7 +29,27 @@ public partial class MainWindow
         onlineIndex.RetryNow();if(DetailMetadataNeedsRetry(item.Id))_ = FetchDetailMetadata(item,true);
         requestedDetails.Remove(item.Id);RefreshDetail(item.Id);
     }
-    void RefreshDetail(int id)
+    DispatcherTimer? detailRefreshTimer;
+    int pendingDetailRefreshId;
+    bool pendingFullDetailRefresh;
+    void QueueDetailRefresh(int id,bool releasesOnly=false)
+    {
+        if(closed||activePerson!=null||current?.Id!=id)return;
+        RefreshLoadingIndicator();
+        pendingFullDetailRefresh=detailRefreshTimer?.IsEnabled==true&&pendingDetailRefreshId==id?pendingFullDetailRefresh||!releasesOnly:!releasesOnly;
+        pendingDetailRefreshId=id;
+        if(detailRefreshTimer==null)
+        {
+            detailRefreshTimer=new DispatcherTimer(DispatcherPriority.Background){Interval=TimeSpan.FromMilliseconds(80)};
+            detailRefreshTimer.Tick+=(_,_)=>
+            {
+                detailRefreshTimer.Stop();
+                RefreshDetail(pendingDetailRefreshId,!pendingFullDetailRefresh);
+            };
+        }
+        if(!detailRefreshTimer.IsEnabled)detailRefreshTimer.Start();
+    }
+    void RefreshDetail(int id,bool releasesOnly=false)
     {
         if(closed||activePerson!=null||current?.Id!=id)return;RefreshLoadingIndicator();
         // Keep an open selector stable while providers finish in the background.
@@ -56,6 +77,7 @@ public partial class MainWindow
             }
             return;
         }
+        if(releasesOnly&&RefreshDetailReleaseRows(id))return;
         var scroller=FindVisual<ScrollViewer>(Body,_=>true);var offset=scroller?.VerticalOffset??0;
         Render();UpdateLayout();FindVisual<ScrollViewer>(Body,_=>true)?.ScrollToVerticalOffset(offset);
     }
