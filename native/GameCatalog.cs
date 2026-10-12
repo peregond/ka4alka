@@ -103,7 +103,13 @@ public sealed class GameCatalog(SourceClient client)
         var hasNext=root.TryGetProperty("total_count",out var total)&&total.TryGetInt32(out var totalCount)&&root.TryGetProperty("start",out var start)&&start.TryGetInt32(out var offset)?offset+PageSize<totalCount:count>=PageSize;
         return new(items.DistinctBy(x=>x.Id).Take(PageSize).ToArray(),root.TryGetProperty("total",out _)?false:hasNext);
     }
-    static string? RowImage(HtmlNode row)=>Image(row.SelectSingleNode(".//*[contains(@class,'search_capsule')]//img")?.GetAttributeValue("src","")??row.SelectSingleNode(".//img")?.GetAttributeValue("src",""));
+    // The small capsule of a search row exists for every game. Games whose artwork still sits in the plain folder also have the 460 by 215 header the cards are shaped for, at a fixed address.
+    static string? RowImage(HtmlNode row)
+    {
+        var capsule=Image(row.SelectSingleNode(".//*[contains(@class,'search_capsule')]//img")?.GetAttributeValue("src","")??row.SelectSingleNode(".//img")?.GetAttributeValue("src",""));
+        var plain=capsule==null?null:Regex.Match(capsule,@"^(https://[^/?#]+/store_item_assets/steam/apps/\d{1,9}/)capsule_231x87\.jpg(\?[^#]*)?$");
+        return plain is {Success:true}?plain.Groups[1].Value+"header.jpg"+plain.Groups[2].Value:capsule;
+    }
     // The title search answers with prices in cents; the same card chips are drawn from them.
     static GameStoreInfo? SearchPrice(JsonElement row)
     {

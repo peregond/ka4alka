@@ -417,7 +417,7 @@ public partial class MainWindow
         var frame=new Border{CornerRadius=new(18),Child=stage};
         frame.SizeChanged+=(_,e)=>
         {
-            if(e.NewSize.Width<=0)return;var height=Math.Clamp(e.NewSize.Width*9/16,200,520);if(Math.Abs(stage.Height-height)>1)stage.Height=height;
+            if(e.NewSize.Width<=0)return;var height=Math.Clamp(e.NewSize.Width*9/16,200,460);if(Math.Abs(stage.Height-height)>1)stage.Height=height;
             var clip=new RectangleGeometry(new Rect(0,0,e.NewSize.Width,Math.Max(1,stage.Height)),18,18);clip.Freeze();stage.Clip=clip;
         };
         var picture=gameShotImage=new Image{Name="GameShotImage",Stretch=Stretch.UniformToFill};RenderOptions.SetBitmapScalingMode(picture,BitmapScalingMode.HighQuality);stage.Children.Add(picture);

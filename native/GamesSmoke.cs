@@ -114,7 +114,20 @@ public partial class MainWindow
         bool Shown(string name)=>VisualElements<FrameworkElement>(Body).Any(x=>x.Name==name&&x.IsVisible&&x.ActualWidth>0);
         Check(Shown("GamePriceChip")&&Shown("GameDiscount")&&Shown("GameSoon")&&Shown("GameReviewText"),"cards show the price, the discount, a coming-soon mark and the review score where Steam gives them");
         Check(VisualElements<TextBlock>(Body).Any(x=>x.Name=="GameReviewText"&&x.IsVisible&&x.Text=="👍 93%")&&VisualElements<TextBlock>(Body).Any(x=>x.Name=="GameReviewText"&&x.IsVisible&&x.Text=="👍 41%"),"the review score names the share of positive reviews");
+        bool Tone(string text,string key)=>VisualElements<TextBlock>(Body).Where(x=>x.Name=="GameReviewText"&&x.IsVisible&&x.Text==text).Any(x=>ReferenceEquals(x.Foreground,FindResource(key)));
+        Check(Tone("👍 93%","Accent")&&Tone("👍 41%","Warning")&&Tone("👍 37%","Danger"),"a review score is coloured by Steam's verdict: green when positive, amber when mixed, red when negative");
         Check(VisualElements<Button>(Body).Count(b=>b.Name.StartsWith("GameGenre"))==GameGenres.All.Length&&VisualElements<Button>(Body).Any(b=>b.Name=="GameChipAll")&&VisualElements<Button>(Body).Count(b=>b.Name.StartsWith("GameChip"))==GameBrowse.Sorts.Length+1,"the sorts and the genres sit under the search as two rows of chips");
+        Check(!gameShelfViews.ContainsKey("library")&&!VisualElements<TextBlock>(Body).Any(x=>x.Text=="Ваши игры"),"a player with no queued games sees no library shelf");
+        var queued=new DownloadItem{MediaSection="Игры",MediaPageUrl=game.PageUrl,MediaTitle=game.Title,Name=game.Title+" (2011) PC RePack",ImageUrl=game.ImageUrl,AddedUtc=DateTime.UtcNow,MediaYear=2011};
+        gameLibrarySource=()=>[queued];
+        try
+        {
+            Render();await Settle();
+            Check(gameShelfViews.TryGetValue("library",out var mine)&&mine.Row.Content is CatalogRow libraryRow&&libraryRow.Items.Length==1&&libraryRow.Items[0].Id==game.Id&&FindVisual<TextBlock>(Body,x=>x.Text=="Ваши игры")!=null,"a queued game appears on its own shelf above the catalogue");
+            Shot("games-home-library");
+        }
+        finally{gameLibrarySource=null;}
+        Render();await Settle();
         Shot("games-home-dark");
         foreach(var width in new[]{510d,1280d})
         {

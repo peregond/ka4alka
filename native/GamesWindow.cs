@@ -30,6 +30,9 @@ public partial class MainWindow
     Panel? gameFilterRow;
     ScrollViewer? gameGenreScroll;Button? gameGenreBack,gameGenreForward;
     bool GameHome=>section=="Игры"&&current==null&&activePerson==null&&gameQuery.Length==0&&gameShelf.Length==0&&gameGenre.Length==0&&gamePage==1;
+    // Games from the download queue, newest first, as the same cards the catalogue shows.
+    internal Func<IEnumerable<DownloadItem>>? gameLibrarySource;
+    MediaItem[] GameLibrary()=>(gameLibrarySource?.Invoke()??downloads.Items).Where(x=>x.MediaSection=="Игры").OrderByDescending(x=>x.AddedUtc).Select(DownloadMetadata.Card).OfType<MediaItem>().DistinctBy(x=>x.Id).Take(40).ToArray();
     MediaItem[] GameShelfItems(string key)=>gameShelfItems.TryGetValue(key,out var items)?items.Where(PersonallyVisible).ToArray():[];
     void AddGameDetails(GameDetails detail)
     {
@@ -76,7 +79,7 @@ public partial class MainWindow
         var stack=new StackPanel{Name="GameFilters"};
         var row=new DockPanel();stack.Children.Add(row);
         var refresh=ActionButton("","IconRefresh",RefreshGames,"PillButton");refresh.Name="GameRefresh";refresh.ToolTip="Обновить каталог";AutomationProperties.SetName(refresh,"Обновить каталог");
-        refresh.Padding=new(0);refresh.Width=compactHeight?36:40;refresh.MinHeight=compactHeight?36:40;refresh.Margin=new(8,0,0,8);DockPanel.SetDock(refresh,Dock.Right);row.Children.Add(refresh);
+        refresh.Padding=new(0);refresh.Width=compactHeight?36:40;refresh.MinHeight=compactHeight?36:40;refresh.VerticalAlignment=VerticalAlignment.Top;refresh.Margin=new(8,0,0,8);DockPanel.SetDock(refresh,Dock.Right);row.Children.Add(refresh);
         var chips=new WrapPanel();row.Children.Add(chips);
         void Chip(string label,string shelf)
         {
@@ -170,6 +173,12 @@ public partial class MainWindow
         }
         else if(gameShelfLoading.Contains("popular"))content.Children.Add(BannerSkeleton());
         BuildGameFilters();content.Children.Add(TakeFiltersPanel());
+        // The games the player has already queued come first, so what they are playing is one click away.
+        var library=GameLibrary();
+        if(library.Length>0)
+        {
+            var mine=AddShelf(content,"Library","Ваши игры",()=>ShowDownloads(this,new RoutedEventArgs()),"GameRow",1);gameShelfViews["library"]=mine;mine.Set(library,false);
+        }
         foreach(var spec in GameShelves.Home)
         {
             var open=spec;var view=AddShelf(content,char.ToUpperInvariant(spec.Key[0])+spec.Key[1..],spec.Title,()=>OpenGameList(open.Sort,open.Genre),"GameRow",spec.Rows);gameShelfViews[spec.Key]=view;

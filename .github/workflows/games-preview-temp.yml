@@ -1,6 +1,6 @@
 name: Games preview (temporary)
 # Temporary: renders the games smoke test on Windows and commits compressed screenshots to the same branch
-# so the pages can be reviewed. Removed together with the screenshots before the pull request is finished. Run for the games interface work.
+# so the pages can be reviewed. Removed together with the screenshots before the pull request is finished. Run 2 for the games interface work.
 on:
   push:
     branches: [claude/brave-galileo-7mt77d]
