@@ -24,7 +24,7 @@ public partial class MainWindow:Window
     public MainWindow()
     {
         InitializeComponent();
-        InitializeStatusToast();
+        InitializeStatusToast();InitializeShareLinks();
         onlineIndex=new(sourceClient,relays:new IndexRelays(sourceClient));sourceClient.TorrentRelay=onlineIndex.RelayTorrent;sharedCatalog=new(sourceClient);
         catalogRefreshTimer.Tick+=(_,_)=>
         {
@@ -37,7 +37,7 @@ public partial class MainWindow:Window
             }
         };
         catalogRefreshTimer.Start();
-        ContentRendered+=(_,_)=>{_=MaintainCacheAsync();_=RefreshSharedCatalogAsync();};
+        ContentRendered+=(_,_)=>{_=RestoreCatalogIndexAsync();_=MaintainCacheAsync();_=RefreshSharedCatalogAsync();};
         EnableAdaptiveLayout();
         EnableShortcuts();InitializeDownloadDrop();
         try{downloads=new(null,prefs.MaxDownloadKbps,prefs.MaxUploadKbps);}catch(Exception e){downloads=newEmpty(prefs.MaxDownloadKbps,prefs.MaxUploadKbps);Status.Text="Не удалось прочитать очередь: "+e.Message;}
@@ -50,6 +50,12 @@ public partial class MainWindow:Window
         Closing+=OnClosing;ready=true;ApplyLiteMode();ApplyTheme();ApplyCompactLayout();Render();
     }
     static DownloadService newEmpty(int down,int up){var path=Path.Combine(Preferences.DataDir,"queue.json");if(File.Exists(path))File.Move(path,path+".unreadable-"+DateTime.Now.Ticks);return new(null,down,up);}
+    async Task RestoreCatalogIndexAsync()
+    {
+        try{await catalogIndex.RestoreAsync(metadataLifetime.Token);}
+        catch(OperationCanceledException) when(metadataLifetime.IsCancellationRequested){}
+        catch(Exception error){if(!closed)ErrorLog.Write(error);}
+    }
     Task RefreshSharedCatalogAsync(bool force=false)
     {
         forceSharedCatalogRefresh|=force;
@@ -144,24 +150,6 @@ public partial class MainWindow:Window
         StyleNav(DownloadsButton,section=="Загрузки");
         StyleNav(SavedButton,section=="Сохранённое"||savedReturn!=null&&section!="Настройки");
         StyleNav(SettingsButton,section=="Настройки");
-    }
-    // The year, genre and description overlay stays out of layout until a card is hovered; with motion on it fades in.
-    // The cover itself is never scaled, so the whole poster stays visible inside its frame.
-    void PosterHoverIn(object sender,System.Windows.Input.MouseEventArgs e)=>PosterHover(sender,true);
-    void PosterHoverOut(object sender,System.Windows.Input.MouseEventArgs e)=>PosterHover(sender,false);
-    void PosterHover(object sender,bool over)
-    {
-        if(sender is not Button card||FindVisual<Border>(card,border=>border.Name=="PosterHover") is not {} overlay)return;
-        if(over)overlay.Visibility=Visibility.Visible;
-        if(!Motion)
-        {
-            overlay.BeginAnimation(UIElement.OpacityProperty,null);overlay.Opacity=over?1:0;
-            if(!over)overlay.Visibility=Visibility.Collapsed;
-            return;
-        }
-        var fade=new System.Windows.Media.Animation.DoubleAnimation(over?1:0,TimeSpan.FromMilliseconds(200)){EasingFunction=new System.Windows.Media.Animation.CubicEase{EasingMode=System.Windows.Media.Animation.EasingMode.EaseOut}};
-        if(!over)fade.Completed+=(_,_)=>{if(!card.IsMouseOver)overlay.Visibility=Visibility.Collapsed;};
-        overlay.BeginAnimation(UIElement.OpacityProperty,fade);
     }
     void OpenCard(object sender,RoutedEventArgs e)
     {

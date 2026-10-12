@@ -34,7 +34,7 @@ public partial class MainWindow
     CancellationTokenSource? liveRequest;
     readonly Dictionary<int,IReadOnlyList<SourceEntry>> liveReleases=[];
     readonly HashSet<int> cachedReleaseViews=[];
-    readonly CatalogIndex catalogIndex=new(Preferences.DataDir);
+    readonly CatalogIndex catalogIndex=new(Preferences.DataDir,deferRestore:true);
     readonly HashSet<int> requestedDetails=[];
     readonly Dictionary<int,Task<MediaItem>> cardMetadata=[];
     readonly MetadataScheduler metadataScheduler=new();
@@ -42,8 +42,8 @@ public partial class MainWindow
     readonly OnlineIndexClient onlineIndex;
     Task<MediaItem> Metadata(MediaItem item,bool priority=false,CancellationToken ct=default,Action<MediaItem>? updated=null,bool force=false)
     {
-        // A title found only on IMDb has no catalog page to read; its card shows what the search returned.
-        if(ImdbSuggestions.IsImdbOnly(item))return Task.FromResult(item);
+        // A title found only on IMDb has no catalog page to read. An opened card asks the site for its text and cast, TheTVDB for series and TMDB for films (shelf cards do not); TVmaze backs up series.
+        if(ImdbSuggestions.IsImdbOnly(item))return priority?ImdbMetadata(item,ct,updated,force):Task.FromResult(item);
         item=DownloadMetadata.EnrichMedia(item,new[]{sharedCatalog.Find(item)}.OfType<MediaItem>().Concat(BundledCatalog.Search(item.Section,item.Title)));
         if(!force&&MediaMetadata.HasFullDetails(item)){updated?.Invoke(item);return Task.FromResult(item);}
         if(force){cardMetadata.Remove(item.Id);resolvedPriorityMetadata.Remove(item.Id);}
@@ -80,6 +80,32 @@ public partial class MainWindow
             finally{if(priority)priorityMetadata.Remove(item.Id);}
         }
         task=Load();if(cardMetadata.Count>=100)cardMetadata.Remove(cardMetadata.Keys.First());cardMetadata[item.Id]=task;return task;
+    }
+    Task<MediaItem> ImdbMetadata(MediaItem item,CancellationToken ct,Action<MediaItem>? updated,bool force)
+    {
+        if(item.Section is not ("Фильмы" or "Сериалы")||string.IsNullOrWhiteSpace(item.ImdbId))return Task.FromResult(item);
+        if(force)cardMetadata.Remove(item.Id);
+        if(cardMetadata.TryGetValue(item.Id,out var cached))return cached;
+        if(!ct.CanBeCanceled)ct=metadataLifetime.Token;
+        async Task<MediaItem> Load()
+        {
+            await Task.Yield();
+            using var deadline=CancellationTokenSource.CreateLinkedTokenSource(ct);
+            deadline.CancelAfter(TimeSpan.FromSeconds(15));
+            var result=item;
+            // The site's answer (TheTVDB for series, TMDB for films) comes first; a series it could not describe falls back to TVmaze.
+            try{result=await onlineIndex.Title(item,deadline.Token);updated?.Invoke(result);}
+            catch(Exception) when(!ct.IsCancellationRequested){}
+            if(item.Section=="Сериалы"&&!MediaMetadata.HasDescription(result))
+            {
+                try{result=await TvMazeMetadata.Load(sourceClient,result,deadline.Token);updated?.Invoke(result);}
+                catch(Exception) when(!ct.IsCancellationRequested){}
+            }
+            // Nothing found keeps the search card, and the next opening asks again.
+            if(ReferenceEquals(result,item))cardMetadata.Remove(item.Id);
+            return result;
+        }
+        var task=Load();if(cardMetadata.Count>=100)cardMetadata.Remove(cardMetadata.Keys.First());cardMetadata[item.Id]=task;return task;
     }
     async Task UpdateCardRatings(MediaItem item)
     {
@@ -172,7 +198,7 @@ public partial class MainWindow
         StartCatalogQualityCheck(rawPage);
         var cards=rawPage.Where(CatalogQualityMatches).ToArray();
         ShowCatalog(cards);
-        var list=catalogList!;
+        var list=catalogList!;list.Opacity=liveLoading&&cards.Length>0?.65:1;
         Body.Children.Remove(list);ScrollViewer.SetVerticalScrollBarVisibility(list,ScrollBarVisibility.Disabled);ScrollViewer.SetHorizontalScrollBarVisibility(list,ScrollBarVisibility.Disabled);WheelScroll.SetIsEnabled(list,false);
         // The scroll viewer extends 6 px past the gutter so hover rings and focus rings are not clipped.
         var content=new StackPanel{Margin=new(6,6,6,0)};RenderPeopleSearchResults(content,false);
@@ -269,7 +295,7 @@ public partial class MainWindow
         liveRequest?.Cancel();liveRequest?.Dispose();liveRequest=new();var token=liveRequest.Token;liveLoading=true;liveError="";
         var request=liveRequest;var selection=CatalogSelection;var forceRefresh=catalogRefreshRequested;catalogRefreshRequested=false;
         bool IsCurrent()=>ReferenceEquals(liveRequest,request)&&!token.IsCancellationRequested&&liveKey==key&&submittedQuery==query;
-        liveItems=[];catalogHasNext=false;
+        if(!forceRefresh){liveItems=[];catalogHasNext=false;}
         var cacheKey=category+"|"+selection.Filter+"|"+page+(selection.Region.Length>0?"|region:"+selection.Region+"|home:"+CatalogRegions.HomeCountry(selection.HomeCountry):"")+(selection.Collection.StartsWith("seasonal:",StringComparison.Ordinal)?"|"+selection.Collection:"");
         await Task.Yield();
         try
@@ -315,7 +341,7 @@ public partial class MainWindow
             }
             else
             {
-                await sharedCatalog.RestoreAsync(token);
+                await Task.WhenAll(sharedCatalog.RestoreAsync(token),catalogIndex.RestoreAsync(token));
                 var result=await UnifiedSearch.FindAsync(query,
                     (kind,t)=>searchProvider!=null?searchProvider(kind,query,t):CatalogBatches.ReadPage(c=>onlineIndex.Browse(kind,query,1,c),c=>new LiveCatalog(sourceClient).Browse(kind,query,1,c),false,t),
                     kind=>catalogIndex.Search(kind,query).Concat(sharedCatalog.Search(kind,query)).Concat(BundledCatalog.Search(kind,query)).ToArray(),token,

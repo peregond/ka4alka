@@ -17,11 +17,15 @@ public partial class MainWindow
     Panel? detailActions;
     TextBlock? releaseCountLabel;
     StackPanel? releaseControlsHost;
+    StackPanel? detailReleaseRowsHost;
+    StackPanel? detailPoorQualitySlot;
+    SourceEntry? detailRecommendedEntry;
     string detailActionState="";
     static readonly string[] VideoExtensions=[".mkv",".mp4",".avi",".mov",".m4v",".wmv",".ts",".webm",".mpg",".mpeg"];
 
     void RenderLiveDetail(MediaItem item)
     {
+        detailFilteredReleases=null;detailReleaseRowsHost=null;
         if(requestedDetails.Add(item.Id))
         {
             var cached=catalogIndex.CachedReleaseSnapshot(item);
@@ -91,11 +95,11 @@ public partial class MainWindow
             detailRatings.Children.Add(row);
         }
         Rating("Кинопоиск",item.Kinopoisk);Rating("IMDb",item.Imdb);
-        var traits=string.Join(" · ",new[]{item.Genre,item.Country}.Where(x=>!string.IsNullOrWhiteSpace(x)));
-        if(traits.Length>0)detailMetaRow.Children.Add(new TextBlock{Name="DetailTraits",Text=traits,FontSize=14,Foreground=(Brush)FindResource("BannerMuted"),VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,12,4)});
-        foreach(var quality in item.ReleaseResolutions.OrderByDescending(x=>x).Select(x=>x>=2160?"4K":x+"p").Take(4))
-            detailMetaRow.Children.Add(new Border{BorderBrush=(Brush)FindResource("BannerBadgeEdge"),BorderThickness=new(1),CornerRadius=new(6),Padding=new(6,2,6,2),Margin=new(0,0,8,4),VerticalAlignment=VerticalAlignment.Center,Child=new TextBlock{Text=quality,FontSize=11,FontWeight=FontWeights.Bold,Foreground=(Brush)FindResource("BannerText")}});
-        if(item.OnlyPoorQuality){var poor=PoorQualityBadge(item.PosterQuality);poor.Foreground=(Brush)FindResource("BannerText");detailInfo.Children.Add(poor);}
+        // Every genre is listed here; a poster's caption shows only the first.
+        var traits=string.Join(" · ",new[]{item.AllGenres,item.Country}.Where(x=>!string.IsNullOrWhiteSpace(x)));
+        if(traits.Length>0)detailMetaRow.Children.Add(new TextBlock{Name="DetailTraits",Text=traits,FontSize=14,Foreground=(Brush)FindResource("BannerMuted"),TextWrapping=TextWrapping.Wrap,VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,12,4)});
+        detailPoorQualitySlot=new StackPanel();detailInfo.Children.Add(detailPoorQualitySlot);
+        UpdateDetailQuality(item);
         // credits, only those already known
         var directors=item.People.Where(x=>x.Role=="Режиссёры").Take(2).ToArray();
         var cast=item.People.Where(x=>x.Role=="Актёры").Take(5).ToArray();
@@ -157,8 +161,28 @@ public partial class MainWindow
             var empty=new StackPanel{Margin=new(2,16,2,20)};var noReleases=Text("Подходящих раздач пока нет",17);noReleases.FontWeight=FontWeights.SemiBold;empty.Children.Add(noReleases);empty.Children.Add(Text("Можно обновить поиск раздач или вернуться позже.",13,true));
             panel.Children.Add(empty);FinishDetailRender();return;
         }
-        RenderReleasePicker(panel,releases);
+        detailReleaseRowsHost=new StackPanel();panel.Children.Add(detailReleaseRowsHost);
+        var rows=new StackPanel();detailReleaseRowsHost.Children.Add(rows);RenderReleasePicker(rows,releases);
         FinishDetailRender();
+    }
+    void UpdateDetailQuality(MediaItem item)
+    {
+        if(detailMetaRow==null||detailPoorQualitySlot==null)return;
+        foreach(var badge in detailMetaRow.Children.OfType<FrameworkElement>().Where(x=>Equals(x.Tag,"DetailQualityBadge")).ToArray())detailMetaRow.Children.Remove(badge);
+        foreach(var quality in item.ReleaseResolutions.OrderByDescending(x=>x).Select(x=>x>=2160?"4K":x+"p").Take(4))
+            detailMetaRow.Children.Add(new Border{Tag="DetailQualityBadge",BorderBrush=(Brush)FindResource("BannerBadgeEdge"),BorderThickness=new(1),CornerRadius=new(6),Padding=new(6,2,6,2),Margin=new(0,0,8,4),VerticalAlignment=VerticalAlignment.Center,Child=new TextBlock{Text=quality,FontSize=11,FontWeight=FontWeights.Bold,Foreground=(Brush)FindResource("BannerText")}});
+        detailPoorQualitySlot.Children.Clear();
+        if(item.OnlyPoorQuality){var poor=PoorQualityBadge(item.PosterQuality);poor.Foreground=(Brush)FindResource("BannerText");detailPoorQualitySlot.Children.Add(poor);}
+    }
+    bool RefreshDetailReleaseRows(int id)
+    {
+        if(current?.Id!=id||detailReleaseRowsHost==null||releaseControlsHost==null||
+            !liveReleases.TryGetValue(id,out var releases)||releases.Count==0)return false;
+        UpdateDetailQuality(current);
+        releaseControlsHost.Children.Clear();detailReleaseRowsHost.Children.Clear();
+        // Each slice owns its SizeChanged handler. Drop the entire old slice rather than retaining its closures.
+        var rows=new StackPanel();detailReleaseRowsHost.Children.Add(rows);RenderReleasePicker(rows,releases);
+        RefreshReleaseLoadingIndicator();UpdateLayout();return true;
     }
     void FinishDetailRender()
     {
@@ -191,19 +215,31 @@ public partial class MainWindow
         var pick=ReleaseRecommendation.Pick(releases,QualityMinimum);
         return pick==null?"none":"pick:"+pick.Entry.Id+"|"+releases.Count;
     }
+    int detailFilteredMovieId;
+    SourceEntry[]? detailFilteredReleases;
+    bool DetailRecommendationChanged(MediaItem item,IReadOnlyList<SourceEntry> choices)
+        =>!Equals(detailRecommendedEntry,DownloadsOf(item).Length==0?ReleaseRecommendation.Pick(choices,QualityMinimum)?.Entry:null);
+    void ApplyDetailReleaseFilters(int movieId,SourceEntry[] visible)
+    {
+        if(current?.Id!=movieId)return;
+        detailFilteredMovieId=movieId;detailFilteredReleases=visible;
+        if(DetailActionState(current,visible)!=detailActionState||DetailRecommendationChanged(current,visible))BuildDetailActions(current,visible);
+    }
     void RefreshDetailActions()
     {
         if(current==null||detailActions==null||section is "Загрузки" or "Настройки"||activePerson!=null)return;
         liveReleases.TryGetValue(current.Id,out var known);
-        var state=DetailActionState(current,known??[]);
-        if(state==detailActionState)return;
-        BuildDetailActions(current,known??[]);
+        var choices=detailFilteredMovieId==current.Id&&detailFilteredReleases!=null?detailFilteredReleases:known??[];
+        var state=DetailActionState(current,choices);
+        if(state==detailActionState&&!DetailRecommendationChanged(current,choices))return;
+        BuildDetailActions(current,choices);
     }
     void BuildDetailActions(MediaItem item,IReadOnlyList<SourceEntry> releases)
     {
         if(detailActions==null)return;
         detailActions.Children.Clear();detailActionState=DetailActionState(item,releases);
         var owned=DownloadsOf(item);var done=owned.FirstOrDefault(x=>x.Completed);var active=owned.FirstOrDefault(x=>!x.Completed);
+        detailRecommendedEntry=owned.Length==0?ReleaseRecommendation.Pick(releases,QualityMinimum)?.Entry:null;
         FrameworkElement Spaced(FrameworkElement element){element.Margin=new(0,0,10,8);return element;}
         Button Action(string text,string icon,bool primary,Action click)
         {
@@ -220,14 +256,14 @@ public partial class MainWindow
         {
             detailActions.Children.Add(Spaced(DownloadProgressButton(active)));
         }
-        else if(ReleaseRecommendation.Pick(releases,QualityMinimum) is {} pick)
+        else if(detailRecommendedEntry is {} choice)
         {
-            var button=new Button{Name="DetailDownload",Style=(Style)FindResource("PrimaryButton"),Tag=pick.Entry,Height=52,MinHeight=52,Padding=new(22,0,22,0),FontSize=15,Margin=new(0,0,10,8),ToolTip="Скачать рекомендованную раздачу: "+pick.Entry.Title};
+            var button=new Button{Name="DetailDownload",Style=(Style)FindResource("PrimaryButton"),Tag=choice,Height=52,MinHeight=52,Padding=new(22,0,22,0),FontSize=15,Margin=new(0,0,10,8),ToolTip="Скачать рекомендованную раздачу: "+choice.Title};
             var row=new StackPanel{Orientation=Orientation.Horizontal};
             row.Children.Add(IconLabel("Скачать","IconDownload",18));
-            var detail=string.Join(" · ",new[]{(ReleaseQuality.Height(pick.Entry) is int h?h+"p":pick.Entry.Quality),pick.Entry.Size.HasValue?DownloadService.FormatBytes(pick.Entry.Size.Value):""}.Where(x=>x.Length>0));
+            var detail=string.Join(" · ",new[]{(ReleaseQuality.Height(choice) is int h?h+"p":choice.Quality),choice.Size.HasValue?DownloadService.FormatBytes(choice.Size.Value):""}.Where(x=>x.Length>0));
             row.Children.Add(new TextBlock{Text=detail,FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=14,FontWeight=FontWeights.Medium,Opacity=.75,Margin=new(10,0,0,0),VerticalAlignment=VerticalAlignment.Center});
-            button.Content=row;AutomationProperties.SetName(button,"Скачать раздачу: "+pick.Entry.Title);button.Click+=SourceDownload;detailActions.Children.Add(button);
+            button.Content=row;AutomationProperties.SetName(button,"Скачать раздачу: "+choice.Title);button.Click+=SourceDownload;detailActions.Children.Add(button);
         }
         else
         {
@@ -240,6 +276,15 @@ public partial class MainWindow
         void Paint(){var now=IsSaved(item);favorite.Content=IconLabel("",now?"IconHeartFilled":"IconHeart",20);favorite.ToolTip=now?"Сохранено":"Сохранить";AutomationProperties.SetName(favorite,now?"Сохранено":"Сохранить");}
         Paint();favorite.Click+=(_,_)=>{ToggleSaved(item);Paint();UpdateSavedCount();};
         detailActions.Children.Add(favorite);
+        if(ShareLink.Create(item)!=null)
+        {
+            var share=new Button{Name="DetailShare",Style=(Style)FindResource("IconButton"),Width=52,Height=52,Margin=new(0,0,10,8),ToolTip="Скопировать ссылку на "+(item.Section=="Сериалы"?"сериал":"фильм")};
+            share.SetResourceReference(Control.BackgroundProperty,"BannerAction");share.SetResourceReference(Control.BorderBrushProperty,"BannerEdge");share.Foreground=(Brush)FindResource("BannerText");
+            share.Content=IconLabel("","IconShare",20);AutomationProperties.SetName(share,"Поделиться");
+            // The card's details may have loaded since the buttons were built, so the link takes the current title.
+            share.Click+=(_,_)=>CopyShareLink(current is {} open&&open.Id==item.Id?open:item);
+            detailActions.Children.Add(share);
+        }
     }
     FrameworkElement DownloadProgressButton(DownloadItem item)
     {

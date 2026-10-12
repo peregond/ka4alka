@@ -16,6 +16,7 @@ public partial class MainWindow
     public async Task BugReportSmokeTest(string output)
     {
         Directory.CreateDirectory(output);var originalLight=prefs.Light;var windows=new List<Window>();var checks=new List<string>();
+        var originalSection=section;var originalReturnItem=settingsReturnItem;var originalPersonNavigation=settingsPersonNavigation;
         void Check(bool value,string message){if(!value)throw new Exception(message);checks.Add(message);}
         async Task Settle(Window dialog){dialog.UpdateLayout();await dialog.Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);await Task.Delay(80);dialog.UpdateLayout();}
         async Task Until(Func<bool> condition,string message){var until=DateTime.UtcNow.AddSeconds(5);while(!condition()&&DateTime.UtcNow<until)await Task.Delay(20);Check(condition(),message);}
@@ -25,6 +26,9 @@ public partial class MainWindow
             var completion=new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);var opened=new List<Uri>();var copied=new List<string>();var saved=new List<string>();
             var holdDraft=false;var draftWorker=false;using var draftEntered=new ManualResetEventSlim();using var releaseDraft=new ManualResetEventSlim();
             var saveCalls=0;TaskCompletionSource? heldSave=null;
+            // The report is opened from settings that were entered from a film card.
+            var reportedCard=DownloadMetadata.Card(new(){MediaTitle="Фильм из отчёта",MediaSection="Фильмы",MediaPageUrl=LiveCatalog.Base+"/movies/bug-report-card",MediaYear=2026})!;
+            section="Настройки";settingsReturnItem=reportedCard;settingsPersonNavigation=null;
             var dialog=CreateBugReport(_=>completion.Task,uri=>opened.Add(uri),report=>copied.Add(report),null,(p,s,d)=>
             {
                 draftWorker=!Dispatcher.CheckAccess();
@@ -39,6 +43,7 @@ public partial class MainWindow
             completion.SetResult("Наблюдения\n"+prefs.Folder+"\ntoken=private-fixture-token\nhttps://tracker.test/private-fixture-passkey/announce");await Settle(dialog);
             var preview=Find<TextBox>(dialog,"BugReportPreview");var open=Find<Button>(dialog,"OpenBugReport");
             await Until(()=>open.IsEnabled,"Reviewed initial report finishes its worker validation.");
+            Check(preview.Text.StartsWith("Открытая карточка: "+ShareLink.Create(reportedCard)+"\n",StringComparison.Ordinal),"A report opened from a film card's settings names the card by its link.");
             Check(!preview.IsReadOnly&&open.IsEnabled&&!preview.Text.Contains("private-fixture-token")&&!preview.Text.Contains("private-fixture-passkey")&&!preview.Text.Contains(prefs.Folder),"Loaded preview is editable and removes private folders and tracker credentials.");
             preview.Text+="\nПроверенная пользователем заметка";
             Check(!open.IsEnabled,"Editing immediately disables export until the current revision is sanitized.");
@@ -93,6 +98,7 @@ public partial class MainWindow
         finally
         {
             foreach(var window in windows)if(window.IsVisible)window.Close();prefs.Light=originalLight;ApplyTheme();
+            section=originalSection;settingsReturnItem=originalReturnItem;settingsPersonNavigation=originalPersonNavigation;
         }
         Close();
     }

@@ -32,6 +32,7 @@ public partial class MainWindow
                 var fit=WindowSizing.FitPixels(pixels.Width,pixels.Height,scale,scale);
                 MinWidth=fit.MinWidth;MinHeight=fit.MinHeight;MaxWidth=fit.MaxWidth;MaxHeight=fit.MaxHeight;Width=fit.Width;Height=fit.Height;
                 await Task.Delay(60);
+                await CheckWindowFrame($"DPI-{pixels.Width}-{scale}",async()=>{UpdateLayout();await Task.Delay(30);UpdateLayout();},false);
                 foreach(var page in new[]{"Фильмы","Сохранённое","Загрузки","Настройки"})
                 {
                     section=page;current=null;Render();UpdateLayout();

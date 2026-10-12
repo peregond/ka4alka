@@ -71,7 +71,8 @@ response=await get('https://nnmclub.to/forum/download.php?id=7');assert.equal(re
 // BigFanGroup: the real public rows used by the Windows tests parse identically on the site.
 const catalogSource=load('../lib/catalog-source.ts');
 const sources=load('../lib/release-sources.ts',{'./catalog-source':catalogSource});
-const fixture=name=>fs.readFileSync(new URL(`../../tests/Fixtures/${name}.html`,import.meta.url),'utf8');
+// Keep website tests runnable when web-index/ is exported without the desktop project.
+const fixture=name=>fs.readFileSync(new URL(`./fixtures/${name}.html`,import.meta.url),'utf8');
 const film={id:'movies:interstellar',section:'movies',title:'Интерстеллар',originalTitle:'Interstellar',year:2014,pageUrl:'https://w6.zona.plus/movies/interstellar'};
 const series={id:'series:south-park',section:'series',title:'Южный парк',originalTitle:'South Park',year:1997,pageUrl:'https://w6.zona.plus/tvseries/south-park'};
 const films=sources.parseBigFanGroup(fixture('bigfangroup-film'),film);

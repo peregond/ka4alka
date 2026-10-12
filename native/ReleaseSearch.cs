@@ -35,7 +35,7 @@ public static class ReleaseSearch
             SourceEntry[] items=[];SourceCheck check;
             try
             {
-                var rows=await provider.Search(deadline.Token).WaitAsync(deadline.Token);
+                var rows=await Task.Run(()=>provider.Search(deadline.Token),deadline.Token).WaitAsync(deadline.Token).ConfigureAwait(false);
                 var now=DateTime.UtcNow;
                 items=rows.Select(row=>row with{DataReceivedUtc=now,DataProvider=provider.Name}).ToArray();
                 check=new(provider.Name,items.Length>0?SourceState.Ready:SourceState.Empty,items.Length,now,now);

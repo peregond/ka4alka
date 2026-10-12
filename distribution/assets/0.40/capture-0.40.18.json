@@ -1,0 +1,89 @@
+{
+  "Version": "0.40.18",
+  "ReleaseArchiveSha256": "e1879b1df3ddc70eef389d239599abd76b40981022591518665191baf62a9fd2",
+  "ReleaseDllSha256": "64684c15c14830baaffa66ed4909b9c2126801d4f7d4cbe6d86840a95b504a30",
+  "Captures": [
+    {
+      "File": "catalog-dark.png",
+      "Width": 1424,
+      "Height": 892,
+      "LoadedVisiblePosters": 15,
+      "PendingVisiblePosters": 0,
+      "Titles": [
+        "Курьер",
+        "Человек-паук: Новый день",
+        "Последний богатырь. Колобок",
+        "Одиссея",
+        "Мстители: Финал",
+        "Холоп 3",
+        "Моана",
+        "Объект преступления",
+        "Мангуст",
+        "До последнего грамма",
+        "Комната внизу",
+        "Арахнид",
+        "Унабомбер",
+        "Не стесняйся!"
+      ]
+    },
+    {
+      "File": "catalog-light.png",
+      "Width": 1424,
+      "Height": 892,
+      "LoadedVisiblePosters": 15,
+      "PendingVisiblePosters": 0,
+      "Titles": [
+        "Курьер",
+        "Человек-паук: Новый день",
+        "Последний богатырь. Колобок",
+        "Одиссея",
+        "Мстители: Финал",
+        "Холоп 3",
+        "Моана",
+        "Объект преступления",
+        "Мангуст",
+        "Комната внизу",
+        "Арахнид",
+        "Унабомбер",
+        "Не стесняйся!",
+        "Твоя мать, твоя мать, твоя мать"
+      ]
+    },
+    {
+      "File": "detail-dark.png",
+      "Width": 1424,
+      "Height": 892,
+      "LoadedVisiblePosters": 2,
+      "PendingVisiblePosters": 0,
+      "Titles": [
+        "Курьер"
+      ]
+    },
+    {
+      "File": "series-dark.png",
+      "Width": 1424,
+      "Height": 892,
+      "LoadedVisiblePosters": 10,
+      "PendingVisiblePosters": 1,
+      "Titles": [
+        "Жизнь без ошибок",
+        "Гангстерленд",
+        "Джентльмены",
+        "Сверхъестественное",
+        "Укрытие",
+        "Джек Ричер",
+        "Ходячие мертвецы",
+        "Первый отдел",
+        "Этернавт"
+      ]
+    },
+    {
+      "File": "settings-dark.png",
+      "Width": 1424,
+      "Height": 892,
+      "LoadedVisiblePosters": 0,
+      "PendingVisiblePosters": 0,
+      "Titles": []
+    }
+  ]
+}

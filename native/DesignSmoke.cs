@@ -143,6 +143,7 @@ public partial class MainWindow
             await Settle();liveKey=CurrentCatalogKey;
             await Size(1760,950);
             Render();await Settle();
+            var windowFrame=await CheckWindowFrame("desktop",Settle,true);
             if(TextOptions.GetTextFormattingMode(this)!=TextFormattingMode.Display||TextOptions.GetTextRenderingMode(this)!=TextRenderingMode.Auto)throw new Exception("Text does not use Windows display metrics and system antialiasing.");
             var wheelScrolling=await CheckWheelScrolling();
             MinWidth=360;MinHeight=300;
@@ -187,9 +188,11 @@ public partial class MainWindow
             Render();await Settle();
             void CheckSeriesLayout()
             {
-                // The year and genre line lives in the poster's hover overlay, not under the title.
+                // Under each title a steady line holds the year and one genre; hovering a poster adds no text over it.
                 var genres=VisualElements<TextBlock>(Body).Where(x=>x.Name=="CardGenreText").ToArray();
-                if(genres.Length==0||genres.Any(x=>x.Text.Contains('\n')||x.Text.Contains('\r')||x.TextWrapping!=TextWrapping.NoWrap||(x.Parent as FrameworkElement)?.Parent is not Border{Name:"PosterHover"}))throw new Exception("Series genres must be one line inside the poster hover overlay.");
+                if(genres.Length==0||genres.Any(x=>x.Text.Contains('\n')||x.Text.Contains('\r')||x.Text.Contains(',')||x.TextWrapping!=TextWrapping.NoWrap||x.Parent is not StackPanel{} card||card.Children.IndexOf(x)<1||card.Children[card.Children.IndexOf(x)-1] is not TextBlock{Name:"CardTitleText"}))
+                    throw new Exception("Under each poster title there must be one line with the year and a single genre: "+string.Join(" | ",genres.Take(4).Select(x=>x.Text)));
+                if(VisualElements<Border>(Body).Any(x=>x.Name=="PosterHover"))throw new Exception("Posters must not show text over the cover on hover.");
                 var posters=VisualElements<Border>(discoveryShelf!).Where(x=>x.Name=="CardPoster").Select(x=>x.TransformToAncestor(discoveryShelf!).TransformBounds(new Rect(new Point(),x.RenderSize))).ToArray();
                 if(posters.Length<2||posters.Max(x=>x.Top)-posters.Min(x=>x.Top)>1||posters.Max(x=>x.Height)-posters.Min(x=>x.Height)>1)throw new Exception("Series shelf posters are not aligned at the top.");
                 // The first card of a shelf and of the catalog grid keeps its whole hover ring.
@@ -416,7 +419,7 @@ public partial class MainWindow
                 BackgroundTheme=new{Light=backgroundLight,Dark=backgroundDark},
                 TextRendering="Grayscale",TextFormatting="Ideal",FractionalRasterScales=new[]{1.2,1.25,1.5},QualityBadgeOnPoster=true,SeriesPosterAlignment=true,MultilineSeriesMetadataContained=true,
                 SearchAndSettings=searchSettings,
-                UiActions=uiActions,
+                UiActions=uiActions,WindowFrame=windowFrame,
                 WheelScrolling=wheelScrolling,
                 SourceFailureVisible=true,SourceProgressPreservesOpenFilter=true,SourceProgressPreservesScroll=true,SourceRetryState=true,
                 WidthChecks=checks,Screens=new[]{"sources-light","sources-dark","sources-510","search-light","search-dark","search-small","search-minimum","settings-light","settings-dark","settings-small","settings-minimum","catalog-light","catalog-dark","detail-wide-light","detail-wide-dark","detail-720","release-720","detail-510","release-510","short-description-expanded","series-season-filter","series-long-strip","downloads-empty","downloads-light","downloads-dark","downloads-510","downloads-360"}

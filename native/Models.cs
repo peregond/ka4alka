@@ -42,10 +42,9 @@ public record MediaItem(int Id, string Title, string Section, string Genre, int 
         downloaded=complete;downloadPercent=percent;
         PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(DownloadPercent)));PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(HasDownloadProgress)));PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(IsDownloaded)));
     }
-    // Year and genres under a poster; the "Фильм"/"Сериал" fallback adds nothing inside its own section, so it is left out.
-    [JsonIgnore] public string CardMeta=>string.Join(" · ",new[]{Year>0?Year.ToString():"",InlineMetadata(liveGenre??Genre)}.Where(x=>x.Length>0));
-    // Shown over the poster on hover under the year and genre line: the start of the description, if there is one.
-    [JsonIgnore] public string HoverText=>string.IsNullOrWhiteSpace(Description)?"":Description.Trim() is var text&&text.Length>200?text[..200].TrimEnd()+"…":Description.Trim();
+    // Under a poster's title: the year and the first genre. The film page lists every genre.
+    [JsonIgnore] public string CardMeta=>string.Join(" · ",new[]{Year>0?Year.ToString():"",AllGenres.Split(", ")[0]}.Where(x=>x.Length>0));
+    [JsonIgnore] public string AllGenres=>InlineMetadata(liveGenre??Genre);
     [JsonIgnore] public string CardRatingSource => KpAvailable?"Кинопоиск":ImdbAvailable?"IMDb":"Оценка пока недоступна";
     static string InlineMetadata(string? value)=>string.Join(", ",(value??"").Split(',').Select(part=>Regex.Replace(part,@"\s+"," ").Trim()).Where(part=>part.Length>0));
     [JsonIgnore] public string CardGenre {get{var value=InlineMetadata(liveGenre??Genre);return value.Length==0?Section=="Сериалы"?"Сериал":"Фильм":value;}}
@@ -173,6 +172,20 @@ public class DownloadItem : INotifyPropertyChanged
     [JsonIgnore] public string DisplayName=>string.IsNullOrWhiteSpace(MediaTitle)?Name:MediaTitle;
     [JsonIgnore] public string YearLabel=>MediaYear is >=1880 and <=2100?MediaYear.ToString(System.Globalization.CultureInfo.InvariantCulture):"";
     [JsonIgnore] public bool HasYear=>YearLabel.Length>0;
+    // A series download names the season it holds, taken from the release title (or the torrent name when the release is unknown).
+    [JsonIgnore] public string SeasonLabel
+    {
+        get
+        {
+            if(MediaSection!="Сериалы")return "";
+            var info=SeriesReleaseInfo.Parse(string.IsNullOrWhiteSpace(ReleaseTitle)?Name:ReleaseTitle);
+            if(!info.Season.HasValue&&!info.MultipleSeasons&&!string.IsNullOrWhiteSpace(ReleaseTitle))info=SeriesReleaseInfo.Parse(Name);
+            if(!info.Season.HasValue&&!info.MultipleSeasons)return "";
+            return info.Episode.HasValue&&!info.MultipleEpisodes?$"{info.SeasonLabel}, {info.EpisodeLabel}":info.SeasonLabel;
+        }
+    }
+    [JsonIgnore] public string YearSeasonLabel=>HasYear&&SeasonLabel.Length>0?YearLabel+" · "+SeasonLabel:HasYear?YearLabel:SeasonLabel;
+    [JsonIgnore] public bool HasYearSeason=>YearSeasonLabel.Length>0;
     [JsonIgnore] public bool HasMediaCard=>DownloadMetadata.Card(this)!=null;
     [JsonIgnore] public int MinimumQualityHeight {get;set;}=720;
     [JsonIgnore] public string PosterQuality=>ReleaseQuality.Label(new SourceEntry("",string.IsNullOrWhiteSpace(ReleaseTitle)?Name:ReleaseTitle,"","",null,null));

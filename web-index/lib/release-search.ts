@@ -23,11 +23,10 @@ export function presentRelease(item:Release):Release {
 export async function searchReleases(request:Request):Promise<Response> {
   let media=searchMedia(new URL(request.url).searchParams);
   if(!media)return Response.json({error:"Неверная карточка."},{status:400});
-  if(!media.originalTitle) {
-    try{const detail=await fetchDetail(media);media={...media,originalTitle:detail.originalTitle??null};}catch{/* Search with the known title. */}
-  }
+  const known=media;
+  const aliases=!known.originalTitle?()=>fetchDetail(known).then(detail=>({...known,originalTitle:detail.originalTitle??null})).catch(()=>known):undefined;
   try {
-    const items=(await collectReleases(media)).map(presentRelease);
+    const items=(await collectReleases(known,aliases)).map(presentRelease);
     return Response.json({items,updated:true,sourceCount:new Set(items.map(x=>x.source)).size},{headers:{"Cache-Control":"no-store"}});
   } catch {return Response.json({error:"Варианты загрузки временно недоступны."},{status:503});}
 }

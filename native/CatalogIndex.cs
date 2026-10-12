@@ -19,17 +19,35 @@ public sealed class CatalogIndex
     const int Limit=3000;
     public long Revision {get;private set;}
 
-    public CatalogIndex(string dataDir)
+    readonly Task<Entry[]> restore;
+    bool restored;
+    public CatalogIndex(string dataDir,bool deferRestore=false)
     {
         path=Path.Combine(dataDir,"catalog-index.json");
+        restore=deferRestore?Task.Run(ReadSaved):Task.FromResult(ReadSaved());
+        if(!deferRestore){ApplySaved(restore.Result);restored=true;}
+    }
+    Entry[] ReadSaved()
+    {
         try
         {
-            if(new FileInfo(path).Length>12*1024*1024)return;
-            var saved=JsonSerializer.Deserialize<Entry[]>(CacheFiles.ReadAllText(path));
-            if(saved==null)return;
-            foreach(var row in saved.Take(Limit))if(Valid(row.Item))entries[Key(row.Item)]=row;
+            if(new FileInfo(path).Length>12*1024*1024)return [];
+            return (JsonSerializer.Deserialize<Entry[]>(CacheFiles.ReadAllText(path))??[]).Take(Limit).Where(row=>Valid(row.Item)).ToArray();
         }
-        catch(IOException){}catch(JsonException){}catch(UnauthorizedAccessException){}
+        catch(IOException){return [];}catch(JsonException){return [];}catch(UnauthorizedAccessException){return [];}
+    }
+    void ApplySaved(Entry[] rows)
+    {
+        foreach(var row in rows)entries.TryAdd(Key(row.Item),row);
+    }
+    // Publication happens on the caller's context; background disk reading never mutates UI-owned state.
+    public async Task RestoreAsync(CancellationToken ct=default)
+    {
+        if(restored)return;
+        var rows=await restore.WaitAsync(ct);
+        await writer.WaitAsync(ct);
+        try{if(!restored){ApplySaved(rows);restored=true;Revision++;}}
+        finally{writer.Release();}
     }
 
     static string Key(MediaItem item)=>item.Section+"|"+item.PageUrl;
@@ -57,6 +75,7 @@ public sealed class CatalogIndex
     }
     public async Task ClearMemoryAsync()
     {
+        await RestoreAsync();
         await writer.WaitAsync();try{entries.Clear();Revision++;}finally{writer.Release();}
     }
 
@@ -105,6 +124,7 @@ public sealed class CatalogIndex
     public async Task AddAsync(IEnumerable<MediaItem> items,CancellationToken ct=default)
     {
         var incoming=items.Where(Valid).ToArray();if(incoming.Length==0)return;
+        await RestoreAsync(ct);
         await writer.WaitAsync(ct);
         try
         {
@@ -133,7 +153,9 @@ public sealed class CatalogIndex
             if(entries.Count>Limit)
                 foreach(var key in entries.OrderBy(x=>x.Value.SeenUtc).Take(entries.Count-Limit).Select(x=>x.Key).ToArray())entries.Remove(key);
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            await CacheFiles.WriteAllTextAsync(path,JsonSerializer.Serialize(entries.Values.ToArray()),ct);
+            var snapshot=entries.Values.ToArray();
+            var json=await Task.Run(()=>JsonSerializer.Serialize(snapshot),ct);
+            await CacheFiles.WriteAllTextAsync(path,json,ct);
             Revision++;
         }
         finally{writer.Release();}

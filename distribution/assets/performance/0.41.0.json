@@ -1,0 +1,28 @@
+{
+  "Version": "0.41.0",
+  "WindowsRun": 38186477169,
+  "Artifact": 11720002448,
+  "NativeBatches": [
+    {
+      "Stage": "release-freshness-dark-refresh-batch",
+      "Requests": 32,
+      "FullCardRenders": 0,
+      "ReleasePickerRenders": 1,
+      "BannerPreserved": true
+    },
+    {
+      "Stage": "release-freshness-light-compact-refresh-batch",
+      "Requests": 32,
+      "FullCardRenders": 0,
+      "ReleasePickerRenders": 1,
+      "BannerPreserved": true
+    }
+  ],
+  "ServerChecks": {
+    "ConcurrentRequests": 32,
+    "SourceSearches": 1,
+    "MetadataLookups": 1,
+    "CacheEntriesLimit": 64,
+    "CacheTtlSeconds": 30
+  }
+}

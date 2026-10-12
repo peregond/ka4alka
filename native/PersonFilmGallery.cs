@@ -40,8 +40,8 @@ public partial class MainWindow
         var grid=new ItemsControl{Name=name,ItemTemplate=(DataTemplate)FindResource("MediaRow"),ItemsSource=rows,Margin=new(0,0,-10,0)};content.Children.Add(grid);
         var frame=PersonPanel(content,name+"Card");frame.Margin=new(0,0,0,20);
         var view=new PersonGalleryView(frame,rows);grid.Tag=view;
-        grid.SizeChanged+=(_,_)=>view.Resize(grid.ActualWidth);
-        grid.Loaded+=(_,_)=>view.Resize(grid.ActualWidth);
+        grid.SizeChanged+=(_,_)=>view.Resize(ScrollStableWidth(grid));
+        grid.Loaded+=(_,_)=>view.Resize(ScrollStableWidth(grid));
         return view;
     }
 }

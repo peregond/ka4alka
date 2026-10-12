@@ -15,6 +15,6 @@
     </Reference>
   </ItemGroup>
   <Target Name="RequireReleasedApplication" BeforeTargets="ResolveReferences">
-    <Error Condition="!Exists('$(ReleaseDirectory)/Kachalka.dll')" Text="Set ReleaseDirectory to the expanded, verified public 0.39.0 application." />
+    <Error Condition="!Exists('$(ReleaseDirectory)/Kachalka.dll')" Text="Set ReleaseDirectory to the expanded, verified published application." />
   </Target>
 </Project>

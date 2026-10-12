@@ -53,6 +53,8 @@ public partial class MainWindow
             foreach(var item in prefs.LiveFavorites){cardMetadata[item.Id]=Task.FromResult(item);requestedDetails.Add(item.Id);liveReleases[item.Id]=[];}
             savedCategory="";savedPage=1;Render();await Settle();
             check(catalogDisplay.Count==40&&catalogDisplay.Any(item=>item.Section=="Фильмы")&&catalogDisplay.Any(item=>item.Section=="Сериалы"),"unified Saved shows films and series together on a paged gallery");
+            var firstSaved=VisualElements<Button>(Body).FirstOrDefault(button=>button.Tag is MediaItem&&button.IsVisible&&button.ActualWidth>0);
+            check(firstSaved!=null&&RingClipper(firstSaved,Body) is null,"the first saved poster keeps its whole hover ring: "+(firstSaved==null?"no card":RingClipper(firstSaved,Body)));
             check(new[]{"Все","Фильмы","Сериалы"}.All(name=>Filter(name).IsVisible)&&FiltersPanel.IsVisible,"Saved exposes all, film and series filters below the persistent search");
             Click(Filter("Сериалы"));await Settle();check(catalogDisplay.Count==5&&catalogDisplay.All(item=>item.Section=="Сериалы"),"Saved series filter retains saved series from the same collection");
             Click(Filter("Фильмы"));await Settle();

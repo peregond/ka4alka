@@ -1,5 +1,6 @@
 import { decodeHtml, normalize, type Media } from "./catalog-source";
 import type { Release } from "./release";
+import { createReleaseLookup } from "./release-cache";
 
 const text=(value:string)=>decodeHtml(value.replace(/<[^>]*>/g," ").replace(/\s+/g," ")).trim();
 async function read(url:string,max=4_000_000) {
@@ -105,8 +106,8 @@ export async function yts(media:Media):Promise<Release[]> {
 
 export async function rutor(media:Media):Promise<Release[]> {
   const queries=[media.title,...(media.originalTitle&&media.originalTitle!==media.title?[media.originalTitle]:[])];
-  const results:Release[]=[];
-  for(const query of queries) {
+  const groups=await Promise.all(queries.map(async query=>{
+    const results:Release[]=[];
     try {
       const html=await read(`https://rutor.info/search/0/0/000/0/${encodeURIComponent(query)}`);
       for(const row of html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)) {
@@ -122,8 +123,9 @@ export async function rutor(media:Media):Promise<Release[]> {
         results.push(make(media,"RuTor",hashFrom(cleanMagnet)??pageUrl,title,pageUrl,cleanMagnet,size,seeds));
       }
     } catch { /* Other sources remain available. */ }
-  }
-  return results;
+    return results;
+  }));
+  return groups.flat();
 }
 
 export async function nnmClub(media:Media):Promise<Release[]> {
@@ -250,8 +252,20 @@ export async function archive(media:Media):Promise<Release[]> {
   return (data.response?.docs??[]).filter(x=>matches(media,x.title,"Internet Archive")).map(x=>make(media,"Internet Archive",x.identifier,x.title,`https://archive.org/details/${encodeURIComponent(x.identifier)}`,null,null,null));
 }
 
-export async function collectReleases(media:Media) {
-  const sources=[rutor(media),nnmClub(media),megaPeer(media),bigFanGroup(media),pirateBay(media),knaben(media),archive(media),...(media.section==="series"?[eztv(media),nyaa(media)]:[yts(media)])];
+const lookupReleases=createReleaseLookup();
+export function collectReleases(media:Media,aliases?:Promise<Media>|(()=>Promise<Media>)) {
+  const key=JSON.stringify([media.id,media.title,media.originalTitle,media.year,media.section]);
+  return lookupReleases(key,()=>collectUncachedReleases(media,typeof aliases==="function"?aliases():aliases));
+}
+async function collectUncachedReleases(media:Media,aliases?:Promise<Media>) {
+  const russian=(item:Media)=>[rutor(item),nnmClub(item),megaPeer(item),bigFanGroup(item)];
+  // Search known Russian titles immediately; preserve original-title searches after metadata resolves.
+  const resolved=aliases??Promise.resolve(media);
+  const extraRussian=aliases?resolved.then(item=>item.originalTitle&&item.originalTitle!==media.title
+    ?Promise.all(russian({...item,title:item.originalTitle,originalTitle:item.originalTitle})).then(groups=>groups.flat()):[]):Promise.resolve([]);
+  const sources=[...russian(media),extraRussian,
+    resolved.then(pirateBay),resolved.then(knaben),resolved.then(archive),
+    ...(media.section==="series"?[resolved.then(eztv),resolved.then(nyaa)]:[resolved.then(yts)])];
   const groups=await Promise.allSettled(sources);const rows=groups.flatMap(group=>group.status==="fulfilled"?group.value:[]);
   const unique=new Map<string,Release>();
   for(const item of rows){const key=(hashFrom(item.torrentUrl??"")??item.pageUrl??item.id).toUpperCase();if(!unique.has(key))unique.set(key,item);}

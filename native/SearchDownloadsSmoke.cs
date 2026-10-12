@@ -311,7 +311,7 @@ public partial class MainWindow
             });
             var font=new Typeface(FontFamily,FontStyles.Normal,FontWeights.Normal,FontStretches.Normal);
             check(FontFamily.Source.Contains("Fonts/#Onest")&&font.TryGetGlyphTypeface(out var glyph)&&glyph.FamilyNames.Values.Any(name=>name=="Onest")&&glyph.CharacterToGlyphMap.ContainsKey('М'),"the packaged Onest font is used by the window and contains Cyrillic glyphs");
-            check(Icon is BitmapSource&&BrandLogo.Source is BitmapSource,"application icon and transparent kettlebell logo load from packaged resources");
+            check(Icon is BitmapSource&&BrandLogo.Source is BitmapSource,"application icon and transparent @ logo load from packaged resources");
             Width=1280;Height=800;section="Загрузки";current=null;Render();await SettleDownloads();
             fixtures[^1].MediaPageUrl="https://w6.zona.plus/tvseries/download-fixture";fixtures[^1].Refresh();await SettleDownloads();
             var linked=DownloadMetadata.Card(fixtures[^1])??throw new Exception("The associated download card fixture is missing.");requestedDetails.Add(linked.Id);

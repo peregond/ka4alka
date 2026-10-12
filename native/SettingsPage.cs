@@ -47,15 +47,20 @@ public partial class MainWindow
         var settingsLayout=new Grid{Name="SettingsLayout"};settingsLayout.ColumnDefinitions.Add(new(){Width=new GridLength(0)});settingsLayout.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});
         var sectionNav=new StackPanel{Name="SettingsSections",Margin=new(0,0,24,0),Visibility=Visibility.Collapsed};settingsLayout.Children.Add(sectionNav);
         Grid.SetColumn(settingsScroll,1);settingsLayout.Children.Add(settingsScroll);Body.Children.Add(settingsLayout);
-        var sectionFrames=new Dictionary<string,Border>();
+        var sectionFrames=new Dictionary<string,Border>();var sectionIcons=new Dictionary<string,string>();
         StackPanel Card(string heading,string description,string icon)
         {
             var panel=new StackPanel();
             var frame=new Border{Child=panel,CornerRadius=new(20),Padding=new(24),BorderThickness=new(1),Margin=new(0,0,0,20),Tag=heading};
-            frame.SetResourceReference(Border.BackgroundProperty,"Panel");frame.SetResourceReference(Border.BorderBrushProperty,"EdgeSoft");content.Children.Add(frame);sectionFrames[heading]=frame;
-            var headings=new StackPanel{Margin=new(0,0,0,18)};
-            var h=Text(heading,18);h.FontWeight=FontWeights.Bold;h.Margin=new(0,0,0,4);headings.Children.Add(h);
-            if(description.Length>0)headings.Children.Add(Hint(description));
+            frame.SetResourceReference(Border.BackgroundProperty,"Panel");frame.SetResourceReference(Border.BorderBrushProperty,"EdgeSoft");content.Children.Add(frame);sectionFrames[heading]=frame;sectionIcons[heading]=icon;
+            // Each section carries its own icon on a soft tile, the same one as in the section list.
+            var headings=new DockPanel{Margin=new(0,0,0,18),LastChildFill=true};
+            var tile=new Border{Width=36,Height=36,CornerRadius=new(10),Margin=new(0,0,14,0),VerticalAlignment=VerticalAlignment.Top};tile.SetResourceReference(Border.BackgroundProperty,"AccentSoft");
+            var glyph=new System.Windows.Shapes.Path{Data=(Geometry)FindResource(icon),Width=18,Height=18,Stretch=Stretch.Uniform,StrokeThickness=1.8,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,StrokeLineJoin=PenLineJoin.Round,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};
+            glyph.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty,"Accent");tile.Child=glyph;DockPanel.SetDock(tile,Dock.Left);headings.Children.Add(tile);
+            var texts=new StackPanel{VerticalAlignment=VerticalAlignment.Center};headings.Children.Add(texts);
+            var h=Text(heading,18);h.FontWeight=FontWeights.Bold;h.Margin=new(0,0,0,4);texts.Children.Add(h);
+            if(description.Length>0)texts.Children.Add(Hint(description));
             panel.Children.Add(headings);return panel;
         }
         void Divider(StackPanel panel)
@@ -73,7 +78,7 @@ public partial class MainWindow
         var appearance=Card("Внешний вид","Тема оформления и режим для слабых компьютеров.","IconTheme");
         var themeCaption=Text("Тема",13);themeCaption.FontWeight=FontWeights.SemiBold;themeCaption.SetResourceReference(TextBlock.ForegroundProperty,"TextSoft");themeCaption.Margin=new(0,0,0,10);appearance.Children.Add(themeCaption);
         var themes=new UniformGrid{Columns=2,Margin=new(0,0,-12,-12)};appearance.Children.Add(themes);
-        themes.SizeChanged+=(_,_)=>{var columns=themes.ActualWidth>=440?2:1;if(themes.Columns!=columns)themes.Columns=columns;};
+        themes.SizeChanged+=(_,_)=>{var columns=ScrollStableWidth(themes)>=440?2:1;if(themes.Columns!=columns)themes.Columns=columns;};
         foreach(var light in new[]{false,true})
         {
             var selected=prefs.Light==light;
@@ -136,6 +141,11 @@ public partial class MainWindow
         var tmdbLogo=new Image{Name="TmdbLogo",Source=new System.Windows.Media.Imaging.BitmapImage(new Uri("pack://application:,,,/Assets/tmdb-logo.png")),Width=128,Height=17,Stretch=Stretch.Uniform,HorizontalAlignment=HorizontalAlignment.Left,Margin=new(0,18,0,8)};
         AutomationProperties.SetName(tmdbLogo,"The Movie Database — источник широких фонов");catalogue.Children.Add(tmdbLogo);
         var artworkAttribution=Hint("Широкие фоны — TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.");artworkAttribution.Name="TmdbAttribution";catalogue.Children.Add(artworkAttribution);
+        // TheTVDB's licence for small projects requires this credit with a direct link to the site.
+        var tvdbAttribution=Hint("Описания сериалов, которых нет в русском каталоге — ");tvdbAttribution.Name="TvdbAttribution";tvdbAttribution.Margin=new(0,8,0,0);
+        var tvdbLink=new System.Windows.Documents.Hyperlink(new System.Windows.Documents.Run("Metadata provided by TheTVDB"));tvdbLink.SetResourceReference(System.Windows.Documents.TextElement.ForegroundProperty,"Accent");
+        tvdbLink.Click+=(_,_)=>{try{System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://www.thetvdb.com/"){UseShellExecute=true});}catch(Exception){}};
+        tvdbAttribution.Inlines.Add(tvdbLink);tvdbAttribution.Inlines.Add(new System.Windows.Documents.Run("."));catalogue.Children.Add(tvdbAttribution);
         homeCountry.SelectionChanged+=(_,_)=>
         {
             if(homeCountry.SelectedItem is not CatalogChoice choice)return;
@@ -201,7 +211,7 @@ public partial class MainWindow
         Divider(files);
         files.Children.Add(Text("Свободное место",13));
         files.Children.Add(Hint("Перед началом и во время скачивания проверяем место для оставшихся файлов и других активных загрузок на том же диске. Оставляем запас 256 МБ. Если места не хватает, загрузка встанет на паузу: освободи место и нажми «Продолжить»."));
-        var notifications=Card("Уведомления","Windows сообщит о завершении загрузки, ошибке или нехватке места.","IconInfo");
+        var notifications=Card("Уведомления","Windows сообщит о завершении загрузки, ошибке или нехватке места.","IconBell");
         var notify=new CheckBox{Name="SettingsNotifyDownloads",Style=(Style)FindResource("SettingsSwitch"),Content=SwitchTitle("Уведомления о загрузках"),IsChecked=prefs.NotifyDownloads,Margin=new(0,0,0,8)};
         AutomationProperties.SetName(notify,"Уведомления Windows о загрузках");notifications.Children.Add(notify);
         notifications.Children.Add(Hint("Повторяющиеся ошибки не создают поток уведомлений. Нажатие на уведомление откроет очередь. Windows может скрывать уведомления в режиме «Не беспокоить»."));
@@ -214,7 +224,7 @@ public partial class MainWindow
         };
         var testNotification=ActionButton("Проверить уведомление","IconInfo",()=>Feedback(notificationNotice,ShowTestDownloadNotification()?"Уведомление передано Windows. Если оно скрыто, проверь настройки уведомлений и режим «Не беспокоить».":prefs.NotifyDownloads?"Windows не приняла уведомление. Попробуй ещё раз.":"Включи уведомления о загрузках для проверки.",!prefs.NotifyDownloads));
         AutomationProperties.SetName(testNotification,"Проверить уведомление Windows");notifications.Children.Add(testNotification);
-        var system=Card("Запуск и Windows","Автозапуск и подключения участников раздачи.","IconSettings");
+        var system=Card("Запуск и Windows","Автозапуск и подключения участников раздачи.","IconPower");
         var startupNotice=Notice(system);
         var startup=new CheckBox{Name="SettingsStartup",Content=SwitchTitle("Открывать Качалку при входе в Windows"),IsChecked=WindowsIntegration.StartupEnabled,Style=(Style)FindResource("SettingsSwitch"),Margin=new(0,0,0,12)};
         AutomationProperties.SetName(startup,"Запускать Качалку вместе с Windows");system.Children.Add(startup);
@@ -233,9 +243,9 @@ public partial class MainWindow
             catch(Exception error){ErrorLog.Write(error);Feedback(firewallNotice,error.Message,true);}
         });
         AutomationProperties.SetName(firewall,"Разрешить Качалку в брандмауэре");firewall.HorizontalAlignment=HorizontalAlignment.Left;system.Children.Add(firewall);
-        RenderLanSettings(Card("Устройства в сети","Отправляй загрузки на другой компьютер с Качалкой.","IconSeries"));
+        RenderLanSettings(Card("Устройства в сети","Отправляй загрузки на другой компьютер с Качалкой.","IconLaptop"));
         RenderUpdateSettings(Card("Обновления","Приложение всегда под рукой в актуальной версии.","IconRefresh"));
-        var cache=Card("Кэш","Постеры, фотографии и данные каталога: до 1 ГБ. Раз в неделю удаляем данные, не использованные за последние семь дней. При заполнении — самые давно не открывавшиеся.","IconRefresh");
+        var cache=Card("Кэш","Постеры, фотографии и данные каталога: до 1 ГБ. Раз в неделю удаляем данные, не использованные за последние семь дней. При заполнении — самые давно не открывавшиеся.","IconStorage");
         var cacheSize=Text("Подсчитываем размер…",13);cacheSize.Name="SettingsCacheSize";cache.Children.Add(cacheSize);
         var cacheNotice=Notice(cache);
         var clearCache=AsyncButton("Очистить кэш",async()=>
@@ -247,7 +257,7 @@ public partial class MainWindow
         clearCache.Name="ClearCacheButton";AutomationProperties.SetName(clearCache,"Очистить кэш");clearCache.HorizontalAlignment=HorizontalAlignment.Left;cache.Children.Add(clearCache);
         cache.Children.Add(Hint("Скачанные файлы, очередь загрузок, избранное и настройки сохраняются."));
         _=ShowCacheSizeAsync(cacheSize);
-        var diagnostics=Card("Помощь и диагностика","Отчёт поможет разобраться с ошибкой. Пути к личным папкам и ключи доступа скрываются.","IconInfo");
+        var diagnostics=Card("Помощь и диагностика","Отчёт поможет разобраться с ошибкой. Пути к личным папкам и ключи доступа скрываются.","IconHelp");
         var diagnosticActions=new WrapPanel();diagnostics.Children.Add(diagnosticActions);
         var diagnosticNotice=Notice(diagnostics);
         var copyingReport=false;
@@ -259,14 +269,24 @@ public partial class MainWindow
             catch(Exception error){Feedback(diagnosticNotice,"Не удалось скопировать логи: "+error.Message,true);}
             finally{copyingReport=false;}
         }));
-        diagnosticActions.Children.Add(ActionButton("Сообщить об ошибке","IconInfo",()=>
+        diagnostics.Children.Add(Text("Скопируй логи и приложи их к сообщению в чате поддержки.",11,true));
+        var community=Card("Новости и поддержка","Новости Качалки и помощь сообщества в Telegram.","IconBell");
+        var communityActions=new WrapPanel();community.Children.Add(communityActions);
+        var communityNotice=Notice(community);
+        void OpenTelegram(string url)
         {
-            try{ShowBugReport();}
-            catch(Exception error){Feedback(diagnosticNotice,"Не удалось открыть форму: "+error.Message,true);}
-        }));
-        diagnostics.Children.Add(Text("Отчёт отправляется только вручную — приложение само его никуда не отправляет.",11,true));
-        // Cards follow the order of the redesign; navigation on wide windows jumps between them.
-        var wanted=new[]{"Загрузки","Запуск и Windows","Внешний вид","Каталог","Уведомления","Устройства в сети","Обновления","Кэш","Помощь и диагностика"};
+            try{System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url){UseShellExecute=true});}
+            catch(Exception){Feedback(communityNotice,"Не удалось открыть Telegram. Попробуй открыть ссылку в браузере.",true);}
+        }
+        var news=ActionButton("Новости в Telegram","IconBell",()=>OpenTelegram("https://t.me/ka4alkacc"));
+        news.ToolTip="https://t.me/ka4alkacc";AutomationProperties.SetName(news,"Новости в Telegram");communityActions.Children.Add(news);
+        var help=ActionButton("Сообщить об ошибке","IconHelp",()=>OpenTelegram("https://t.me/+6sT2ocaKvLxlNmRi"));
+        help.ToolTip="Открыть чат поддержки в Telegram";AutomationProperties.SetName(help,"Сообщить об ошибке");communityActions.Children.Add(help);
+
+        // Sections run from what people change often to what they set once or open when something goes wrong;
+        // on wide windows the list on the left groups them the same way and jumps between the cards.
+        var groups=new (string Caption,string[] Sections)[]{("Основное",["Загрузки","Внешний вид","Каталог","Уведомления"]),("Система",["Устройства в сети","Запуск и Windows","Обновления"]),("Обслуживание",["Новости и поддержка","Кэш","Помощь и диагностика"])};
+        var wanted=groups.SelectMany(group=>group.Sections).ToArray();
         foreach(var name in wanted.Reverse())if(sectionFrames.TryGetValue(name,out var frame)){content.Children.Remove(frame);content.Children.Insert(0,frame);}
         Button? activeSection=null;
         void MarkSection(Button button)
@@ -274,10 +294,16 @@ public partial class MainWindow
             if(activeSection!=null){activeSection.Background=Brushes.Transparent;activeSection.SetResourceReference(Control.ForegroundProperty,"Muted");activeSection.FontWeight=FontWeights.Medium;}
             activeSection=button;button.SetResourceReference(Control.BackgroundProperty,"NavSelected");button.SetResourceReference(Control.ForegroundProperty,"Text");button.FontWeight=FontWeights.SemiBold;
         }
-        foreach(var name in wanted)
+        foreach(var (caption,sections) in groups)
+        foreach(var name in sections)
         {
             if(!sectionFrames.TryGetValue(name,out var frame))continue;
-            var jump=new Button{Style=(Style)FindResource("QuietButton"),Content=name,HorizontalContentAlignment=HorizontalAlignment.Left,MinHeight=40,Height=40,Padding=new(14,0,14,0),Margin=new(0,0,0,2),FontSize=14};
+            if(name==sections[0])
+            {
+                var label=Text(caption.ToUpperInvariant(),11);label.FontWeight=FontWeights.SemiBold;label.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");
+                label.Margin=new(14,sectionNav.Children.Count==0?4:18,0,6);sectionNav.Children.Add(label);
+            }
+            var jump=new Button{Style=(Style)FindResource("QuietButton"),Content=IconLabel(name,sectionIcons[name],17),HorizontalContentAlignment=HorizontalAlignment.Left,MinHeight=40,Height=40,Padding=new(14,0,14,0),Margin=new(0,0,0,2),FontSize=14};
             jump.Click+=(_,_)=>
             {
                 MarkSection(jump);settingsScroll.UpdateLayout();

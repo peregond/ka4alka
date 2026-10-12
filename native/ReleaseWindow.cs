@@ -48,9 +48,15 @@ public partial class MainWindow
     // Small helpers shared by the table rows and the compact cards.
     FrameworkElement ReleaseTag(string text,bool accent=false,string? tooltip=null)
     {
-        var label=new TextBlock{Text=text,FontSize=12,FontWeight=FontWeights.Medium,VerticalAlignment=VerticalAlignment.Center};
+        var label=new TextBlock{Text=text,FontSize=12,FontWeight=FontWeights.Medium,VerticalAlignment=VerticalAlignment.Center,MaxWidth=260,TextWrapping=TextWrapping.Wrap};
         label.SetResourceReference(TextBlock.ForegroundProperty,accent?"Accent":"Muted");
         var tag=new Border{Child=label,CornerRadius=new(6),Padding=new(8,2,8,2),Margin=new(0,0,6,4),MinHeight=22,ToolTip=tooltip};tag.SetResourceReference(Border.BackgroundProperty,"Raised");return tag;
+    }
+    IEnumerable<FrameworkElement> AudioTags(SourceEntry entry)
+    {
+        var audio=ReleaseFreshness.AudioTrack(entry);
+        if(audio!="Не указано")yield return ReleaseTag(audio,RussianAudio.Rank(entry)==3,ReleaseFreshness.AudioNote);
+        foreach(var studio in ReleaseAudio.StudioNames(entry))yield return ReleaseTag(studio,false,ReleaseFreshness.AudioNote);
     }
     FrameworkElement SeedHealth(SourceEntry entry)
     {
@@ -98,8 +104,10 @@ public partial class MainWindow
         return LanDownloadAction(entry);
     }
 
+    int releasePickerRenders;
     void RenderReleasePicker(StackPanel panel,IReadOnlyList<SourceEntry> releases)
     {
+        releasePickerRenders++;
         var filmId=current?.Id??0;
         var state=ReleaseSelection(filmId);
         var host=releaseControlsHost??panel;
@@ -125,7 +133,8 @@ public partial class MainWindow
         var isSeries=current?.Section=="Сериалы";
         if(isSeries){Filter("Сезон",releases.Select(x=>x.Series).OrderBy(x=>x.Season??int.MaxValue).Select(x=>x.SeasonLabel),hidden,false);Filter("Серия",releases.Select(x=>x.Series).OrderBy(x=>x.Episode??int.MaxValue).Select(x=>x.EpisodeLabel),hidden,false);}
         Filter("Качество",releases.Select(x=>x.Quality),hidden,false);
-        Filter("Озвучка",releases.Select(ReleaseFreshness.Audio),more,true);
+        Filter("Студия озвучки",releases.SelectMany(ReleaseAudio.StudioOptions).OrderBy(x=>x),top,true);
+        Filter("Тип озвучки",releases.SelectMany(ReleaseAudio.TypeOptions).OrderBy(x=>x),top,true);
         Filter("Субтитры",releases.Select(x=>x.Subs),more,true);
         Filter("Источник",releases.Select(x=>x.Source),more,true);
         Filter("Тип",releases.Select(x=>x.Type),more,true);
@@ -214,7 +223,7 @@ public partial class MainWindow
         ApplyMore();
         void UpdateActions()
         {
-            var additional=new[]{"Озвучка","Источник","Тип","Кодек","HDR","Субтитры"}.Count(x=>filters[x].SelectedItem?.ToString()!="Все");
+            var additional=new[]{"Источник","Тип","Кодек","HDR","Субтитры"}.Count(x=>filters[x].SelectedItem?.ToString()!="Все");
             toggle.Content=ChipContent((state.More?"Скрыть фильтры":"Ещё фильтры")+(additional>0?$" · {additional}":""),true);StyleChip(toggle,additional>0);
             AutomationProperties.SetName(toggle,state.More?"Скрыть дополнительные фильтры раздач":"Показать дополнительные фильтры раздач");
             reset.Visibility=prefs.HidePoorQuality||state.OnlyRussian||filters.Values.Any(x=>x.SelectedItem?.ToString()!="Все")||sort.SelectedIndex!=0?Visibility.Visible:Visibility.Collapsed;
@@ -274,7 +283,7 @@ public partial class MainWindow
             var summary=new WrapPanel{Margin=new(0,0,0,6)};
             if(ReleaseQuality.Poor(entry,QualityMinimum))summary.Children.Add(PoorQualityBadge(ReleaseQuality.Label(entry)));
             if(entry.Quality!="Не указано")summary.Children.Add(ReleaseTag(entry.Quality,true));
-            if(ReleaseFreshness.Audio(entry)!="Не указано")summary.Children.Add(ReleaseTag(ReleaseFreshness.Audio(entry),RussianAudio.Rank(entry)==3,ReleaseFreshness.AudioNote));
+            foreach(var audioTag in AudioTags(entry))summary.Children.Add(audioTag);
             if(isSeries){summary.Children.Add(ReleaseTag(entry.Series.SeasonLabel));summary.Children.Add(ReleaseTag(entry.Series.EpisodeLabel));}
             summary.Children.Add(ReleaseTag(entry.Size.HasValue?DownloadService.FormatBytes(entry.Size.Value):"Размер не указан"));
             summary.Children.Add(ReleaseTag(entry.Seeds switch{>0=> $"Отдают: {entry.Seeds.Value}",0=>"Отдают: 0 по данным источника",_=>"Отдают: неизвестно"},false,ReleaseFreshness.ConnectionNote));
@@ -324,7 +333,7 @@ public partial class MainWindow
             var title=Text(entry.Title,17);title.FontWeight=FontWeights.SemiBold;title.TextWrapping=TextWrapping.Wrap;title.MaxHeight=48;title.TextTrimming=TextTrimming.CharacterEllipsis;title.ToolTip=entry.Title;title.Margin=new(0,2,0,10);info.Children.Add(title);
             var tags=new WrapPanel();
             tags.Children.Add(ReleaseTag(QualityLabel(entry),true));
-            if(ReleaseFreshness.Audio(entry)!="Не указано")tags.Children.Add(ReleaseTag(ReleaseFreshness.Audio(entry),RussianAudio.Rank(entry)==3,ReleaseFreshness.AudioNote));
+            foreach(var audioTag in AudioTags(entry))tags.Children.Add(audioTag);
             if(entry.Size.HasValue)tags.Children.Add(ReleaseTag(DownloadService.FormatBytes(entry.Size.Value)));
             if(entry.Seeds>0)tags.Children.Add(ReleaseTag($"Отдают: {entry.Seeds.Value}",false,ReleaseFreshness.ConnectionNote));
             tags.Children.Add(ReleaseTag(ReleaseFreshness.SourceName(entry)));
@@ -359,16 +368,17 @@ public partial class MainWindow
             SaveSelection();UpdateActions();results.Children.Clear();
             IEnumerable<SourceEntry> filtered=releases;
             if(prefs.HidePoorQuality)filtered=filtered.Where(x=>!ReleaseQuality.Poor(x,QualityMinimum));
-            foreach(var key in new[]{"Источник","Сезон","Серия","Качество","Тип","Озвучка","Субтитры","Кодек","HDR"})
+            foreach(var key in new[]{"Источник","Сезон","Серия","Качество","Тип","Студия озвучки","Тип озвучки","Субтитры","Кодек","HDR"})
             {
                 if(!filters.ContainsKey(key))continue;
                 var value=state.Filters[key];if(value=="Все")continue;
-                filtered=key switch{"Источник"=>filtered.Where(x=>x.Source==value),"Сезон"=>filtered.Where(x=>x.Series.SeasonLabel==value),"Серия"=>filtered.Where(x=>x.Series.EpisodeLabel==value),"Качество"=>filtered.Where(x=>x.Quality==value),"Тип"=>filtered.Where(x=>x.Type==value),"Озвучка"=>filtered.Where(x=>ReleaseFreshness.Audio(x)==value),"Субтитры"=>filtered.Where(x=>x.Subs==value),"Кодек"=>filtered.Where(x=>x.Codec==value),_=>filtered.Where(x=>x.Hdr==value)};
+                filtered=key switch{"Источник"=>filtered.Where(x=>x.Source==value),"Сезон"=>filtered.Where(x=>x.Series.SeasonLabel==value),"Серия"=>filtered.Where(x=>x.Series.EpisodeLabel==value),"Качество"=>filtered.Where(x=>x.Quality==value),"Тип"=>filtered.Where(x=>x.Type==value),"Студия озвучки"=>filtered.Where(x=>ReleaseAudio.MatchesStudio(x,value)),"Тип озвучки"=>filtered.Where(x=>ReleaseAudio.MatchesType(x,value)),"Субтитры"=>filtered.Where(x=>x.Subs==value),"Кодек"=>filtered.Where(x=>x.Codec==value),_=>filtered.Where(x=>x.Hdr==value)};
             }
             if(state.OnlyRussian)filtered=filtered.Where(x=>RussianAudio.Rank(x)==3);
             filtered=state.Sort switch{"Русская озвучка"=>RussianAudio.Order(filtered),"Русские источники"=>filtered.OrderByDescending(RussianSource).ThenByDescending(SeedRank),"Меньше размер"=>filtered.OrderBy(x=>x.Size??long.MaxValue),"Выше качество"=>filtered.OrderByDescending(QualityRank).ThenByDescending(SeedRank),"По названию"=>filtered.OrderBy(x=>x.Title,StringComparer.CurrentCultureIgnoreCase),"По сезону и серии"=>filtered.OrderBy(x=>x.Series.Season??int.MaxValue).ThenBy(x=>x.Series.Episode??int.MaxValue),"По видео"=>filtered.OrderBy(x=>x.Type=="Не указано").ThenBy(x=>x.Type),"По субтитрам"=>filtered.OrderBy(x=>x.Subs=="Не указано").ThenBy(x=>x.Subs),"По озвучке"=>filtered.OrderByDescending(x=>RussianAudio.Rank(x)).ThenBy(x=>ReleaseFreshness.Audio(x)),_=>filtered.OrderByDescending(SeedRank)};
             if(state.Reverse)filtered=filtered.Reverse();
             var visible=filtered.ToArray();var displayed=visible.Take(state.VisibleCount).ToArray();
+            ApplyDetailReleaseFilters(filmId,visible);
             if(releaseCountLabel!=null)releaseCountLabel.Text=visible.Length.ToString();
             // The count already sits next to the section title and the list ends with "Показать ещё", so no extra notes here;
             // the seed disclaimer stays in the row tooltips.
@@ -422,7 +432,7 @@ public partial class MainWindow
                 var title=new TextBlock{Text=entry.Title,FontSize=14,FontWeight=FontWeights.SemiBold,TextTrimming=TextTrimming.CharacterEllipsis,ToolTip=entry.Title,VerticalAlignment=VerticalAlignment.Center};titleLine.Children.Add(title);identity.Children.Add(titleLine);
                 var tags=new WrapPanel{Margin=new(0,6,0,0)};
                 if(ReleaseQuality.Poor(entry,QualityMinimum))tags.Children.Add(PoorQualityBadge(ReleaseQuality.Label(entry)));
-                if(ReleaseFreshness.Audio(entry)!="Не указано")tags.Children.Add(ReleaseTag(ReleaseFreshness.Audio(entry),RussianAudio.Rank(entry)==3,ReleaseFreshness.AudioNote));
+                foreach(var audioTag in AudioTags(entry))tags.Children.Add(audioTag);
                 if(entry.Subs!="Не указано")tags.Children.Add(ReleaseTag("Субтитры"));
                 if(VideoLabel(entry)!="Не указано")tags.Children.Add(ReleaseTag(VideoLabel(entry)));
                 if(isSeries)tags.Children.Add(ReleaseTag(entry.Series.SeasonLabel+" · "+entry.Series.EpisodeLabel));
