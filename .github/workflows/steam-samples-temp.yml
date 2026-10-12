@@ -31,6 +31,7 @@ jobs:
           for f in glob.glob('steam-samples/r2-*.json'):
               try: d=json.load(open(f))
               except Exception: continue
+              if not isinstance(d,dict): continue
               for m in re.finditer(r'search_capsule"><img src="([^"?]+)/capsule_231x87\.jpg',d.get('results_html','')):
                   base=m.group(1)
                   found=re.search(r'/apps/(\d+)',base)
