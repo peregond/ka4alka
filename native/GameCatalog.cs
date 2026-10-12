@@ -10,7 +10,9 @@ public sealed record GameDetails(MediaItem Item,string Requirements,string Devel
 public sealed class GameCatalog(SourceClient client)
 {
     public const int PageSize=40;
-    public static Uri Query(string query,int page,bool newest)=>new("https://store.steampowered.com/search/results/?json=1&l=russian&category1=998&os=win&count=40&start="+((Math.Clamp(page,1,500)-1)*PageSize)+"&term="+Uri.EscapeDataString(query.Trim())+"&sort_by="+(newest?"Released_DESC":"_ASC")+(newest?"":"&filter=topsellers"));
+    public static Uri Query(string query,int page,bool newest)=>query.Trim().Length>0?
+        new("https://store.steampowered.com/api/storesearch/?term="+Uri.EscapeDataString(query.Trim())+"&l=russian"):
+        new("https://store.steampowered.com/search/results/?json=1&l=russian&category1=998&os=win&count=40&start="+((Math.Clamp(page,1,500)-1)*PageSize)+"&sort_by="+(newest?"Released_DESC":"_ASC")+(newest?"":"&filter=topsellers"));
     public static bool TryId(string? page,out int id)
     {
         id=0;if(!Uri.TryCreate(page,UriKind.Absolute,out var uri)||uri.Scheme!="https"||uri.Host!="store.steampowered.com"||!uri.IsDefaultPort||uri.UserInfo.Length>0||uri.Query.Length>0||uri.Fragment.Length>0)return false;
@@ -50,7 +52,7 @@ public sealed class GameCatalog(SourceClient client)
         }
         else throw new InvalidDataException("Steam вернул ответ без каталога игр.");
         var hasNext=root.TryGetProperty("total_count",out var total)&&total.TryGetInt32(out var totalCount)&&root.TryGetProperty("start",out var start)&&start.TryGetInt32(out var offset)?offset+PageSize<totalCount:count>=PageSize;
-        return new(items.DistinctBy(x=>x.Id).Take(PageSize).ToArray(),hasNext);
+        return new(items.DistinctBy(x=>x.Id).Take(PageSize).ToArray(),root.TryGetProperty("total",out _)?false:hasNext);
     }
     public Task<GameCatalogPage> Browse(string query,int page,bool newest,CancellationToken ct)=>Task.Run(async()=>
     {
