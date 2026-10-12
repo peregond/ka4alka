@@ -20,27 +20,28 @@ jobs:
           dir=steam-samples; mkdir -p $dir
           base='https://store.steampowered.com/search/results/'
           get() { curl -sS -m 40 -A 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' -o "$dir/$1" -w "$1 %{http_code} %{size_download}\n" "$2" || echo "$1 FAILED"; }
-          get search-top-json.json "$base?json=1&l=russian&category1=998&os=win&untags=113&count=12&start=0&sort_by=_ASC&filter=topsellers"
-          get search-top-nountags-json.json "$base?json=1&l=russian&category1=998&os=win&count=12&start=0&sort_by=_ASC&filter=topsellers"
-          get search-top-html.json "$base?query&start=0&count=12&dynamic_data=&sort_by=_ASC&filter=topsellers&category1=998&os=win&untags=113&l=russian&infinite=1"
-          get search-new-html.json "$base?query&start=0&count=12&sort_by=Released_DESC&category1=998&os=win&untags=113&l=russian&infinite=1"
-          get search-specials-html.json "$base?query&start=0&count=12&specials=1&category1=998&os=win&untags=113&l=russian&infinite=1&filter=topsellers"
-          get search-specials-json.json "$base?json=1&l=russian&category1=998&os=win&untags=113&count=12&start=0&specials=1&filter=topsellers"
-          get search-upcoming-html.json "$base?query&start=0&count=12&filter=popularcomingsoon&category1=998&os=win&untags=113&l=russian&infinite=1"
-          get search-upcoming-json.json "$base?json=1&l=russian&category1=998&os=win&untags=113&count=12&start=0&filter=popularcomingsoon"
-          get search-rpg-html.json "$base?query&start=0&count=12&tags=122&category1=998&os=win&untags=113&l=russian&infinite=1&filter=topsellers"
-          get search-rpg-json.json "$base?json=1&l=russian&category1=998&os=win&untags=113&tags=122&count=12&start=0&filter=topsellers"
-          get search-coop-json.json "$base?json=1&l=russian&category1=998&os=win&untags=113&tags=1685&count=12&start=0&filter=topsellers"
-          get appdetails-elden.json "https://store.steampowered.com/api/appdetails/?appids=1245620&l=russian"
-          get appdetails-portal2.json "https://store.steampowered.com/api/appdetails/?appids=620&l=russian"
-          get appdetails-witcher3.json "https://store.steampowered.com/api/appdetails/?appids=292030&l=russian"
-          get appdetails-batch-filtered.json "https://store.steampowered.com/api/appdetails/?appids=1245620,620&filters=price_overview&cc=ru&l=russian"
-          get appreviews-elden.json "https://store.steampowered.com/appreviews/1245620?json=1&language=all&purchase_type=all&num_per_page=0"
+          h="$base?query&category1=998&os=win&untags=113&l=russian&infinite=1"
+          get r2-top-c40-s0.json "$h&count=40&start=0&sort_by=_ASC&filter=topsellers"
+          get r2-top-c40-s40.json "$h&count=40&start=40&sort_by=_ASC&filter=topsellers"
+          get r2-top-c100-s0.json "$h&count=100&start=0&sort_by=_ASC&filter=topsellers"
+          get r2-popularnew.json "$h&count=40&start=0&filter=popularnew"
+          get r2-popularnew-s40.json "$h&count=40&start=40&filter=popularnew"
+          get r2-newreleases.json "$h&count=40&start=0&filter=newreleases"
+          get r2-popularwishlist.json "$h&count=40&start=0&filter=popularwishlist"
+          get r2-popularcoming.json "$h&count=40&start=0&filter=popularcomingsoon"
+          get r2-globaltop.json "$h&count=40&start=0&filter=globaltopsellers"
+          get r2-specials-c40.json "$h&count=40&start=0&specials=1&filter=topsellers"
+          get r2-rpg-c40.json "$h&count=40&start=0&tags=122&filter=topsellers"
+          get r2-rpg-new.json "$h&count=40&start=0&tags=122&filter=popularnew"
+          get r2-reviews-sort.json "$h&count=40&start=0&sort_by=Reviews_DESC"
+          get r2-storesearch.json "https://store.steampowered.com/api/storesearch/?term=elden&l=russian&cc=us"
+          get r2-populartags.json "https://store.steampowered.com/tagdata/populartags/russian"
+          get r2-appreviews-ru.json "https://store.steampowered.com/appreviews/620?json=1&language=russian&purchase_type=all&num_per_page=0"
           ls -la $dir
       - name: Commit samples
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add steam-samples
+          git add -f steam-samples
           git commit -m 'Temporary Steam response samples' || exit 0
           git push origin HEAD:${{ github.ref_name }}
