@@ -15,7 +15,7 @@ export async function GET(request:Request) {
     let updated=false;
     if(Date.now()-await lastSynced(key)>4*3600_000) {
       const known=item;
-      const aliases=!known.originalTitle?fetchDetail(known).then(async detail=>{
+      const aliases=!known.originalTitle?()=>fetchDetail(known).then(async detail=>{
         await updateMediaDetail(id,detail);
         return {...known,...Object.fromEntries(Object.entries(detail).filter(([,value])=>value))};
       }).catch(()=>known):undefined;

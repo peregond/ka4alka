@@ -253,9 +253,9 @@ export async function archive(media:Media):Promise<Release[]> {
 }
 
 const lookupReleases=createReleaseLookup();
-export function collectReleases(media:Media,aliases?:Promise<Media>) {
+export function collectReleases(media:Media,aliases?:Promise<Media>|(()=>Promise<Media>)) {
   const key=JSON.stringify([media.id,media.title,media.originalTitle,media.year,media.section]);
-  return lookupReleases(key,()=>collectUncachedReleases(media,aliases));
+  return lookupReleases(key,()=>collectUncachedReleases(media,typeof aliases==="function"?aliases():aliases));
 }
 async function collectUncachedReleases(media:Media,aliases?:Promise<Media>) {
   const russian=(item:Media)=>[rutor(item),nnmClub(item),megaPeer(item),bigFanGroup(item)];

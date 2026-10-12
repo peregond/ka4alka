@@ -24,7 +24,7 @@ export async function searchReleases(request:Request):Promise<Response> {
   let media=searchMedia(new URL(request.url).searchParams);
   if(!media)return Response.json({error:"Неверная карточка."},{status:400});
   const known=media;
-  const aliases=!known.originalTitle?fetchDetail(known).then(detail=>({...known,originalTitle:detail.originalTitle??null})).catch(()=>known):undefined;
+  const aliases=!known.originalTitle?()=>fetchDetail(known).then(detail=>({...known,originalTitle:detail.originalTitle??null})).catch(()=>known):undefined;
   try {
     const items=(await collectReleases(known,aliases)).map(presentRelease);
     return Response.json({items,updated:true,sourceCount:new Set(items.map(x=>x.source)).size},{headers:{"Cache-Control":"no-store"}});
