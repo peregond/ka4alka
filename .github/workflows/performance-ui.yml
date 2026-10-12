@@ -1,5 +1,8 @@
 name: Verify bounded background work and image loading
 on:
+  push:
+    branches: [claude/quirky-hopper-1vlmj6]
+    paths: ['.github/workflows/performance-ui.yml', 'native/**', 'tests/**']
   workflow_dispatch:
 permissions:
   contents: read
