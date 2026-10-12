@@ -11,13 +11,27 @@ public static class ReleaseAvailability
 
 public partial class MainWindow
 {
-    bool NoDownloads(MediaItem item)=>ReleaseAvailability.Hidden(catalogIndex.RememberedReleases(item),DateTime.UtcNow);
+    bool ReceivedDownloadOptions(MediaItem item,ReleaseCache? evidence)
+    {
+        if(!releaseViews.TryGetValue(item.Id,out var view)||!liveReleases.TryGetValue(item.Id,out var rows))return false;
+        var received=view.ReceivedUtc??view.SavedUtc;var now=DateTime.UtcNow;
+        return received>now.AddDays(-7)&&received<=now.AddMinutes(5)&&(evidence==null||received>=evidence.SavedUtc)&&rows.Any(ReleaseAvailability.Downloadable);
+    }
+    bool NoDownloads(MediaItem item)
+    {
+        var remembered=catalogIndex.RememberedReleases(item);
+        return !ReceivedDownloadOptions(item,remembered)&&ReleaseAvailability.Hidden(remembered,DateTime.UtcNow);
+    }
     ReleaseCache? CatalogReleaseEvidence(MediaItem item)
     {
         var quality=qualitySnapshots.GetValueOrDefault(item.Id);var remembered=catalogIndex.RememberedReleases(item);
         return remembered!=null&&(quality==null||remembered.SavedUtc>=quality.SavedUtc)?remembered:quality;
     }
-    bool RecommendableTitle(MediaItem item)=>ReleaseAvailability.Recommended(CatalogReleaseEvidence(item),DateTime.UtcNow);
+    bool RecommendableTitle(MediaItem item)
+    {
+        var evidence=CatalogReleaseEvidence(item);
+        return ReceivedDownloadOptions(item,evidence)||ReleaseAvailability.Recommended(evidence,DateTime.UtcNow);
+    }
     async Task CheckCatalogAvailability(IReadOnlyList<MediaItem> items,string key,string category,CancellationToken token,bool force=false)
     {
         // Scan just the current page, never all thousands of metadata records.
