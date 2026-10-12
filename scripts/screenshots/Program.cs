@@ -20,7 +20,7 @@ internal static class Program
     static string releaseDirectory="",outputDirectory="";
     static readonly List<object> captures=[];
     static readonly List<string> skipped=[];
-    static readonly DateTime Deadline=DateTime.UtcNow.AddSeconds(270);
+    static readonly DateTime Deadline=DateTime.UtcNow.AddSeconds(510);
 
     [STAThread]
     public static int Main(string[] args)
@@ -44,7 +44,7 @@ internal static class Program
     static int StartReleasedApplication()
     {
         var version=typeof(Kachalka.App).Assembly.GetName().Version?.ToString(3);
-        var expected=Environment.GetEnvironmentVariable("KACHALKA_SCREENSHOT_VERSION")??"0.40.18";
+        var expected=Environment.GetEnvironmentVariable("KACHALKA_SCREENSHOT_VERSION")??"0.42.0";
         if(version!=expected)throw new InvalidOperationException("Screenshot driver requires the public "+expected+" assembly, got "+version);
         var state=Path.Combine(outputDirectory,"isolated-state-"+Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(state);
@@ -196,6 +196,20 @@ internal static class Program
         Call(window,"ShowCatalogSection","Сериалы");await Settle(window);
         await Until(()=>Field(window,"liveLoading") is false&&Field(window,"liveItems") is IEnumerable rows&&rows.Cast<object>().Any(),TimeSpan.FromSeconds(70),"Actual series source catalogue did not load.");
         await Task.Delay(2000);FreezeRefresh(window);await WaitPosters(window,"Series catalogue");Save(window,"series-dark.png");
+        Call(window,"ShowGames");await Settle(window);
+        await Until(()=>Field(window,"gameLoading") is false&&Field(window,"gameItems") is IEnumerable games&&games.Cast<object>().Any(),TimeSpan.FromSeconds(60),"Actual Steam game catalogue did not load.");
+        await WaitPosters(window,"Steam game catalogue");Save(window,"games-dark.png");
+        Call(window,"ToggleTheme",window,new RoutedEventArgs());await Settle(window);await WaitPosters(window,"Light game catalogue");Save(window,"games-light.png");
+        Call(window,"ToggleTheme",window,new RoutedEventArgs());await Settle(window);
+        Value<TextBox>(window,"Search").Text="Portal 2";Call(window,"SubmitGameSearch");await Settle(window);
+        await Until(()=>Field(window,"gameLoading") is false&&Field(window,"gameItems") is IEnumerable games&&games.Cast<MediaItem>().Any(game=>game.PageUrl=="https://store.steampowered.com/app/620/"),TimeSpan.FromSeconds(45),"Steam search did not return the actual Portal 2 card.");
+        await WaitPosters(window,"Steam search",1);
+        var gameButton=Visuals<Button>(window).First(button=>button.Tag is MediaItem game&&game.PageUrl=="https://store.steampowered.com/app/620/");
+        gameButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await Settle(window);
+        await Until(()=>Field(window,"gameDescription") is TextBlock description&&description.Text.Length>0&&!description.Text.StartsWith("Загружаем")&&!description.Text.Contains("временно недоступно"),TimeSpan.FromSeconds(45),"Real Steam game description did not load.");
+        await Until(()=>Field(window,"gameReleasesLoading") is false,TimeSpan.FromSeconds(30),"Real game source search did not complete.");
+        await WaitPosters(window,"Steam game detail",1);Save(window,"game-detail-dark.png");
+        Call(window,"ShowDownloads",window,new RoutedEventArgs());await Settle(window);Save(window,"downloads-dark.png");
         var settings=Visuals<Button>(window).FirstOrDefault(button=>button.Name=="SettingsButton")??throw new InvalidOperationException("Actual settings navigation is missing.");
         settings.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await Settle(window);Save(window,"settings-dark.png");
         var releasedDll=Path.Combine(releaseDirectory,"Kachalka.dll");

@@ -10,7 +10,7 @@ on:
       version:
         description: Published release matching the reviewed screenshots
         required: true
-        default: '0.40.18'
+        default: '0.42.0'
 permissions:
   contents: write
 concurrency:
@@ -48,9 +48,10 @@ jobs:
           notes = Path('distribution/RELEASE-NOTES-' + version + '.md')
           files = {
               'catalog-dark': 'catalog-dark', 'catalog-light': 'catalog-light',
-              'series-dark': 'series-dark', 'detail-dark': 'detail-wide-dark',
+              'series-dark': 'series-dark', 'detail-dark': 'detail-dark',
               'downloads-dark': 'downloads-dark', 'settings-dark': 'settings-dark',
-              'lan-pairing-dark': 'lan-pairing-dark'
+              'games-dark': 'games-dark', 'games-light': 'games-light',
+              'game-detail-dark': 'game-detail-dark'
           }
           with tempfile.TemporaryDirectory() as tmp:
               uploads = []
@@ -64,5 +65,5 @@ jobs:
               # These explicit names can replace screenshots only, never update packages.
               subprocess.run(['gh', 'release', 'upload', tag, *uploads, '--clobber'], check=True)
           subprocess.run(['gh', 'release', 'edit', tag, '--notes-file', str(notes)], check=True)
-          print('Published seven reviewed screenshots and release notes for ' + tag)
+          print('Published reviewed screenshots and release notes for ' + tag)
           PY

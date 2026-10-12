@@ -5,7 +5,7 @@ on:
       version:
         description: Published version to capture
         required: true
-        default: '0.40.18'
+        default: '0.42.0'
       publish_reviewed:
         description: Publish reviewed repository screenshots instead of capturing again
         type: boolean
@@ -74,7 +74,7 @@ jobs:
           $stderr=Join-Path $env:RUNNER_TEMP 'kachalka-capture-stderr.txt'
           $process=Start-Process -RedirectStandardOutput $stdout -RedirectStandardError $stderr -FilePath 'dotnet' -ArgumentList @(('"'+$driver+'"'),('"'+$env:KACHALKA_SCREENSHOT_RELEASE+'"'),('"'+$output+'"')) -PassThru
           try {
-            if(-not $process.WaitForExit(300000)){$process.Kill($true);throw 'Released application screenshot capture exceeded five minutes'}
+            if(-not $process.WaitForExit(540000)){$process.Kill($true);throw 'Released application screenshot capture exceeded nine minutes'}
             if($process.ExitCode -ne 0){
               if(Test-Path -LiteralPath $stdout){Get-Content -LiteralPath $stdout}
               if(Test-Path -LiteralPath $stderr){Get-Content -LiteralPath $stderr}
@@ -87,7 +87,7 @@ jobs:
           $info=Get-Content -LiteralPath $infoPath -Raw | ConvertFrom-Json
           $dllHash=(Get-FileHash -LiteralPath (Join-Path $env:KACHALKA_SCREENSHOT_RELEASE 'Kachalka.dll') -Algorithm SHA256).Hash.ToLowerInvariant()
           if($info.Version -ne $env:RELEASE_VERSION -or $info.ReleaseDllSha256 -ne $dllHash){throw 'Screenshots were not captured from the verified published DLL'}
-          foreach($name in @('catalog-dark.png','catalog-light.png','series-dark.png','settings-dark.png')){
+          foreach($name in @('catalog-dark.png','catalog-light.png','series-dark.png','detail-dark.png','games-dark.png','games-light.png','game-detail-dark.png','downloads-dark.png','settings-dark.png')){
             if(-not(Test-Path -LiteralPath (Join-Path $output $name))){throw ('Missing required screenshot: '+$name)}
           }
           # Persist only public screenshot metadata, never the isolated profile or keys.
@@ -106,7 +106,7 @@ jobs:
           $folder=Join-Path $PWD 'test-output/documentation-current'
           $files=@(Get-ChildItem -LiteralPath $folder -Filter '*.png' -File | Where-Object {$_.Name -match '^[a-z0-9][a-z0-9.-]*\.png$'} | ForEach-Object {$_.FullName})
           $files+=(Join-Path $folder 'capture-info.json')
-          if($files.Count -lt 5){throw 'Expected four screenshots and sanitized capture metadata'}
+          if($files.Count -lt 10){throw 'Expected nine screenshots and sanitized capture metadata'}
           $tag='docs-preview-${{ github.run_id }}'
           $existing=gh release view $tag --json isDraft --jq '.isDraft' 2>$null
           if($LASTEXITCODE -ne 0){
