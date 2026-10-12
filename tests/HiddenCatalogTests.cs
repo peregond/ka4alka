@@ -13,7 +13,7 @@ static class HiddenCatalogTests
         Check(HiddenCatalog.Hidden(item,prefs)&&HiddenCatalog.Hidden(item with{GenreKeys=[]},prefs),"hidden genres match stable keys and localized labels");
         Check(!HiddenCatalog.Hidden(item with{Genre="драма",GenreKeys=[]},prefs),"unknown or different genres are not guessed to be hidden");
         prefs.HiddenGenres.Clear();Check(!HiddenCatalog.Hidden(item,prefs),"restoring a genre returns its titles without changing the catalog");
-        var first=item with{Id=1,ImdbId=null,PageUrl=null};var second=first with{Id=2};prefs.HiddenTitles.Add(HiddenCatalog.Title(first));
+        var first=item with{Id=1,Title="Локальная карточка A",ImdbId=null,PageUrl=null};var second=first with{Id=2,Title="Локальная карточка B"};prefs.HiddenTitles.Add(HiddenCatalog.Title(first));
         Check(!HiddenCatalog.Hidden(second,prefs),"local cards without a page still keep independent hidden identities");
         var path=Path.Combine(Preferences.DataDir,"settings.json");var original=File.Exists(path)?File.ReadAllBytes(path):null;
         try
