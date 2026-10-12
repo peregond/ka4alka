@@ -20,8 +20,11 @@ export async function GET(request:Request) {
         return {...known,...Object.fromEntries(Object.entries(detail).filter(([,value])=>value))};
       }).catch(()=>known):undefined;
       const found=await collectReleases(known,aliases);
-      if(found.length)await upsertReleases(found);
-      await markSynced(key);updated=true;
+      if(found.length) {
+        await upsertReleases(found);
+        await markSynced(key);
+      }
+      updated=true;
     }
     const releases=await readReleases(id);
     return Response.json({items:releases,updated,sourceCount:new Set(releases.map(x=>x.source)).size},{headers:{"Cache-Control":"no-store"}});

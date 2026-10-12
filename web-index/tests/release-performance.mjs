@@ -49,3 +49,21 @@ assert(cached.length>0);
 assert(requested.some(x=>x.includes('rutor.info')&&x.includes('Film')),'original-title Russian queries remain available');
 assert(requested.some(x=>x.includes('knaben')),'English search resumes when aliases resolve');
 console.log('PASS: metadata starts once on cache misses; RuTor queries start in parallel; Russian searches start before metadata; original-title searches are preserved');
+
+// Empty provider replies must not suppress database-backed retries for four hours.
+const routeSource=stripTypeScriptTypes(fs.readFileSync(new URL('../app/api/releases/route.ts',import.meta.url),'utf8')).replace(/^import[^\n]*\n/gm,'').replace(/^export /gm,'');
+let routeItems=[],syncMarks=0,providerCalls=0;
+const route=vm.runInNewContext(routeSource+'\nGET',{
+  URL,Response,Date,Set,Object,seed:[],
+  getMedia:async()=>media,lastSynced:async()=>0,
+  collectReleases:async()=>{providerCalls++;return routeItems},
+  upsertReleases:async()=>{},markSynced:async()=>{syncMarks++},
+  readReleases:async()=>routeItems,
+});
+const request={url:'https://example.test/api/releases?id=movies:fixture'};
+assert.equal((await route(request)).status,200);
+assert.equal((await route(request)).status,200);
+assert.equal(providerCalls,2);assert.equal(syncMarks,0);
+routeItems=[{...item,source:'RuTor'}];
+assert.equal((await route(request)).status,200);assert.equal(syncMarks,1);
+console.log('PASS: empty API searches retry without a database cooldown; useful replies mark successful synchronization');
