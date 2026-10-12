@@ -59,6 +59,7 @@ public static class CoverCachePerformanceTests
         var small=await Poster(100);var repeated=await Poster(100);var large=await Poster(280);
         Check(posterFetches==1&&small.PixelWidth==100&&repeated.PixelWidth==100&&large.PixelWidth==280&&small.IsFrozen&&large.IsFrozen,
             "disk thumbnails survive repeated loads and DPI variants reuse one original download");
+        Check(File.Exists(posterPath+".w100.png")&&File.Exists(posterPath+".w280.png"),"both decoded-size variants are actually persisted on disk");
         await File.WriteAllBytesAsync(posterPath+".w100.png",[9]);var repairedThumbnail=await Poster(100);
         Check(posterFetches==1&&repairedThumbnail.PixelWidth==100,"a corrupt thumbnail regenerates from the original without another network request");
     }
