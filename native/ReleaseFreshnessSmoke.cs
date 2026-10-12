@@ -91,7 +91,9 @@ public partial class MainWindow
                 await Task.Delay(300);await Settle();
                 var batchRenders=renderCount-beforeBatch;
                 var pickerRenders=releasePickerRenders-beforePicker;
-                Check(batchRenders==0&&pickerRenders is >=1 and <=2,name+": burst notifications rebuilt the full card or were not coalesced.");
+                if(batchRenders!=0||pickerRenders is <1 or >2)
+                    File.WriteAllText(Path.Combine(output,"batch-debug.json"),JsonSerializer.Serialize(new{batchRenders,pickerRenders,pendingFullDetailRefresh,pendingDetailRefreshId,TimerEnabled=detailRefreshTimer?.IsEnabled,Caller=lastRenderCaller,CurrentId=current?.Id,RowsHost=detailReleaseRowsHost!=null,ControlsHost=releaseControlsHost!=null}));
+                Check(batchRenders==0&&pickerRenders is >=1 and <=2,$"{name}: burst notifications rebuilt the full card or were not coalesced (full={batchRenders}, picker={pickerRenders}, fullPending={pendingFullDetailRefresh}, timer={detailRefreshTimer?.IsEnabled}).");
                 Check(ReferenceEquals(banner,FindVisual<Grid>(Body,x=>x.Name=="CinemaCards")),name+": release updates replaced the banner and actor controls.");
                 Check(detailMetaRow!.Children.OfType<Border>().Any(x=>Equals(x.Tag,"DetailQualityBadge")&&x.Child is TextBlock t&&t.Text=="4K"),name+": partial release refresh left the quality badges stale.");
                 Check(FindVisual<Button>(Body,x=>x.Name=="DetailDownload")?.Tag is SourceEntry offered&&offered.Title==changedRelease.Title,name+": same-ID updated release left a stale download action.");

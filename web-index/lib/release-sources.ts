@@ -45,7 +45,10 @@ export function matches(media:Media,title:string,source:string) {
 }
 
 export async function knaben(media:Media):Promise<Release[]> {
-  const query=media.originalTitle||media.title;
+  const groups=await Promise.allSettled(mediaNames(media).slice(0,4).map(query=>knabenTitle(media,query)));
+  return groups.flatMap(group=>group.status==="fulfilled"?group.value:[]);
+}
+async function knabenTitle(media:Media,query:string):Promise<Release[]> {
   const response=await fetch("https://api.knaben.org/v1",{
     method:"POST",headers:{"Content-Type":"application/json","Accept":"application/json","User-Agent":"KachalkaIndex/0.2"},
     body:JSON.stringify({query,search_field:"title",search_type:"100%",order_by:"seeders",order_direction:"desc",size:75,hide_unsafe:true,hide_xxx:true}),

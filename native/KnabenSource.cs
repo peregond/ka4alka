@@ -33,7 +33,7 @@ public static class KnabenSource
             .Where(query=>!string.IsNullOrWhiteSpace(query))
             .Select(query=>query!.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Take(2)
+            .Take(4)
             .ToArray();
         if(queries.Length==0)return [];
         var entries=new List<SourceEntry>();

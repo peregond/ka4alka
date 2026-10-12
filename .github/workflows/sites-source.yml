@@ -2,10 +2,6 @@ name: Prepare verified Sites source
 on:
   push:
     branches: [claude/quirky-hopper-1vlmj6]
-    paths:
-      - 'web-index/**'
-      - 'scripts/prepare-sites-source.mjs'
-      - '.github/workflows/sites-source.yml'
   workflow_dispatch:
 permissions:
   contents: read

@@ -1,0 +1,46 @@
+name: Verify catalog identity and incremental card updates
+on:
+  push:
+    branches: [claude/quirky-hopper-1vlmj6]
+    paths: ['.github/workflows/identity-ui.yml', 'native/ReleaseFreshnessSmoke.cs', 'native/SourceStatusView.cs']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: identity-ui-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  identity-ui:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+      - name: Verify multilingual identity and persistent catalog on Windows
+        run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --imdb-suggestions-only
+      - name: Verify actual incremental WPF card updates
+        shell: pwsh
+        run: |
+          $env:KACHALKA_DATA=Join-Path $PWD 'test-output/identity-ui/profile'
+          $folder=Join-Path $env:KACHALKA_DATA 'downloads'
+          New-Item -ItemType Directory -Force $folder | Out-Null
+          @{Folder=$folder;FolderConfigured=$true;AutoResumeDownloads=$false;CheckForUpdates=$false;AutoUpdate=$false;Animations=$false} | ConvertTo-Json | Set-Content (Join-Path $env:KACHALKA_DATA 'settings.json') -Encoding utf8NoBOM
+          $output=Join-Path $PWD 'test-output/identity-ui/render'
+          $app=Start-Process (Join-Path $PWD 'native/bin/Release/net10.0-windows/Kachalka.exe') -ArgumentList @('--release-freshness-smoke-test',('"'+$output+'"')) -PassThru
+          if(-not $app.WaitForExit(60000)){$app.Kill($true);throw 'Incremental card test timed out'}
+          if(Test-Path (Join-Path $output 'error.txt')){throw (Get-Content (Join-Path $output 'error.txt') -Raw)}
+          if($app.ExitCode -ne 0 -or -not(Test-Path (Join-Path $output 'checks.json'))){throw 'Incremental card checks missing'}
+          Get-Content (Join-Path $output 'checks.json')
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: identity-ui-${{ github.sha }}
+          path: test-output/identity-ui/render/
+          if-no-files-found: ignore
