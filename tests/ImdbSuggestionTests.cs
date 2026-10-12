@@ -93,10 +93,11 @@ static class ImdbSuggestionTests
         Check(offline.Requests.Count(x=>x.AbsolutePath=="/api/catalog")==1,"a failed description lookup does not make the site rest for the catalog");
         var zona=new MediaItem(-5,"Во все тяжкие","Сериалы","",2008,"—","—","#526B69"){OriginalTitle="Breaking Bad",PageUrl=LiveCatalog.Base+"/tvseries/vo-vse-tyazhkie-2008"};
         var imdbBreakingBad=ImdbSuggestions.Parse("""{"d":[{"id":"tt0903747","l":"Breaking Bad","q":"TV series","y":2008}]}""","breaking bad");
-        Check(ImdbSuggestions.Missing([zona],imdbBreakingBad).Length==0&&ImdbSuggestions.Missing([zona],found).Length==2,"a title the catalog already has is not added twice");
+        Check(MediaIdentity.Merge(new[]{zona}.Concat(imdbBreakingBad)).Length==1&&MediaIdentity.Merge(new[]{zona}.Concat(found)).Length==3,"a title the catalog already has is not added twice");
         var merged=await UnifiedSearch.FindAsync("solar opposites",(_,_)=>Task.FromResult<IReadOnlyList<MediaItem>>([]),_=>[],CancellationToken.None,_=>Task.FromResult<IReadOnlyList<MediaItem>>(found));
         Check(merged.Items.Length==2&&merged.Items[0].Title=="Solar Opposites","search results include the IMDb titles the catalog lacks");
         var failing=await UnifiedSearch.FindAsync("solar opposites",(_,_)=>Task.FromResult<IReadOnlyList<MediaItem>>([zona]),_=>[],CancellationToken.None,_=>throw new HttpRequestException("offline"));
         Check(failing.Items.Length==1&&!failing.Offline,"an unreachable IMDb never hides catalog results");
+        await Kachalka.Tests.MediaIdentityTests.Run();
     }
 }

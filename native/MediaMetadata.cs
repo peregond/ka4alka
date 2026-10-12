@@ -16,6 +16,7 @@ public static class MediaMetadata
         OriginalTitle=string.IsNullOrWhiteSpace(fresh.OriginalTitle)?prior.OriginalTitle:fresh.OriginalTitle,
         ImageUrl=string.IsNullOrWhiteSpace(fresh.ImageUrl)?prior.ImageUrl:fresh.ImageUrl,
         OnlineId=fresh.OnlineId??prior.OnlineId,ImdbId=fresh.ImdbId??prior.ImdbId,
+        TitleAliases=prior.TitleAliases.Concat(fresh.TitleAliases).Distinct(StringComparer.OrdinalIgnoreCase).Take(16).ToArray(),
         Kinopoisk=Score(fresh.Kinopoisk)?fresh.Kinopoisk:prior.Kinopoisk,
         Imdb=Score(fresh.Imdb)?fresh.Imdb:prior.Imdb,
         Genre=string.IsNullOrWhiteSpace(fresh.Genre)?prior.Genre:fresh.Genre,Country=string.IsNullOrWhiteSpace(fresh.Country)?prior.Country:fresh.Country,

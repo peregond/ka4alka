@@ -17,6 +17,7 @@
   <ItemGroup><ProjectReference Include="../lan-core/Kachalka.Lan.csproj" /></ItemGroup>
   <ItemGroup><EmbeddedResource Include="../web-index/app/data/seed.json" LogicalName="Kachalka.catalog-seed.json" /></ItemGroup>
   <ItemGroup><EmbeddedResource Include="../web-index/app/data/starter.json" LogicalName="Kachalka.catalog-starter.json" /></ItemGroup>
+  <ItemGroup><EmbeddedResource Include="../web-index/app/data/title-aliases.json" LogicalName="Kachalka.title-aliases.json" /></ItemGroup>
   <ItemGroup><EmbeddedResource Include="../scripts/catalog-collections.json" LogicalName="Kachalka.catalog-collections.json" /></ItemGroup>
   <ItemGroup><Resource Include="Fonts/*.ttf" /></ItemGroup>
   <ItemGroup><Resource Include="Assets/logo.png" /><Resource Include="Assets/app.ico" /></ItemGroup>

@@ -29,7 +29,7 @@ public static class UnifiedSearch
         }
         var batches=await Task.WhenAll(Category("Фильмы"),Category("Сериалы"));var found=await extra;cancellation.ThrowIfCancellationRequested();
         var catalog=batches.SelectMany(x=>x.Items).ToArray();
-        return new(catalog.Concat(ImdbSuggestions.Missing(catalog,found)).DistinctBy(x=>(x.Section,x.Id)).OrderBy(Rank).ThenBy(x=>x.Title,StringComparer.CurrentCultureIgnoreCase).ToArray(),batches.Any(x=>x.Offline));
+        return new(MediaIdentity.Merge(catalog.Concat(found)).OrderBy(Rank).ThenBy(x=>x.Title,StringComparer.CurrentCultureIgnoreCase).ToArray(),batches.Any(x=>x.Offline));
     }
     public static MediaItem[] Filter(IEnumerable<MediaItem> items,string category)=>items.Where(x=>category==""||x.Section==category).ToArray();
 }

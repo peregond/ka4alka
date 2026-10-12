@@ -38,7 +38,7 @@ public sealed class CatalogIndex
     }
     void ApplySaved(Entry[] rows)
     {
-        foreach(var row in rows)entries.TryAdd(Key(row.Item),row);
+        foreach(var row in rows)entries.TryAdd(Key(row.Item),row with{Item=MediaIdentity.Enrich(row.Item)});
     }
     // Publication happens on the caller's context; background disk reading never mutates UI-owned state.
     public async Task RestoreAsync(CancellationToken ct=default)
@@ -51,10 +51,10 @@ public sealed class CatalogIndex
     }
 
     static string Key(MediaItem item)=>item.Section+"|"+item.PageUrl;
-    string ReleasePath(MediaItem item)=>Path.Combine(Path.GetDirectoryName(path)!,"release-index",Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Key(item))))+".json");
+    string ReleasePath(MediaItem item)=>Path.Combine(Path.GetDirectoryName(path)!,"release-index",Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(MediaIdentity.StableKey(item))))+".json");
     static bool Valid(MediaItem item)=>item.Section is "Фильмы" or "Сериалы"&&
         !string.IsNullOrWhiteSpace(item.Title)&&Uri.TryCreate(item.PageUrl,UriKind.Absolute,out var url)&&
-        url.Scheme=="https"&&(url.Host.Equals("zona.plus",StringComparison.OrdinalIgnoreCase)||url.Host.EndsWith(".zona.plus",StringComparison.OrdinalIgnoreCase));
+        url.Scheme=="https"&&(url.Host.Equals("zona.plus",StringComparison.OrdinalIgnoreCase)||url.Host.EndsWith(".zona.plus",StringComparison.OrdinalIgnoreCase)||url.Host.Equals("www.imdb.com",StringComparison.OrdinalIgnoreCase)&&Regex.IsMatch(url.AbsolutePath,@"^/title/tt\d{5,10}/?$"));
     static string Normalize(string text)=>Regex.Replace(text.Replace('ё','е').Replace('Ё','Е').ToLowerInvariant(),@"[^\p{L}\p{N}]+"," ").Trim();
 
     public IReadOnlyList<MediaItem> Search(string section,string query,int limit=80)
@@ -62,7 +62,7 @@ public sealed class CatalogIndex
         CacheFiles.Touch(path);var term=Normalize(query);if(term.Length==0)return Recent(section,limit);
         var tokens=term.Split(' ',StringSplitOptions.RemoveEmptyEntries);
         return entries.Values.Where(x=>x.Item.Section==section)
-            .Select(x=>(x.Item,x.SeenUtc,Score:Score(x.Item,term,tokens)))
+            .Select(x=>(x.Item,x.SeenUtc,Score:MediaIdentity.Score(x.Item,term,tokens)))
             .Where(x=>x.Score>0).OrderByDescending(x=>x.Score).ThenByDescending(x=>x.SeenUtc)
             .Take(Math.Clamp(limit,1,200)).Select(x=>x.Item).ToArray();
     }
@@ -73,6 +73,7 @@ public sealed class CatalogIndex
         .Where(x=>x.Item.Section==section).OrderByDescending(x=>x.SeenUtc)
         .Take(Math.Clamp(limit,1,200)).Select(x=>x.Item).ToArray();
     }
+    public MediaItem? FindByImdb(string section,string? imdbId)=>imdbId==null?null:entries.Values.Select(x=>x.Item).FirstOrDefault(x=>x.Section==section&&x.ImdbId==imdbId&&(x.TitleAliases.Length>0||!string.IsNullOrWhiteSpace(x.Description)));
     public async Task ClearMemoryAsync()
     {
         await RestoreAsync();
@@ -86,6 +87,7 @@ public sealed class CatalogIndex
         try
         {
             var file=ReleasePath(item);
+            if(!File.Exists(file))file=Path.Combine(Path.GetDirectoryName(path)!,"release-index",Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Key(item))))+".json");
             if(new FileInfo(file).Length>3*1024*1024)return null;
             var saved=JsonSerializer.Deserialize<ReleaseCache>(CacheFiles.ReadAllText(file));
             return saved is {Items:not null}&&saved.SavedUtc>DateTime.UtcNow.AddDays(-7)&&saved.SavedUtc<=DateTime.UtcNow.AddMinutes(5)?saved:null;
@@ -107,23 +109,9 @@ public sealed class CatalogIndex
         finally{writer.Release();}
     }
 
-    static int Score(MediaItem item,string term,string[] tokens)
-    {
-        var title=Normalize(item.Title);var original=Normalize(item.OriginalTitle??"");
-        var words=(title+" "+original+" "+(item.Year>0?item.Year:"")).Split(' ',StringSplitOptions.RemoveEmptyEntries);
-        if(tokens.Any(token=>!words.Any(word=>word.StartsWith(token,StringComparison.Ordinal))))return 0;
-        if(title==term)return 100;
-        if(original==term)return 95;
-        if(title.StartsWith(term,StringComparison.Ordinal))return 80;
-        if(original.StartsWith(term,StringComparison.Ordinal))return 75;
-        if(title.Contains(term,StringComparison.Ordinal))return 65;
-        if(original.Contains(term,StringComparison.Ordinal))return 60;
-        return 30+tokens.Length;
-    }
-
     public async Task AddAsync(IEnumerable<MediaItem> items,CancellationToken ct=default)
     {
-        var incoming=items.Where(Valid).ToArray();if(incoming.Length==0)return;
+        var incoming=items.Where(Valid).Select(MediaIdentity.Enrich).ToArray();if(incoming.Length==0)return;
         await RestoreAsync(ct);
         await writer.WaitAsync(ct);
         try
@@ -138,6 +126,8 @@ public sealed class CatalogIndex
                     entries[key]=new(item with
                     {
                         OriginalTitle=item.OriginalTitle??old.OriginalTitle,
+                        ImdbId=item.ImdbId??old.ImdbId,
+                        TitleAliases=item.TitleAliases.Concat(old.TitleAliases).Distinct(StringComparer.OrdinalIgnoreCase).Take(16).ToArray(),
                         Description=item.Description??old.Description,
                         People=item.People.Length>0?item.People:old.People,
                         Awards=item.Awards.Length>0?item.Awards:old.Awards,

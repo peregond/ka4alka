@@ -18,20 +18,13 @@ public sealed class NnmClubSource(SourceClient client)
 
     public async Task<IReadOnlyList<SourceEntry>> Search(MediaItem item,CancellationToken ct)
     {
-        var queries=new[]{item.Title,item.OriginalTitle}
-            .Where(query=>!string.IsNullOrWhiteSpace(query))
-            .Select(query=>query!.Trim())
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Take(2);
-        var entries=new List<SourceEntry>();Exception? failure=null;var answered=false;
-        foreach(var query in queries)
+        var groups=await Task.WhenAll(MediaIdentity.Queries(item).Select(async query=>
         {
-            try{entries.AddRange(Parse(await client.Read(QueryUri(query),2*1024*1024,ct),item));answered=true;}
-            catch(Exception error) when(!ct.IsCancellationRequested){failure??=error;/* Keep releases from the other title. */}
-        }
-        // A blocked tracker is unavailable, not a tracker without releases.
-        if(!answered&&failure!=null)System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
-        return entries.DistinctBy(entry=>entry.Id).OrderByDescending(entry=>entry.Seeds??-1).Take(100).ToArray();
+            try{return (Items:Parse(await client.Read(QueryUri(query),2*1024*1024,ct),item),Error:(Exception?)null);}
+            catch(Exception error) when(!ct.IsCancellationRequested){return (Items:(IReadOnlyList<SourceEntry>)[],Error:error);}
+        }));
+        if(groups.Length>0&&groups.All(x=>x.Error!=null))System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(groups.First().Error!).Throw();
+        return groups.SelectMany(x=>x.Items).DistinctBy(entry=>entry.Id).OrderByDescending(entry=>entry.Seeds??-1).Take(100).ToArray();
     }
 
     public static IReadOnlyList<SourceEntry> Parse(byte[] data,MediaItem item)

@@ -27,6 +27,7 @@ export function parseSeries(imdbId: string, extended: Row): TitleInfo | null {
     imdbId, source: "TheTVDB", sourceId: id, section: "series", title, originalTitle: original && original !== title ? original : null,
     year: yearOf(extended.year ?? extended.firstAired), overview: overview || null,
     genres: unique(rows(extended.genres).map(row => row.name), 4), countries: unique([extended.originalCountry], 1),
+    aliases: unique([title,original,...rows(translations.nameTranslations).filter(row=>row.language==="rus").map(row=>row.name),...rows(extended.aliases).filter(row=>row.language==="rus").map(row=>row.name)],16),
     actors: unique(actors, 12), directors: [],
   };
 }

@@ -56,6 +56,8 @@ jobs:
           if($LASTEXITCODE -ne 0){throw 'Locked web dependencies failed'}
           node tests/release-performance.mjs
           if($LASTEXITCODE -ne 0){throw 'Server release search performance checks failed'}
+          node tests/title-identity.mjs
+          if($LASTEXITCODE -ne 0){throw 'Server multilingual identity checks failed'}
           node tests/title-lookup.mjs
           if($LASTEXITCODE -ne 0){throw 'Title lookup checks failed'}
           node node_modules/typescript/bin/tsc --noEmit --incremental false

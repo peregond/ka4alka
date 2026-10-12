@@ -29,7 +29,7 @@ public static class KnabenSource
 
     public static async Task<IReadOnlyList<SourceEntry>> Search(MediaItem item,CancellationToken ct)
     {
-        var queries=new[]{item.OriginalTitle,item.Title}
+        var queries=new[]{item.OriginalTitle}.Concat(MediaIdentity.Queries(item))
             .Where(query=>!string.IsNullOrWhiteSpace(query))
             .Select(query=>query!.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)

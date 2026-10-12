@@ -27,6 +27,8 @@ const context={createReleaseLookup:cache,Promise,Map,Set,URL,AbortSignal,TextDec
     const body=String(url).includes('rutor.info')?'<tr><td><a href="/torrent/1">Фильм (2026) 1080p</a><a href="magnet:?xt=urn:btih:'+('a'.repeat(40))+'">magnet</a></td></tr>':'{}';
     return new Promise(resolve=>pending.push(()=>resolve(new Response(body))));
   }};
+const identity=vm.runInNewContext(read('catalog-identity.ts')+'\n({enrichMedia,mediaNames})',{verified:JSON.parse(fs.readFileSync(new URL('../app/data/title-aliases.json',import.meta.url),'utf8')),Map,Set});
+Object.assign(context,identity);
 const sources=vm.runInNewContext(read('release-sources.ts')+'\n({rutor,collectReleases})',context);
 const media={id:'movies:fixture',title:'Фильм',originalTitle:'Film',year:2026,section:'movies'};
 const pair=sources.rutor(media);assert.equal(requested.length,2,'both RuTor title requests start before either answers');

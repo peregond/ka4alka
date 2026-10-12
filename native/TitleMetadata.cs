@@ -46,6 +46,8 @@ public static class TitleMetadata
         people=people.Concat(Credits("directors","Режиссёры")).Concat(Credits("actors","Актёры")).ToArray();
         return item with
         {
+            Title=ImdbSuggestions.IsImdbOnly(item)&&Text(row,"title") is {Length:>0} title?title:item.Title,
+            TitleAliases=item.TitleAliases.Concat(Strings(row,"aliases",16)).Concat(new[]{item.Title,original??"",Text(row,"title")??""}).Where(x=>x.Length>0).Distinct(StringComparer.OrdinalIgnoreCase).Take(16).ToArray(),
             Description=!string.IsNullOrWhiteSpace(overview)?overview:item.Description,
             Genre=string.IsNullOrWhiteSpace(item.Genre)&&genres.Length>0?string.Join(", ",genres):item.Genre,
             Country=string.IsNullOrWhiteSpace(item.Country)&&countries.Length>0?string.Join(", ",countries):item.Country,

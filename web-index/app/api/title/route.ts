@@ -2,15 +2,22 @@ import { env } from "cloudflare:workers";
 import { fetchMovie } from "@/lib/tmdb-title";
 import { titleCache, type TitleSection } from "@/lib/title-info";
 import { fetchSeries, tvdbSession } from "@/lib/tvdb-title";
+import { readTitle, writeTitle } from "@/lib/title-store";
 
 export const runtime = "edge";
 // Series come from TheTVDB, films from TMDB. Each source has its own secret; a missing one only silences its section.
 let session: { key: string; get: ReturnType<typeof tvdbSession> } | null = null;
-const lookup = titleCache((imdbId, section) => {
-  if (section === "movies") return fetchMovie(imdbId, env.TMDB_READ_TOKEN ?? "");
-  const key = env.TVDB_API_KEY ?? "";
-  if (!session || session.key !== key) session = { key, get: tvdbSession(key) };
-  return fetchSeries(imdbId, session.get);
+const lookup = titleCache(async (imdbId, section) => {
+  try{const stored=await readTitle(imdbId,section);if(stored)return stored;}catch{ /* Old deployments without the migration remain usable. */ }
+  let item;
+  if (section === "movies") item=await fetchMovie(imdbId, env.TMDB_READ_TOKEN ?? "");
+  else {
+    const key = env.TVDB_API_KEY ?? "";
+    if (!session || session.key !== key) session = { key, get: tvdbSession(key) };
+    item=await fetchSeries(imdbId, session.get);
+  }
+  if(item)try{await writeTitle(item);}catch{ /* Storage failure cannot discard a verified upstream answer. */ }
+  return item;
 });
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;

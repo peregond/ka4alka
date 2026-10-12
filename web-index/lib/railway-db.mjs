@@ -42,6 +42,7 @@ export function railwayDb() {
     }
   }
   instance = {
+    close() { db.close(); instance=undefined; },
     prepare: sql => new Statement(sql),
     async batch(statements) {
       db.exec("BEGIN IMMEDIATE");

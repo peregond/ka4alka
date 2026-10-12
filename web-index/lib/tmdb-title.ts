@@ -18,6 +18,7 @@ export function parseMovie(imdbId: string, detail: Row): TitleInfo | null {
     overview: clean(detail.overview, 4000) || null,
     genres: unique(list(detail.genres), 4).map(name => name.toLowerCase()), countries: unique(list(detail.production_countries), 3),
     actors: unique(list(cast), 12), directors: unique(list(crew), 2),
+    aliases: unique([title,original,...list(((detail.alternative_titles??{}) as Row).titles, row=>row.iso_3166_1==="RU"?row.title:null)],16),
   };
 }
 
@@ -31,5 +32,5 @@ export async function fetchMovie(imdbId: string, token: string, request: typeof 
   // One exact answer only; an id that TMDB lists as something else is not a film.
   const id = movies.length === 1 ? movies[0].id : null;
   if (typeof id !== "number" || !Number.isSafeInteger(id) || id <= 0) return null;
-  return parseMovie(imdbId, await read(`movie/${id}?language=ru-RU&append_to_response=credits`));
+  return parseMovie(imdbId, await read(`movie/${id}?language=ru-RU&append_to_response=credits,alternative_titles`));
 }

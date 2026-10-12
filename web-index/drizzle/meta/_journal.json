@@ -8,6 +8,13 @@
       "when": 1790538069413,
       "tag": "0000_unique_titania",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1791803112497,
+      "tag": "0001_title_metadata",
+      "breakpoints": true
     }
   ]
 }

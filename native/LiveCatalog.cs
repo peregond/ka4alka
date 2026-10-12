@@ -187,13 +187,14 @@ public sealed class LiveCatalog(SourceClient client)
     {
         static string Normalize(string value)=>Regex.Replace(Regex.Replace(value.Replace('ё','е').Replace('Ё','Е').ToLowerInvariant(),@"[^\p{L}\p{N}]+"," ").Trim(),@"\s+"," ");
         var title=Normalize(item.Title);var original=Normalize(item.OriginalTitle??"");
+        var expectedNames=MediaIdentity.Names(item).Select(Normalize).ToArray();
         if(title.Length==0)return false;
         var candidate=Regex.Replace(entry.Title,@"^(?:\s*\[[^\]]{1,40}\]\s*)+","");
         var names=Regex.Split(candidate,@"\s+[/|]\s+").Select(Normalize).ToArray();
         if(item.Section=="Фильмы"&&item.Year>0)
         {
             foreach(var name in names)
-            foreach(var expected in new[]{title,original}.Where(x=>x.Length>0))
+            foreach(var expected in expectedNames)
             {
                 if(!name.StartsWith(expected+" ",StringComparison.Ordinal))continue;
                 var metadata=name[(expected.Length+1)..];var alias=expected==title?original:title;
@@ -214,10 +215,10 @@ public sealed class LiveCatalog(SourceClient client)
                 if(item.Section=="Сериалы")return Regex.IsMatch(tail,@"^\d{1,2}\s+(?:сезон|season)\b")||Regex.IsMatch(tail,@"^\d{3,4}\b");
                 return Regex.IsMatch(tail,@"^\d{4}\b");
             }
-            if(other.Length>0&&(tail==other||tail.StartsWith(other+" ",StringComparison.Ordinal)))return true;
+            if(expectedNames.Any(otherName=>otherName!=expected&&(tail==otherName||tail.StartsWith(otherName+" ",StringComparison.Ordinal))))return true;
             return Regex.IsMatch(tail,@"^(?:s\d{1,2}(?:e\d{1,3})?|e\d{1,3}|season|сезон|серия|серии|episode|ep|complete|полный|все|web|hdtv|dvdrip|hdrip|bdrip|bluray|remux|720p|1080p|2160p|4k|x264|x265|h264|h265|hevc|avc|mkv|mp4|avi|repack)\b");
         }
-        if(!names.Any(name=>MatchName(name,title)||original.Length>0&&MatchName(name,original)))return false;
+        if(!names.Any(name=>expectedNames.Any(expected=>MatchName(name,expected))))return false;
         return item.Section=="Сериалы"||entry.Source!="RuTor"||item.Year<=0||Regex.IsMatch(entry.Title,@"(?<!\d)"+item.Year+@"(?!\d)");
     }
     public static IReadOnlyList<SourceEntry> ParseRutor(byte[] bytes)

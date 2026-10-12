@@ -5,10 +5,10 @@ public static class NativeReleaseSources
     public static ReleaseSource[] Create(SourceClient client,MediaItem item)=>Create(client,_=>Task.FromResult(item),item.Section=="Сериалы");
     public static ReleaseSource[] Create(SourceClient client,Func<CancellationToken,Task<MediaItem>> resolve,bool series,Func<CancellationToken,Task<MediaItem>>? resolveAliases=null)
     {
-        async Task<IReadOnlyList<SourceEntry>> Resolved(Func<MediaItem,CancellationToken,Task<IReadOnlyList<SourceEntry>>> search,CancellationToken ct,bool aliases=false)=>await search(await (aliases?(resolveAliases??resolve):resolve)(ct),ct);
+        async Task<IReadOnlyList<SourceEntry>> Resolved(Func<MediaItem,CancellationToken,Task<IReadOnlyList<SourceEntry>>> search,CancellationToken ct,bool aliases=false)=>await search(MediaIdentity.Enrich(await (aliases?(resolveAliases??resolve):resolve)(ct)),ct);
         async Task<IReadOnlyList<SourceEntry>> Aliases(MediaItem item,Func<string,CancellationToken,Task<IReadOnlyList<SourceEntry>>> search,CancellationToken ct)
         {
-            var groups=await Task.WhenAll(new[]{item.Title,item.OriginalTitle}.Where(x=>!string.IsNullOrWhiteSpace(x)).Cast<string>().Distinct(StringComparer.OrdinalIgnoreCase).Select(async title=>
+            var groups=await Task.WhenAll(MediaIdentity.Queries(item).Select(async title=>
             {
                 try{return (Items:await search(title,ct),Error:(Exception?)null);}
                 catch(Exception error) when(!ct.IsCancellationRequested){return (Items:(IReadOnlyList<SourceEntry>)[],Error:error);}

@@ -60,7 +60,7 @@ public sealed class SharedCatalog
     {
         CacheFiles.Touch(path);static string Normalize(string value)=>System.Text.RegularExpressions.Regex.Replace(value.Replace('ё','е').Replace('Ё','Е').ToLowerInvariant(),@"[^\p{L}\p{N}]+"," ").Trim();
         var words=Normalize(query).Split(' ',StringSplitOptions.RemoveEmptyEntries);
-        return All.Where(item=>item.Section==section&&words.All(word=>Normalize(item.Title+" "+item.OriginalTitle+" "+item.Year).Split(' ').Any(part=>part.StartsWith(word,StringComparison.Ordinal)))).Take(80).ToArray();
+        return All.Where(item=>item.Section==section&&MediaIdentity.MatchesQuery(item,words)).Take(80).ToArray();
     }
     // Navigation cancellation stops only its wait, never the shared disk load or refresh.
     public Task RestoreAsync(CancellationToken ct=default)

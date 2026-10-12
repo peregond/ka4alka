@@ -32,6 +32,7 @@ jobs:
         run: |
           node tests/title-lookup.mjs
           node tests/release-performance.mjs
+          node tests/title-identity.mjs
           node node_modules/typescript/bin/tsc --noEmit --incremental false
       - name: Build for Sites
         working-directory: web-index

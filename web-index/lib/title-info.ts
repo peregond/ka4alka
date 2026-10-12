@@ -4,6 +4,7 @@ export type TitleSection = "movies" | "series";
 export type TitleInfo = {
   imdbId: string; source: "TheTVDB" | "TMDB"; sourceId: number; section: TitleSection; title: string; originalTitle: string | null; year: number;
   overview: string | null; genres: string[]; countries: string[]; actors: string[]; directors: string[];
+  aliases?: string[];
 };
 export const clean = (value: unknown, max: number) => typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, max) : "";
 export const unique = (values: unknown[], max: number) => [...new Set(values.map(value => clean(value, 120)).filter(Boolean))].slice(0, max);
@@ -30,18 +31,18 @@ export async function readJson(url: string, init: RequestInit, request: typeof f
 export function titleCache(lookup: (imdbId: string, section: TitleSection) => Promise<TitleInfo | null>, now = Date.now) {
   const saved = new Map<string, { expires: number; value: TitleInfo | null }>();
   const pending = new Map<string, Promise<TitleInfo | null>>();
-  let retryAfter = 0;
+  const retryAfter = new Map<TitleSection,number>();
   return async (imdbId: string, section: TitleSection) => {
     const key = `${section}|${imdbId}`;
     const cached = saved.get(key); if (cached && cached.expires > now()) return cached.value;
     const running = pending.get(key); if (running) return running;
-    if (retryAfter > now() || pending.size >= 4) throw new Error("Title lookup is temporarily unavailable");
+    if ((retryAfter.get(section)??0) > now() || pending.size >= 4) throw new Error("Title lookup is temporarily unavailable");
     const task = Promise.resolve().then(async () => {
       try {
         const value = await lookup(imdbId, section);
         if (saved.size >= 512) saved.delete(saved.keys().next().value!);
         saved.set(key, { value, expires: now() + (value ? 7 * 86400000 : 6 * 3600000) }); return value;
-      } catch { retryAfter = now() + 60000; throw new Error("Title lookup is temporarily unavailable"); }
+      } catch { retryAfter.set(section,now() + 60000); throw new Error("Title lookup is temporarily unavailable"); }
       finally { pending.delete(key); }
     });
     pending.set(key, task); return task;

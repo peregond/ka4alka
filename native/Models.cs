@@ -13,6 +13,7 @@ public record MediaItem(int Id, string Title, string Section, string Genre, int 
     public string? ImageUrl {get;init;}
     public string? Description {get;init;}
     public string? OriginalTitle {get;init;}
+    public string[] TitleAliases {get;init;}=[];
     public CinemaPerson[] People {get;init;}=[];
     public CinemaAward[] Awards {get;init;}=[];
     public CinemaCollection[] Collections {get;init;}=[];

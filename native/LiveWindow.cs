@@ -345,7 +345,7 @@ public partial class MainWindow
                 var result=await UnifiedSearch.FindAsync(query,
                     (kind,t)=>searchProvider!=null?searchProvider(kind,query,t):CatalogBatches.ReadPage(c=>onlineIndex.Browse(kind,query,1,c),c=>new LiveCatalog(sourceClient).Browse(kind,query,1,c),false,t),
                     kind=>catalogIndex.Search(kind,query).Concat(sharedCatalog.Search(kind,query)).Concat(BundledCatalog.Search(kind,query)).ToArray(),token,
-                    searchProvider!=null?null:t=>ImdbSuggestions.SearchAsync(query,t),updated=>
+                    searchProvider!=null?null:t=>SearchSupplement(query,t),updated=>
                     {
                         if(!IsCurrent())return;
                         liveItems=updated.Items;
@@ -359,6 +359,25 @@ public partial class MainWindow
         catch(OperationCanceledException){}
         catch(Exception){if(IsCurrent())liveError="Источник временно недоступен. Повтори загрузку или выбери другую страницу.";}
         finally{if(IsCurrent()){liveLoading=false;if(!closed&&current==null&&activePerson==null&&section==category&&!favoritesOnly)Render();}}
+    }
+
+    async Task<IReadOnlyList<MediaItem>> SearchSupplement(string query,CancellationToken ct)
+    {
+        var found=await ImdbSuggestions.SearchAsync(query,ct);
+        using var slots=new SemaphoreSlim(2,2);
+        using var deadline=CancellationTokenSource.CreateLinkedTokenSource(ct);deadline.CancelAfter(TimeSpan.FromSeconds(3));
+        return await Task.WhenAll(found.Select(async (value,index)=>
+        {
+            var item=MediaIdentity.Enrich(value);
+            var saved=catalogIndex.FindByImdb(item.Section,item.ImdbId);
+            if(saved!=null)return MediaMetadata.Merge(item,saved);
+            // Known aliases already identify the work. Only unresolved top matches need an upstream lookup.
+            if(item.TitleAliases.Length>0||index>=4)return item;
+            var entered=false;
+            try{await slots.WaitAsync(deadline.Token);entered=true;return await onlineIndex.Title(item,deadline.Token);}
+            catch(Exception) when(!ct.IsCancellationRequested){return item;}
+            finally{if(entered)slots.Release();}
+        }));
     }
 }
 

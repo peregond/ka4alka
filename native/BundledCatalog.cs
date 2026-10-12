@@ -9,7 +9,7 @@ public static class BundledCatalog
     sealed record SearchRow(MediaItem Item,string[] Words);
     sealed record Snapshot(MediaItem[] Items,SearchRow[] Search);
     static string Normalize(string value)=>System.Text.RegularExpressions.Regex.Replace(value.Replace('ё','е').Replace('Ё','Е').ToLowerInvariant(),@"[^\p{L}\p{N}]+"," ").Trim();
-    static Snapshot Index(MediaItem[] items)=>new(items,items.Select(item=>new SearchRow(item,Normalize(item.Title+" "+item.OriginalTitle+" "+item.Year).Split(' ',StringSplitOptions.RemoveEmptyEntries))).ToArray());
+    static Snapshot Index(MediaItem[] items)=>new(items,items.Select(item=>new SearchRow(item,Normalize(string.Join(" ",MediaIdentity.Names(item))+" "+item.Year).Split(' ',StringSplitOptions.RemoveEmptyEntries))).ToArray());
     static Snapshot? loaded;
     static readonly Lazy<Snapshot> starter=new(()=>
     {

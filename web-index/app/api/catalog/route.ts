@@ -1,5 +1,6 @@
 import { sharedCatalogPage } from "@/lib/shared-catalog";
 import { fetchCatalog, normalize } from "@/lib/catalog-source";
+import { catalogQueries, enrichMedia } from "@/lib/catalog-identity";
 import { snapshotPage, PAGE_LIMIT } from "@/lib/catalog-snapshot";
 import { lastSynced, markSynced, readMedia, upsertMedia, countMedia } from "@/lib/index-store";
 
@@ -11,21 +12,23 @@ export async function GET(request:Request) {
   const rawPage=Number(url.searchParams.get("page")??1);
   const page=query?1:Math.min(PAGE_LIMIT,Math.max(1,Number.isFinite(rawPage)?Math.floor(rawPage):1));
   const key=`catalog:${section}:${page}:${normalize(query)}`;
-  const snapshot=snapshotPage(section,query,page);
-  const respond=(items:typeof snapshot.items,sourceStatus:string,indexCount:number,hasMore:boolean)=>Response.json({items,sourceStatus,indexCount,hasMore,page},{headers:{"Cache-Control":"no-store"}});
+  const queries=query?catalogQueries(section,query):[query];
+  const sourceQuery=queries.find(name=>/[а-яё]/i.test(name))??query;
+  const snapshot=snapshotPage(section,sourceQuery,page);
+  const respond=(items:typeof snapshot.items,sourceStatus:string,indexCount:number,hasMore:boolean)=>Response.json({items:items.map(enrichMedia),sourceStatus,indexCount,hasMore,page},{headers:{"Cache-Control":"no-store"}});
   try {
-    const shared=await sharedCatalogPage(section,query,page);
+    const shared=await sharedCatalogPage(section,sourceQuery,page);
     if(shared) {
       try{await upsertMedia(shared.items,query?null:page);}catch{}
-      return Response.json({...shared,page,sourceStatus:"updated"},{headers:{"Cache-Control":"no-store"}});
+      return Response.json({...shared,items:shared.items.map(enrichMedia),page,sourceStatus:"updated"},{headers:{"Cache-Control":"no-store"}});
     }
   } catch { /* The shared feed cannot replace existing offline fallbacks with an error. */ }
   try {
-    const cached=await readMedia(section,query,page);
+    const cached=await readMedia(section,sourceQuery,page);
     const fresh=Date.now()-await lastSynced(key)<15*60_000;
     if(!fresh||cached.length===0) {
       try {
-        const found=await fetchCatalog(section,query,page);
+        const found=await fetchCatalog(section,sourceQuery,page);
         // Never mark an empty or blocked source response as a successful refresh.
         if(found.length) {
           await upsertMedia(found,query?null:page);await markSynced(key);
