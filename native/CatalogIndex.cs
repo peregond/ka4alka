@@ -14,6 +14,7 @@ public sealed class CatalogIndex
 {
     sealed record Entry(MediaItem Item,DateTime SeenUtc);
     readonly Dictionary<string,Entry> entries=[];
+    readonly Dictionary<string,MediaItem> identities=[];
     readonly SemaphoreSlim writer=new(1,1);
     readonly string path;
     const int Limit=3000;
@@ -39,6 +40,16 @@ public sealed class CatalogIndex
     void ApplySaved(Entry[] rows)
     {
         foreach(var row in rows)entries.TryAdd(Key(row.Item),row with{Item=MediaIdentity.Enrich(row.Item)});
+        IndexIdentities();
+    }
+    void IndexIdentities()
+    {
+        identities.Clear();
+        foreach(var item in entries.Values.Select(x=>x.Item).Where(x=>x.ImdbId!=null))
+        {
+            var key=MediaIdentity.StableKey(item);
+            identities[key]=identities.TryGetValue(key,out var prior)?MediaIdentity.Merge([prior,item]).Single():item;
+        }
     }
     // Publication happens on the caller's context; background disk reading never mutates UI-owned state.
     public async Task RestoreAsync(CancellationToken ct=default)
@@ -73,11 +84,11 @@ public sealed class CatalogIndex
         .Where(x=>x.Item.Section==section).OrderByDescending(x=>x.SeenUtc)
         .Take(Math.Clamp(limit,1,200)).Select(x=>x.Item).ToArray();
     }
-    public MediaItem? FindByImdb(string section,string? imdbId)=>imdbId==null?null:entries.Values.Select(x=>x.Item).FirstOrDefault(x=>x.Section==section&&x.ImdbId==imdbId&&(x.TitleAliases.Length>0||!string.IsNullOrWhiteSpace(x.Description)));
+    public MediaItem? FindByImdb(string section,string? imdbId)=>imdbId==null?null:identities.GetValueOrDefault(section+"|"+imdbId.ToLowerInvariant());
     public async Task ClearMemoryAsync()
     {
         await RestoreAsync();
-        await writer.WaitAsync();try{entries.Clear();Revision++;}finally{writer.Release();}
+        await writer.WaitAsync();try{entries.Clear();identities.Clear();Revision++;}finally{writer.Release();}
     }
 
     public IReadOnlyList<SourceEntry> CachedReleases(MediaItem item)=>CachedReleaseSnapshot(item)?.Items??[];
@@ -142,6 +153,7 @@ public sealed class CatalogIndex
             }
             if(entries.Count>Limit)
                 foreach(var key in entries.OrderBy(x=>x.Value.SeenUtc).Take(entries.Count-Limit).Select(x=>x.Key).ToArray())entries.Remove(key);
+            IndexIdentities();
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             var snapshot=entries.Values.ToArray();
             var json=await Task.Run(()=>JsonSerializer.Serialize(snapshot),ct);

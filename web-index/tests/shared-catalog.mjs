@@ -27,7 +27,8 @@ assert(first.items.every((item,index)=>index===0||Math.min(item.year,2026)<=Math
 now+=86400000;offline=true;
 const saved=await source.sharedCatalogPage('movies','',1);assert.equal(saved.items[0].id,first.items[0].id);assert.equal(calls,2);
 await source.sharedCatalogPage('series','',2);assert.equal(calls,2);
-const route=load('../app/api/catalog/route.ts',{
+const identity=load('../lib/catalog-identity.ts',{'@/app/data/title-aliases.json':JSON.parse(fs.readFileSync(new URL('../app/data/title-aliases.json',import.meta.url),'utf8'))});
+const route=load('../app/api/catalog/route.ts',{'@/lib/catalog-identity':identity,
   '@/lib/shared-catalog':source,'@/lib/catalog-source':{normalize:value=>value},'@/lib/catalog-snapshot':{PAGE_LIMIT:250,snapshotPage:()=>({items:[],indexCount:0,hasMore:false})},
   '@/lib/index-store':{upsertMedia:async()=>{throw new Error('D1 unavailable')}}
 });

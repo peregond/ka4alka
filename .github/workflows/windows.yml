@@ -23,7 +23,10 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Verify title lookup, authentication and response parsing
         working-directory: web-index
-        run: node tests/title-lookup.mjs
+        run: |
+          node tests/title-lookup.mjs
+          node tests/title-identity.mjs
+          node tests/release-performance.mjs
       - name: Type-check the site
         working-directory: web-index
         run: node node_modules/typescript/bin/tsc --noEmit --incremental false

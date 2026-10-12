@@ -16,7 +16,12 @@ static class MediaIdentityTests
         Check(MediaIdentity.Merge([solar,solar with{Id=-105,Year=2021}]).Length==2,"identical translated names in different years are not merged");
         Check(MediaIdentity.Merge([other,other with{Id=-106,ImdbId="tt0000001"}]).Length==2,"conflicting IMDb ids are never merged");
         Check(MediaIdentity.Merge([solar,solar with{Id=-107,Section="Фильмы"}]).Length==2,"a series and a movie remain separate");
+        var first=solar with{Id=-110,Title="Северная грань",PageUrl="https://w6.zona.plus/tvseries/first"};
+        var second=first with{Id=-111,Title="Граница севера",PageUrl="https://w6.zona.plus/tvseries/second"};
+        var bridge=first with{Id=-112,Title="Northern Border",ImdbId="tt1234567",PageUrl="https://www.imdb.com/title/tt1234567/",TitleAliases=[first.Title,second.Title]};
+        Check(MediaIdentity.Merge([first,second,bridge]).Length==1,"verified metadata bridges previously separate alternate translations");
         Check(MediaIdentity.Queries(other).Contains("Обратная сторона Земли")&&MediaIdentity.Queries(other).Contains("Solar Opposites"),"tracker queries include both Russian names and the original name");
+        Check(MediaIdentity.OriginalQuery("Солнечные противоположности")=="Solar Opposites"&&MediaIdentity.OriginalQuery("Южный парк")=="South Park","known Russian queries also find the exact original title when the Russian catalog is unavailable");
         Check(LiveCatalog.Matches(solar,new SourceEntry("identity","Solar Opposites S01 1080p","RuTor","",null,null)),"English torrents match the Russian catalog card");
         var root=Path.Combine(Path.GetTempPath(),"kachalka-identity-"+Guid.NewGuid().ToString("N"));
         try {

@@ -13,17 +13,21 @@ public partial class MainWindow
     sealed record SavedReturn(string Category,int Page,double Offset);
     SavedReturn? savedReturn;
 
-    bool IsSaved(MediaItem item)=>prefs.Favorites.Contains(item.Id)||prefs.LiveFavorites.Any(saved=>saved.Id==item.Id);
+    bool IsSaved(MediaItem item)=>prefs.Favorites.Contains(item.Id)||prefs.LiveFavorites.Any(saved=>saved.Id==item.Id||MediaIdentity.Same(saved,item));
     void ToggleSaved(MediaItem item)
     {
-        if(IsSaved(item)){prefs.Favorites.Remove(item.Id);prefs.LiveFavorites.RemoveAll(saved=>saved.Id==item.Id);}
+        if(IsSaved(item))
+        {
+            var ids=prefs.LiveFavorites.Where(saved=>saved.Id==item.Id||MediaIdentity.Same(saved,item)).Select(saved=>saved.Id).Append(item.Id).ToHashSet();
+            prefs.Favorites.ExceptWith(ids);prefs.LiveFavorites.RemoveAll(saved=>ids.Contains(saved.Id));
+        }
         else{prefs.Favorites.Add(item.Id);prefs.LiveFavorites.RemoveAll(saved=>saved.Id==item.Id);prefs.LiveFavorites.Add(item);}
         prefs.Save();
     }
-    MediaItem[] SavedItems()=>prefs.LiveFavorites.AsEnumerable().Reverse()
+    MediaItem[] SavedItems()=>MediaIdentity.Merge(prefs.LiveFavorites.AsEnumerable().Reverse()
         .Concat(liveItems.Concat(catalogIndex.Recent("Фильмы",200)).Concat(catalogIndex.Recent("Сериалы",200)).Concat(Catalog.Items)
             .Where(item=>prefs.Favorites.Contains(item.Id)))
-        .Where(item=>item.Section is "Фильмы" or "Сериалы").DistinctBy(item=>item.Id).ToArray();
+        .Where(item=>item.Section is "Фильмы" or "Сериалы").DistinctBy(item=>item.Id));
     void ShowSaved(object sender,RoutedEventArgs e)
     {
         searchDelay.Stop();liveRequest?.Cancel();liveLoading=false;

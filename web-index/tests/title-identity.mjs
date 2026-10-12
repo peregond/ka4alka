@@ -6,7 +6,7 @@ import vm from 'node:vm';
 import ts from 'typescript';
 function load(file,dependencies={}) {
   const code=ts.transpileModule(fs.readFileSync(new URL(file,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText;
-  const exports={};vm.runInNewContext(code,{exports,require:name=>dependencies[name],Date,Map,Set,JSON,Number});return exports;
+  const exports={};vm.runInNewContext(code,{exports,require:name=>dependencies[name],Date,Map,Set,JSON,Number,Promise,Response,URL});return exports;
 }
 const aliases=JSON.parse(fs.readFileSync(new URL('../app/data/title-aliases.json',import.meta.url),'utf8'));
 const identity=load('../lib/catalog-identity.ts',{'@/app/data/title-aliases.json':aliases});
@@ -35,6 +35,13 @@ try {
   const restored=await store.readTitle('tt8910922','series');
   assert.equal(restored.imdbId,'tt8910922');assert(restored.aliases.includes('Солнечные противоположности'));
   assert.equal(await store.readTitle('tt8910922','movies'),null);
+  let upstream=0;
+  const film={...parsed,imdbId:'tt1160419',section:'movies',source:'TMDB',sourceId:438631,title:'Дюна',originalTitle:'Dune',year:2021};
+  const dependencies={'cloudflare:workers':{env:{TMDB_READ_TOKEN:'fixture'}},'@/lib/title-store':store,'@/lib/title-info':title,'@/lib/tmdb-title':{fetchMovie:async()=>{upstream++;return film}},'@/lib/tvdb-title':{}};
+  const req={url:'https://example.test/api/title?imdb=tt1160419&section=movies'};
+  assert.equal((await load('../app/api/title/route.ts',dependencies).GET(req)).status,200);
+  assert.equal((await load('../app/api/title/route.ts',dependencies).GET(req)).status,200);
+  assert.equal(upstream,1,'a new Worker instance uses the persistent title cache instead of another upstream lookup');
   assert.equal(await db.prepare('SELECT COUNT(*) AS n FROM railway_migrations WHERE name=?').bind('0001_title_metadata.sql').first('n'),1);
   await db.prepare('UPDATE title_metadata SET updated_at=?').bind(Date.now()-8*86400000).run();
   assert.equal(await store.readTitle('tt8910922','series'),null);

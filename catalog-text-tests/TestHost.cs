@@ -13,6 +13,8 @@ public record MediaItem(int Id, string Title, string Section, string Genre, int 
     public string? OnlineId { get; init; }
     public string? Description { get; init; }
     public string? OriginalTitle { get; init; }
+    public string? ImdbId { get; init; }
+    public string[] TitleAliases { get; init; }=[];
 }
 
 public static class Preferences
@@ -105,5 +107,10 @@ public static class CatalogPaging
 // matching remains covered by the native application tests.
 public static class ImdbSuggestions
 {
-    public static IEnumerable<MediaItem> Missing(IEnumerable<MediaItem> catalog,IEnumerable<MediaItem> suggestions)=>suggestions;
+    public static bool IsImdbOnly(MediaItem item)=>item.PageUrl?.StartsWith("https://www.imdb.com/title/")==true;
+}
+public static class MediaMetadata
+{
+    // The harness has only catalog fields. Full native metadata merging is exercised on Windows.
+    public static MediaItem Merge(MediaItem prior,MediaItem fresh)=>prior with{ImdbId=fresh.ImdbId??prior.ImdbId,OriginalTitle=fresh.OriginalTitle??prior.OriginalTitle,TitleAliases=prior.TitleAliases.Concat(fresh.TitleAliases).Distinct().ToArray(),Description=fresh.Description??prior.Description};
 }

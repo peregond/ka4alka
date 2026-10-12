@@ -363,7 +363,7 @@ public partial class MainWindow
 
     async Task<IReadOnlyList<MediaItem>> SearchSupplement(string query,CancellationToken ct)
     {
-        var found=await ImdbSuggestions.SearchAsync(query,ct);
+        var found=await ImdbSuggestions.SearchAsync(MediaIdentity.OriginalQuery(query),ct);
         using var slots=new SemaphoreSlim(2,2);
         using var deadline=CancellationTokenSource.CreateLinkedTokenSource(ct);deadline.CancelAfter(TimeSpan.FromSeconds(3));
         return await Task.WhenAll(found.Select(async (value,index)=>

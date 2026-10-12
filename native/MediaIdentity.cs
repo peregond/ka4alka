@@ -31,7 +31,7 @@ public static class MediaIdentity
     {
         var row=Find(item);
         var aliases=Clean(item.TitleAliases.Concat(row?.Aliases??[]));
-        if(row==null&&aliases.SequenceEqual(item.TitleAliases))return item;
+        if(aliases.SequenceEqual(item.TitleAliases)&&(row==null||item.ImdbId!=null&&!string.IsNullOrWhiteSpace(item.OriginalTitle)))return item;
         return item with{ImdbId=item.ImdbId??row?.ImdbId,OriginalTitle=item.OriginalTitle??row?.OriginalTitle,TitleAliases=aliases};
     }
     static SearchNames Index(MediaItem item)=>names.GetValue(item,key=>
@@ -42,6 +42,12 @@ public static class MediaIdentity
         return new(values,normalized,normalized.Select(x=>x.Split(' ',StringSplitOptions.RemoveEmptyEntries)).ToArray());
     });
     public static string[] Names(MediaItem item)=>Index(item).Names;
+    public static string OriginalQuery(string query)
+    {
+        var term=Normalize(query);
+        var matches=known.Value.Where(row=>row.Aliases.Any(name=>Normalize(name)==term)).Select(row=>row.OriginalTitle).Distinct().Take(2).ToArray();
+        return matches.Length==1?matches[0]:query;
+    }
     public static string[] Queries(MediaItem item)=>Names(item).Take(4).ToArray();
     public static bool MatchesQuery(MediaItem item,string[] words)=>Index(item).Words.Any(title=>words.All(word=>title.Any(part=>part.StartsWith(word,StringComparison.Ordinal))||item.Year>0&&item.Year.ToString().StartsWith(word,StringComparison.Ordinal)));
     public static int Score(MediaItem item,string term,string[] words)
@@ -55,33 +61,38 @@ public static class MediaIdentity
     {
         if(a.Section!=b.Section)return false;
         if(a.ImdbId!=null&&b.ImdbId!=null)return a.ImdbId.Equals(b.ImdbId,StringComparison.OrdinalIgnoreCase);
-        return a.Year>0&&a.Year==b.Year&&Names(a).Select(Normalize).Intersect(Names(b).Select(Normalize)).Any();
+        return a.Year>0&&a.Year==b.Year&&Index(a).Normalized.Intersect(Index(b).Normalized).Any();
+    }
+    static MediaItem Join(MediaItem prior,MediaItem item)
+    {
+        var preferItem=ImdbSuggestions.IsImdbOnly(prior)&&!ImdbSuggestions.IsImdbOnly(item);
+        var preferred=preferItem?item:prior;var other=preferItem?prior:item;
+        return MediaMetadata.Merge(preferred,other) with{TitleAliases=Clean(Names(preferred).Concat(Names(other)))};
     }
     // Linear indexed grouping. Conflicting IMDb IDs and ambiguous aliases are kept separate.
     public static MediaItem[] Merge(IEnumerable<MediaItem> items)
     {
-        var result=new List<MediaItem>();var keys=new Dictionary<string,HashSet<int>>();
+        var result=new List<MediaItem>();var keys=new Dictionary<string,HashSet<int>>();var removed=new HashSet<int>();
         IEnumerable<string> Keys(MediaItem item)
         {
             if(item.ImdbId!=null)yield return StableKey(item);
-            if(item.Year>0)foreach(var name in Names(item))yield return item.Section+"|"+item.Year+"|"+Normalize(name);
+            if(item.Year>0)foreach(var name in Index(item).Normalized)yield return item.Section+"|"+item.Year+"|"+name;
             yield return item.Section+"|page|"+(item.PageUrl??item.Id.ToString());
         }
         foreach(var value in items)
         {
             var item=Enrich(value);var candidates=new HashSet<int>();
-            foreach(var key in Keys(item))if(keys.TryGetValue(key,out var indices))foreach(var index in indices)if(Same(result[index],item)||result[index].Section==item.Section&&result[index].Id==item.Id&&(result[index].ImdbId==null||item.ImdbId==null))candidates.Add(index);
+            foreach(var key in Keys(item))if(keys.TryGetValue(key,out var indices))foreach(var index in indices)if(!removed.Contains(index)&&(Same(result[index],item)||result[index].Section==item.Section&&result[index].Id==item.Id&&(result[index].ImdbId==null||item.ImdbId==null)))candidates.Add(index);
             int target;
-            if(candidates.Count==1)
+            if(candidates.Count==1||candidates.Count>1&&item.ImdbId!=null&&candidates.All(index=>result[index].ImdbId==null||string.Equals(result[index].ImdbId,item.ImdbId,StringComparison.OrdinalIgnoreCase)))
             {
-                target=candidates.Single();var prior=result[target];
-                var preferItem=ImdbSuggestions.IsImdbOnly(prior)&&!ImdbSuggestions.IsImdbOnly(item);
-                var preferred=preferItem?item:prior;var other=preferItem?prior:item;
-                result[target]=MediaMetadata.Merge(preferred,other) with{TitleAliases=Clean(Names(preferred).Concat(Names(other)))};
+                target=candidates.Min();
+                foreach(var index in candidates.Where(index=>index!=target)){result[target]=Join(result[target],result[index]);removed.Add(index);}
+                result[target]=Join(result[target],item);
             }
             else{target=result.Count;result.Add(item);}
             foreach(var key in Keys(result[target])){if(!keys.TryGetValue(key,out var indices))keys[key]=indices=[];indices.Add(target);}
         }
-        return result.ToArray();
+        return result.Where((_,index)=>!removed.Contains(index)).ToArray();
     }
 }

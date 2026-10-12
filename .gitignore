@@ -34,6 +34,7 @@ test-output/
 coverage/
 TestResults/
 *.tsbuildinfo
+*_wpftmp.csproj
 *.tmp
 *.bak
 outputs/
