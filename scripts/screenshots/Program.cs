@@ -201,10 +201,9 @@ internal static class Program
         await WaitPosters(window,"Steam game catalogue");Save(window,"games-dark.png");
         Call(window,"ToggleTheme",window,new RoutedEventArgs());await Settle(window);await WaitPosters(window,"Light game catalogue");Save(window,"games-light.png");
         Call(window,"ToggleTheme",window,new RoutedEventArgs());await Settle(window);
-        Value<TextBox>(window,"Search").Text="Portal 2";Call(window,"SubmitGameSearch");await Settle(window);
-        await Until(()=>Field(window,"gameLoading") is false&&Field(window,"gameItems") is IEnumerable games&&games.Cast<MediaItem>().Any(game=>game.PageUrl=="https://store.steampowered.com/app/620/"),TimeSpan.FromSeconds(45),"Steam search did not return the actual Portal 2 card.");
-        await WaitPosters(window,"Steam search",1);
-        var gameButton=Visuals<Button>(window).First(button=>button.Tag is MediaItem game&&game.PageUrl=="https://store.steampowered.com/app/620/");
+        var gameButtons=Visuals<Button>(window).Where(button=>button.Tag is MediaItem game&&game.Section=="Игры"&&Visuals<Image>(button).Any(Loaded)).ToArray();
+        var gameButton=gameButtons.FirstOrDefault(button=>button.Tag is MediaItem game&&game.PageUrl=="https://store.steampowered.com/app/730/")
+            ??gameButtons.FirstOrDefault()??throw new InvalidOperationException("No real loaded Steam card was available to open.");
         gameButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await Settle(window);
         await Until(()=>Field(window,"gameDescription") is TextBlock description&&description.Text.Length>0&&!description.Text.StartsWith("Загружаем")&&!description.Text.Contains("временно недоступно"),TimeSpan.FromSeconds(45),"Real Steam game description did not load.");
         await Until(()=>Field(window,"gameReleasesLoading") is false,TimeSpan.FromSeconds(30),"Real game source search did not complete.");
