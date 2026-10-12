@@ -48,3 +48,6 @@ next-env.d.ts
 # Railway local database
 /data/
 *.sqlite*
+
+# Ignore local TypeScript incremental output.
+*.tsbuildinfo
