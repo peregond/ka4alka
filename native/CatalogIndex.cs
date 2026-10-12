@@ -84,7 +84,11 @@ public sealed class CatalogIndex
         .Where(x=>x.Item.Section==section).OrderByDescending(x=>x.SeenUtc)
         .Take(Math.Clamp(limit,1,200)).Select(x=>x.Item).ToArray();
     }
-    public MediaItem? FindByImdb(string section,string? imdbId)=>imdbId==null?null:identities.GetValueOrDefault(section+"|"+imdbId.ToLowerInvariant());
+    public MediaItem? FindByImdb(string section,string? imdbId)
+    {
+        var item=imdbId==null?null:identities.GetValueOrDefault(section+"|"+imdbId.ToLowerInvariant());
+        return item!=null&&(item.TitleAliases.Length>0||!string.IsNullOrWhiteSpace(item.Description))?item:null;
+    }
     public async Task ClearMemoryAsync()
     {
         await RestoreAsync();

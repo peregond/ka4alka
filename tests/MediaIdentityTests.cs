@@ -31,6 +31,9 @@ static class MediaIdentityTests
             Check(restored.Search("Сериалы","South Park").Count>0,"IMDb-only identities are retained in the local database");
             var named=other with{TitleAliases=["Иное проверенное название"]};await index.AddAsync([named]);
             Check(new CatalogIndex(root).Search("Сериалы","Иное проверенное название").Count==1,"additional provider aliases persist without a new application build");
+            var bare=other with{Id=-120,Title="Unknown Title",ImdbId="tt7654321",OriginalTitle="Unknown Title",TitleAliases=[],PageUrl="https://www.imdb.com/title/tt7654321/"};
+            await index.AddAsync([bare]);
+            Check(index.FindByImdb("Сериалы",bare.ImdbId)==null,"an incomplete cached suggestion cannot suppress a later metadata retry");
         } finally{if(Directory.Exists(root))Directory.Delete(root,true);}
     }
 }
