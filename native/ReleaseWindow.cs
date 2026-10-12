@@ -104,8 +104,10 @@ public partial class MainWindow
         return LanDownloadAction(entry);
     }
 
+    int releasePickerRenders;
     void RenderReleasePicker(StackPanel panel,IReadOnlyList<SourceEntry> releases)
     {
+        releasePickerRenders++;
         var filmId=current?.Id??0;
         var state=ReleaseSelection(filmId);
         var host=releaseControlsHost??panel;

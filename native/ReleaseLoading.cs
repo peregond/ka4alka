@@ -46,16 +46,23 @@ public partial class MainWindow
         view.Saved=saved.Length>0;view.SavedUtc??=view.ReceivedUtc;view.ReceivedUtc=null;view.Checking=true;
         bool IsCurrent()=>!closed&&!token.IsCancellationRequested&&ReferenceEquals(view.Request,request);
         SourceCheck Remember(SourceCheck check)=>check.LastSuccessUtc.HasValue?check:check with{LastSuccessUtc=prior.GetValueOrDefault(check.Name)};
+        var releaseRowsDirty=true;var publishedChecking=view.Checking;
         void Publish()
         {
             if(!IsCurrent())return;
-            var keys=fresh.Select(ReleaseSearch.Identity).ToHashSet();
-            view.Saved=saved.Any(x=>!keys.Contains(ReleaseSearch.Identity(x)));
-            if(view.Saved)cachedReleaseViews.Add(item.Id);else cachedReleaseViews.Remove(item.Id);
-            liveReleases[item.Id]=ReleaseSearch.WithSaved(fresh,saved);view.Sources=checks.Values.ToArray();
-            qualitySnapshots.Remove(item.Id);ApplyKnownQuality(item);if(current?.Id==item.Id)ApplyKnownQuality(current);
-            foreach(var card in liveItems.Concat(prefs.LiveFavorites).Concat(catalogDisplay).Where(x=>x.Id==item.Id))ApplyKnownQuality(card);
-            RefreshDetail(item.Id);
+            view.Sources=checks.Values.ToArray();
+            if(releaseRowsDirty)
+            {
+                var keys=fresh.Select(ReleaseSearch.Identity).ToHashSet();
+                view.Saved=saved.Any(x=>!keys.Contains(ReleaseSearch.Identity(x)));
+                if(view.Saved)cachedReleaseViews.Add(item.Id);else cachedReleaseViews.Remove(item.Id);
+                liveReleases[item.Id]=ReleaseSearch.WithSaved(fresh,saved);
+                qualitySnapshots.Remove(item.Id);ApplyKnownQuality(item);if(current?.Id==item.Id)ApplyKnownQuality(current);
+                foreach(var card in liveItems.Concat(prefs.LiveFavorites).Concat(catalogDisplay).Where(x=>x.Id==item.Id))ApplyKnownQuality(card);
+            }
+            if(releaseRowsDirty||publishedChecking!=view.Checking)QueueDetailRefresh(item.Id,releasesOnly:true);
+            else RefreshReleaseLoadingIndicator();
+            releaseRowsDirty=false;publishedChecking=view.Checking;
             if(!view.Checking&&(prefs.HidePoorQuality||prefs.CatalogQualityHeight!=0)&&current==null&&(section is "Фильмы" or "Сериалы")&&liveItems.Concat(prefs.LiveFavorites).Any(x=>x.Id==item.Id))RenderCatalogKeepingPosition();
         }
         void IndexRows(IEnumerable<SourceEntry> rows,SourceState state)
@@ -97,7 +104,7 @@ public partial class MainWindow
             var settled=false;
             void Apply(ReleaseSearchUpdate update)
             {
-                fresh.Clear();fresh.AddRange(update.Items);
+                if(!fresh.SequenceEqual(update.Items)){fresh.Clear();fresh.AddRange(update.Items);releaseRowsDirty=true;}
                 foreach(var source in update.Sources)checks[source.Name]=Remember(source);
                 if(update.Items.Length>0)view.ReceivedUtc=update.Items.Select(x=>x.DataReceivedUtc).Max();
                 IndexRows(update.Items,SourceState.Ready);Publish();

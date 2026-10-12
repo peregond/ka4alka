@@ -14,7 +14,7 @@ on:
       version:
         description: Version matching native/Kachalka.csproj
         required: true
-        default: '0.40.21'
+        default: '0.41.0'
       publish:
         description: Publish the release as soon as every release check passes
         type: boolean
@@ -26,14 +26,14 @@ permissions:
   contents: write
   actions: read
 concurrency:
-  group: kachalka-release-0.40.21
+  group: kachalka-release-0.41.0
   cancel-in-progress: false
 jobs:
   release:
     runs-on: windows-latest
     timeout-minutes: 25
     env:
-      RELEASE_VERSION: ${{ inputs.version || '0.40.21' }}
+      RELEASE_VERSION: ${{ inputs.version || '0.41.0' }}
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
     steps:
       - uses: actions/checkout@v4
@@ -45,6 +45,21 @@ jobs:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
           restore-keys: nuget-${{ runner.os }}-
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify server release search and metadata
+        working-directory: web-index
+        shell: pwsh
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          if($LASTEXITCODE -ne 0){throw 'Locked web dependencies failed'}
+          node tests/release-performance.mjs
+          if($LASTEXITCODE -ne 0){throw 'Server release search performance checks failed'}
+          node tests/title-lookup.mjs
+          if($LASTEXITCODE -ne 0){throw 'Title lookup checks failed'}
+          node node_modules/typescript/bin/tsc --noEmit --incremental false
+          if($LASTEXITCODE -ne 0){throw 'Server type check failed'}
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -152,9 +167,9 @@ jobs:
           $process=Start-Process dist/Kachalka-0.40/Kachalka.exe -ArgumentList @('--cinema-smoke-test',$output) -PassThru
           if(-not $process.WaitForExit(60000)){$process.Kill();throw 'Person card UI smoke timed out'}
           if($process.ExitCode -ne 0 -or (Test-Path "$output/error.txt") -or -not (Test-Path "$output/checks.json")){throw 'Person card UI smoke failed'}
-      - name: Verify upgrade from previously published 0.40.20
+      - name: Verify upgrade from previously published 0.40.21
         shell: pwsh
-        run: ./tests/WindowsPublishedUpgrade.ps1 -FromVersion 0.40.20 -ReleaseDirectory ('dist/release-'+$env:RELEASE_VERSION)
+        run: ./tests/WindowsPublishedUpgrade.ps1 -FromVersion 0.40.21 -ReleaseDirectory ('dist/release-'+$env:RELEASE_VERSION)
       - name: Upload verified files to draft GitHub Release
         shell: pwsh
         env:

@@ -81,6 +81,16 @@ public partial class MainWindow
                 RefreshDetailActions();
                 Check(FindVisual<Button>(Body,x=>x.Name=="DetailDownload")?.Tag is SourceEntry selected&&selected.Id==direct.Id,
                     name+": periodic refresh lost the filtered recommendation.");
+                var beforeBatch=renderCount;var beforePicker=releasePickerRenders;
+                var banner=FindVisual<Grid>(Body,x=>x.Name=="CinemaCards");
+                for(var i=0;i<32;i++)QueueDetailRefresh(movie.Id,releasesOnly:true);
+                Check(renderCount==beforeBatch,name+": source notifications synchronously rebuilt the card.");
+                await Task.Delay(300);await Settle();
+                var batchRenders=renderCount-beforeBatch;
+                var pickerRenders=releasePickerRenders-beforePicker;
+                Check(batchRenders==0&&pickerRenders is >=1 and <=2,name+": burst notifications rebuilt the full card or were not coalesced.");
+                Check(ReferenceEquals(banner,FindVisual<Grid>(Body,x=>x.Name=="CinemaCards")),name+": release updates replaced the banner and actor controls.");
+                checks.Add(new{Stage=name+"-refresh-batch",Requests=32,FullCardRenders=batchRenders,ReleasePickerRenders=pickerRenders,BannerPreserved=true});
             }
             File.WriteAllText(Path.Combine(output,"checks.json"),JsonSerializer.Serialize(checks,new JsonSerializerOptions{WriteIndented=true}));
         }

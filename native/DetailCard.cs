@@ -17,12 +17,13 @@ public partial class MainWindow
     Panel? detailActions;
     TextBlock? releaseCountLabel;
     StackPanel? releaseControlsHost;
+    StackPanel? detailReleaseRowsHost;
     string detailActionState="";
     static readonly string[] VideoExtensions=[".mkv",".mp4",".avi",".mov",".m4v",".wmv",".ts",".webm",".mpg",".mpeg"];
 
     void RenderLiveDetail(MediaItem item)
     {
-        detailFilteredReleases=null;
+        detailFilteredReleases=null;detailReleaseRowsHost=null;
         if(requestedDetails.Add(item.Id))
         {
             var cached=catalogIndex.CachedReleaseSnapshot(item);
@@ -159,8 +160,18 @@ public partial class MainWindow
             var empty=new StackPanel{Margin=new(2,16,2,20)};var noReleases=Text("Подходящих раздач пока нет",17);noReleases.FontWeight=FontWeights.SemiBold;empty.Children.Add(noReleases);empty.Children.Add(Text("Можно обновить поиск раздач или вернуться позже.",13,true));
             panel.Children.Add(empty);FinishDetailRender();return;
         }
-        RenderReleasePicker(panel,releases);
+        detailReleaseRowsHost=new StackPanel();panel.Children.Add(detailReleaseRowsHost);
+        var rows=new StackPanel();detailReleaseRowsHost.Children.Add(rows);RenderReleasePicker(rows,releases);
         FinishDetailRender();
+    }
+    bool RefreshDetailReleaseRows(int id)
+    {
+        if(current?.Id!=id||detailReleaseRowsHost==null||releaseControlsHost==null||
+            !liveReleases.TryGetValue(id,out var releases)||releases.Count==0)return false;
+        releaseControlsHost.Children.Clear();detailReleaseRowsHost.Children.Clear();
+        // Each slice owns its SizeChanged handler. Drop the entire old slice rather than retaining its closures.
+        var rows=new StackPanel();detailReleaseRowsHost.Children.Add(rows);RenderReleasePicker(rows,releases);
+        RefreshReleaseLoadingIndicator();UpdateLayout();return true;
     }
     void FinishDetailRender()
     {
