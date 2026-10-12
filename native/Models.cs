@@ -125,6 +125,8 @@ public class Preferences
     public bool QualityFilterConfigured {get;set;}
     public int MinimumReleaseHeight {get;set;}=720;
     public int CatalogQualityHeight {get;set;}
+    public HashSet<string> HiddenGenres {get;set;}=[];
+    public List<HiddenCatalogTitle> HiddenTitles {get;set;}=[];
     public HashSet<int> Favorites {get;set;}=[];
     public List<MediaItem> LiveFavorites {get;set;}=[];
     public static string DataDir=>Environment.GetEnvironmentVariable("KACHALKA_DATA") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"Kachalka");
@@ -134,6 +136,7 @@ public class Preferences
         {
             var prefs=JsonSerializer.Deserialize<Preferences>(File.ReadAllText(Path.Combine(DataDir,"settings.json")))??new();
             if(!prefs.QualityFilterConfigured){prefs.HidePoorQuality=true;prefs.QualityFilterConfigured=true;}
+            prefs.HiddenGenres??=[];prefs.HiddenTitles??=[];prefs.HiddenTitles=prefs.HiddenTitles.Where(row=>row!=null&&row.Title is {Length:<=300}&&row.Identity is {Length:<=500}).Take(1000).ToList();
             prefs.CatalogQualityHeight=ReleaseQuality.CatalogHeight(prefs.CatalogQualityHeight);
             prefs.HomeCountry=CatalogRegions.HomeCountry(prefs.HomeCountry);
             return prefs;

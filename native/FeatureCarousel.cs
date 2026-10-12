@@ -87,6 +87,7 @@ public partial class MainWindow
         if(slides.Length<2){dots.Visibility=Visibility.Collapsed;previous.Visibility=Visibility.Collapsed;next.Visibility=Visibility.Collapsed;}
 
         var view=new FeatureCarouselView{Slides=slides,Frame=frame,Poster=image,Eyebrow=eyebrow,Title=title,People=people,Meta=meta,Dots=dots,About=aboutAction,Favorite=favorite,Previous=previous,Next=next,LiteCover=liteCover,PosterHost=posterHost};
+        frame.ContextMenu=new ContextMenu();frame.ContextMenuOpening+=(_,_)=>{if(view.Bound!=null)frame.ContextMenu=CatalogPersonalMenu(view.Bound);};
         carousel=view;
         previous.Click+=(_,_)=>ShowFeatureSlide(view,(view.Index+view.Slides.Length-1)%view.Slides.Length);
         next.Click+=(_,_)=>ShowFeatureSlide(view,(view.Index+1)%view.Slides.Length);

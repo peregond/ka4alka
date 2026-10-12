@@ -25,14 +25,14 @@ public partial class MainWindow
         discoveryShelves.Clear();
         if(!DiscoveryCatalog)return;
         var popular=DiscoveryPopularItems(section);
-        var banners=popular.Length>0?popular:cards;
+        var banners=popular.Length>0?popular:cards.Where(item=>RecommendableTitle(item)&&PersonallyVisible(item)).ToArray();
         if(banners.Length>0)
         {
             discoveryHero=new Grid{Margin=new(0,0,0,28)};
             discoveryHero.Children.Add(BuildFeatureCarousel(banners));
             content.Children.Add(discoveryHero);
         }
-        else if(liveLoading||featuredRequests.Contains(section))content.Children.Add(BannerSkeleton());
+        else if(liveLoading||CatalogQualityChecking||featuredRequests.Contains(section))content.Children.Add(BannerSkeleton());
         if(filterRow!=null)content.Children.Add(filterRow);
         var regions=DiscoveryRegionalItems(section,prefs.HomeCountry,cards);
         var order=section=="Фильмы"?new[]{DiscoveryShelfKind.Popular,DiscoveryShelfKind.New,DiscoveryShelfKind.Foreign,DiscoveryShelfKind.Native}:new[]{DiscoveryShelfKind.Popular,DiscoveryShelfKind.Foreign,DiscoveryShelfKind.New,DiscoveryShelfKind.Native};
@@ -41,8 +41,8 @@ public partial class MainWindow
             var view=AddDiscoveryShelf(content,kind);discoveryShelves[kind]=view;
             switch(kind)
             {
-                case DiscoveryShelfKind.Popular:view.Set(popular,featuredRequests.Contains(section)&&!featuredFallback.Contains(section));discoveryShelf=view.Row;break;
-                case DiscoveryShelfKind.New:view.Set(cards,liveLoading);break;
+                case DiscoveryShelfKind.Popular:view.Set(popular,CatalogQualityChecking||featuredRequests.Contains(section)&&!featuredFallback.Contains(section));discoveryShelf=view.Row;break;
+                case DiscoveryShelfKind.New:view.Set(cards,liveLoading||CatalogQualityChecking);break;
                 case DiscoveryShelfKind.Foreign:view.Set(regions.Foreign,regions.Loading);break;
                 case DiscoveryShelfKind.Native:view.Set(regions.Native,regions.Loading);break;
             }
@@ -58,7 +58,7 @@ public partial class MainWindow
         var kp=CatalogPaging.Rating(item);
         return kp>=0?kp:double.TryParse(item.Imdb.Replace(',','.'),System.Globalization.NumberStyles.Float,System.Globalization.CultureInfo.InvariantCulture,out var imdb)?imdb:-1;
     }
-    MediaItem[] DiscoveryPopularItems(string category)=>catalogPages.TryGetValue(category+"||1",out var page)&&!featuredFallback.Contains(category)?page.Items.Where(item=>!NoDownloads(item)&&CatalogQualityMatches(item)).DistinctBy(item=>item.Id).Take(40).ToArray():[];
+    MediaItem[] DiscoveryPopularItems(string category)=>catalogPages.TryGetValue(category+"||1",out var page)&&!featuredFallback.Contains(category)?page.Items.Where(item=>!NoDownloads(item)&&RecommendableTitle(item)&&PersonallyVisible(item)&&CatalogQualityMatches(item)).DistinctBy(item=>item.Id).Take(40).ToArray():[];
     void SyncDiscoveryContext()
     {
         SyncRegionalDiscoveryContext();

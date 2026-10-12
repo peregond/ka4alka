@@ -15,7 +15,7 @@ public partial class MainWindow
            (view.ReceivedUtc??view.SavedUtc)>DateTime.UtcNow.AddDays(-7)&&
            (known==null||(view.ReceivedUtc??view.SavedUtc)>=known.SavedUtc)&&liveReleases.TryGetValue(item.Id,out var rows))return rows.ToArray();
         if(known?.SavedUtc>DateTime.UtcNow.AddDays(-7))return known.Items;
-        var snapshot=catalogIndex.CachedReleaseSnapshot(item);
+        var snapshot=catalogIndex.RememberedReleases(item);
         var entries=snapshot?.Items??[];
         if(qualitySnapshots.Count>=300)qualitySnapshots.Remove(qualitySnapshots.Keys.First());
         qualitySnapshots[item.Id]=new(snapshot?.SavedUtc??DateTime.UtcNow,entries,snapshot?.Sources);return entries;
@@ -28,6 +28,21 @@ public partial class MainWindow
             (prefs.CatalogQualityHeight==0||item.HasReleaseResolution(prefs.CatalogQualityHeight));
     }
 
+    System.Windows.Threading.DispatcherTimer? catalogEvidenceRefresh;
+    void ScheduleCatalogEvidenceRefresh()
+    {
+        if(catalogEvidenceRefresh==null)
+        {
+            catalogEvidenceRefresh=new(System.Windows.Threading.DispatcherPriority.Background){Interval=TimeSpan.FromMilliseconds(160)};
+            catalogEvidenceRefresh.Tick+=(_,_)=>
+            {
+                if(closed||current!=null||activePerson!=null||section is not ("Фильмы" or "Сериалы")){catalogEvidenceRefresh.Stop();return;}
+                if(VisualElements<ComboBox>(RootGrid).Any(x=>x.IsDropDownOpen)||VisualElements<Button>(RootGrid).Any(x=>x.ContextMenu?.IsOpen==true))return;
+                catalogEvidenceRefresh.Stop();RenderCatalogKeepingPosition();
+            };
+        }
+        if(!catalogEvidenceRefresh.IsEnabled)catalogEvidenceRefresh.Start();
+    }
     readonly SemaphoreSlim catalogQualitySlots=new(2,2);
     readonly Dictionary<int,DateTime> catalogQualityAttempts=[];
     CancellationTokenSource? catalogQualityRequest;
@@ -56,11 +71,11 @@ public partial class MainWindow
         var now=DateTime.UtcNow;
         if(releaseViews.TryGetValue(item.Id,out var view)&&(view.ReceivedUtc??view.SavedUtc)>now.AddDays(-1))return true;
         if(qualitySnapshots.TryGetValue(item.Id,out var memory)&&memory.SavedUtc>now.AddDays(-1)&&memory.Sources is {Length:>0}&&memory.Sources.Any(x=>x.State is SourceState.Ready or SourceState.Empty))return true;
-        return catalogIndex.CachedReleaseSnapshot(item)?.SavedUtc>now.AddDays(-1);
+        return catalogIndex.RememberedReleases(item)?.SavedUtc>now.AddDays(-1);
     }
     void StartCatalogQualityCheck(IReadOnlyList<MediaItem> currentPage)
     {
-        if(prefs.CatalogQualityHeight==0||closed||current!=null||activePerson!=null){CancelCatalogQualityCheck();return;}
+        if(prefs.CatalogQualityHeight==0&&!DiscoveryCatalog||closed||current!=null||activePerson!=null){CancelCatalogQualityCheck();return;}
         // Main-page identity defines the request lifetime. Late discovery rows
         // join that same bounded queue, so progress does not cancel its work.
         var page=currentPage.Where(x=>x.IsLive).DistinctBy(x=>x.Id).Take(CatalogPaging.Size).ToArray();
@@ -86,6 +101,11 @@ public partial class MainWindow
             {
                 token.ThrowIfCancellationRequested();
                 if(!work.Force&&FreshQuality(item))return;
+                // Cold persisted evidence is read on a worker, never by each
+                // poster during a Dispatcher render.
+                var snapshot=await Task.Run(()=>catalogIndex.CachedReleaseSnapshot(item),token);
+                if(snapshot!=null){qualitySnapshots[item.Id]=snapshot;ApplyKnownQuality(item);}
+                if(!work.Force&&FreshQuality(item)){ScheduleCatalogEvidenceRefresh();return;}
                 var saved=KnownQuality(item);var indexed=Array.Empty<SourceEntry>();
                 SourceCheck indexState;
                 using(var deadline=CancellationTokenSource.CreateLinkedTokenSource(token))
@@ -102,7 +122,7 @@ public partial class MainWindow
                 }
                 token.ThrowIfCancellationRequested();
                 var fresh=indexed;var sources=new[]{indexState};
-                if(!ReleaseQuality.HasResolution(ReleaseSearch.WithSaved(indexed,saved),height)&&Interlocked.Decrement(ref work.FallbackBudget)>=0)
+                if(catalogQualityProvider==null&&(height==0?!indexed.Any(ReleaseAvailability.Downloadable):!ReleaseQuality.HasResolution(ReleaseSearch.WithSaved(indexed,saved),height))&&Interlocked.Decrement(ref work.FallbackBudget)>=0)
                 {
                     // A small fallback budget avoids a full multi-tracker source
                     // scan for every poster, and does not fetch movie metadata.
@@ -123,7 +143,7 @@ public partial class MainWindow
                     qualitySnapshots.GetValueOrDefault(item.Id)?.SavedUtc??DateTime.MinValue;
                 qualitySnapshots[item.Id]=new(evidenceTime,rows,sources);
                 ApplyKnownQuality(item);
-                if(!VisualElements<Button>(RootGrid).Any(x=>x.ContextMenu?.IsOpen==true))RenderCatalogKeepingPosition();
+                ScheduleCatalogEvidenceRefresh();
             }
             finally{catalogQualitySlots.Release();}
         }

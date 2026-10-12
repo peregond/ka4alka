@@ -123,7 +123,7 @@ public partial class MainWindow
             lookup.Task=Metadata(item,ct:lookup.Request.Token);
         }
         lookup.Subscribers++;
-        try{var data=await lookup.Task.WaitAsync(ct);if(!closed&&!ct.IsCancellationRequested)item.SetScores(data.Kinopoisk,data.Imdb,data.Genre);}
+        try{var data=await lookup.Task.WaitAsync(ct);if(!closed&&!ct.IsCancellationRequested){item.SetScores(data.Kinopoisk,data.Imdb,data.Genre);if(prefs.HiddenGenres.Count>0&&!PersonallyVisible(item))ScheduleCatalogEvidenceRefresh();}}
         catch{ /* A missing rating stays unavailable. */ }
         finally
         {
@@ -219,11 +219,11 @@ public partial class MainWindow
         IEnumerable<MediaItem> shown=favoritesOnly?prefs.LiveFavorites.Where(x=>x.Section==section&&x.Title.Contains(submittedQuery,StringComparison.CurrentCultureIgnoreCase)).DistinctBy(x=>x.Id).Where(selection.Matches):SearchActive?UnifiedSearch.Filter(liveItems,searchCategory).Where(selection.Matches):liveItems;
         if(favoritesOnly)shown=catalogOrder=="По рейтингу"?shown.OrderByDescending(CatalogPaging.Rating):shown.OrderByDescending(x=>x.Year);
         var local=favoritesOnly||SearchActive;
-        var all=shown.Where(x=>favoritesOnly||SearchActive||!NoDownloads(x)).ToArray();
+        var all=shown.Where(x=>favoritesOnly||SearchActive||!NoDownloads(x)&&PersonallyVisible(x)).ToArray();
         if(local&&!liveLoading){catalogLastPage=Math.Max(1,(all.Length+CatalogPaging.Size-1)/CatalogPaging.Size);livePage=Math.Min(livePage,catalogLastPage.Value);catalogHasNext=livePage<catalogLastPage;}
         var rawPage=local?all.Skip((livePage-1)*CatalogPaging.Size).Take(CatalogPaging.Size).ToArray():all;
         StartCatalogQualityCheck(rawPage);
-        var cards=rawPage.Where(CatalogQualityMatches).ToArray();
+        var cards=rawPage.Where(item=>(!DiscoveryCatalog||RecommendableTitle(item))&&CatalogQualityMatches(item)).ToArray();
         ShowCatalog(cards);
         var list=catalogList!;list.Opacity=liveLoading&&cards.Length>0?.65:1;
         Body.Children.Remove(list);ScrollViewer.SetVerticalScrollBarVisibility(list,ScrollBarVisibility.Disabled);ScrollViewer.SetHorizontalScrollBarVisibility(list,ScrollBarVisibility.Disabled);WheelScroll.SetIsEnabled(list,false);
@@ -237,8 +237,8 @@ public partial class MainWindow
         else if(cards.Length==0)
         {
             var empty=new StackPanel{HorizontalAlignment=HorizontalAlignment.Center,MaxWidth=370,Margin=new(24)};
-            var label=Text(liveLoading?"Загружаем подборку…":CatalogQualityChecking?"Проверяем качество раздач…":liveError.Length>0?"Каталог пока недоступен":SearchActive&&peopleSearchItems.Length>0?"Фильмы и сериалы не найдены":"Ничего не найдено",23);label.FontWeight=FontWeights.SemiBold;label.TextAlignment=TextAlignment.Center;empty.Children.Add(label);
-            var hint=Text(liveLoading?"Это займёт несколько секунд.":CatalogQualityChecking?"Фильмы появятся по мере проверки источников.":favoritesOnly?"Сохраняй фильмы и сериалы из карточки — они останутся под рукой.":"Попробуй другую страницу, запрос или сбрось фильтры.",13,true);hint.TextAlignment=TextAlignment.Center;empty.Children.Add(hint);
+            var label=Text(liveLoading?"Загружаем подборку…":CatalogQualityChecking?(prefs.CatalogQualityHeight==0?"Проверяем варианты загрузки…":"Проверяем качество раздач…"):liveError.Length>0?"Каталог пока недоступен":SearchActive&&peopleSearchItems.Length>0?"Фильмы и сериалы не найдены":"Ничего не найдено",23);label.FontWeight=FontWeights.SemiBold;label.TextAlignment=TextAlignment.Center;empty.Children.Add(label);
+            var hint=Text(liveLoading?"Это займёт несколько секунд.":CatalogQualityChecking?"Фильмы появятся по мере проверки источников.":favoritesOnly?"Сохраняй фильмы и сериалы из карточки — они останутся под рукой.":!SearchActive&&(prefs.HiddenTitles.Count>0||prefs.HiddenGenres.Count>0)?"Проверь скрытые названия и жанры в настройках или выбери другую страницу.":"Попробуй другую страницу, запрос или сбрось фильтры.",13,true);hint.TextAlignment=TextAlignment.Center;empty.Children.Add(hint);
             if(!liveLoading){var retry=ActionButton("Сбросить фильтры","IconRefresh",()=>ChangeCatalogFilter(()=>{favoritesOnly=false;ResetCatalogFilters();prefs.HidePoorQuality=false;prefs.CatalogQualityHeight=0;ResetCatalogQualityChecks();prefs.Save();}));retry.HorizontalAlignment=HorizontalAlignment.Center;empty.Children.Add(retry);}
             content.Children.Add(empty);
         }
@@ -381,7 +381,7 @@ public partial class MainWindow
                 items=result.Items;if(result.Offline)liveError="Часть источников недоступна · добавлены результаты из сохранённого каталога";
             }
             try{await catalogIndex.AddAsync(items,token);}catch(IOException){}catch(UnauthorizedAccessException){}
-            if(IsCurrent()){liveItems=items;if(items.Count==0)liveError="Ничего не найдено. Измени запрос или фильтры.";else if(!SearchActive&&prefs.CatalogQualityHeight==0)_ = CheckCatalogAvailability(items,key,category,token,forceRefresh);}
+            if(IsCurrent()){liveItems=items;if(items.Count==0)liveError="Ничего не найдено. Измени запрос или фильтры.";else if(!SearchActive&&!DiscoveryCatalog&&prefs.CatalogQualityHeight==0)_ = CheckCatalogAvailability(items,key,category,token,forceRefresh);}
         }
         catch(OperationCanceledException){}
         catch(Exception){if(IsCurrent())liveError="Источник временно недоступен. Повтори загрузку или выбери другую страницу.";}

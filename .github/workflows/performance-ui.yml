@@ -30,11 +30,13 @@ jobs:
           key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
           restore-keys: nuget-${{ runner.os }}-
       - name: Verify memory budgets, shared cancellation, persisted thumbnails and incremental search
-        run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --performance-only
+        run: |
+          dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --performance-only
+          dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --home-availability-only
       - name: Verify actual WPF viewport loading and responsive person profiles
         shell: pwsh
         run: |
-          foreach ($mode in @('cover-viewport','person-performance','startup-performance')) {
+          foreach ($mode in @('cover-viewport','person-performance','startup-performance','home-availability')) {
             $env:KACHALKA_DATA=Join-Path $PWD "test-output/performance/$mode/profile"
             $folder=Join-Path $env:KACHALKA_DATA 'downloads'
             New-Item -ItemType Directory -Force $folder | Out-Null

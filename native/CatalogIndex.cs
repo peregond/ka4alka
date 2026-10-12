@@ -15,6 +15,7 @@ public sealed class CatalogIndex
     sealed record Entry(MediaItem Item,DateTime SeenUtc);
     readonly Dictionary<string,Entry> entries=[];
     readonly Dictionary<string,MediaItem> identities=[];
+    readonly System.Collections.Concurrent.ConcurrentDictionary<string,ReleaseCache> releaseMemory=new();
     readonly SemaphoreSlim writer=new(1,1);
     readonly string path;
     const int Limit=3000;
@@ -95,6 +96,13 @@ public sealed class CatalogIndex
         await writer.WaitAsync();try{entries.Clear();identities.Clear();Revision++;}finally{writer.Release();}
     }
 
+    public ReleaseCache? RememberedReleases(MediaItem item)=>releaseMemory.GetValueOrDefault(MediaIdentity.StableKey(item));
+    void RememberReleases(MediaItem item,ReleaseCache snapshot)
+    {
+        if(releaseMemory.Count>=300)releaseMemory.TryRemove(releaseMemory.Keys.First(),out _);
+        releaseMemory[MediaIdentity.StableKey(item)]=snapshot;
+    }
+    public void ClearReleaseMemory()=>releaseMemory.Clear();
     public IReadOnlyList<SourceEntry> CachedReleases(MediaItem item)=>CachedReleaseSnapshot(item)?.Items??[];
     public ReleaseCache? CachedReleaseSnapshot(MediaItem item)
     {
@@ -105,7 +113,8 @@ public sealed class CatalogIndex
             if(!File.Exists(file))file=Path.Combine(Path.GetDirectoryName(path)!,"release-index",Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Key(item))))+".json");
             if(new FileInfo(file).Length>3*1024*1024)return null;
             var saved=JsonSerializer.Deserialize<ReleaseCache>(CacheFiles.ReadAllText(file));
-            return saved is {Items:not null}&&saved.SavedUtc>DateTime.UtcNow.AddDays(-7)&&saved.SavedUtc<=DateTime.UtcNow.AddMinutes(5)?saved:null;
+            if(saved is {Items:not null}&&saved.SavedUtc>DateTime.UtcNow.AddDays(-7)&&saved.SavedUtc<=DateTime.UtcNow.AddMinutes(5)){RememberReleases(item,saved);return saved;}
+            return null;
         }
         catch(IOException){return null;}catch(JsonException){return null;}catch(UnauthorizedAccessException){return null;}
     }
@@ -124,7 +133,7 @@ public sealed class CatalogIndex
                 return JsonSerializer.Serialize(snapshot,new JsonSerializerOptions{IgnoreReadOnlyProperties=true});
             },ct);
             await CacheFiles.WriteAllTextAsync(file,json,ct);
-            Revision++;
+            RememberReleases(item,snapshot);Revision++;
         }
         finally{writer.Release();}
     }

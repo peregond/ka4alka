@@ -130,6 +130,8 @@ public partial class MainWindow
             try{prefs.Save();ApplyLiteMode();Feedback(liteNotice,"Настройка сохранена.");}
             catch(Exception error){prefs.LiteMode=previous;prefs.LiteModeConfigured=configured;lite.IsChecked=previous;ApplyLiteMode();Feedback(liteNotice,"Не удалось сохранить настройки: "+error.Message,true);}
         };
+        var personal=Card("Скрытые названия и жанры","Выбери, что не показывать в каталоге и подборках. Поиск, сохранённое и загрузки остаются доступны.","IconMovies");
+        RenderHiddenCatalogSettings(personal);
         var catalogue=Card("Каталог","Выбери страну для отечественных подборок фильмов и сериалов.","IconMovies");
         var countryLabel=Hint("Отечественное кино");countryLabel.Margin=new(0,0,0,7);catalogue.Children.Add(countryLabel);
         var homeCountries=CatalogChoices.Countries.OrderBy(choice=>choice.Label).ToArray();

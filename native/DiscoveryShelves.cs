@@ -80,9 +80,9 @@ public partial class MainWindow
     DiscoveryRegionalPage DiscoveryRegionalItems(string category,string homeCountry,MediaItem[] cards)
     {
         discoveryRegions.TryGetValue(category+"|"+homeCountry,out var saved);
-        var foreign=(saved?.Foreign??[]).Concat(cards).Where(item=>CatalogRegions.IsForeign(item,homeCountry)&&!NoDownloads(item)&&CatalogQualityMatches(item)).DistinctBy(item=>item.Id).Take(40).ToArray();
-        var native=(saved?.Native??[]).Concat(cards).Where(item=>CatalogRegions.IsNative(item,homeCountry)&&!NoDownloads(item)&&CatalogQualityMatches(item)).DistinctBy(item=>item.Id).Take(40).ToArray();
-        return new(foreign,native,saved?.Loading??false);
+        var foreign=(saved?.Foreign??[]).Concat(cards).Where(item=>CatalogRegions.IsForeign(item,homeCountry)&&!NoDownloads(item)&&RecommendableTitle(item)&&PersonallyVisible(item)&&CatalogQualityMatches(item)).DistinctBy(item=>item.Id).Take(40).ToArray();
+        var native=(saved?.Native??[]).Concat(cards).Where(item=>CatalogRegions.IsNative(item,homeCountry)&&!NoDownloads(item)&&RecommendableTitle(item)&&PersonallyVisible(item)&&CatalogQualityMatches(item)).DistinctBy(item=>item.Id).Take(40).ToArray();
+        return new(foreign,native,(saved?.Loading??false)||CatalogQualityChecking);
     }
     void SetDiscoveryRegionalItems(string category,string homeCountry,MediaItem[] foreign,MediaItem[] native,bool loading=false)
     {

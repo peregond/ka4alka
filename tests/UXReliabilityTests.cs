@@ -11,6 +11,7 @@ static class UXReliabilityTests
         SourceCheck[] empty=[new("Index",SourceState.Empty,CheckedUtc:now),new("Russian",SourceState.Empty,CheckedUtc:now)];
         await index.CacheReleasesAsync(movie,[],empty);
         var saved=index.CachedReleaseSnapshot(movie);
+        Check(!ReleaseAvailability.Recommended(saved,now)&&!ReleaseAvailability.Recommended(null,now),"empty and unchecked metadata cards are not homepage recommendations");
         Check(ReleaseAvailability.Hidden(saved,now),"successfully checked film without any releases is hidden from the feed");
         Check(ReleaseAvailability.Hidden(new CatalogIndex(Path.Combine(root,"availability-index")).CachedReleaseSnapshot(movie),now),"empty-release evidence survives restart");
         Check(!ReleaseAvailability.Hidden(saved,now.AddDays(1).AddSeconds(1)),"a hidden film becomes eligible for a fresh check after one day");
@@ -21,6 +22,8 @@ static class UXReliabilityTests
         await index.CacheReleasesAsync(movie,[release]);
         Check(!ReleaseAvailability.Hidden(index.CachedReleaseSnapshot(movie),now),"a found release restores the film even when indexed seed count is zero");
         var prior=index.CachedReleaseSnapshot(movie);
+        Check(ReleaseAvailability.Recommended(prior,now)&&index.RememberedReleases(movie)!=null,"actual downloadable links qualify a homepage card and populate the memory-only rendering cache");
+        Check(!ReleaseAvailability.Recommended(prior! with{SavedUtc=now.AddDays(-8)},now),"expired availability cannot promote a new-user recommendation");
         await index.CacheReleasesAsync(movie,[],[new("Offline",SourceState.Unavailable)]);
         Check(index.CachedReleaseSnapshot(movie)?.SavedUtc==prior!.SavedUtc,"network failure preserves known download options and their timestamp");
         var english=release with{Id="english",Source="The Pirate Bay",Title="Movie (2026) ENG 1080p",Seeds=900};
