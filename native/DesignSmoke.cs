@@ -311,6 +311,40 @@ public partial class MainWindow
                 if(seasonReleases.Length!=1||seasonReleases[0].Id!="series-s01"||seasonFilter.SelectedItem?.ToString()!="1 сезон")throw new Exception("Choosing a season in the strip did not filter its releases.");
                 await Size(1280,820);firstSeason=FindVisual<RadioButton>(Body,x=>AutomationProperties.GetName(x)=="Сезон: 1 сезон")!;firstSeason.BringIntoView();await Settle();Shot("series-season-strip");
             }
+            {
+                // A long series (South Park has 27 seasons) must not run past the window: the strip scrolls sideways, keeps the
+                // chosen season in view, offers arrows and a list of every season, and the list can choose one.
+                var longShow=show with{Id=-987654317,Title="Южный парк",OriginalTitle="South Park",PageUrl="https://example.invalid/design/long-show"};
+                var longSeasons=Enumerable.Range(1,27).Select(number=>firstEpisode with{Id="long-s"+number.ToString("00"),Title=$"South Park S{number:00}E01 WEB-DL 1080p",TorrentUrl="magnet:?xt=urn:btih:"+number.ToString("x40"),Seeds=10+number}).ToArray();
+                requestedDetails.Add(longShow.Id);cardMetadata[longShow.Id]=Task.FromResult(longShow);liveReleases[longShow.Id]=longSeasons;
+                ReleaseSelection(longShow.Id).Filters["Сезон"]="24 сезон";
+                await Size(1000,820);section="Сериалы";current=longShow;Render();await Settle();
+                var chosenSeason=FindVisual<RadioButton>(Body,x=>AutomationProperties.GetName(x)=="Сезон: 24 сезон")??throw new Exception("Long series: the chosen season is missing from the strip.");
+                DependencyObject? up=chosenSeason;while(up!=null&&up is not ScrollViewer)up=System.Windows.Media.VisualTreeHelper.GetParent(up);
+                var seasonScroller=up as ScrollViewer??throw new Exception("Long series: the season strip is not scrollable.");
+                var seasonFrame=FindVisual<Border>(Body,x=>AutomationProperties.GetName(x)=="Сезоны сериала")??throw new Exception("Long series: the season strip frame is missing.");
+                if(seasonScroller.ScrollableWidth<=0||seasonFrame.ActualWidth>Body.ActualWidth+1)throw new Exception("Long series: the season strip runs past the window instead of scrolling.");
+                var seasonBounds=chosenSeason.TransformToAncestor(seasonScroller).TransformBounds(new Rect(0,0,chosenSeason.ActualWidth,chosenSeason.ActualHeight));
+                if(!chosenSeason.IsChecked.GetValueOrDefault()||seasonBounds.Left<-1||seasonBounds.Right>seasonScroller.ViewportWidth+1)throw new Exception("Long series: the chosen season is not in view.");
+                var seasonBack=FindVisual<Button>(Body,x=>AutomationProperties.GetName(x)=="Прокрутить влево: Сезоны сериала")??throw new Exception("Long series: the back arrow is missing.");
+                var seasonList=FindVisual<Button>(Body,x=>AutomationProperties.GetName(x)=="Показать весь список: Сезоны сериала")??throw new Exception("Long series: the season list button is missing.");
+                if(!seasonBack.IsVisible||!seasonList.IsVisible)throw new Exception("Long series: the scroll controls are hidden although the strip overflows.");
+                FindVisual<ScrollViewer>(Body,_=>true)?.ScrollToTop();await Settle();Shot("series-long-strip");
+                var offsetBefore=seasonScroller.HorizontalOffset;
+                if(seasonBack.IsEnabled)
+                {
+                    seasonBack.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));await Settle();
+                    if(seasonScroller.HorizontalOffset>=offsetBefore)throw new Exception("Long series: the back arrow did not scroll the strip.");
+                }
+                seasonList.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));await Settle();
+                var seasonMenu=seasonList.ContextMenu??throw new Exception("Long series: the season list has no menu.");
+                var menuSeasons=seasonMenu.Items.OfType<MenuItem>().ToArray();
+                if(menuSeasons.Length!=28||menuSeasons.Count(x=>x.IsChecked)!=1||menuSeasons.Single(x=>x.IsChecked).Tag?.ToString()!="24 сезон")throw new Exception("Long series: the season list does not name every season with the chosen one marked.");
+                menuSeasons.Single(x=>Equals(x.Tag,"3 сезон")).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));await Settle();
+                var menuReleases=VisualElements<Button>(Body).Where(x=>x.IsVisible&&x.Tag is SourceEntry&&x.Name!="DetailDownload").Select(x=>(SourceEntry)x.Tag).ToArray();
+                if(menuReleases.Length!=1||menuReleases[0].Id!="long-s03")throw new Exception("Long series: choosing a season in the list did not filter its releases.");
+                seasonMenu.IsOpen=false;
+            }
             await Size(1760,950);section="Загрузки";current=null;Render();await Settle();
             if(downloads.Items.Count!=0||downloads.EngineCreated)throw new Exception("Design smoke unexpectedly created a download.");
             Shot("downloads-empty");
@@ -388,7 +422,7 @@ public partial class MainWindow
                 UiActions=uiActions,WindowFrame=windowFrame,
                 WheelScrolling=wheelScrolling,
                 SourceFailureVisible=true,SourceProgressPreservesOpenFilter=true,SourceProgressPreservesScroll=true,SourceRetryState=true,
-                WidthChecks=checks,Screens=new[]{"sources-light","sources-dark","sources-510","search-light","search-dark","search-small","search-minimum","settings-light","settings-dark","settings-small","settings-minimum","catalog-light","catalog-dark","detail-wide-light","detail-wide-dark","detail-720","release-720","detail-510","release-510","short-description-expanded","series-season-filter","downloads-empty","downloads-light","downloads-dark","downloads-510","downloads-360"}
+                WidthChecks=checks,Screens=new[]{"sources-light","sources-dark","sources-510","search-light","search-dark","search-small","search-minimum","settings-light","settings-dark","settings-small","settings-minimum","catalog-light","catalog-dark","detail-wide-light","detail-wide-dark","detail-720","release-720","detail-510","release-510","short-description-expanded","series-season-filter","series-long-strip","downloads-empty","downloads-light","downloads-dark","downloads-510","downloads-360"}
             },new JsonSerializerOptions{WriteIndented=true}));
         }
         catch(Exception error)

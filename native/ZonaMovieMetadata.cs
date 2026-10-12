@@ -74,6 +74,8 @@ public static class ZonaMovieMetadata
             }
             return item with
             {
+                // A card that arrived without a cover (from a download, a person's filmography, a search) takes the page's own.
+                ImageUrl=string.IsNullOrWhiteSpace(item.ImageUrl)?ZonaPoster.FromJson(movie):item.ImageUrl,
                 Description=Text(Field(movie,"description")),OriginalTitle=original.Length>0?original:null,
                 Kinopoisk=Score(Field(movie,"rating_kinopoisk")),Imdb=Score(Field(movie,"rating_imdb")),
                 People=people.DistinctBy(x=>(Normalize(x.Name),x.Role,x.SourcePersonId)).Take(80).OrderBy(x=>x.Role switch{"Актёры"=>0,"Режиссёры"=>1,_=>2}).ToArray(),

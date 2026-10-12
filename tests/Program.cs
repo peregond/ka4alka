@@ -66,6 +66,8 @@ DownloadFolderTests.Run();
 ReleaseQualityTests.Run();
 ReleaseAudioTests.Run();
 FeaturePosterTests.Run();
+ZonaPosterTests.Run();
+ScrollStripTests.Run();
 PosterBlurTests.Run();
 AdditionalSourceTests.Run();
 await TorrentRelayTests.Run(root);
