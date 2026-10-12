@@ -127,7 +127,7 @@ internal static class Program
 
     static async Task WaitPosters(MainWindow window,string stage,int minimum=4)
     {
-        var until=DateTime.UtcNow.AddSeconds(45);string last="";var stable=DateTime.UtcNow;
+        var until=DateTime.UtcNow.AddSeconds(75);string last="";var stable=DateTime.UtcNow;
         while(DateTime.UtcNow<until&&DateTime.UtcNow<Deadline)
         {
             await Settle(window);
@@ -138,7 +138,7 @@ internal static class Program
             await Task.Delay(200);
         }
         var current=VisiblePosters(window);var loaded=current.Count(Loaded);
-        if(loaded<minimum)throw new InvalidOperationException(stage+": real application loaded only "+loaded+" visible source posters; catalogue error: "+Field(window,"liveError"));
+        if(loaded<minimum||current.Any(image=>!Loaded(image)))throw new InvalidOperationException(stage+": real application loaded only "+loaded+" visible source posters; pending="+current.Count(image=>!Loaded(image))+"; catalogue error: "+Field(window,"liveError"));
         Console.WriteLine(stage+": actual source posters loaded="+loaded+", unavailable or still pending="+current.Count(image=>!Loaded(image)));
     }
     static void FreezeRefresh(MainWindow window)
@@ -177,7 +177,7 @@ internal static class Program
         window.WindowState=WindowState.Normal;window.MaxWidth=1920;window.MaxHeight=1200;window.Width=1440;window.Height=900;window.Left=0;window.Top=0;
         await Settle(window);
         await Until(()=>Field(window,"liveLoading") is false&&Field(window,"liveItems") is IEnumerable rows&&rows.Cast<object>().Any(),TimeSpan.FromSeconds(80),"Actual default source catalogue did not load.");
-        await Task.Delay(2000);FreezeRefresh(window);await WaitPosters(window,"Film catalogue");await Task.Delay(8000);await Settle(window);Save(window,"catalog-dark.png");
+        await Task.Delay(2000);FreezeRefresh(window);await WaitPosters(window,"Film catalogue");await Task.Delay(8000);await WaitPosters(window,"Final film catalogue");await Settle(window);Save(window,"catalog-dark.png");
         Call(window,"ToggleTheme",window,new RoutedEventArgs());await Settle(window);FreezeRefresh(window);await WaitPosters(window,"Light film catalogue");Save(window,"catalog-light.png");
         Call(window,"ToggleTheme",window,new RoutedEventArgs());await Settle(window);
         var movieButton=Visuals<Button>(window).FirstOrDefault(button=>button.Tag is MediaItem movie&&movie.Section=="Фильмы"&&movie.IsLive&&
