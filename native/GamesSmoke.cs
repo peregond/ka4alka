@@ -68,6 +68,7 @@ public partial class MainWindow
 
         popular.SetResult(new(games,false));await Settle();
         Check(carousel is {} banner&&banner.Slides[0].Id==spotlight.Id&&banner.Slides.Length==5&&banner.Slides[4].Id==game.Id&&banner.Eyebrow.Text=="В центре внимания"&&Equals(banner.About.Tag,spotlight),"the popular shelf becomes a five-slide banner with its first game in the spotlight");
+        Check(games.All(x=>x.CardMeta=="")&&games[0].CardMeta!="Windows"&&(games[0] with{Year=2022,Genre="Экшены, RPG"}).CardMeta=="2022 · Экшены","a game card shows no placeholder caption, and its year and genre once they are known");
         Check(discoveryShelves.Count==2&&discoveryShelves[DiscoveryShelfKind.Popular].Row.Content is CatalogRow popularRow&&popularRow.Items.Any(x=>x.Id==game.Id)&&discoveryShelves[DiscoveryShelfKind.Popular].Row.ContentTemplate==FindResource("GameRow"),"the popular shelf lists games on wide capsule cards");
         Check(discoveryShelves[DiscoveryShelfKind.New].Row.Visibility!=Visibility.Visible&&FindVisual<TextBlock>(Body,x=>x.Text=="Новые игры")!=null,"the new releases shelf waits for its own request under its own title");
         if(!prefs.LiteMode)
@@ -115,6 +116,7 @@ public partial class MainWindow
         Check(VisualElements<TextBlock>(Body).Any(x=>x.Text=="Репак")&&VisualElements<Border>(Body).Any(b=>b.Child is TextBlock {Text:"FitGirl"})&&VisualElements<Border>(Body).Any(b=>b.Child is TextBlock {Text:"Русский язык"}),"a release row names its kind, repack author and language from its title");
         Check(VisualElements<Button>(Body).Any(b=>AutomationProperties.GetName(b).StartsWith("Скачать раздачу:")&&b.Name!="GameDownload"),"the rows keep the shared download action");
         await Settle();Shot("game-detail-dark");
+        gameScroll!.ScrollToVerticalOffset(gameScroll.ScrollableHeight);await Settle();Shot("game-detail-releases");gameScroll.ScrollToVerticalOffset(0);await Settle();
         await Size(700,900);Shot("game-detail-narrow");
         await Size(1280,900);
         var old=prefs.LiveFavorites.ToList();var oldIds=new HashSet<int>(prefs.Favorites);
