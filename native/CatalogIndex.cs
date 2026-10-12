@@ -117,8 +117,13 @@ public sealed class CatalogIndex
         try
         {
             ct.ThrowIfCancellationRequested();
-            var file=ReleasePath(item);Directory.CreateDirectory(Path.GetDirectoryName(file)!);
-            await CacheFiles.WriteAllTextAsync(file,JsonSerializer.Serialize(new ReleaseCache(DateTime.UtcNow,releases.Take(300).ToArray(),sources?.ToArray()),new JsonSerializerOptions{IgnoreReadOnlyProperties=true}),ct);
+            var file=ReleasePath(item);var snapshot=new ReleaseCache(DateTime.UtcNow,releases.Take(300).ToArray(),sources?.ToArray());
+            var json=await Task.Run(()=>
+            {
+                ct.ThrowIfCancellationRequested();Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+                return JsonSerializer.Serialize(snapshot,new JsonSerializerOptions{IgnoreReadOnlyProperties=true});
+            },ct);
+            await CacheFiles.WriteAllTextAsync(file,json,ct);
             Revision++;
         }
         finally{writer.Release();}
