@@ -12,11 +12,11 @@ public partial class MainWindow
         void Save(Action change)
         {
             var titles=prefs.HiddenTitles.ToList();var genres=new HashSet<string>(prefs.HiddenGenres);
-            try{change();prefs.Save();ScheduleCatalogEvidenceRefresh();Status.Text="Каталог настроен. Вернуть скрытое можно в настройках.";}
+            try{change();prefs.Save();if(section=="Игры")Dispatcher.BeginInvoke(new Action(()=>{if(section=="Игры"&&current==null)Render();}));else ScheduleCatalogEvidenceRefresh();Status.Text="Каталог настроен. Вернуть скрытое можно в настройках.";}
             catch(Exception error){prefs.HiddenTitles=titles;prefs.HiddenGenres=genres;Status.Text="Не удалось сохранить выбор: "+error.Message;}
         }
         var hidden=HiddenCatalog.TitleHidden(item,prefs.HiddenTitles);
-        var title=new MenuItem{Header=hidden?"Вернуть в каталог":item.Section=="Сериалы"?"Скрыть сериал из каталога":"Скрыть фильм из каталога"};
+        var title=new MenuItem{Header=hidden?"Вернуть в каталог":item.Section=="Сериалы"?"Скрыть сериал из каталога":item.Section=="Игры"?"Скрыть игру из каталога":"Скрыть фильм из каталога"};
         title.Click+=(_,_)=>Save(()=>
         {
             if(hidden)prefs.HiddenTitles.RemoveAll(row=>row.Section==item.Section&&(row.CatalogId==item.Id||row.Identity==HiddenCatalog.Title(item).Identity));

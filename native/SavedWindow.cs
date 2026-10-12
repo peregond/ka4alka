@@ -27,7 +27,7 @@ public partial class MainWindow
     MediaItem[] SavedItems()=>MediaIdentity.Merge(prefs.LiveFavorites.AsEnumerable().Reverse()
         .Concat(liveItems.Concat(catalogIndex.Recent("Фильмы",200)).Concat(catalogIndex.Recent("Сериалы",200)).Concat(Catalog.Items)
             .Where(item=>prefs.Favorites.Contains(item.Id)))
-        .Where(item=>item.Section is "Фильмы" or "Сериалы").DistinctBy(item=>item.Id));
+        .Where(item=>item.Section is "Фильмы" or "Сериалы" or "Игры").DistinctBy(item=>item.Id));
     void ShowSaved(object sender,RoutedEventArgs e)
     {
         searchDelay.Stop();liveRequest?.Cancel();liveLoading=false;
@@ -56,7 +56,7 @@ public partial class MainWindow
         var title=Text("Сохранённое",compactHeight?22:28);title.FontWeight=FontWeights.SemiBold;title.Margin=new(0);heading.Children.Add(title);PageHeader.Children.Add(heading);
         var toolbar=new DockPanel();catalogToolbar=toolbar;
         var filters=inlineCatalogFilters=new StackPanel{Orientation=Orientation.Horizontal};
-        foreach(var (key,label) in new[]{("","Все"),("Фильмы","Фильмы"),("Сериалы","Сериалы")})
+        foreach(var (key,label) in new[]{("","Все"),("Фильмы","Фильмы"),("Сериалы","Сериалы"),("Игры","Игры")})
         {
             var total=saved.Count(item=>key.Length==0||item.Section==key);
             var button=Button(label+" · "+total,()=>{savedCategory=key;savedPage=1;Render();});button.Style=(Style)FindResource("PillButton");

@@ -33,10 +33,11 @@ jobs:
         run: |
           dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --performance-only
           dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --home-availability-only
+          dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --games-only
       - name: Verify actual WPF viewport loading and responsive person profiles
         shell: pwsh
         run: |
-          foreach ($mode in @('cover-viewport','person-performance','startup-performance','home-availability')) {
+          foreach ($mode in @('cover-viewport','person-performance','startup-performance','home-availability','games')) {
             $env:KACHALKA_DATA=Join-Path $PWD "test-output/performance/$mode/profile"
             $folder=Join-Path $env:KACHALKA_DATA 'downloads'
             New-Item -ItemType Directory -Force $folder | Out-Null

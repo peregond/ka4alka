@@ -99,7 +99,7 @@ public static class KnabenSource
             if(!string.Equals(tracker,"RuTracker",StringComparison.OrdinalIgnoreCase)&&
                !string.Equals(tracker,"RuTracker.org",StringComparison.OrdinalIgnoreCase))continue;
             var title=String(row,"title")?.Trim();
-            if(string.IsNullOrWhiteSpace(title)||title.Length>500||!VideoCategoryPattern.IsMatch(String(row,"category")??""))continue;
+            if(string.IsNullOrWhiteSpace(title)||title.Length>500||!(item.Section=="Игры"?Regex.IsMatch(String(row,"category")??"",@"(?i)(?:games?.*(?:pc|windows)|pc.*games?|windows.*games?|игры.*(?:pc|пк))"):VideoCategoryPattern.IsMatch(String(row,"category")??"")))continue;
             var hash=String(row,"hash");
             if(hash==null||!HashPattern.IsMatch(hash))
             {
@@ -114,7 +114,7 @@ public static class KnabenSource
             var size=Long(row,"bytes");
             var seeds=Count(row,"seeders");
             var entry=new SourceEntry("RuTracker:"+hash,title,"RuTracker",page,magnetUrl,null,size,seeds){Via="Knaben",Leechers=Count(row,"leechers")};
-            if(!LiveCatalog.Matches(item,entry))continue;
+            if(item.Section=="Игры"?!GameReleaseSources.Matches(item,entry):!LiveCatalog.Matches(item,entry))continue;
             if(item.Section=="Фильмы"&&item.Year>0&&!Regex.IsMatch(title,@"(?<!\d)"+item.Year+@"(?!\d)"))continue;
             entries.Add(entry);
         }

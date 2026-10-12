@@ -12,6 +12,7 @@ public static class DownloadMetadata
     public static MediaItem? Card(DownloadItem item)
     {
         var section=item.MediaSection;
+        if(section=="Игры"&&GameCatalog.TryId(item.MediaPageUrl,out var gameId))return GameCatalog.Item(gameId,item.DisplayName,item.ImageUrl) with{Year=item.MediaYear};
         if(section is not ("Фильмы" or "Сериалы")||!Uri.TryCreate(item.MediaPageUrl,UriKind.Absolute,out var page)||page.Scheme!="https"||!page.IsDefaultPort||page.UserInfo.Length>0||page.Query.Length>0||page.Fragment.Length>0)return null;
         if(page.Host=="www.imdb.com")return ImdbCard(item,section,page);
         if(page.Host!="w6.zona.plus")return null;

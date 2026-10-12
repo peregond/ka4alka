@@ -11,6 +11,7 @@ public partial class MainWindow
     void SubmitSearch(object sender,RoutedEventArgs e)
     {
         if(OpenShareLink(Search.Text))return;
+        if(section=="Игры"||current?.Section=="Игры"){section="Игры";SubmitGameSearch();return;}
         ResetCatalogNavigationPosition();
         searchDelay.Stop();
         if(section is not ("Фильмы" or "Сериалы"))section=current?.Section is "Фильмы" or "Сериалы"?current.Section:lastCatalogSection;
@@ -35,7 +36,7 @@ public partial class MainWindow
         // Release searches have their own indicator beside the release results.
         var details=current?.IsLive==true&&DetailMetadataLoading(current.Id)&&!MediaMetadata.HasDescription(current);
         // A film page shows breathing placeholders in place of its synopsis and releases instead of this bar.
-        var loading=activePerson!=null||current!=null?false:section is "Фильмы" or "Сериалы"?liveLoading&&!favoritesOnly:section=="Источники"?searching:section is "Музыка" or "Игры" or "Программы"?archiveLoading:section is "ТВ-каналы" or "Радио" or "Спорт"?broadcastLoading:false;
+        var loading=activePerson!=null||current!=null?false:section is "Фильмы" or "Сериалы"?liveLoading&&!favoritesOnly:section=="Источники"?searching:section=="Игры"?gameLoading:section is "Музыка" or "Программы"?archiveLoading:section is "ТВ-каналы" or "Радио" or "Спорт"?broadcastLoading:false;
         LoadingIndicator.Visibility=loading?Visibility.Visible:Visibility.Collapsed;
         LoadingLabel.Text=details?"Загружаем информацию…":SearchActive&&(section is "Фильмы" or "Сериалы")?"Ищем фильмы и сериалы…":"Загружаем страницу…";
     }

@@ -48,7 +48,7 @@ public record MediaItem(int Id, string Title, string Section, string Genre, int 
     [JsonIgnore] public string AllGenres=>InlineMetadata(liveGenre??Genre);
     [JsonIgnore] public string CardRatingSource => KpAvailable?"Кинопоиск":ImdbAvailable?"IMDb":"Оценка пока недоступна";
     static string InlineMetadata(string? value)=>string.Join(", ",(value??"").Split(',').Select(part=>Regex.Replace(part,@"\s+"," ").Trim()).Where(part=>part.Length>0));
-    [JsonIgnore] public string CardGenre {get{var value=InlineMetadata(liveGenre??Genre);return value.Length==0?Section=="Сериалы"?"Сериал":"Фильм":value;}}
+    [JsonIgnore] public string CardGenre {get{var value=InlineMetadata(liveGenre??Genre);return value.Length==0?Section=="Сериалы"?"Сериал":Section=="Игры"?"Игра для Windows":"Фильм":value;}}
     string bestQuality="";
     [JsonIgnore] public string BestQuality=>bestQuality;
     [JsonIgnore] public bool HasQuality=>bestQuality.Length>0;
@@ -75,7 +75,7 @@ public record MediaItem(int Id, string Title, string Section, string Genre, int 
         if(quality!=bestQuality){bestQuality=quality;PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(BestQuality)));PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(HasQuality)));}
     }
     public void SetScores(string kp,string imdb,string? genre=null){if(!string.IsNullOrWhiteSpace(genre))liveGenre=genre;liveKp=kp;liveImdb=imdb;liveScores=$"КП {kp}   IMDb {imdb}";PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(null));}
-    [JsonIgnore] public string Subtitle => Cinema ? string.Join(" · ",new[]{Section=="Сериалы"?"Сериал":"Фильм",Year>0?Year.ToString():null,InlineMetadata(Genre)}.Where(x=>!string.IsNullOrWhiteSpace(x))) : "Демонстрационный каталог";
+    [JsonIgnore] public string Subtitle => Cinema ? string.Join(" · ",new[]{Section=="Сериалы"?"Сериал":Section=="Игры"?"Игра для Windows":"Фильм",Year>0?Year.ToString():null,InlineMetadata(Genre)}.Where(x=>!string.IsNullOrWhiteSpace(x))) : "Демонстрационный каталог";
     [JsonIgnore] public Brush Cover { get { var b = new LinearGradientBrush((Color)ColorConverter.ConvertFromString(Color), (Color)ColorConverter.ConvertFromString("#20262E"), 75); b.Freeze(); return b; } }
 }
 public record CatalogRow(MediaItem[] Items,int Columns);

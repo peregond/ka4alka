@@ -15,6 +15,7 @@
   </Style>
   <Geometry x:Key="IconMovies">M3,5 L21,5 21,21 3,21 Z M3,10 L21,10 M7,5 L11,10 M14,5 L18,10</Geometry>
   <Geometry x:Key="IconSeries">M3,7 L21,7 21,20 3,20 Z M8,3 L12,7 16,3</Geometry>
+  <Geometry x:Key="IconGame">M7,7 L17,7 C20,7 22,16 20,18 C18,20 16,16 15,15 L9,15 C8,16 6,20 4,18 C2,16 4,7 7,7 M6,10 L6,14 M4,12 L8,12 M16,11 L17,11 M18,13 L19,13</Geometry>
   <Geometry x:Key="IconDevice">M3,4 L21,4 21,16 3,16 Z M12,16 L12,21 M8,21 L16,21</Geometry>
   <Geometry x:Key="IconDownload">M12,3 L12,16 M7,11 L12,16 17,11 M4,17 L4,21 20,21 20,17</Geometry>
   <Geometry x:Key="IconSettings">M4,7 L20,7 M4,17 L20,17 M8,4 L8,10 M16,14 L16,20</Geometry>
@@ -105,6 +106,19 @@
      </StackPanel>
     </Button>
    </DataTemplate></ItemsControl.ItemTemplate></local:PosterRow>
+  </DataTemplate>
+  <DataTemplate x:Key="GameRow">
+   <local:PosterRow ItemsSource="{Binding Items}" Margin="0,0,-16,0"><ItemsControl.ItemsPanel><ItemsPanelTemplate><local:PosterGrid Columns="{Binding Columns}"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+    <ItemsControl.ItemTemplate><DataTemplate>
+     <Button Click="OpenCard" ContextMenuOpening="CatalogPosterMenu" Tag="{Binding}" Style="{StaticResource PosterButton}" Padding="0" Margin="0,5,16,18" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Top" AutomationProperties.Name="{Binding Title,StringFormat='Открыть игру {0}'}"><Button.ContextMenu><ContextMenu/></Button.ContextMenu>
+      <StackPanel>
+       <Border Background="{DynamicResource Panel}" CornerRadius="12" Height="125" SizeChanged="GamePosterSized"><Image Loaded="SourceCover" DataContextChanged="SourceCoverChanged" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality"/></Border>
+       <TextBlock Text="{Binding Title}" Margin="2,9,2,0" Height="36" FontSize="14" LineHeight="18" FontWeight="SemiBold" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding Title}"/>
+       <TextBlock Text="Windows" Margin="2,3,2,0" FontSize="12" Foreground="{DynamicResource Subtle}"/>
+      </StackPanel>
+     </Button>
+    </DataTemplate></ItemsControl.ItemTemplate>
+   </local:PosterRow>
   </DataTemplate>
   <Style x:Key="RowIconButton" TargetType="Button" BasedOn="{StaticResource IconButton}">
    <Setter Property="Margin" Value="4,0,0,0"/><Setter Property="Foreground" Value="{DynamicResource Muted}"/>
