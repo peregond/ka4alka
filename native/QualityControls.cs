@@ -10,7 +10,7 @@ public partial class MainWindow
     readonly Dictionary<int,ReleaseCache> qualitySnapshots=[];
     SourceEntry[] KnownQuality(MediaItem item)
     {
-        qualitySnapshots.TryGetValue(item.Id,out var known);
+        var known=CatalogReleaseEvidence(item);
         if(releaseViews.TryGetValue(item.Id,out var view)&&
            (view.ReceivedUtc??view.SavedUtc)>DateTime.UtcNow.AddDays(-7)&&
            (known==null||(view.ReceivedUtc??view.SavedUtc)>=known.SavedUtc)&&liveReleases.TryGetValue(item.Id,out var rows))return rows.ToArray();

@@ -50,6 +50,8 @@ public partial class MainWindow
                 prefs.HiddenTitles.Clear();var genreMenu=(MenuItem)CatalogPersonalMenu(good).Items[1];var genreOption=(MenuItem)genreMenu.Items[0];genreOption.IsChecked=true;genreOption.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));Render();UpdateLayout();
                 Check(catalogDisplay.Count==0&&carousel==null,category+": hidden genre filters banners and the main catalog");
                 prefs.HiddenGenres.Clear();prefs.Save();Render();UpdateLayout();Check(catalogDisplay.Any(item=>item.Id==good.Id),category+": restoring choices returns the title without another network scan");
+                qualitySnapshots[good.Id]=new(DateTime.UtcNow.AddMinutes(-10),[]);
+                Render();UpdateLayout();Check(catalogDisplay.Any(item=>item.Id==good.Id)&&good.HasReleaseResolution(1080),category+": newer remembered releases replace an older empty quality view after returning from details");
             }
             section="Настройки";current=null;Render();UpdateLayout();
             Check(VisualElements<TextBlock>(Body).Any(text=>text.Text=="Скрытые названия и жанры"),"native Settings expose the reversible hidden-content controls");

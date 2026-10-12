@@ -12,7 +12,12 @@ public static class ReleaseAvailability
 public partial class MainWindow
 {
     bool NoDownloads(MediaItem item)=>ReleaseAvailability.Hidden(catalogIndex.RememberedReleases(item),DateTime.UtcNow);
-    bool RecommendableTitle(MediaItem item)=>ReleaseAvailability.Recommended(qualitySnapshots.GetValueOrDefault(item.Id)??catalogIndex.RememberedReleases(item),DateTime.UtcNow);
+    ReleaseCache? CatalogReleaseEvidence(MediaItem item)
+    {
+        var quality=qualitySnapshots.GetValueOrDefault(item.Id);var remembered=catalogIndex.RememberedReleases(item);
+        return remembered!=null&&(quality==null||remembered.SavedUtc>=quality.SavedUtc)?remembered:quality;
+    }
+    bool RecommendableTitle(MediaItem item)=>ReleaseAvailability.Recommended(CatalogReleaseEvidence(item),DateTime.UtcNow);
     async Task CheckCatalogAvailability(IReadOnlyList<MediaItem> items,string key,string category,CancellationToken token,bool force=false)
     {
         // Scan just the current page, never all thousands of metadata records.
