@@ -66,11 +66,13 @@ public partial class MainWindow
     void RenderGameDetail(MediaItem game)
     {
         SetBack(SavedBackLabel()??DownloadBackLabel()??"Игры",GameBack);
+        if(!GameCatalog.TryId(game.PageUrl,out var steamId)){PageHeader.Children.Add(Text("Не удалось открыть карточку игры: неизвестный адрес Steam.",14,true));return;}
         var content=new StackPanel{Margin=new(4)};Body.Children.Add(new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=content,VerticalScrollBarVisibility=ScrollBarVisibility.Auto});
         var title=gameTitle=Text(game.Title,28);title.FontWeight=FontWeights.SemiBold;content.Children.Add(title);
         var poster=gameCover=new Image{DataContext=game,Height=180,Stretch=Stretch.UniformToFill,HorizontalAlignment=HorizontalAlignment.Left,MaxWidth=460,Margin=new(0,12,0,12)};poster.Width=Math.Min(460,Math.Max(160,Body.ActualWidth-20));poster.Height=poster.Width*9/16;poster.Loaded+=SourceCover;poster.DataContextChanged+=SourceCoverChanged;content.Children.Add(poster);
         var actions=new WrapPanel();actions.Children.Add(ActionButton(IsSaved(game)?"Сохранено":"Сохранить",IsSaved(game)?"IconHeartFilled":"IconHeart",()=>{ToggleSaved(current??game);Render();},"PillButton"));
-        actions.Children.Add(Button("Открыть в Steam",()=>System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(game.PageUrl!){UseShellExecute=true})));content.Children.Add(actions);
+        actions.Children.Add(Button("Открыть в Steam",()=>System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(game.PageUrl!){UseShellExecute=true})));
+        var steamDb=Button("SteamDB",()=>System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://steamdb.info/app/"+steamId+"/"){UseShellExecute=true}));steamDb.ToolTip="Цены, статистика игроков и история изменений на SteamDB";actions.Children.Add(steamDb);content.Children.Add(actions);
         gameDescription=Text(gameDetails.TryGetValue(game.Id,out var detail)?detail.Item.Description??"Описание пока недоступно.":"Загружаем описание…",14);gameDescription.Margin=new(0,14,0,8);content.Children.Add(gameDescription);
         gameRequirements=Text(detail==null?"":GameRequirements(detail),12,true);content.Children.Add(gameRequirements);
         var releaseHeading=Text("Варианты загрузки",22);releaseHeading.Margin=new(0,22,0,10);content.Children.Add(releaseHeading);
