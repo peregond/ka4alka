@@ -164,7 +164,8 @@ jobs:
         run: |
           $env:KACHALKA_DATA=Join-Path $env:RUNNER_TEMP 'kachalka-cinema-smoke'
           $output=Join-Path $pwd 'test-output/cinema-ui'
-          $process=Start-Process dist/Kachalka-0.40/Kachalka.exe -ArgumentList @('--cinema-smoke-test',$output) -PassThru
+          $application=Join-Path $pwd ('dist/Kachalka-'+([Version]$env:RELEASE_VERSION).ToString(2)+'/Kachalka.exe')
+          $process=Start-Process $application -ArgumentList @('--cinema-smoke-test',$output) -PassThru
           if(-not $process.WaitForExit(60000)){$process.Kill();throw 'Person card UI smoke timed out'}
           if($process.ExitCode -ne 0 -or (Test-Path "$output/error.txt") -or -not (Test-Path "$output/checks.json")){throw 'Person card UI smoke failed'}
       - name: Verify upgrade from previously published 0.40.21
