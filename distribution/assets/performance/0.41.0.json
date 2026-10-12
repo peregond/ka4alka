@@ -1,21 +1,25 @@
 {
   "Version": "0.41.0",
-  "WindowsRun": 38186477169,
-  "Artifact": 11720002448,
+  "WindowsRun": 38188737318,
+  "Artifact": 11720961060,
   "NativeBatches": [
     {
       "Stage": "release-freshness-dark-refresh-batch",
       "Requests": 32,
       "FullCardRenders": 0,
       "ReleasePickerRenders": 1,
-      "BannerPreserved": true
+      "BannerPreserved": true,
+      "QualityBadgesCurrent": true,
+      "SameIdDownloadUpdated": true
     },
     {
       "Stage": "release-freshness-light-compact-refresh-batch",
       "Requests": 32,
       "FullCardRenders": 0,
       "ReleasePickerRenders": 1,
-      "BannerPreserved": true
+      "BannerPreserved": true,
+      "QualityBadgesCurrent": true,
+      "SameIdDownloadUpdated": true
     }
   ],
   "ServerChecks": {
