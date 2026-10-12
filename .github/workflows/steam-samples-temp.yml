@@ -1,0 +1,46 @@
+name: Steam samples (temporary)
+# Temporary: fetches live Steam store responses on a runner and commits them to the same branch so the
+# catalogue parser can be written against real data. Removed together with the samples before the pull request.
+on:
+  push:
+    branches: [claude/brave-galileo-7mt77d]
+    paths: ['.github/workflows/steam-samples-temp.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  samples:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch samples
+        run: |
+          set -u
+          dir=steam-samples; mkdir -p $dir
+          base='https://store.steampowered.com/search/results/'
+          get() { curl -sS -m 40 -A 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' -o "$dir/$1" -w "$1 %{http_code} %{size_download}\n" "$2" || echo "$1 FAILED"; }
+          get search-top-json.json "$base?json=1&l=russian&category1=998&os=win&untags=113&count=12&start=0&sort_by=_ASC&filter=topsellers"
+          get search-top-nountags-json.json "$base?json=1&l=russian&category1=998&os=win&count=12&start=0&sort_by=_ASC&filter=topsellers"
+          get search-top-html.json "$base?query&start=0&count=12&dynamic_data=&sort_by=_ASC&filter=topsellers&category1=998&os=win&untags=113&l=russian&infinite=1"
+          get search-new-html.json "$base?query&start=0&count=12&sort_by=Released_DESC&category1=998&os=win&untags=113&l=russian&infinite=1"
+          get search-specials-html.json "$base?query&start=0&count=12&specials=1&category1=998&os=win&untags=113&l=russian&infinite=1&filter=topsellers"
+          get search-specials-json.json "$base?json=1&l=russian&category1=998&os=win&untags=113&count=12&start=0&specials=1&filter=topsellers"
+          get search-upcoming-html.json "$base?query&start=0&count=12&filter=popularcomingsoon&category1=998&os=win&untags=113&l=russian&infinite=1"
+          get search-upcoming-json.json "$base?json=1&l=russian&category1=998&os=win&untags=113&count=12&start=0&filter=popularcomingsoon"
+          get search-rpg-html.json "$base?query&start=0&count=12&tags=122&category1=998&os=win&untags=113&l=russian&infinite=1&filter=topsellers"
+          get search-rpg-json.json "$base?json=1&l=russian&category1=998&os=win&untags=113&tags=122&count=12&start=0&filter=topsellers"
+          get search-coop-json.json "$base?json=1&l=russian&category1=998&os=win&untags=113&tags=1685&count=12&start=0&filter=topsellers"
+          get appdetails-elden.json "https://store.steampowered.com/api/appdetails/?appids=1245620&l=russian"
+          get appdetails-portal2.json "https://store.steampowered.com/api/appdetails/?appids=620&l=russian"
+          get appdetails-witcher3.json "https://store.steampowered.com/api/appdetails/?appids=292030&l=russian"
+          get appdetails-batch-filtered.json "https://store.steampowered.com/api/appdetails/?appids=1245620,620&filters=price_overview&cc=ru&l=russian"
+          get appreviews-elden.json "https://store.steampowered.com/appreviews/1245620?json=1&language=all&purchase_type=all&num_per_page=0"
+          ls -la $dir
+      - name: Commit samples
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add steam-samples
+          git commit -m 'Temporary Steam response samples' || exit 0
+          git push origin HEAD:${{ github.ref_name }}
