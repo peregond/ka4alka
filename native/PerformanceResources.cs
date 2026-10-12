@@ -5,8 +5,10 @@ namespace Kachalka;
 public static class PerformanceBudget
 {
     public static bool IsConstrained(int processors,long memoryBytes)=>processors<=2||memoryBytes>0&&memoryBytes<=4L*1024*1024*1024;
-    public static bool Constrained {get;}=IsConstrained(Environment.ProcessorCount,GC.GetGCMemoryInfo().TotalAvailableMemoryBytes);
-    public static bool DefaultLiteMode(bool configured,bool existing)=>configured?existing:Constrained;
+    public static bool HardwareConstrained {get;}=IsConstrained(Environment.ProcessorCount,GC.GetGCMemoryInfo().TotalAvailableMemoryBytes);
+    public static bool LiteMode {get;set;}
+    public static bool Constrained=>HardwareConstrained||LiteMode;
+    public static bool DefaultLiteMode(bool configured,bool existing)=>configured?existing:HardwareConstrained;
     public static int ImageWorkers=>Constrained?1:2;
     public static int FilmographyWorkers=>Constrained?2:4;
     public static long ImageMemoryBytes=>Constrained?12L*1024*1024:32L*1024*1024;

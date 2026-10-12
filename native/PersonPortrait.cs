@@ -91,7 +91,8 @@ public partial class MainWindow
                                 if(image.IsLoaded&&!pending.IsCancellationRequested){image.Source=cached;FitFace();fallback.Visibility=Visibility.Collapsed;frame.ToolTip=person.Name;}
                                 return;
                             }
-                            await coverSlots.WaitAsync(pending.Token);
+                            var slots=prefs.LiteMode?liteCoverSlots:coverSlots;
+                            await slots.WaitAsync(pending.Token);
                             try
                             {
                                 using var download=CancellationTokenSource.CreateLinkedTokenSource(pending.Token);download.CancelAfter(TimeSpan.FromSeconds(12));
@@ -101,7 +102,7 @@ public partial class MainWindow
                                 if(image.IsLoaded&&!pending.IsCancellationRequested){image.Source=bitmap;FitFace();fallback.Visibility=Visibility.Collapsed;frame.ToolTip=person.Name;}
                                 return;
                             }
-                            finally{coverSlots.Release();}
+                            finally{slots.Release();}
                         }
                     }
                     catch(OperationCanceledException)when(pending.IsCancellationRequested){throw;}

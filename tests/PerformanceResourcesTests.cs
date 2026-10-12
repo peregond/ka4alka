@@ -7,6 +7,7 @@ public static class PerformanceResourcesTests
         void Check(bool value,string label){if(!value)throw new Exception(label);Console.WriteLine("PASS: "+label);}
         Check(PerformanceBudget.IsConstrained(2,16L<<30)&&PerformanceBudget.IsConstrained(8,4L<<30)&&!PerformanceBudget.IsConstrained(8,0)&&!PerformanceBudget.IsConstrained(4,8L<<30),"low-resource budgets cover two-core and 4 GB machines without treating unknown memory as zero");
         Check(PerformanceBudget.DefaultLiteMode(true,true)&&!PerformanceBudget.DefaultLiteMode(true,false),"automatic low-resource defaults preserve both explicit manual Lite choices");
+        var priorLite=PerformanceBudget.LiteMode;try{PerformanceBudget.LiteMode=true;Check(PerformanceBudget.ImageWorkers==1&&PerformanceBudget.FilmographyWorkers==2&&PerformanceBudget.ImageMemoryBytes==12L*1024*1024,"manual Lite mode also applies background and memory limits on powerful hardware");}finally{PerformanceBudget.LiteMode=priorLite;}
         var cache=new WeightedLruCache<string,byte[]>(10,value=>value.Length);
         cache.Put("a",new byte[4]);cache.Put("b",new byte[4]);cache.TryGetValue("a",out _);cache.Put("c",new byte[4]);
         Check(cache.Bytes==8&&cache.ContainsKey("a")&&!cache.ContainsKey("b"),"image budget evicts the least recently used entry by bytes");
