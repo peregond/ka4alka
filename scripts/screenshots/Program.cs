@@ -141,17 +141,6 @@ internal static class Program
         if(loaded<minimum||current.Any(image=>!Loaded(image)))throw new InvalidOperationException(stage+": real application loaded only "+loaded+" visible source posters; pending="+current.Count(image=>!Loaded(image))+"; catalogue error: "+Field(window,"liveError"));
         Console.WriteLine(stage+": actual source posters loaded="+loaded+", unavailable or still pending="+current.Count(image=>!Loaded(image)));
     }
-    static void FreezeRefresh(MainWindow window)
-    {
-        if(Field(window,"catalogRefreshTimer") is DispatcherTimer timer)timer.Stop();
-        // Only pause background source validation once actual catalogue records
-        // have arrived. Existing data, source ratings and image bindings remain.
-        foreach(var name in new[]{"CancelCatalogQualityCheck","CancelDiscoveryQualityCheck"})
-        {
-            var method=window.GetType().GetMethod(name,Members,[]);
-            method?.Invoke(window,null);
-        }
-    }
     static void Save(MainWindow window,string filename)
     {
         window.UpdateLayout();var content=window.Content as FrameworkElement??throw new InvalidOperationException("Actual application client area is missing.");
@@ -177,8 +166,8 @@ internal static class Program
         window.WindowState=WindowState.Normal;window.MaxWidth=1920;window.MaxHeight=1200;window.Width=1440;window.Height=900;window.Left=0;window.Top=0;
         await Settle(window);
         await Until(()=>Field(window,"liveLoading") is false&&Field(window,"liveItems") is IEnumerable rows&&rows.Cast<object>().Any(),TimeSpan.FromSeconds(80),"Actual default source catalogue did not load.");
-        await Task.Delay(2000);FreezeRefresh(window);await WaitPosters(window,"Film catalogue");await Task.Delay(8000);await WaitPosters(window,"Final film catalogue");await Settle(window);Save(window,"catalog-dark.png");
-        Call(window,"ToggleTheme",window,new RoutedEventArgs());await Settle(window);FreezeRefresh(window);await WaitPosters(window,"Light film catalogue");Save(window,"catalog-light.png");
+        await Task.Delay(2000);await WaitPosters(window,"Film catalogue");await Task.Delay(8000);await WaitPosters(window,"Final film catalogue");await Settle(window);Save(window,"catalog-dark.png");
+        Call(window,"ToggleTheme",window,new RoutedEventArgs());await Settle(window);await WaitPosters(window,"Light film catalogue");Save(window,"catalog-light.png");
         Call(window,"ToggleTheme",window,new RoutedEventArgs());await Settle(window);
         var movieButton=Visuals<Button>(window).FirstOrDefault(button=>button.Tag is MediaItem movie&&movie.Section=="Фильмы"&&movie.IsLive&&
             Visuals<Image>(button).Any(image=>image.DataContext is MediaItem&&Loaded(image)));
@@ -195,7 +184,7 @@ internal static class Program
         else skipped.Add("No genuine loaded film card was available for detail navigation.");
         Call(window,"ShowCatalogSection","Сериалы");await Settle(window);
         await Until(()=>Field(window,"liveLoading") is false&&Field(window,"liveItems") is IEnumerable rows&&rows.Cast<object>().Any(),TimeSpan.FromSeconds(70),"Actual series source catalogue did not load.");
-        await Task.Delay(2000);FreezeRefresh(window);await WaitPosters(window,"Series catalogue");Save(window,"series-dark.png");
+        await Task.Delay(2000);await WaitPosters(window,"Series catalogue");Save(window,"series-dark.png");
         Call(window,"ShowGames");await Settle(window);
         await Until(()=>Field(window,"gameLoading") is false&&Field(window,"gameItems") is IEnumerable games&&games.Cast<object>().Any(),TimeSpan.FromSeconds(60),"Actual Steam game catalogue did not load.");
         await WaitPosters(window,"Steam game catalogue");Save(window,"games-dark.png");
