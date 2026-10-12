@@ -44,6 +44,20 @@ public partial class MainWindow
                 finally{handler.Release.Set();}
                 await task;
             }
+            using(var handler=new StartupSourceHandler())
+            using(var client=new SourceClient(handler))
+            {
+                var item=new MediaItem(-987402,"Проверка раздач","Фильмы","",2026,"—","—","#123456"){OnlineId="movies:performance"};
+                var task=new OnlineIndexClient(client,new Uri("https://catalog.invalid/")).Releases(item,CancellationToken.None);
+                try
+                {
+                    await handler.Started.Task.WaitAsync(TimeSpan.FromSeconds(6));var before=beats;
+                    await Task.Delay(150);await Dispatcher.InvokeAsync(()=>beats++,DispatcherPriority.Input);
+                    if(handler.Thread==ui||handler.TimedOut||task.IsCompleted||beats-before<3)throw new Exception("Catalog quality/release API loading blocks window input.");
+                }
+                finally{handler.Release.Set();}
+                await task;
+            }
             using(var release=new ManualResetEventSlim())
             {
                 var started=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);var worker=0;var timedOut=false;
@@ -90,7 +104,7 @@ public partial class MainWindow
                 return new {PreviousMs=oldMs,PreparedMs=watch.Elapsed.TotalMilliseconds,PreviousAllocatedBytes=oldBytes,PreparedAllocatedBytes=GC.GetAllocatedBytesForCurrentThread()-allocated};
             });
             if(measurements.PreparedAllocatedBytes>=measurements.PreviousAllocatedBytes/2)throw new Exception("Prepared title search still repeatedly allocates normalized names.");
-            await File.WriteAllTextAsync(Path.Combine(output,"checks.json"),JsonSerializer.Serialize(new {DeferredCatalogPreserved=true,ClearNotRepopulated=true,CatalogWorker=true,ReleaseWorker=true,NativeInputWhileLoading=true,HeartbeatTicks=beats,SearchResultsUnchanged=true,Queries=queries.Length,Records=BundledCatalog.All.Count,Search=measurements}));
+            await File.WriteAllTextAsync(Path.Combine(output,"checks.json"),JsonSerializer.Serialize(new {DeferredCatalogPreserved=true,ClearNotRepopulated=true,CatalogWorker=true,ReleaseWorker=true,QualityApiWorker=true,NativeInputWhileLoading=true,HeartbeatTicks=beats,SearchResultsUnchanged=true,Queries=queries.Length,Records=BundledCatalog.All.Count,Search=measurements}));
         }
         finally{heartbeat.Stop();}
         Close();

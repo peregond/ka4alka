@@ -275,7 +275,9 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null,Inde
 
     // Catalog-wide quality checks read the site only. An opened card may also ask
     // a standalone relay when the site does not answer (allowRelay).
-    public async Task<IReadOnlyList<SourceEntry>> Releases(MediaItem item,CancellationToken ct,bool allowRelay=false)
+    public Task<IReadOnlyList<SourceEntry>> Releases(MediaItem item,CancellationToken ct,bool allowRelay=false)
+        =>Task.Run(()=>ReleasesCore(item,ct,allowRelay),ct);
+    async Task<IReadOnlyList<SourceEntry>> ReleasesCore(MediaItem item,CancellationToken ct,bool allowRelay)
     {
         var id=IdFor(item)??throw new InvalidDataException("Карточка не связана с онлайн-индексом.");
         try
