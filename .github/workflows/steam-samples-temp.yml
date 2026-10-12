@@ -21,14 +21,37 @@ jobs:
           base='https://store.steampowered.com/search/results/'
           get() { curl -sS -m 40 -A 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' -o "$dir/$1" -w "$1 %{http_code} %{size_download}\n" "$2" || echo "$1 FAILED"; }
           mkdir -p $dir
-          : > $dir/r3-image-status.txt
-          for id in 4078430 5155360 730 3219030 1808500 632360 1867240 3010850 1551980 4019220 4435490 2054970 2288340 976730 381210 4080220 553850 359550 3940610 4231820 1374490 1142710 4032350 1174180 2254990 4356430 3240220 3743140 1158310 1245620 252490 2333000 2887580 3669870 4001890 3932890 1086940 270880 2406770 1478500 1623730 2183900 108600 3493540 892970 4656000 2483190 3321460 1091500 2638890 306130 3883570 2071280 1621690 1361210 2185060 2124120 1295660 3031880 440900 690830 1488490 1364780 814380 2138710 2138720 1903340 4968640 1190970 427410 305620 2495100 4075620 2001070 3115160 1422450 2719590 4534960 2769570 1774880 4115450 4199910 4824610 2109770 1846700 1757350 2050420 4095380 2381520 2590240 2963950 2929250 2272360 3292470 3727390 3558670 2873440 3710600 1340720 2814860 2582960 2231020 4077740 2340970 1940080 3978820 2828710 2649560 3016620 1280190 1687540 2179480 4743930 1313230 1912410 3751260 2075800 39210 3259780 3219630; do
-            for kind in header.jpg capsule_616x353.jpg library_hero.jpg; do
-              code=$(curl -s -m 20 -o /dev/null -w '%{http_code}' -A 'Mozilla/5.0' "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/$id/$kind")
-              echo "$id $kind $code" >> $dir/r3-image-status.txt
-            done
-          done
-          awk '{c[$2" "$3]++} END{for(k in c) print k, c[k]}' $dir/r3-image-status.txt | sort
+          python3 - <<'PY'
+          import json,re,urllib.request,concurrent.futures as cf
+          out=open('steam-samples/r4-image-status.txt','w')
+          bases={}
+          for name in ['top','popularnew','specials','popularwishlist']:
+              pass
+          import glob
+          for f in glob.glob('steam-samples/r2-*.json'):
+              try: d=json.load(open(f))
+              except Exception: continue
+              for m in re.finditer(r'search_capsule"><img src="([^"?]+)/capsule_231x87\.jpg',d.get('results_html','')):
+                  base=m.group(1)
+                  mid=re.search(r'/apps/(\d+)',base).group(1)
+                  bases[mid]=base
+          ids=list(bases)[:90]
+          def head(url):
+              try:
+                  req=urllib.request.Request(url,method='HEAD',headers={'User-Agent':'Mozilla/5.0'})
+                  return urllib.request.urlopen(req,timeout=20).status
+              except Exception as e:
+                  return getattr(e,'code',0)
+          jobs=[]
+          with cf.ThreadPoolExecutor(8) as pool:
+              for i in ids:
+                  for kind in ['header.jpg','capsule_616x353.jpg','capsule_467x181.jpg','capsule_231x87.jpg']:
+                      url=bases[i]+'/'+kind
+                      jobs.append((i,kind,pool.submit(head,url),'hashed' if re.search(r'/apps/\d+/[0-9a-f]{20,}',bases[i]) else 'plain'))
+              for i,kind,f,t in jobs:
+                  out.write(f'{i} {t} {kind} {f.result()}\n')
+          PY
+          awk '{c[$2" "$3" "$4]++} END{for(k in c) print k, c[k]}' steam-samples/r4-image-status.txt | sort
           ls -la $dir
       - name: Commit samples
         run: |
