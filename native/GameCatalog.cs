@@ -6,18 +6,22 @@ using HtmlAgilityPack;
 namespace Kachalka;
 
 public sealed record GameCatalogPage(MediaItem[] Items,bool HasNext);
-public sealed record GameDetails(MediaItem Item,string Requirements,string Developers,string Publishers);
+public sealed record GameDetails(MediaItem Item,string Requirements,string Developers,string Publishers,string Price="",int Metacritic=0);
 public sealed class GameCatalog(SourceClient client)
 {
     public const int PageSize=40;
+    // Steam tag 113 is "Free to Play": browsing never lists those games. A title search still finds any game by name.
+    public const int FreeToPlayTag=113;
     public static Uri Query(string query,int page,bool newest)=>query.Trim().Length>0?
         new("https://store.steampowered.com/api/storesearch/?term="+Uri.EscapeDataString(query.Trim())+"&l=russian"):
-        new("https://store.steampowered.com/search/results/?json=1&l=russian&category1=998&os=win&count=40&start="+((Math.Clamp(page,1,500)-1)*PageSize)+"&sort_by="+(newest?"Released_DESC":"_ASC")+(newest?"":"&filter=topsellers"));
+        new("https://store.steampowered.com/search/results/?json=1&l=russian&category1=998&os=win&untags="+FreeToPlayTag+"&count=40&start="+((Math.Clamp(page,1,500)-1)*PageSize)+"&sort_by="+(newest?"Released_DESC":"_ASC")+(newest?"":"&filter=topsellers"));
     public static bool TryId(string? page,out int id)
     {
         id=0;if(!Uri.TryCreate(page,UriKind.Absolute,out var uri)||uri.Scheme!="https"||uri.Host!="store.steampowered.com"||!uri.IsDefaultPort||uri.UserInfo.Length>0||uri.Query.Length>0||uri.Fragment.Length>0)return false;
         var match=Regex.Match(uri.AbsolutePath,@"^/app/(\d{1,9})/?$");return match.Success&&int.TryParse(match.Groups[1].Value,out id)&&id>0;
     }
+    // Steam keeps a wide hero picture for most games; where it is missing the banner falls back to the blurred capsule.
+    public static string? HeroImage(MediaItem game)=>TryId(game.PageUrl,out var id)?"https://cdn.akamai.steamstatic.com/steam/apps/"+id+"/library_hero.jpg":null;
     public static MediaItem Item(int id,string name,string? image=null)=>new(-id,name,"Игры","Windows",0,"—","—","#526B69")
         {PageUrl="https://store.steampowered.com/app/"+id+"/",OnlineId="steam:"+id,ImageUrl=image,OriginalTitle=name};
     static string? String(JsonElement row,string name)=>row.TryGetProperty(name,out var value)&&value.ValueKind==JsonValueKind.String?value.GetString():null;
@@ -78,7 +82,9 @@ public sealed class GameCatalog(SourceClient client)
         var year=0;if(data.TryGetProperty("release_date",out var date))int.TryParse(Regex.Match(String(date,"date")??"",@"\b(19|20)\d{2}\b").Value,out year);
         var description=Plain(String(data,"short_description")??String(data,"about_the_game")??"");
         var requirements=data.TryGetProperty("pc_requirements",out var req)&&req.ValueKind==JsonValueKind.Object?Plain(String(req,"minimum")??""):"";
-        return new(item with{Title=String(data,"name")??item.Title,Genre=genre,Year=year,Description=description[..Math.Min(4000,description.Length)],ImageUrl=Image(String(data,"header_image"))??item.ImageUrl},requirements[..Math.Min(8000,requirements.Length)],Join("developers"),Join("publishers"));
+        var price=data.TryGetProperty("is_free",out var free)&&free.ValueKind==JsonValueKind.True?"Бесплатно":data.TryGetProperty("price_overview",out var overview)&&overview.ValueKind==JsonValueKind.Object?Plain(String(overview,"final_formatted")??""):"";
+        var score=data.TryGetProperty("metacritic",out var metacritic)&&metacritic.ValueKind==JsonValueKind.Object&&metacritic.TryGetProperty("score",out var points)&&points.TryGetInt32(out var parsedScore)&&parsedScore is >0 and <=100?parsedScore:0;
+        return new(item with{Title=String(data,"name")??item.Title,Genre=genre,Year=year,Description=description[..Math.Min(4000,description.Length)],ImageUrl=Image(String(data,"header_image"))??item.ImageUrl},requirements[..Math.Min(8000,requirements.Length)],Join("developers"),Join("publishers"),price[..Math.Min(40,price.Length)],score);
     }
     public Task<GameDetails> Detail(MediaItem item,CancellationToken ct)=>Task.Run(async()=>
     {

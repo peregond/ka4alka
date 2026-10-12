@@ -17,5 +17,6 @@ static class FeaturePosterTests
         Check(FeatureBackdrop.FromResponse(Encoding.UTF8.GetBytes("{\"id\":\"movies:film\",\"backdrop\":null}"),id)==null,"missing landscape artwork allows the local placeholder to remain");
         Check(Rejected(()=>FeatureBackdrop.FromResponse(Encoding.UTF8.GetBytes("{\"id\":\"movies:film\"}"),id)),"malformed responses cannot poison the no-artwork cache");
         Check(FeatureBackdrop.Landscape(1280,720)&&!FeatureBackdrop.Landscape(1280,1920)&&!FeatureBackdrop.Landscape(300,168)&&!FeatureBackdrop.Landscape(1280,100),"portrait, undersized and excessively wide images are rejected");
+        Check(FeatureBackdrop.Landscape(1280,413,3.4)&&!FeatureBackdrop.Landscape(1280,413)&&!FeatureBackdrop.Landscape(1280,300,3.4)&&!FeatureBackdrop.Landscape(1280,1920,3.4),"Steam's 3.1:1 library hero is accepted for games only, and portraits still are not");
     }
 }

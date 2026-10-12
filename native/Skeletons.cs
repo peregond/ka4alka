@@ -42,7 +42,10 @@ public partial class MainWindow
     // Poster cards in as many columns as the real grid would use at this width.
     FrameworkElement PosterSkeleton(int rows,string name)
     {
-        var grid=new UniformGrid{Name=name,Columns=Math.Max(1,WindowSizing.PosterColumns(Math.Max(0,Body.ActualWidth))),Margin=new(0,5,-16,0),IsHitTestVisible=false};
+        // Games show wide capsules, so their placeholders use the capsule columns and shape.
+        var games=section=="Игры";
+        Func<double,int> columnsFor=games?WindowSizing.GameColumns:WindowSizing.PosterColumns;
+        var grid=new UniformGrid{Name=name,Columns=Math.Max(1,columnsFor(Math.Max(0,Body.ActualWidth))),Margin=new(0,5,-16,0),IsHitTestVisible=false};
         AutomationProperties.SetName(grid,"Загружаем подборку");
         void Fill()
         {
@@ -50,7 +53,8 @@ public partial class MainWindow
             for(var index=0;index<grid.Columns*rows;index++)
             {
                 var cell=new StackPanel{Margin=new(0,0,16,18)};
-                var poster=new Border{CornerRadius=new(12)};poster.SetResourceReference(Border.BackgroundProperty,"Raised");poster.SizeChanged+=PosterResized;cell.Children.Add(poster);
+                var poster=new Border{CornerRadius=new(12)};poster.SetResourceReference(Border.BackgroundProperty,"Raised");
+                if(games)poster.SizeChanged+=GamePosterSized;else poster.SizeChanged+=PosterResized;cell.Children.Add(poster);
                 cell.Children.Add(SkeletonBar(12,new(2,12,28,0)));cell.Children.Add(SkeletonBar(10,new(2,10,64,0),.7));grid.Children.Add(cell);
             }
         }
@@ -61,7 +65,7 @@ public partial class MainWindow
         grid.SizeChanged+=(_,e)=>
         {
             if(!e.WidthChanged||Math.Abs(e.NewSize.Width-measured)<48)return;measured=e.NewSize.Width;
-            var columns=Math.Max(1,WindowSizing.PosterColumns(e.NewSize.Width-16));if(columns==grid.Columns)return;grid.Columns=columns;Fill();
+            var columns=Math.Max(1,columnsFor(e.NewSize.Width-16));if(columns==grid.Columns)return;grid.Columns=columns;Fill();
         };
         return grid;
     }

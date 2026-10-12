@@ -15,7 +15,7 @@
   </Style>
   <Geometry x:Key="IconMovies">M3,5 L21,5 21,21 3,21 Z M3,10 L21,10 M7,5 L11,10 M14,5 L18,10</Geometry>
   <Geometry x:Key="IconSeries">M3,7 L21,7 21,20 3,20 Z M8,3 L12,7 16,3</Geometry>
-  <Geometry x:Key="IconGame">M7,7 L17,7 C20,7 22,16 20,18 C18,20 16,16 15,15 L9,15 C8,16 6,20 4,18 C2,16 4,7 7,7 M6,10 L6,14 M4,12 L8,12 M16,11 L17,11 M18,13 L19,13</Geometry>
+  <Geometry x:Key="IconGame">M7,6 L17,6 C20.5,6 22,9 22,13 C22,16 21,18 19.5,18 C18,18 17,17 16,15.5 L8,15.5 C7,17 6,18 4.5,18 C3,18 2,16 2,13 C2,9 3.5,6 7,6 Z M7.5,9 L7.5,12 M6,10.5 L9,10.5 M16.5,9.8 L16.5,9.9 M18.5,11.8 L18.5,11.9</Geometry>
   <Geometry x:Key="IconDevice">M3,4 L21,4 21,16 3,16 Z M12,16 L12,21 M8,21 L16,21</Geometry>
   <Geometry x:Key="IconDownload">M12,3 L12,16 M7,11 L12,16 17,11 M4,17 L4,21 20,21 20,17</Geometry>
   <Geometry x:Key="IconSettings">M4,7 L20,7 M4,17 L20,17 M8,4 L8,10 M16,14 L16,20</Geometry>
@@ -108,17 +108,18 @@
    </DataTemplate></ItemsControl.ItemTemplate></local:PosterRow>
   </DataTemplate>
   <DataTemplate x:Key="GameRow">
-   <local:PosterRow ItemsSource="{Binding Items}" Margin="0,0,-16,0"><ItemsControl.ItemsPanel><ItemsPanelTemplate><local:PosterGrid Columns="{Binding Columns}"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-    <ItemsControl.ItemTemplate><DataTemplate>
-     <Button Click="OpenCard" ContextMenuOpening="CatalogPosterMenu" Tag="{Binding}" Style="{StaticResource PosterButton}" Padding="0" Margin="0,5,16,18" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Top" AutomationProperties.Name="{Binding Title,StringFormat='Открыть игру {0}'}"><Button.ContextMenu><ContextMenu/></Button.ContextMenu>
-      <StackPanel>
-       <Border Background="{DynamicResource Panel}" CornerRadius="12" Height="125" SizeChanged="GamePosterSized"><Image Loaded="SourceCover" DataContextChanged="SourceCoverChanged" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality"/></Border>
-       <TextBlock Text="{Binding Title}" Margin="2,9,2,0" Height="36" FontSize="14" LineHeight="18" FontWeight="SemiBold" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding Title}"/>
-       <TextBlock Text="Windows" Margin="2,3,2,0" FontSize="12" Foreground="{DynamicResource Subtle}"/>
-      </StackPanel>
-     </Button>
-    </DataTemplate></ItemsControl.ItemTemplate>
-   </local:PosterRow>
+   <local:PosterRow ItemsSource="{Binding Items}" Margin="0,0,-16,0"><ItemsControl.ItemsPanel><ItemsPanelTemplate><local:PosterGrid Columns="{Binding Columns}"/></ItemsPanelTemplate></ItemsControl.ItemsPanel><ItemsControl.ItemTemplate><DataTemplate>
+    <Button Click="OpenCard" ContextMenuOpening="CatalogPosterMenu" Tag="{Binding}" Style="{StaticResource PosterButton}" Padding="0" Margin="0,5,16,18" Background="Transparent" BorderBrush="Transparent" BorderThickness="0" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Top" AutomationProperties.Name="{Binding Title, StringFormat='Открыть игру {0}'}"><Button.ContextMenu><ContextMenu/></Button.ContextMenu>
+     <StackPanel>
+      <Border x:Name="GameCardArt" Background="{DynamicResource Panel}" SizeChanged="GamePosterSized" CornerRadius="12" ClipToBounds="True"><Grid><Image Loaded="SourceCover" DataContextChanged="SourceCoverChanged" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality"/>
+       <Border x:Name="GameDownloaded" Width="24" Height="24" CornerRadius="12" Background="{DynamicResource Accent}" Margin="8" HorizontalAlignment="Right" VerticalAlignment="Top" IsHitTestVisible="False" ToolTip="Скачано" AutomationProperties.Name="Скачано"><Border.Style><Style TargetType="Border"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding IsDownloaded}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></Border.Style><Path Data="{StaticResource IconCheck}" Stroke="{DynamicResource AccentInk}" StrokeThickness="2.2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Width="13" Height="13" Stretch="Uniform"/></Border>
+       <ProgressBar x:Name="GameProgress" Minimum="0" Maximum="100" Value="{Binding DownloadPercent,Mode=OneWay}" Height="4" VerticalAlignment="Bottom" BorderThickness="0" Background="#BF0A0C0F" Foreground="{DynamicResource Accent}" IsHitTestVisible="False" ToolTip="Скачивается"><ProgressBar.Style><Style TargetType="ProgressBar"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding HasDownloadProgress}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></ProgressBar.Style></ProgressBar>
+      </Grid></Border>
+      <TextBlock x:Name="GameTitleText" Text="{Binding Title}" Margin="2,10,2,0" Height="36" FontSize="14" LineHeight="18" FontWeight="SemiBold" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding Title}"/>
+      <TextBlock x:Name="GameMetaText" Text="{Binding CardMeta}" Height="16" Margin="2,2,2,0" FontSize="12" Foreground="{DynamicResource Subtle}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding CardMeta}"/>
+     </StackPanel>
+    </Button>
+   </DataTemplate></ItemsControl.ItemTemplate></local:PosterRow>
   </DataTemplate>
   <Style x:Key="RowIconButton" TargetType="Button" BasedOn="{StaticResource IconButton}">
    <Setter Property="Margin" Value="4,0,0,0"/><Setter Property="Foreground" Value="{DynamicResource Muted}"/>
@@ -129,7 +130,7 @@
      <Grid SizeChanged="DownloadRowResized"><Grid.ColumnDefinitions><ColumnDefinition Width="48"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
       <Button Style="{StaticResource PosterButton}" Tag="{Binding}" Click="OpenDownloadCard" IsEnabled="{Binding HasMediaCard}" ToolTip="Открыть карточку фильма или сериала" AutomationProperties.Name="Открыть карточку по постеру" VerticalAlignment="Top" Margin="0">
        <Border Width="48" Height="72" CornerRadius="8" Background="{DynamicResource Raised}" SizeChanged="PosterResized" ClipToBounds="True" VerticalAlignment="Top">
-        <Grid><Path Data="{StaticResource IconFilm}" Stroke="{DynamicResource Subtle}" StrokeThickness="1.5" Width="18" Height="18" Stretch="Uniform" Opacity="0.7"/><Image Loaded="SourceCover" DataContextChanged="SourceCoverChanged" Stretch="Uniform"/></Grid>
+        <Grid><Path Stroke="{DynamicResource Subtle}" StrokeThickness="1.5" Width="18" Height="18" Stretch="Uniform" Opacity="0.7"><Path.Style><Style TargetType="Path"><Setter Property="Data" Value="{StaticResource IconFilm}"/><Style.Triggers><DataTrigger Binding="{Binding MediaSection}" Value="Игры"><Setter Property="Data" Value="{StaticResource IconGame}"/></DataTrigger></Style.Triggers></Style></Path.Style></Path><Image Loaded="SourceCover" DataContextChanged="SourceCoverChanged" Stretch="Uniform"/></Grid>
        </Border>
       </Button>
       <StackPanel Grid.Column="1" Margin="12,0,8,0" VerticalAlignment="Center">

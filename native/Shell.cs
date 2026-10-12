@@ -45,6 +45,9 @@ public partial class MainWindow
     }
     void ClearBack(){headerBackAction=null;BackButton.Visibility=Visibility.Collapsed;}
 
+    // Each catalogue section keeps its own icon: a film strip, a television and a gamepad.
+    static string NavIcon(string section)=>section switch{"Фильмы"=>"IconFilm","Игры"=>"IconGame",_=>"IconTv"};
+
     // Navigation entry content: 20 px icon, label and an optional trailing badge.
     // badge: 0 none, 1 plain counter (Saved), 2 accent pill (active downloads).
     Grid NavContent(string label,string geometry,bool narrow,int badge=0)

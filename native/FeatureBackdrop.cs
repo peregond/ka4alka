@@ -20,5 +20,6 @@ public static class FeatureBackdrop
         if(backdrop.ValueKind!=JsonValueKind.Object||!backdrop.TryGetProperty("source",out var source)||source.GetString()!="TMDB"||!backdrop.TryGetProperty("url",out var url)||url.ValueKind!=JsonValueKind.String||ValidUrl(url.GetString()) is not {} valid)throw new InvalidDataException("Неверный адрес фона.");
         return valid;
     }
-    public static bool Landscape(int width,int height)=>width>=780&&height>0&&(double)width/height is >=1.6 and <=2.5;
+    // TMDB backdrops are about 16:9. Steam's library hero is a 3.1:1 strip, so games accept a wider ratio.
+    public static bool Landscape(int width,int height,double widest=2.5)=>width>=780&&height>0&&(double)width/height is var ratio&&ratio>=1.6&&ratio<=widest;
 }
