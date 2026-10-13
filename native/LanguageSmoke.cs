@@ -38,6 +38,17 @@ public partial class MainWindow
             section="Сериалы";liveKey=CurrentCatalogKey;Render();await Settle();
             Check(VisualElements<TextBlock>(Body).Any(text=>text.Text=="New series"),"Series shelves use the same English presentation.");
             Shot("series-english");
+            var languageMovie=new MediaItem(-990021,"Language fixture","Фильмы","",2021,"—","8.0","#526B69"){PageUrl="https://example.invalid/language-fixture",Description="Fixture"};
+            SourceEntry LanguageRelease(string id,string audio,int seeds)=>new(id,"Language fixture (2021) 1080p "+audio,"Fixture","https://example.invalid/"+id,"magnet:?xt=urn:btih:"+new string('a',40),null,Seeds:seeds);
+            var englishRelease=LanguageRelease("english-fixture","ENG",50);var russianRelease=LanguageRelease("russian-fixture","RUS",900);
+            liveReleases[languageMovie.Id]=[russianRelease,englishRelease];requestedDetails.Add(languageMovie.Id);releaseViews[languageMovie.Id]=new(){ReceivedUtc=DateTime.UtcNow};
+            current=languageMovie;section="Фильмы";Render();await Settle();
+            Check(FindVisual<Button>(Body,button=>button.Name=="DetailDownload")?.Tag is SourceEntry chosen&&chosen.Id==englishRelease.Id,"English interface recommends English audio even when Russian alternatives have more seeders.");
+            Check(VisualElements<Button>(Body).Where(button=>button.Name!="DetailDownload").Select(button=>button.Tag).OfType<SourceEntry>().First().Id==englishRelease.Id,"Default release list matches the English recommendation.");
+            var releaseSort=FindVisual<ComboBox>(Body,box=>System.Windows.Automation.AutomationProperties.GetName(box)==AppLanguage.T("Сортировка раздач"))??throw new Exception("Release sorting is missing.");
+            releaseSort.SelectedItem="Русская озвучка";await Settle();
+            Check(VisualElements<Button>(Body).Where(button=>button.Name!="DetailDownload").Select(button=>button.Tag).OfType<SourceEntry>().First().Id==russianRelease.Id,"Manual Russian audio sorting remains available in the English interface.");
+            releaseSort.SelectedIndex=0;await Settle();Shot("releases-english-priority");current=null;
             var item=new DownloadItem{Name="Фильмы",Paused=true,Progress=100,HasCompletedDownload=true,FilesMissing=true,Status="Файлы не найдены",Hint="Повторная загрузка не запускается автоматически",MissingFilesMessage="Повторная загрузка не запускается автоматически"};
             downloads.Items.Add(item);section="Загрузки";Render();await Settle();
             Check(VisualElements<TextBlock>(Body).Any(text=>text.Text=="Files not found"),"Bound download status is translated without changing its canonical state.");

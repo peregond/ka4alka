@@ -152,7 +152,7 @@ public partial class MainWindow
         var boundary=SharedCatalog.BoundaryUtc(DateTime.UtcNow);if(boundary==catalogMemoryBoundary)return false;
         catalogMemoryBoundary=boundary;catalogPages.Clear();ResetDiscoveryData();cardMetadata.Clear();catalogLastPage=null;if(!SearchActive)liveKey="";return true;
     }
-    string CurrentCatalogKey=>(SearchActive?"Поиск|"+submittedQuery:section+"|"+livePage+"|"+CatalogSelection.Filter+"|"+CatalogSelection.Collection+"|region:"+catalogRegion+"|home:"+CatalogRegions.HomeCountry(prefs.HomeCountry))+"|quality:"+prefs.CatalogQualityHeight;
+    string CurrentCatalogKey=>(SearchActive?"Поиск|"+submittedQuery+"|language:"+prefs.UiLanguage:section+"|"+livePage+"|"+CatalogSelection.Filter+"|"+CatalogSelection.Collection+"|region:"+catalogRegion+"|home:"+CatalogRegions.HomeCountry(prefs.HomeCountry))+"|quality:"+prefs.CatalogQualityHeight;
     CatalogSelection CatalogSelection=>new(catalogGenre,catalogCountry,catalogYear,catalogRating,catalogOrder switch{"По рейтингу"=>"rating","По популярности"=>"popular",_=>"date"},catalogCollection,catalogRegion,prefs.HomeCountry);
     void ResetCatalogFilters(){catalogYear=null;catalogGenre="";catalogCountry="";catalogRating=0;catalogOrder="Сначала новые";catalogCollection="all";catalogRegion="";catalogLastPage=null;}
     void ChangeCatalogFilter(Action change)
@@ -321,8 +321,8 @@ public partial class MainWindow
     async Task FetchCatalog(string key,string category,string query,int page)
     {
         liveRequest?.Cancel();liveRequest?.Dispose();liveRequest=new();var token=liveRequest.Token;liveLoading=true;liveError="";
-        var request=liveRequest;var selection=CatalogSelection;var forceRefresh=catalogRefreshRequested;catalogRefreshRequested=false;
-        bool IsCurrent()=>ReferenceEquals(liveRequest,request)&&!token.IsCancellationRequested&&liveKey==key&&submittedQuery==query;
+        var request=liveRequest;var searchLanguage=prefs.UiLanguage;var selection=CatalogSelection;var forceRefresh=catalogRefreshRequested;catalogRefreshRequested=false;
+        bool IsCurrent()=>ReferenceEquals(liveRequest,request)&&!token.IsCancellationRequested&&liveKey==key&&submittedQuery==query&&(query.Length==0||prefs.UiLanguage==searchLanguage);
         if(!forceRefresh){liveItems=[];catalogHasNext=false;}
         var cacheKey=category+"|"+selection.Filter+"|"+page+(selection.Region.Length>0?"|region:"+selection.Region+"|home:"+CatalogRegions.HomeCountry(selection.HomeCountry):"")+(selection.Collection.StartsWith("seasonal:",StringComparison.Ordinal)?"|"+selection.Collection:"");
         await Task.Yield();
@@ -378,7 +378,7 @@ public partial class MainWindow
                         if(!IsCurrent())return;
                         liveItems=updated.Items;
                         if(!closed&&current==null&&activePerson==null&&section==category&&!favoritesOnly)RenderCatalogKeepingPosition();
-                    });
+                    },preferredLanguage:searchLanguage);
                 items=result.Items;if(result.Offline)liveError="Часть источников недоступна · добавлены результаты из сохранённого каталога";
             }
             try{await catalogIndex.AddAsync(items,token);}catch(IOException){}catch(UnauthorizedAccessException){}

@@ -27,6 +27,22 @@ static class UnifiedSearchTests
         try{await fastFilm.Task.WaitAsync(TimeSpan.FromSeconds(2));Check(!streaming.IsCompleted,"fast movie results appear without waiting for the series catalog");}
         finally{slowSeries.TrySetResult([series]);}
         Check((await streaming).Items.Length==2,"streamed results retain both categories after the slow reply");
+        var english=Item("Фильмы",50,"Spark Returns");
+        var translated=Item("Сериалы",51,"Искра возвращается") with{TitleAliases=["Spark Forever"]};
+        var fallback=Item("Фильмы",52,"Искры") with{TitleAliases=["Sparkle"]};
+        var mixed=new[]{fallback,translated,english};
+        var preferred=await UnifiedSearch.FindAsync("Spark",(kind,_)=>Task.FromResult<IReadOnlyList<MediaItem>>(mixed.Where(x=>x.Section==kind).ToArray()),_=>[],default,preferredLanguage:"en");
+        Check(preferred.Items.Select(x=>x.Id).SequenceEqual([50,51,52]),"English search prioritizes Latin titles, then known aliases, while retaining other-language alternatives");
+        var exact=english with{Id=53,Title="Искра",TitleAliases=["Spark"]};
+        var precise=await UnifiedSearch.FindAsync("Spark",(_,_)=>Task.FromResult<IReadOnlyList<MediaItem>>([english,exact]),_=>[],default,preferredLanguage:"en");
+        Check(precise.Items.First().Id==53,"an exact translated alias outranks a less relevant English title");
+        Check(translated.Title=="Искра возвращается"&&translated.TitleAliases.Single()=="Spark Forever","language ranking never mutates canonical names or aliases");
+        var slowEnglish=new TaskCompletionSource<IReadOnlyList<MediaItem>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        SearchResult? early=null;
+        var preferredStreaming=UnifiedSearch.FindAsync("Spark",(_,_)=>Task.FromResult<IReadOnlyList<MediaItem>>([]),kind=>kind=="Сериалы"?[translated]:[],default,_=>slowEnglish.Task,value=>early=value,preferredLanguage:"en");
+        Check(early?.Items.Single().Id==51&&!preferredStreaming.IsCompleted,"cached alternatives remain usable without waiting for English sources");
+        slowEnglish.SetResult([english]);
+        Check((await preferredStreaming).Items.Select(x=>x.Id).SequenceEqual([50,51]),"an arriving English result is promoted without losing fallback rows");
         using var obsolete=new CancellationTokenSource();var never=new TaskCompletionSource<IReadOnlyList<MediaItem>>(TaskCreationOptions.RunContinuationsAsynchronously);var publishes=0;
         var obsoleteSearch=UnifiedSearch.FindAsync("Искра",(_,_)=>never.Task,_=>[],obsolete.Token,updated:_=>publishes++);
         obsolete.Cancel();try{await obsoleteSearch.WaitAsync(TimeSpan.FromSeconds(2));throw new Exception("Obsolete search remained alive");}catch(OperationCanceledException){}

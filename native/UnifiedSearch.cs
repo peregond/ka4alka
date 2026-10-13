@@ -4,15 +4,15 @@ public record SearchResult(MediaItem[] Items,bool Offline);
 public static class UnifiedSearch
 {
     public static async Task<SearchResult> FindAsync(string query,Func<string,CancellationToken,Task<IReadOnlyList<MediaItem>>> remote,Func<string,IReadOnlyList<MediaItem>> saved,CancellationToken cancellation,
-        Func<CancellationToken,Task<IReadOnlyList<MediaItem>>>? supplement=null,Action<SearchResult>? updated=null)
+        Func<CancellationToken,Task<IReadOnlyList<MediaItem>>>? supplement=null,Action<SearchResult>? updated=null,string preferredLanguage="ru")
     {
         cancellation.ThrowIfCancellationRequested();
         var term=query.Trim();
-        int Rank(MediaItem item)=>item.Title.Equals(term,StringComparison.CurrentCultureIgnoreCase)?0:item.Title.StartsWith(term,StringComparison.CurrentCultureIgnoreCase)?1:2;
+        int Rank(MediaItem item)=>MediaIdentity.Names(item).Any(name=>name.Equals(term,StringComparison.CurrentCultureIgnoreCase))?0:MediaIdentity.Names(item).Any(name=>name.StartsWith(term,StringComparison.CurrentCultureIgnoreCase))?1:2;
         // Read UI-owned local stores once. Every subsequent merge/rank runs on
         // a worker; publication returns to the caller's synchronization context.
         var local=new[]{"Фильмы","Сериалы"}.SelectMany(kind=>saved(kind).Where(x=>x.Section==kind)).DistinctBy(x=>(x.Section,x.Id)).ToArray();
-        SearchResult Build(IEnumerable<MediaItem> rows,bool offline)=>new(MediaIdentity.Merge(rows.DistinctBy(x=>(x.Section,x.Id))).OrderBy(Rank).ThenBy(x=>x.Title,StringComparer.CurrentCultureIgnoreCase).ToArray(),offline);
+        SearchResult Build(IEnumerable<MediaItem> rows,bool offline)=>new(MediaIdentity.Merge(rows.DistinctBy(x=>(x.Section,x.Id))).OrderBy(Rank).ThenBy(x=>SearchLanguage.TitleRank(x,preferredLanguage)).ThenBy(x=>x.Title,StringComparer.CurrentCultureIgnoreCase).ToArray(),offline);
         if(local.Length>0)updated?.Invoke(Build(local,false));
         async Task<SearchResult> Category(string category)
         {

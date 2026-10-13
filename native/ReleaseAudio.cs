@@ -44,9 +44,13 @@ public static class ReleaseAudio
     sealed record Labels(string[] Studios,string[] Types);
     // Reference keys keep cloned records with a changed title separate; weak keys do not retain old catalogs.
     static readonly ConditionalWeakTable<SourceEntry,Labels> Cache=new();
+    static readonly Regex SubtitlePrefix=new(@"(?i)(?:subtitles?|subs?|субтитры)[\s:._=\-]*(?:\[[^\]\r\n]*\]|\([^\)\r\n]*\)|(?:EN|ENG|ENGLISH|RU|RUS|RUSSIAN|GER|DEU|JPN|FRA)\b|русские\b|английские\b)",RegexOptions.CultureInvariant);
+    static readonly Regex SubtitleSuffix=new(@"(?i)(?<![\p{L}\p{N}])(?:EN|ENG|ENGLISH|RU|RUS|RUSSIAN|GER|DEU|JPN|FRA|русские|английские)[\s._\-]+(?:subtitles?|subs?|субтитры)(?![\p{L}\p{N}])",RegexOptions.CultureInvariant);
+    public static string AudioTitle(string title)=>SubtitleSuffix.Replace(SubtitlePrefix.Replace(title,""),"");
+
     static Labels Parse(SourceEntry entry)=>Cache.GetValue(entry,static value=>
     {
-        var title=Regex.Replace(value.Title,@"(?i)(?:subtitles?|subs?|субтитры)\s*[:=\-]?\s*(?:\[[^\]\r\n]*\]|\([^\)\r\n]*\)|ENG\b|RU(?:S)?\b|русские\b)","");
+        var title=AudioTitle(value.Title);
         return new(Studios.Where(x=>x.Pattern.IsMatch(title)).Select(x=>x.Label).ToArray(),
             Types.Where(x=>x.Pattern.IsMatch(title)).Select(x=>x.Label).ToArray());
     });

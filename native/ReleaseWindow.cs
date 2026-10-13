@@ -10,7 +10,7 @@ public partial class MainWindow
     sealed class ReleasePickerState
     {
         public Dictionary<string,string> Filters {get;}=[];
-        public string Sort {get;set;}="Русская озвучка";
+        public string Sort {get;set;}="По языку интерфейса";
         public bool More {get;set;}
         public HashSet<string> Expanded {get;}=[];
         public int VisibleCount {get;set;}=60;
@@ -158,7 +158,7 @@ public partial class MainWindow
         Filter("Тип",releases.Select(x=>x.Type),more,true);
         Filter("Кодек",releases.Select(x=>x.Codec),more,true);
         Filter("HDR",releases.Select(x=>x.Hdr),more,true);
-        var sorts=new[]{"Русская озвучка","Русские источники","Больше отдающих","Меньше размер","Выше качество","По названию","По видео","По субтитрам","По озвучке"}.Concat(isSeries?["По сезону и серии"]:[]).ToArray();
+        var sorts=new[]{"По языку интерфейса","Английская озвучка","Русская озвучка","Русские источники","Больше отдающих","Меньше размер","Выше качество","По названию","По видео","По субтитрам","По озвучке"}.Concat(isSeries?["По сезону и серии"]:[]).ToArray();
         var sort=new ComboBox{ItemsSource=sorts,SelectedItem=state.Sort,MinWidth=0,Margin=new(0,0,10,12)};
         if(sort.SelectedIndex<0)sort.SelectedIndex=0;
         AutomationProperties.SetName(sort,AppLanguage.T("Сортировка раздач"));hidden.Children.Add(sort);
@@ -227,7 +227,7 @@ public partial class MainWindow
         AutomationProperties.SetName(reset,AppLanguage.T("Сбросить фильтры и сортировку раздач"));
         top.Children.Add(toggle);top.Children.Add(reset);
         var results=new StackPanel{Margin=new(0,8,0,0)};panel.Children.Add(results);
-        var recommended=ReleaseRecommendation.Pick(releases,QualityMinimum);
+        var recommended=ReleaseRecommendation.Pick(releases,QualityMinimum,prefs.UiLanguage);
         bool compact=Body.ActualWidth<1000,changingFilters=false;
 
         // Refresh, sources and the poor-quality switch stay out of the way until "Ещё фильтры" is opened
@@ -280,7 +280,7 @@ public partial class MainWindow
         void SaveSelection()
         {
             foreach(var pair in filters)state.Filters[pair.Key]=pair.Value.SelectedItem?.ToString()??"Все";
-            state.Sort=sort.SelectedItem?.ToString()??"Русская озвучка";
+            state.Sort=sort.SelectedItem?.ToString()??"По языку интерфейса";
         }
         Grid RowGrid()
         {
@@ -376,7 +376,7 @@ public partial class MainWindow
                 filtered=key switch{"Источник"=>filtered.Where(x=>x.Source==value),"Сезон"=>filtered.Where(x=>x.Series.SeasonLabel==value),"Серия"=>filtered.Where(x=>x.Series.EpisodeLabel==value),"Качество"=>filtered.Where(x=>x.Quality==value),"Тип"=>filtered.Where(x=>x.Type==value),"Студия озвучки"=>filtered.Where(x=>ReleaseAudio.MatchesStudio(x,value)),"Тип озвучки"=>filtered.Where(x=>ReleaseAudio.MatchesType(x,value)),"Субтитры"=>filtered.Where(x=>x.Subs==value),"Кодек"=>filtered.Where(x=>x.Codec==value),_=>filtered.Where(x=>x.Hdr==value)};
             }
             if(state.OnlyRussian)filtered=filtered.Where(x=>RussianAudio.Rank(x)==3);
-            filtered=state.Sort switch{"Русская озвучка"=>RussianAudio.Order(filtered),"Русские источники"=>filtered.OrderByDescending(RussianSource).ThenByDescending(SeedRank),"Меньше размер"=>filtered.OrderBy(x=>x.Size??long.MaxValue),"Выше качество"=>filtered.OrderByDescending(QualityRank).ThenByDescending(SeedRank),"По названию"=>filtered.OrderBy(x=>x.Title,StringComparer.CurrentCultureIgnoreCase),"По сезону и серии"=>filtered.OrderBy(x=>x.Series.Season??int.MaxValue).ThenBy(x=>x.Series.Episode??int.MaxValue),"По видео"=>filtered.OrderBy(x=>x.Type=="Не указано").ThenBy(x=>x.Type),"По субтитрам"=>filtered.OrderBy(x=>x.Subs=="Не указано").ThenBy(x=>x.Subs),"По озвучке"=>filtered.OrderByDescending(x=>RussianAudio.Rank(x)).ThenBy(x=>ReleaseFreshness.Audio(x)),_=>filtered.OrderByDescending(SeedRank)};
+            filtered=state.Sort switch{"По языку интерфейса"=>SearchLanguage.AudioOrder(filtered,prefs.UiLanguage),"Английская озвучка"=>SearchLanguage.AudioOrder(filtered,"en"),"Русская озвучка"=>RussianAudio.Order(filtered),"Русские источники"=>filtered.OrderByDescending(RussianSource).ThenByDescending(SeedRank),"Меньше размер"=>filtered.OrderBy(x=>x.Size??long.MaxValue),"Выше качество"=>filtered.OrderByDescending(QualityRank).ThenByDescending(SeedRank),"По названию"=>filtered.OrderBy(x=>x.Title,StringComparer.CurrentCultureIgnoreCase),"По сезону и серии"=>filtered.OrderBy(x=>x.Series.Season??int.MaxValue).ThenBy(x=>x.Series.Episode??int.MaxValue),"По видео"=>filtered.OrderBy(x=>x.Type=="Не указано").ThenBy(x=>x.Type),"По субтитрам"=>filtered.OrderBy(x=>x.Subs=="Не указано").ThenBy(x=>x.Subs),"По озвучке"=>filtered.OrderByDescending(x=>RussianAudio.Rank(x)).ThenBy(x=>ReleaseFreshness.Audio(x)),_=>filtered.OrderByDescending(SeedRank)};
             if(state.Reverse)filtered=filtered.Reverse();
             var visible=filtered.ToArray();var displayed=visible.Take(state.VisibleCount).ToArray();
             ApplyDetailReleaseFilters(filmId,visible);

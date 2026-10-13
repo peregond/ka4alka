@@ -1511,5 +1511,11 @@
   "ТБ свободно": "TB free",
   "Б свободно": "B free",
   "Не удалось сохранить язык: ": "Could not save the language: ",
-  "Диск · {0}  ·  папка Ka4alka": "Disk · {0}  ·  Ka4alka folder"
+  "Диск · {0}  ·  папка Ka4alka": "Disk · {0}  ·  Ka4alka folder",
+  "По языку интерфейса": "Interface language first",
+  "Английская озвучка": "English audio",
+  "Английская озвучка при больше всего отдающих": "English audio · most seeders",
+  "Английская озвучка при много отдающих": "English audio · many seeders",
+  "Английская озвучка при умеренный размер": "English audio · moderate size",
+  "Английская озвучка при проверенный источник": "English audio · verified source"
 }

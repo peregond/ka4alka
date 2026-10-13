@@ -206,13 +206,13 @@ public partial class MainWindow
         if(owned.Any(x=>x.Completed))return "done:"+owned.First(x=>x.Completed).Id;
         var active=owned.FirstOrDefault(x=>!x.Completed);
         if(active!=null)return "active:"+active.Id;
-        var pick=ReleaseRecommendation.Pick(releases,QualityMinimum);
+        var pick=ReleaseRecommendation.Pick(releases,QualityMinimum,prefs.UiLanguage);
         return pick==null?"none":"pick:"+pick.Entry.Id+"|"+releases.Count;
     }
     int detailFilteredMovieId;
     SourceEntry[]? detailFilteredReleases;
     bool DetailRecommendationChanged(MediaItem item,IReadOnlyList<SourceEntry> choices)
-        =>!Equals(detailRecommendedEntry,DownloadsOf(item).Length==0?ReleaseRecommendation.Pick(choices,QualityMinimum)?.Entry:null);
+        =>!Equals(detailRecommendedEntry,DownloadsOf(item).Length==0?ReleaseRecommendation.Pick(choices,QualityMinimum,prefs.UiLanguage)?.Entry:null);
     void ApplyDetailReleaseFilters(int movieId,SourceEntry[] visible)
     {
         if(current?.Id!=movieId)return;
@@ -234,7 +234,7 @@ public partial class MainWindow
         if(detailActions==null)return;
         detailActions.Children.Clear();detailActionState=DetailActionState(item,releases);
         var owned=DownloadsOf(item);var done=owned.FirstOrDefault(x=>x.Completed);var active=owned.FirstOrDefault(x=>!x.Completed);
-        detailRecommendedEntry=owned.Length==0?ReleaseRecommendation.Pick(releases,QualityMinimum)?.Entry:null;
+        detailRecommendedEntry=owned.Length==0?ReleaseRecommendation.Pick(releases,QualityMinimum,prefs.UiLanguage)?.Entry:null;
         FrameworkElement Spaced(FrameworkElement element){element.Margin=new(0,0,10,8);return element;}
         Button Action(string text,string icon,bool primary,Action click)
         {
