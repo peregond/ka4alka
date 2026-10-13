@@ -52,6 +52,7 @@ if(args.Contains("--diagnose-cinema-source")){await CinemaSourceTests.Diagnostic
 if(args.Contains("--probe-portraits")){await PortraitSourceProbe.Run(root);return;}
 if(args.Contains("--performance-only")){await PerformanceResourcesTests.Run();await CoverCachePerformanceTests.Run(root);await UnifiedSearchTests.Run();await ReleaseSearchTests.Run();return;}
 if(args.Contains("--home-availability-only")){HiddenCatalogTests.Run();await UXReliabilityTests.Run(root);return;}
+if(args.Contains("--missing-files-only")){await MissingDownloadFilesTests.Run(root);return;}
 if(args.Contains("--games-only")){await GameCatalogTests.Run(root);return;}
 if(args.Contains("--metadata-only")){await MediaMetadataTests.Run();return;}
 if(args.Contains("--imdb-suggestions-only")){await ImdbSuggestionTests.Run();return;}
@@ -103,6 +104,7 @@ DownloadDiagnosticsTests.Run();
 DownloadSpaceTests.Run(root);
 await DownloadReliabilityTests.Run(root);
 await DownloadDeletionTests.Run(root);
+await MissingDownloadFilesTests.Run(root);
 await DownloadLanTests.Run(root);
 await CoverCachePerformanceTests.Run(root);
 await MagnetDiscoveryTests.Run(root);

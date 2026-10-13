@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Automation;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
@@ -60,12 +61,21 @@ public partial class MainWindow
                 Check(signals==1,"Disposing the network monitor cancels queued callbacks and its timer.");
             }
             await CheckDownloadDiagnostics(output);
+            var missing=new DownloadItem{Name="Удалённая серия",Progress=100,HasCompletedDownload=true,FilesMissing=true,Paused=true,Status="Файлы не найдены",MissingFilesMessage="Файлы удалены вне приложения.",Hint="Файлы удалены вне приложения."};
+            downloads.Items.Add(missing);section="Загрузки";current=null;Render();UpdateLayout();await Task.Delay(150);
+            var retry=FindVisual<Button>(Body,b=>ReferenceEquals(b.Tag,missing)&&AutomationProperties.GetName(b)=="Скачать заново после подтверждения")??throw new Exception("Missing-file retry action missing.");
+            var remove=FindVisual<Button>(Body,b=>ReferenceEquals(b.Tag,missing)&&AutomationProperties.GetName(b)=="Удалить задачу с отсутствующими файлами")??throw new Exception("Prominent queue removal missing.");
+            Check(retry.IsVisible&&remove.IsVisible,"Missing payload has visible redownload and remove-from-queue actions.");
+            var confirmations=0;missingFilesConfirm=_=>{confirmations++;return false;};await ToggleDownloadItem(missing);
+            Check(confirmations==1&&missing.FilesMissing&&missing.Paused&&!downloads.EngineCreated,"Declining explicit redownload leaves the task safely paused without creating an engine.");
+            Shot("missing-download-files");missingFilesConfirm=null;await downloads.Remove(missing);
+            Check(!downloads.Items.Contains(missing),"Missing payload task can be removed from the queue.");
             File.WriteAllText(Path.Combine(output,"checks.json"),JsonSerializer.Serialize(new{Checks=checks,DiagnosticDialog=true,WindowsNotificationAccepted=true,VisibilityVerified=false},new JsonSerializerOptions{WriteIndented=true}));
         }
         catch(Exception error){File.WriteAllText(Path.Combine(output,"error.txt"),error.ToString());throw;}
         finally
         {
-            prefs.NotifyDownloads=originalNotify;prefs.AutoRecoverDownloads=originalRecover;prefs.Light=originalLight;prefs.Save();ApplyTheme();Close();
+            missingFilesConfirm=null;prefs.NotifyDownloads=originalNotify;prefs.AutoRecoverDownloads=originalRecover;prefs.Light=originalLight;prefs.Save();ApplyTheme();Close();
         }
     }
 }

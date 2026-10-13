@@ -31,6 +31,7 @@
 
   <Geometry x:Key="IconTheme">M12,3 A9,9 0 1 1 11.99,3 M12,3 L12,21</Geometry>
   <Geometry x:Key="IconBack">M20,12 L4,12 M10,6 L4,12 10,18</Geometry>
+  <Geometry x:Key="IconReset">M6,6 L18,18 M18,6 L6,18</Geometry>
   <Geometry x:Key="IconRefresh">M20,8 A8,8 0 1 0 20,16 M20,3 L20,8 15,8</Geometry>
   <Geometry x:Key="IconChevron">M9,5 L16,12 9,19</Geometry>
   <Geometry x:Key="IconFilter">M4,6 L20,6 M7,12 L17,12 M10,18 L14,18</Geometry>
@@ -147,7 +148,7 @@
        </WrapPanel>
       </StackPanel>
       <StackPanel x:Name="RowActions" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center"><StackPanel.Style><Style TargetType="StackPanel"><Style.Triggers><DataTrigger Binding="{Binding Busy}" Value="True"><Setter Property="IsEnabled" Value="False"/></DataTrigger></Style.Triggers></Style></StackPanel.Style>
-       <Button Style="{StaticResource RowIconButton}" Tag="{Binding}" Click="ToggleDownload" ToolTip="{Binding Action}" AutomationProperties.Name="{Binding Action}">
+       <Button Tag="{Binding}" Click="ToggleDownload" ToolTip="{Binding Action}" AutomationProperties.Name="{Binding Action}"><Button.Style><Style TargetType="Button" BasedOn="{StaticResource RowIconButton}"><Style.Triggers><DataTrigger Binding="{Binding FilesMissing}" Value="True"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></Button.Style>
         <Grid><Path Data="{StaticResource IconPause}" Stroke="{DynamicResource Muted}" StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Width="17" Height="17" Stretch="Uniform"><Path.Style><Style TargetType="Path"><Setter Property="Visibility" Value="Visible"/><Style.Triggers><DataTrigger Binding="{Binding Paused}" Value="True"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></Path.Style></Path>
          <Path Data="{StaticResource IconPlay}" Stroke="{DynamicResource Accent}" Fill="{DynamicResource Accent}" StrokeThickness="1.4" StrokeLineJoin="Round" Width="15" Height="15" Stretch="Uniform"><Path.Style><Style TargetType="Path"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding Paused}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></Path.Style></Path></Grid>
        </Button>
@@ -157,6 +158,14 @@
        <Button Style="{StaticResource RowIconButton}" Tag="{Binding}" Click="DownloadMoreClick" ToolTip="Другие действия" AutomationProperties.Name="Действия загрузки"><Path Data="{StaticResource IconMore}" Fill="{DynamicResource Muted}" Stroke="{DynamicResource Muted}" StrokeThickness="1.2" Width="17" Height="17" Stretch="Uniform"/></Button>
       </StackPanel>
      </Grid>
+     <Border Margin="0,10,0,0" Padding="12,8" CornerRadius="10" Background="{DynamicResource Raised}"><Border.Style><Style TargetType="Border"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding FilesMissing}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></Border.Style>
+      <StackPanel><TextBlock Text="{Binding Hint}" Foreground="{DynamicResource Warning}" TextWrapping="Wrap" Margin="0,0,0,8" FontSize="12"/>
+       <WrapPanel><WrapPanel.Style><Style TargetType="WrapPanel"><Style.Triggers><DataTrigger Binding="{Binding Busy}" Value="True"><Setter Property="IsEnabled" Value="False"/></DataTrigger></Style.Triggers></Style></WrapPanel.Style>
+        <Button Tag="{Binding}" Click="ToggleDownload" Content="Скачать заново" Style="{StaticResource PrimaryButton}" MinHeight="32" Padding="12,4" FontSize="12" AutomationProperties.Name="Скачать заново после подтверждения"/>
+        <Button Tag="{Binding}" Click="RecheckDownloadFiles" Content="Проверить файлы" Style="{StaticResource QuietButton}" MinHeight="32" Padding="12,4" FontSize="12"/>
+        <Button Tag="{Binding}" Click="RemoveDownload" Content="Удалить из загрузок" Style="{StaticResource PillButton}" MinHeight="32" Padding="12,4" FontSize="12" Foreground="{DynamicResource Muted}" AutomationProperties.Name="Удалить задачу с отсутствующими файлами"/>
+       </WrapPanel></StackPanel>
+     </Border>
      <Border Margin="0,12,0,0" Padding="0,14,0,4" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource EdgeSoft}"><Border.Style><Style TargetType="Border"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding Expanded}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></Border.Style>
       <Grid SizeChanged="DownloadDetailsPanelResized"><Grid.ColumnDefinitions><ColumnDefinition Width="1.4*" MinWidth="220"/><ColumnDefinition Width="*" MinWidth="220"/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
        <StackPanel Margin="0,0,24,0">

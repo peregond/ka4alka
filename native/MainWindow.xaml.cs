@@ -194,7 +194,20 @@ public partial class MainWindow:Window
         async Task Add(string source){if(closing||closed)return;try{var added=await downloads.Add(source.Trim(),prefs.Folder);if(closing||closed)return;dialog.Close();section="Загрузки";current=null;Render();Status.Text=added.LowSpacePaused?added.SpacePauseMessage:"Раздача добавлена. Ищем участников.";}catch(Exception)when(closing||closed){}catch(Exception ex){error.Text=ex.Message;}}
         var start=AsyncButton("Начать загрузку",()=>Add(input.Text));start.Style=(Style)FindResource("PrimaryButton");start.IsDefault=true;actions.Children.Add(start);actions.Children.Add(AsyncButton("Выбрать .torrent",async()=>{var f=new OpenFileDialog{Filter="BitTorrent (*.torrent)|*.torrent"};if(f.ShowDialog(dialog)==true)await Add(f.FileName);}));p.Children.Add(actions);p.Children.Add(error);p.Children.Add(Text("После скачивания клиент продолжает раздачу. Нажми «Пауза», чтобы остановить её.",12,true));dialog.ShowDialog();
     }
-    async void ToggleDownload(object sender,RoutedEventArgs e){try{await downloads.Toggle((DownloadItem)((Button)sender).Tag);}catch(Exception ex){Status.Text=ex.Message;}finally{SyncTimer();}}
+    internal Func<DownloadItem,bool>? missingFilesConfirm;
+    async Task ToggleDownloadItem(DownloadItem item)
+    {
+        if(!item.FilesMissing)await downloads.Toggle(item);
+        if(!item.FilesMissing)return;
+        var confirm=missingFilesConfirm?.Invoke(item)??MessageBox.Show(this,
+            "Файлы загрузки «"+item.DisplayName+"» не найдены. Скачать недостающие файлы заново?", "Повторное скачивание",
+            MessageBoxButton.YesNo,MessageBoxImage.Question,MessageBoxResult.No)==MessageBoxResult.Yes;
+        if(confirm)await downloads.RedownloadAsync(item);
+    }
+    async void ToggleDownload(object sender,RoutedEventArgs e){try{await ToggleDownloadItem((DownloadItem)((FrameworkElement)sender).Tag);}catch(Exception ex){Status.Text=ex.Message;}finally{SyncTimer();}}
+    async void RecheckDownloadFiles(object sender,RoutedEventArgs e)
+    {try{await downloads.CheckCompletedFilesAsync(true);}catch(Exception error){Status.Text=error.Message;}}
+
     async void RemoveDownload(object sender,RoutedEventArgs e)
     {
         var item=(DownloadItem)((FrameworkElement)sender).Tag;

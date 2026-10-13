@@ -22,6 +22,13 @@ public partial class MainWindow
         if(prefs.CatalogQualityHeight>0)filters.Add(new("quality",prefs.CatalogQualityHeight switch{2160=>"Качество · 4K",1080=>"Качество · Full HD",_=>"Качество · HD Ready"},()=>{prefs.CatalogQualityHeight=0;prefs.Save();}));
         return filters.ToArray();
     }
+    void ResetAllCatalogFilters()=>ChangeCatalogFilter(()=>{favoritesOnly=false;searchCategory="";ResetCatalogFilters();prefs.CatalogQualityHeight=0;prefs.Save();});
+    Button AddCatalogResetButton()
+    {
+        var reset=ActionButton("Сбросить всё","IconReset",ResetAllCatalogFilters,"PillButton");
+        reset.Name="ResetActiveCatalogFilters";reset.ToolTip="Сбросить фильтры, подборку и сортировку. Поиск и скрытие плохого качества сохранятся.";
+        AutomationProperties.SetName(reset,"Сбросить выбранные фильтры");return reset;
+    }
     void RenderActiveCatalogFilters()
     {
         activeCatalogFilterScroll=null;
@@ -41,11 +48,6 @@ public partial class MainWindow
             button.ToolTip="Снять фильтр: "+filter.Label;
             AutomationProperties.SetName(button,"Снять фильтр: "+filter.Label);row.Children.Add(button);
         }
-        var reset=Button("Сбросить всё",()=>ChangeCatalogFilter(()=>{ResetCatalogFilters();prefs.CatalogQualityHeight=0;prefs.Save();}));
-        reset.Name="ResetActiveCatalogFilters";reset.Style=(Style)FindResource("QuietButton");
-        reset.Margin=new(0,0,0,4);reset.Padding=new(9,5,9,5);reset.MinHeight=28;reset.FontSize=11;
-        reset.ToolTip="Сбросить выбранные фильтры. Поиск и настройка скрытия плохого качества сохранятся.";
-        AutomationProperties.SetName(reset,"Сбросить выбранные фильтры");row.Children.Insert(0,reset);
         activeCatalogFilterScroll=new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=row,Margin=new(0,7,0,0),MaxHeight=compactHeight?68:double.PositiveInfinity,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};
         FilterControls.Children.Add(activeCatalogFilterScroll);
     }

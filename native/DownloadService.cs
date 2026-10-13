@@ -34,12 +34,14 @@ public sealed partial class DownloadService
         if(DownloadOrdering.AssignMissingAddedUtc(restored,File.GetLastWriteTimeUtc(queuePath)))SaveQueue(restored);
         foreach(var item in restored)
         {
-            if(!item.Paused&&!item.LowSpacePaused)pendingResume.Add(item.Id);
+            item.HasCompletedDownload|=item.Progress>=100;
+            if(!item.Paused&&!item.LowSpacePaused&&!item.FilesMissing)pendingResume.Add(item.Id);
             if(item.Completed)completionNotified.Add(item.Id);
             item.Paused=true;item.Busy=false;item.Status="На паузе";item.Stats=$"{item.Progress:F1}% · на паузе";item.Hint="";
             item.DownloadRate=0;item.UploadRate=0;item.TotalBytes=KnownTotal(item.Files);Items.Add(item);
             ApplyReliabilityStatus(item);
         }
+        _=CheckCompletedFilesAsync(true);
     }
     // Pieces are kept in memory until they can be written in larger blocks, so a fast
     // release waits on the disk less often. 64 MB on computers with at least 6 GB of
@@ -199,16 +201,22 @@ public sealed partial class DownloadService
         }finally{gate.Release();}
     }
     public Task Toggle(DownloadItem item)=>SetPausedAsync(item,!item.Paused);
-    async Task SetPausedAsync(DownloadItem item,bool paused)
+    async Task SetPausedAsync(DownloadItem item,bool paused,bool redownload=false)
     {
         if(item.Busy)return;pendingResume.Remove(item.Id);item.Busy=true;item.Refresh();
         await gate.WaitAsync();
         try
         {
             if(!Items.Contains(item)||item.Paused==paused)return;
+            if(!paused&&!redownload&&!await ProtectCompletedFilesAsync(item)){await ReleaseIdleEngine();return;}
             var manager=await Manager(item);
             if(!paused)
             {
+                if(redownload)
+                {
+                    await StopManager(manager);await manager.SetNeedsHashCheckAsync();
+                    item.HasCompletedDownload=false;item.FilesMissing=false;item.MissingFilesMessage="";item.Progress=0;item.Hint="";completionNotified.Remove(item.Id);Save();
+                }
                 SnapshotFiles(item,manager);
                 if(!await EnsureSpaceAsync(item,manager,lifetime.Token)){Update();Save();await ReleaseIdleEngine();return;}
                 lifetime.Token.ThrowIfCancellationRequested();await manager.StartAsync();item.Paused=false;item.LowSpacePaused=false;item.SpacePauseMessage="";item.SpaceCheckFailed=false;item.LastStartedUtc=DateTime.UtcNow;
@@ -272,6 +280,7 @@ public sealed partial class DownloadService
     }
     public void Update()
     {
+        _=CheckCompletedFilesAsync();
         var now=DateTime.UtcNow;
         foreach(var item in Items){if(!managers.TryGetValue(item.Id,out var m))continue;
             item.Name=m.Torrent?.Name??item.Name;SnapshotFiles(item,m);

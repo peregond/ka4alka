@@ -7,6 +7,7 @@ using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
+using System.Windows.Input;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 
@@ -215,6 +216,19 @@ public partial class MainWindow
         Scroll().ScrollToVerticalOffset(500);await Settle();var defaultPosition=CaptureCatalogPosition()!;Click(Card(defaultPosition.ItemId!.Value));await Settle();
         Click(moviesNavigation);deadline=DateTime.UtcNow.AddSeconds(5);while(liveLoading&&DateTime.UtcNow<deadline)await Task.Delay(40);await Settle();
         Check(current==null&&Scroll().VerticalOffset<1,"explicit Films navigation from a detail resets the route instead of restoring its previous scroll");
+        // User input must win over an in-flight return-to-card restoration.
+        Scroll().ScrollToVerticalOffset(400);await Settle();var wheelPosition=CaptureCatalogPosition()!;
+        Click(Card(wheelPosition.ItemId!.Value));await Settle();CinemaBack();
+        var wheelViewer=Scroll();
+        foreach(var delta in new[]{-12,-120})
+        {
+            navigationPendingPosition=wheelPosition;ScheduleCatalogPositionRestore();
+            wheelViewer.RaiseEvent(new MouseWheelEventArgs(Mouse.PrimaryDevice,Environment.TickCount,delta){RoutedEvent=Mouse.PreviewMouseWheelEvent});
+            Check(navigationPendingPosition==null,"wheel and precision touchpad input cancel obsolete title restoration: "+delta);
+            await Task.Delay(350);await Settle();var settledOffset=wheelViewer.VerticalOffset;
+            await Task.Delay(250);UpdateLayout();
+            Check(Math.Abs(wheelViewer.VerticalOffset-settledOffset)<1.1,"manual scrolling settles without an anchor pulling the catalog back: "+delta);
+        }
         Volatile.Write(ref finished,true);
         await File.WriteAllTextAsync(Path.Combine(output,"checks.json"),JsonSerializer.Serialize(new{Checks=checks,RealScrollViewers=true,
             CatalogTitleAnchor=true,ParticipantTitleAnchor=true,SearchFiltersPagePreserved=true,SettingsAndDownloadsReturn=true,

@@ -190,6 +190,7 @@ public partial class MainWindow
             AddCatalogFilters(tabs,sortBar);
             tabs.Children.Add(CatalogQualityControls(()=>{livePage=1;Render();}));
         }
+        if(!PeopleOnlySearch)sortBar.Children.Add(AddCatalogResetButton());
         if(!favoritesOnly)
         {
             var refresh=ActionButton("","IconRefresh",()=>{onlineIndex.RetryNow();ResetCatalogQualityChecks();catalogPages.Clear();ResetDiscoveryData();catalogRefreshRequested=true;liveKey="";Render();},"PillButton");catalogRefreshButton=refresh;refresh.ToolTip="Обновить каталог";System.Windows.Automation.AutomationProperties.SetName(refresh,"Обновить каталог");refresh.Padding=new(0);refresh.Width=40;refresh.Margin=new(8,0,0,8);sortBar.Children.Add(refresh);

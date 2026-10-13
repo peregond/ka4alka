@@ -74,6 +74,7 @@ public partial class MainWindow
         var row=new DockPanel{Name="GameFilters"};
         var refresh=ActionButton("","IconRefresh",RefreshGames,"PillButton");refresh.Name="GameRefresh";refresh.ToolTip="Обновить каталог";AutomationProperties.SetName(refresh,"Обновить каталог");
         refresh.Padding=new(0);refresh.Width=compactHeight?36:40;refresh.MinHeight=compactHeight?36:40;refresh.Margin=new(8,0,0,8);DockPanel.SetDock(refresh,Dock.Right);row.Children.Add(refresh);
+        var reset=ActionButton("Сбросить всё","IconReset",()=>{gameShelf="";gamePage=1;gameKey="";ResetCatalogNavigationPosition();Render();},"PillButton");reset.Name="GameResetFilters";reset.MinHeight=compactHeight?36:40;reset.Margin=new(8,0,0,8);DockPanel.SetDock(reset,Dock.Right);row.Children.Add(reset);
         var chips=new WrapPanel();row.Children.Add(chips);
         void Chip(string label,string shelf)
         {

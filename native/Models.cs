@@ -213,16 +213,20 @@ public class DownloadItem : INotifyPropertyChanged
     public DateTime LastStartedUtc {get;set;}
     public bool Busy {get;set;}
     public bool Paused {get;set;}=true;
+    public bool HasCompletedDownload {get;set;}
+    public bool FilesMissing {get;set;}
+    public string MissingFilesMessage {get;set;}="";
     public bool LowSpacePaused {get;set;}
     public string SpacePauseMessage {get;set;}="";
     public bool SpaceCheckFailed {get;set;}
-    [JsonIgnore] public bool Completed=>Progress>=100;
-    public string Action => Paused?"Продолжить":"Пауза";
+    [JsonIgnore] public bool Completed=>Progress>=100&&!FilesMissing;
+    public string Action => FilesMissing?"Скачать заново":Paused?"Продолжить":"Пауза";
     // Presentation helpers for the status pill, widget and queue rows. They only read state the engine already reports.
     [JsonIgnore] public DownloadStatusKind StatusKind
     {
         get
         {
+            if(FilesMissing)return DownloadStatusKind.Error;
             if(Status.StartsWith("Ошибка",StringComparison.Ordinal)||Status.StartsWith("Не удалось",StringComparison.Ordinal)||Status.StartsWith("Недостаточно места",StringComparison.Ordinal)||Status.StartsWith("Папка недоступна",StringComparison.Ordinal)||LowSpacePaused)return DownloadStatusKind.Error;
             if(Paused)return DownloadStatusKind.Paused;
             if(Completed)return DownloadStatusKind.Seeding;

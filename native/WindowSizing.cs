@@ -184,6 +184,13 @@ public partial class MainWindow
         foreach(var button in inlineCatalogFilters.Children.OfType<Button>().Concat(catalogToolbar?.Children.OfType<StackPanel>().SelectMany(x=>x.Children.OfType<Button>())??[]))
         {
             if(ReferenceEquals(button,catalogRefreshButton))continue;
+            if(button.Name=="ResetActiveCatalogFilters"&&button.Content is StackPanel resetContent)
+            {
+                var iconOnly=width<560;
+                foreach(var label in resetContent.Children.OfType<TextBlock>())label.Visibility=iconOnly?Visibility.Collapsed:Visibility.Visible;
+                foreach(var icon in resetContent.Children.OfType<System.Windows.Shapes.Path>())icon.Margin=new(0,0,iconOnly?0:10,0);
+                button.Width=iconOnly?(shortChip?36:40):double.NaN;
+            }
             button.HorizontalContentAlignment=HorizontalAlignment.Center;button.MinHeight=shortChip?36:40;button.FontSize=compact?13:14;
             button.Padding=new(compact?12:16,0,compact?12:16,0);button.Margin=new(0,0,8,8);
         }

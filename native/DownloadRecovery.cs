@@ -223,6 +223,7 @@ public sealed partial class DownloadService
     }
     async Task<bool> RestartConnectionsAsync(DownloadItem item,TorrentManager manager,CancellationToken token)
     {
+        if(!await ProtectCompletedFilesAsync(item))return false;
         SnapshotFiles(item,manager);
         if(!await EnsureSpaceAsync(item,manager,token))return false;
         await StopManager(manager).WaitAsync(token);
@@ -233,7 +234,12 @@ public sealed partial class DownloadService
     }
     void ApplyReliabilityStatus(DownloadItem item)
     {
-        if(item.LowSpacePaused)
+        if(item.FilesMissing)
+        {
+            item.Status="Файлы не найдены";item.Hint=item.MissingFilesMessage;item.Stats="Повторная загрузка не запускается автоматически";
+            item.DownloadRate=0;item.UploadRate=0;item.Remaining="";item.PeersText="";item.Indeterminate=false;
+        }
+        else if(item.LowSpacePaused)
         {
             item.Status=item.SpaceCheckFailed?"Папка недоступна · на паузе":"Недостаточно места · на паузе";item.Hint=string.IsNullOrWhiteSpace(item.SpacePauseMessage)?"Освободи место и нажми «Продолжить». Перед запуском место проверится заново.":item.SpacePauseMessage;
             item.DownloadRate=0;item.UploadRate=0;item.Remaining="";item.PeersText="";item.Indeterminate=false;
@@ -246,6 +252,7 @@ public sealed partial class DownloadService
     }
     void ObserveNotices(DownloadItem item,TorrentManager manager)
     {
+        if(manager.State==TorrentState.Seeding&&!item.HasCompletedDownload){item.HasCompletedDownload=true;Save();}
         if(!closeRequested&&!item.Paused&&manager.State==TorrentState.Seeding&&completionNotified.Add(item.Id))
         {RaiseNotice(new(DownloadNoticeKind.Completed,item.Id,item.DisplayName,"Загрузка завершена. Файлы сохранены в выбранной папке."));Save();}
         if(manager.State==TorrentState.Error)
