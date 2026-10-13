@@ -200,7 +200,13 @@ public partial class MainWindow
     void UpdateCatalogFilterOverflow()
     {
         if(inlineCatalogFilterScroll==null||inlineCatalogFilters==null||catalogToolbar==null||catalogFilterBack==null||catalogFilterForward==null)return;
-        var overflow=inlineCatalogFilterScroll.ViewportWidth>0&&inlineCatalogFilterScroll.ScrollableWidth>1;
+        // Decide from the space without arrows. Their own visibility must not
+        // change the answer, especially when they consume a tiny viewport.
+        var available=inlineCatalogFilterScroll.ActualWidth;
+        foreach(var arrow in new[]{catalogFilterBack,catalogFilterForward})
+            if(arrow.Visibility==Visibility.Visible)available+=arrow.ActualWidth+arrow.Margin.Left+arrow.Margin.Right;
+        if(available<=0)return;
+        var overflow=inlineCatalogFilters.DesiredSize.Width>available+1;
         var visibility=overflow?Visibility.Visible:Visibility.Collapsed;
         catalogFilterBack.Visibility=visibility;catalogFilterForward.Visibility=visibility;
         catalogFilterBack.IsEnabled=inlineCatalogFilterScroll.HorizontalOffset>1;

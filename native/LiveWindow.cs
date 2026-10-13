@@ -187,7 +187,7 @@ public partial class MainWindow
         }
         if(!PeopleOnlySearch)
         {
-            AddCatalogFilters(tabs,sortBar);
+            AddCatalogFilters(tabs);
             tabs.Children.Add(CatalogQualityControls(()=>{livePage=1;Render();}));
         }
         if(!PeopleOnlySearch)sortBar.Children.Add(AddCatalogResetButton());
