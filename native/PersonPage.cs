@@ -126,7 +126,7 @@ public partial class MainWindow
             catch
             {
                 if(!IsCurrent()||attempt!=refreshAttempt)return;settledAttempt=attempt;personProfileLoading=false;status.Text=AppLanguage.T("Не удалось обновить фильмографию.");retry.Visibility=Visibility.Visible;
-                if(biography.Text=="Загружаем биографию…")biography.Text=AppLanguage.T("Биография пока недоступна.");
+                if(biography.Text==AppLanguage.T("Загружаем биографию…"))biography.Text=AppLanguage.T("Биография пока недоступна.");
                 if(navigationPendingPosition!=null)ScheduleCatalogPositionRestore();
             }
         }
