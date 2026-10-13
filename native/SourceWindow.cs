@@ -60,9 +60,9 @@ public partial class MainWindow
     async Task FindSources()
     {
         sourceRequest?.Cancel();sourceRequest?.Dispose();sourceRequest=new();var token=sourceRequest.Token;searching=true;Render();
-        try{var items=sourceIndex==0?await sourceClient.SearchArchive(sourceQuery,sourceCategory,sourcePage,token):await sourceClient.SearchTorznab(sourceConfigs[sourceIndex-1],sourceQuery,token);if(!token.IsCancellationRequested){sourceResults=items;Status.Text=$"Источник ответил: {items.Count} записей";}}
-        catch(OperationCanceledException){Status.Text="Поиск отменён или источник не ответил вовремя.";}
-        catch(Exception){Status.Text="Не удалось получить ответ. Проверь соединение, адрес источника и API-ключ.";}
+        try{var items=sourceIndex==0?await sourceClient.SearchArchive(sourceQuery,sourceCategory,sourcePage,token):await sourceClient.SearchTorznab(sourceConfigs[sourceIndex-1],sourceQuery,token);if(!token.IsCancellationRequested){sourceResults=items;Status.Text=AppLanguage.T($"Источник ответил: {items.Count} записей");}}
+        catch(OperationCanceledException){Status.Text=AppLanguage.T("Поиск отменён или источник не ответил вовремя.");}
+        catch(Exception){Status.Text=AppLanguage.T("Не удалось получить ответ. Проверь соединение, адрес источника и API-ключ.");}
         finally{searching=false;if(!closed&&section=="Источники")Render();}
     }
     // The recommended-release card's button: the same release, kept apart from the list rows that are tagged with a SourceEntry.
@@ -73,13 +73,13 @@ public partial class MainWindow
         var button=(Button)sender;var item=button.Tag as SourceEntry??((RecommendedDownload)button.Tag).Entry;var media=current?.Cinema==true||current?.Section=="Игры"?current:null;
         if(media?.Cinema==true)media=DownloadMetadata.EnrichMedia(media,prefs.LiveFavorites.Concat(liveItems).Concat(catalogIndex.Recent(media.Section,200)).Append(media));
         button.IsEnabled=false;
-        try{if(!EnsureDownloadFolder()){Status.Text="Папка для загрузок не выбрана. Её можно выбрать в настройках.";return;}
-            Status.Text="Проверяем раздачу…";using var timeout=CancellationTokenSource.CreateLinkedTokenSource(reliabilityCancellation.Token);timeout.CancelAfter(TimeSpan.FromSeconds(30));var source=await sourceClient.TorrentFile(item,timeout.Token);
+        try{if(!EnsureDownloadFolder()){Status.Text=AppLanguage.T("Папка для загрузок не выбрана. Её можно выбрать в настройках.");return;}
+            Status.Text=AppLanguage.T("Проверяем раздачу…");using var timeout=CancellationTokenSource.CreateLinkedTokenSource(reliabilityCancellation.Token);timeout.CancelAfter(TimeSpan.FromSeconds(30));var source=await sourceClient.TorrentFile(item,timeout.Token);
             if(closing||closed)return;
             if(media?.Cinema==true&&cardMetadata.TryGetValue(media.Id,out var metadata)&&metadata.IsCompletedSuccessfully)media=DownloadMetadata.EnrichMedia(media,[metadata.Result]);
-            var added=await downloads.Add(source,prefs.Folder,media,item.ImageUrl,item);if(closing||closed)return;section="Загрузки";current=null;Render();Status.Text=added.LowSpacePaused?added.SpacePauseMessage:item.Seeds==0?"Раздача добавлена, но источник показывает: отдают 0. Ждём участников.":"Раздача добавлена. Ищем участников.";
+            var added=await downloads.Add(source,prefs.Folder,media,item.ImageUrl,item);if(closing||closed)return;section="Загрузки";current=null;Render();Status.Text=AppLanguage.T(added.LowSpacePaused?added.SpacePauseMessage:item.Seeds==0?"Раздача добавлена, но источник показывает: отдают 0. Ждём участников.":"Раздача добавлена. Ищем участников.");
         }catch(Exception)when(closing||closed){}
-        catch(Exception error){var message=error is HttpRequestException?"Не удалось получить раздачу из источника.":error.Message;Status.Text=message;MessageBox.Show(this,message,"Не удалось начать загрузку",MessageBoxButton.OK,MessageBoxImage.Warning);}finally{if(!closing&&!closed)button.IsEnabled=true;}
+        catch(Exception error){var message=error is HttpRequestException?"Не удалось получить раздачу из источника.":error.Message;Status.Text=AppLanguage.T(message);LocalizedDialog.Show(this,message,AppLanguage.T("Не удалось начать загрузку"),MessageBoxButton.OK,MessageBoxImage.Warning);}finally{if(!closing&&!closed)button.IsEnabled=true;}
     }
     void SourcePage(object sender,RoutedEventArgs e){var item=(SourceEntry)((Button)sender).Tag;if(string.IsNullOrEmpty(item.PageUrl))return;System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(SourceClient.WebUri(item.PageUrl).AbsoluteUri){UseShellExecute=true});}
     // Posters keep their 280 px decode up to a 150 % Windows scale; higher scales decode a little wider so they stay sharp.
@@ -252,10 +252,10 @@ public partial class MainWindow
     }
     void AddIndexer()
     {
-        var w=new Window{ShowInTaskbar=false,Title="Torznab-источник",Owner=this,Width=560,SizeToContent=SizeToContent.Height,WindowStartupLocation=WindowStartupLocation.CenterOwner};var p=new StackPanel{Margin=new(24)};w.Content=p;
+        var w=new Window{ShowInTaskbar=false,Title=AppLanguage.T("Torznab-источник"),Owner=this,Width=560,SizeToContent=SizeToContent.Height,WindowStartupLocation=WindowStartupLocation.CenterOwner};var p=new StackPanel{Margin=new(24)};w.Content=p;
         p.Children.Add(Text("Подключить индексатор",22));p.Children.Add(Text("Вставь Torznab URL из Jackett, Prowlarr или другого совместимого сервиса. Ключ хранится только до закрытия приложения.",12,true));
         TextBox Field(string label){p.Children.Add(Text(label,12));var box=new TextBox{Margin=new(0,0,0,12)};p.Children.Add(box);return box;}
         var name=Field("Название");var endpoint=Field("Torznab URL");p.Children.Add(Text("API-ключ",12));var key=new PasswordBox{Margin=new(0,0,0,15),Padding=new(10)};p.Children.Add(key);var error=Text("",12);
-        p.Children.Add(Button("Подключить",()=>{try{SourceClient.WebUri(endpoint.Text.Trim());if(string.IsNullOrWhiteSpace(name.Text))throw new FormatException("Введи название источника.");sourceConfigs.Add(new(name.Text.Trim(),endpoint.Text.Trim(),key.Password));sourceIndex=sourceConfigs.Count;sourceResults=[];w.Close();Render();}catch(Exception ex){error.Text=ex.Message;}}));p.Children.Add(error);w.ShowDialog();
+        p.Children.Add(Button("Подключить",()=>{try{SourceClient.WebUri(endpoint.Text.Trim());if(string.IsNullOrWhiteSpace(name.Text))throw new FormatException("Введи название источника.");sourceConfigs.Add(new(name.Text.Trim(),endpoint.Text.Trim(),key.Password));sourceIndex=sourceConfigs.Count;sourceResults=[];w.Close();Render();}catch(Exception ex){error.Text=AppLanguage.T(ex.Message);}}));p.Children.Add(error);w.ShowDialog();
     }
 }

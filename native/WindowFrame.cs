@@ -91,8 +91,8 @@ public partial class MainWindow
     {
         var maximized=WindowState==WindowState.Maximized;
         WindowTopEdge.Visibility=DrawsOwnTopEdge&&!maximized?Visibility.Visible:Visibility.Collapsed;
-        CaptionMaximize.Content=maximized?"":"";CaptionMaximize.ToolTip=maximized?"Восстановить":"Развернуть";
-        AutomationProperties.SetName(CaptionMaximize,maximized?"Восстановить окно":"Развернуть окно");
+        CaptionMaximize.Content=maximized?"":"";CaptionMaximize.ToolTip=AppLanguage.T(maximized?"Восстановить":"Развернуть");
+        AutomationProperties.SetName(CaptionMaximize,AppLanguage.T(maximized?"Восстановить окно":"Развернуть окно"));
     }
     void CaptionMinimizeClick(object sender,RoutedEventArgs e)=>SystemCommands.MinimizeWindow(this);
     void CaptionMaximizeClick(object sender,RoutedEventArgs e){if(WindowState==WindowState.Maximized)SystemCommands.RestoreWindow(this);else SystemCommands.MaximizeWindow(this);}

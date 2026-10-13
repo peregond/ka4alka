@@ -86,12 +86,12 @@ public partial class MainWindow
         if(!releaseViews.ContainsKey(item.Id))releaseViews[item.Id]=new();
         releaseSourceItemId=item.Id;renderedSourceChecks=null;
         var show=Button("Источники",()=>{});show.Style=(Style)FindResource("QuietButton");show.Padding=new(8,6,8,6);show.MinHeight=30;show.Margin=new(0,0,4,0);show.BorderThickness=new(0);show.VerticalAlignment=VerticalAlignment.Center;
-        show.ToolTip="Состояние трекеров и онлайн-индекса";AutomationProperties.SetName(show,"Показать состояние источников");toolbar.Children.Add(show);releaseSourceToggle=show;
+        show.ToolTip=AppLanguage.T("Состояние трекеров и онлайн-индекса");AutomationProperties.SetName(show,AppLanguage.T("Показать состояние источников"));toolbar.Children.Add(show);releaseSourceToggle=show;
         var retry=ActionButton("Обновить","IconRefresh",()=>RetryReleases(item));retry.MinHeight=30;retry.Padding=new(8,6,8,6);retry.Margin=new(0,0,6,0);retry.BorderThickness=new(0);retry.VerticalAlignment=VerticalAlignment.Center;
-        retry.ToolTip="Повторить поиск раздач во всех источниках";AutomationProperties.SetName(retry,"Обновить варианты загрузки");toolbar.Children.Add(retry);releaseSourceRetry=retry;
+        retry.ToolTip=AppLanguage.T("Повторить поиск раздач во всех источниках");AutomationProperties.SetName(retry,AppLanguage.T("Обновить варианты загрузки"));toolbar.Children.Add(retry);releaseSourceRetry=retry;
         var summary=Text("",11,true);summary.Name="SourceSummary";summary.Margin=new(4,6,4,6);summary.MaxWidth=260;summary.TextTrimming=TextTrimming.CharacterEllipsis;summary.TextWrapping=TextWrapping.NoWrap;summary.VerticalAlignment=VerticalAlignment.Center;
         toolbar.Children.Add(summary);releaseSourceSummary=summary;
-        var rows=new StackPanel{Name="ReleaseSourceDetails",Margin=new(4,0,0,12),Visibility=Visibility.Collapsed};AutomationProperties.SetName(rows,"Состояние источников раздач");target.Children.Add(rows);releaseSourceRows=rows;
+        var rows=new StackPanel{Name="ReleaseSourceDetails",Margin=new(4,0,0,12),Visibility=Visibility.Collapsed};AutomationProperties.SetName(rows,AppLanguage.T("Состояние источников раздач"));target.Children.Add(rows);releaseSourceRows=rows;
         show.Click+=(_,_)=>{if(!releaseViews.TryGetValue(item.Id,out var view))return;view.Expanded=!view.Expanded;RefreshReleaseSourceStatus();};
         RefreshReleaseSourceStatus();
     }
@@ -102,9 +102,9 @@ public partial class MainWindow
         var summary=view.Checking?(liveReleases.GetValueOrDefault(releaseSourceItemId)?.Count>0?"Найденные варианты доступны":""):
             failures>0?$"Не ответили: {failures}"+(view.Saved?" · есть сохранённые":""):view.Saved?"Есть сохранённые варианты":"";
         if(summary.Length==0&&view.ReceivedUtc.HasValue)summary="Данные: "+ReleaseFreshness.Age(view.ReceivedUtc,DateTime.UtcNow);
-        releaseSourceSummary.Text=summary;releaseSourceSummary.ToolTip=summary+". "+ReleaseFreshness.ConnectionNote;releaseSourceSummary.Visibility=summary.Length>0?Visibility.Visible:Visibility.Collapsed;
+        releaseSourceSummary.Text=AppLanguage.T(summary);releaseSourceSummary.ToolTip=AppLanguage.T(summary)+". "+AppLanguage.T(ReleaseFreshness.ConnectionNote);releaseSourceSummary.Visibility=summary.Length>0?Visibility.Visible:Visibility.Collapsed;
         releaseSourceRetry.IsEnabled=!view.Checking;
-        releaseSourceToggle.Content=(view.Expanded?"Скрыть источники":"Источники")+(view.Sources.Length>0?$" · {view.Sources.Length}":"");
+        releaseSourceToggle.Content=AppLanguage.T((view.Expanded?"Скрыть источники":"Источники")+(view.Sources.Length>0?$" · {view.Sources.Length}":""));
         AutomationProperties.SetItemStatus(releaseSourceToggle,view.Checking?"Проверяем источники":failures>0?$"Не ответили: {failures}":view.Sources.Length>0?"Проверка завершена":"Источники ещё не проверяли");
         releaseSourceRows.Visibility=view.Expanded?Visibility.Visible:Visibility.Collapsed;
         if(ReferenceEquals(renderedSourceChecks,view.Sources)&&view.Sources.Length>0)return;
@@ -116,7 +116,7 @@ public partial class MainWindow
         foreach(var source in view.Sources)
         {
             var row=new Grid{Margin=new(0,0,0,8)};row.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});row.ColumnDefinitions.Add(new(){Width=new GridLength(1.6,GridUnitType.Star)});
-            var name=Text(source.Name,12);name.FontWeight=FontWeights.Medium;name.Margin=new(0,0,12,0);row.Children.Add(name);
+            var name=TextRaw(source.Name,12);name.FontWeight=FontWeights.Medium;name.Margin=new(0,0,12,0);row.Children.Add(name);
             var details=Text(ReleaseFreshness.SourceStateText(source,DateTime.UtcNow),12,true);details.Margin=new(0);
             details.ToolTip=ReleaseFreshness.ConnectionNote;Grid.SetColumn(details,1);row.Children.Add(details);releaseSourceRows.Children.Add(row);
         }

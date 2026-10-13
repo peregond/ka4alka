@@ -35,12 +35,12 @@ public partial class MainWindow
             var folder=Path.Combine(Preferences.DataDir,"streams");Directory.CreateDirectory(folder);
             var safe=Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(item.Stream)));
             var path=Path.Combine(folder,safe+".m3u");File.WriteAllText(path,"#EXTM3U\n#EXTINF:-1,"+item.Name.Replace('\n',' ').Replace('\r',' ')+"\n"+item.Stream+"\n",Encoding.UTF8);
-            Process.Start(new ProcessStartInfo(path){UseShellExecute=true});Status.Text="Открываем поток в установленном плеере: "+item.Name;
-        }catch{Status.Text="Нет плеера для этого потока. Установи плеер с поддержкой M3U/HLS или открой сайт канала.";}
+            Process.Start(new ProcessStartInfo(path){UseShellExecute=true});Status.Text=AppLanguage.T("Открываем поток в установленном плеере: "+item.Name);
+        }catch{Status.Text=AppLanguage.T("Нет плеера для этого потока. Установи плеер с поддержкой M3U/HLS или открой сайт канала.");}
     }
     void OpenBroadcastSite(object sender,RoutedEventArgs e)
     {
         var item=(Broadcast)((Button)sender).Tag;if(!Uri.TryCreate(item.Website,UriKind.Absolute,out var url)||url.Scheme is not ("http" or "https"))return;
-        try{Process.Start(new ProcessStartInfo(url.AbsoluteUri){UseShellExecute=true});}catch{Status.Text="Не удалось открыть сайт канала.";}
+        try{Process.Start(new ProcessStartInfo(url.AbsoluteUri){UseShellExecute=true});}catch{Status.Text=AppLanguage.T("Не удалось открыть сайт канала.");}
     }
 }

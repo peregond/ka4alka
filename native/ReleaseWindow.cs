@@ -30,7 +30,7 @@ public partial class MainWindow
     {
         var state=ReleaseSelection(item.Id);
         var toolbar=new WrapPanel{Name="ReleaseToolbar",Margin=new(0,0,0,8),VerticalAlignment=VerticalAlignment.Center};
-        AutomationProperties.SetName(toolbar,"Фильтры и источники раздач");panel.Children.Add(toolbar);
+        AutomationProperties.SetName(toolbar,AppLanguage.T("Фильтры и источники раздач"));panel.Children.Add(toolbar);
         toolbar.Children.Add(QualityControls(()=>{state.VisibleCount=60;RefreshDetail(item.Id);}));
         RenderSourceStatus(toolbar,panel,item);
         RenderReleaseLoading(toolbar,item);
@@ -48,7 +48,7 @@ public partial class MainWindow
     // Small helpers shared by the table rows and the compact cards.
     FrameworkElement ReleaseTag(string text,bool accent=false,string? tooltip=null)
     {
-        var label=new TextBlock{Text=text,FontSize=12,FontWeight=FontWeights.Medium,VerticalAlignment=VerticalAlignment.Center,MaxWidth=260,TextWrapping=TextWrapping.Wrap};
+        var label=new TextBlock{Text=AppLanguage.T(text),FontSize=12,FontWeight=FontWeights.Medium,VerticalAlignment=VerticalAlignment.Center,MaxWidth=260,TextWrapping=TextWrapping.Wrap};
         label.SetResourceReference(TextBlock.ForegroundProperty,accent?"Accent":"Muted");
         var tag=new Border{Child=label,CornerRadius=new(6),Padding=new(8,2,8,2),Margin=new(0,0,6,4),MinHeight=22,ToolTip=tooltip};tag.SetResourceReference(Border.BackgroundProperty,"Raised");return tag;
     }
@@ -74,9 +74,9 @@ public partial class MainWindow
         var numbers=new StackPanel{Orientation=Orientation.Horizontal};
         var seeds=new TextBlock{Text=entry.Seeds.HasValue?string.Format(System.Globalization.CultureInfo.InvariantCulture,"{0:N0}",entry.Seeds.Value).Replace(',',' '):"—",FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=14,FontWeight=FontWeights.SemiBold};seeds.SetResourceReference(TextBlock.ForegroundProperty,"Text");numbers.Children.Add(seeds);
         var peers=new TextBlock{Text=" · "+(entry.Leechers.HasValue?string.Format(System.Globalization.CultureInfo.InvariantCulture,"{0:N0}",entry.Leechers.Value).Replace(',',' '):"—"),FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=14};peers.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");numbers.Children.Add(peers);text.Children.Add(numbers);
-        var caption=new TextBlock{Text=ReleaseRecommendation.Caption(health),FontSize=12};caption.SetResourceReference(TextBlock.ForegroundProperty,key);text.Children.Add(caption);
+        var caption=new TextBlock{Text=AppLanguage.T(ReleaseRecommendation.Caption(health)),FontSize=12};caption.SetResourceReference(TextBlock.ForegroundProperty,key);text.Children.Add(caption);
         row.Children.Add(text);
-        row.ToolTip=$"Отдают: {entry.Seeds?.ToString()??"неизвестно"} · Скачивают: {entry.Leechers?.ToString()??"неизвестно"}. "+ReleaseFreshness.ConnectionNote;
+        row.ToolTip=AppLanguage.T($"Отдают: {entry.Seeds?.ToString()??"неизвестно"} · Скачивают: {entry.Leechers?.ToString()??"неизвестно"}. "+ReleaseFreshness.ConnectionNote);
         return row;
     }
     DownloadItem? QueuedDownload(SourceEntry entry)=>downloads.Items.FirstOrDefault(x=>x.ReleaseId==entry.Id&&x.ReleaseSource==entry.Source&&!string.IsNullOrEmpty(x.ReleaseId));
@@ -85,21 +85,21 @@ public partial class MainWindow
     {
         if(QueuedDownload(entry) is {} queued)
         {
-            var frame=new Border{Width=150,Height=44,Cursor=System.Windows.Input.Cursors.Hand,Background=Brushes.Transparent,DataContext=queued,VerticalAlignment=VerticalAlignment.Center,HorizontalAlignment=HorizontalAlignment.Right,ToolTip="Открыть загрузки"};
+            var frame=new Border{Width=150,Height=44,Cursor=System.Windows.Input.Cursors.Hand,Background=Brushes.Transparent,DataContext=queued,VerticalAlignment=VerticalAlignment.Center,HorizontalAlignment=HorizontalAlignment.Right,ToolTip=AppLanguage.T("Открыть загрузки")};
             var stack=new StackPanel{VerticalAlignment=VerticalAlignment.Center};
             if(queued.Completed)
             {
                 var pill=PillRadius.Apply(new Border{Padding=new(12,6,12,6),HorizontalAlignment=HorizontalAlignment.Right});pill.SetResourceReference(Border.BackgroundProperty,"AccentSoft");
-                var label=new TextBlock{Text="✓ Скачано",FontSize=13,FontWeight=FontWeights.SemiBold};label.SetResourceReference(TextBlock.ForegroundProperty,"Accent");pill.Child=label;stack.Children.Add(pill);
+                var label=new TextBlock{Text=AppLanguage.T("✓ Скачано"),FontSize=13,FontWeight=FontWeights.SemiBold};label.SetResourceReference(TextBlock.ForegroundProperty,"Accent");pill.Child=label;stack.Children.Add(pill);
             }
             else
             {
-                var line=new DockPanel();var state=new TextBlock{Text="В загрузках",FontSize=13,FontWeight=FontWeights.SemiBold};state.SetResourceReference(TextBlock.ForegroundProperty,"Accent");line.Children.Add(state);
+                var line=new DockPanel();var state=new TextBlock{Text=AppLanguage.T("В загрузках"),FontSize=13,FontWeight=FontWeights.SemiBold};state.SetResourceReference(TextBlock.ForegroundProperty,"Accent");line.Children.Add(state);
                 var percent=new TextBlock{FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=12,HorizontalAlignment=HorizontalAlignment.Right};percent.SetBinding(TextBlock.TextProperty,new Binding("PercentLabel"));percent.SetResourceReference(TextBlock.ForegroundProperty,"Muted");DockPanel.SetDock(percent,Dock.Right);line.Children.Insert(0,percent);stack.Children.Add(line);
                 var bar=new ProgressBar{Minimum=0,Maximum=100,Height=4,Margin=new(0,6,0,0),BorderThickness=new(0)};bar.SetResourceReference(Control.BackgroundProperty,"Track");bar.SetResourceReference(Control.ForegroundProperty,"Accent");bar.SetBinding(System.Windows.Controls.Primitives.RangeBase.ValueProperty,new Binding("Progress"){Mode=BindingMode.OneWay});stack.Children.Add(bar);
             }
             frame.Child=stack;frame.MouseLeftButtonUp+=(_,_)=>{searchDelay.Stop();section="Загрузки";current=null;activePerson=null;downloadReturnItem=queued;Render();};
-            AutomationProperties.SetName(frame,"Раздача уже в загрузках: "+entry.Title);return frame;
+            AutomationProperties.SetName(frame,AppLanguage.T("Раздача уже в загрузках: "+entry.Title));return frame;
         }
         return LanDownloadAction(entry);
     }
@@ -108,19 +108,19 @@ public partial class MainWindow
     FrameworkElement RecommendedPill()
     {
         var pill=new Border{CornerRadius=new(11),Padding=new(9,0,9,0),Height=22,Margin=new(0,0,10,6),HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center};pill.SetResourceReference(Border.BackgroundProperty,"AccentSoft");
-        var label=new TextBlock{Text="★ Рекомендуем",FontSize=11,FontWeight=FontWeights.Bold,VerticalAlignment=VerticalAlignment.Center};label.SetResourceReference(TextBlock.ForegroundProperty,"Accent");pill.Child=label;return pill;
+        var label=new TextBlock{Text=AppLanguage.T("★ Рекомендуем"),FontSize=11,FontWeight=FontWeights.Bold,VerticalAlignment=VerticalAlignment.Center};label.SetResourceReference(TextBlock.ForegroundProperty,"Accent");pill.Child=label;return pill;
     }
     FrameworkElement ReasonLine(string reason)
     {
         var row=new StackPanel{Orientation=Orientation.Horizontal,Margin=new(0,4,0,0)};
         var icon=new System.Windows.Shapes.Path{Data=(Geometry)FindResource("IconInfo"),Width=14,Height=14,Stretch=Stretch.Uniform,StrokeThickness=1.6,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,Margin=new(0,0,6,0),VerticalAlignment=VerticalAlignment.Center};icon.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty,"Muted");row.Children.Add(icon);
-        var text=new TextBlock{Text=reason,FontSize=12,VerticalAlignment=VerticalAlignment.Center};text.SetResourceReference(TextBlock.ForegroundProperty,"Muted");row.Children.Add(text);return row;
+        var text=new TextBlock{Text=AppLanguage.T(reason),FontSize=12,VerticalAlignment=VerticalAlignment.Center};text.SetResourceReference(TextBlock.ForegroundProperty,"Muted");row.Children.Add(text);return row;
     }
     FrameworkElement LowSeedLine()
     {
         var row=new StackPanel{Orientation=Orientation.Horizontal,Margin=new(0,4,0,0)};
         var icon=new System.Windows.Shapes.Path{Data=(Geometry)FindResource("IconAlert"),Width=14,Height=14,Stretch=Stretch.Uniform,StrokeThickness=1.6,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,Margin=new(0,0,6,0),VerticalAlignment=VerticalAlignment.Center};icon.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty,"Danger");row.Children.Add(icon);
-        var text=new TextBlock{Text="Мало отдающих — загрузка может идти медленно",FontSize=12,VerticalAlignment=VerticalAlignment.Center};text.SetResourceReference(TextBlock.ForegroundProperty,"Danger");row.Children.Add(text);return row;
+        var text=new TextBlock{Text=AppLanguage.T("Мало отдающих — загрузка может идти медленно"),FontSize=12,VerticalAlignment=VerticalAlignment.Center};text.SetResourceReference(TextBlock.ForegroundProperty,"Danger");row.Children.Add(text);return row;
     }
     int releasePickerRenders;
     void RenderReleasePicker(StackPanel panel,IReadOnlyList<SourceEntry> releases)
@@ -139,12 +139,12 @@ public partial class MainWindow
         void Filter(string label,IEnumerable<string> values,Panel target,bool captioned)
         {
             var field=new StackPanel{Width=captioned?156:120};
-            if(captioned){var caption=new TextBlock{Text=label,FontSize=11,FontWeight=FontWeights.SemiBold,Margin=new(0,0,0,4)};caption.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");field.Children.Add(caption);}
+            if(captioned){var caption=new TextBlock{Text=AppLanguage.T(label),FontSize=11,FontWeight=FontWeights.SemiBold,Margin=new(0,0,0,4)};caption.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");field.Children.Add(caption);}
             var options=new[]{"Все"}.Concat(values.Where(x=>!string.IsNullOrWhiteSpace(x))).Distinct().ToArray();
             var selected=state.Filters.GetValueOrDefault(label,"Все");
             if(!options.Contains(selected))selected="Все";
             var box=new ComboBox{ItemsSource=options,SelectedItem=selected,MinWidth=0,MinHeight=40,Margin=new(0,0,10,10)};
-            AutomationProperties.SetName(box,"Раздачи: "+label);
+            AutomationProperties.SetName(box,AppLanguage.T("Раздачи: "+label));
             field.Children.Add(box);target.Children.Add(field);filters[label]=box;
             state.Filters[label]=selected;
         }
@@ -161,18 +161,18 @@ public partial class MainWindow
         var sorts=new[]{"Русская озвучка","Русские источники","Больше отдающих","Меньше размер","Выше качество","По названию","По видео","По субтитрам","По озвучке"}.Concat(isSeries?["По сезону и серии"]:[]).ToArray();
         var sort=new ComboBox{ItemsSource=sorts,SelectedItem=state.Sort,MinWidth=0,Margin=new(0,0,10,12)};
         if(sort.SelectedIndex<0)sort.SelectedIndex=0;
-        AutomationProperties.SetName(sort,"Сортировка раздач");hidden.Children.Add(sort);
+        AutomationProperties.SetName(sort,AppLanguage.T("Сортировка раздач"));hidden.Children.Add(sort);
 
         // ---- quality segments ----
         var segmentFrame=new Border{CornerRadius=new(12),BorderThickness=new(1),Padding=new(4),Margin=new(0,0,10,10),VerticalAlignment=VerticalAlignment.Center};segmentFrame.SetResourceReference(Border.BackgroundProperty,"Panel");segmentFrame.SetResourceReference(Border.BorderBrushProperty,"EdgeSoft");
-        AutomationProperties.SetName(segmentFrame,"Качество раздач");
+        AutomationProperties.SetName(segmentFrame,AppLanguage.T("Качество раздач"));
         var segmentRow=new StackPanel{Orientation=Orientation.Horizontal};segmentFrame.Child=segmentRow;top.Children.Add(segmentFrame);
         var segments=new Dictionary<string,RadioButton>();var syncing=false;
         void Segment(string value,string label,int count)
         {
-            var content=new StackPanel{Orientation=Orientation.Horizontal};content.Children.Add(new TextBlock{Text=label,VerticalAlignment=VerticalAlignment.Center});
-            content.Children.Add(new TextBlock{Text=count.ToString(),FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=11,Opacity=.7,Margin=new(6,1,0,0),VerticalAlignment=VerticalAlignment.Center});
-            var radio=new RadioButton{Style=(Style)FindResource("SegmentButton"),GroupName="ReleaseQuality"+filmId,Content=content,Tag=value,ToolTip="Показать раздачи: "+label};AutomationProperties.SetName(radio,"Качество: "+label);
+            var content=new StackPanel{Orientation=Orientation.Horizontal};content.Children.Add(new TextBlock{Text=AppLanguage.T(label),VerticalAlignment=VerticalAlignment.Center});
+            content.Children.Add(new TextBlock{Text=AppLanguage.T(count.ToString()),FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=11,Opacity=.7,Margin=new(6,1,0,0),VerticalAlignment=VerticalAlignment.Center});
+            var radio=new RadioButton{Style=(Style)FindResource("SegmentButton"),GroupName="ReleaseQuality"+filmId,Content=content,Tag=value,ToolTip=AppLanguage.T("Показать раздачи: "+label)};AutomationProperties.SetName(radio,AppLanguage.T("Качество: "+label));
             radio.Checked+=(_,_)=>{if(syncing)return;filters["Качество"].SelectedItem=value;};
             segments[value]=radio;segmentRow.Children.Add(radio);
         }
@@ -190,9 +190,9 @@ public partial class MainWindow
         }
         RadioButton SeriesButton(string group,string filterKey,string value,string label,int count)
         {
-            var content=new StackPanel{Orientation=Orientation.Horizontal};content.Children.Add(new TextBlock{Text=label,VerticalAlignment=VerticalAlignment.Center});
-            content.Children.Add(new TextBlock{Text=count.ToString(),FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=11,Opacity=.7,Margin=new(6,1,0,0),VerticalAlignment=VerticalAlignment.Center});
-            var radio=new RadioButton{Style=(Style)FindResource("SegmentButton"),GroupName=group+filmId,Content=content,Tag=value,ToolTip="Показать раздачи: "+label};AutomationProperties.SetName(radio,filterKey+": "+label);
+            var content=new StackPanel{Orientation=Orientation.Horizontal};content.Children.Add(new TextBlock{Text=AppLanguage.T(label),VerticalAlignment=VerticalAlignment.Center});
+            content.Children.Add(new TextBlock{Text=AppLanguage.T(count.ToString()),FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=11,Opacity=.7,Margin=new(6,1,0,0),VerticalAlignment=VerticalAlignment.Center});
+            var radio=new RadioButton{Style=(Style)FindResource("SegmentButton"),GroupName=group+filmId,Content=content,Tag=value,ToolTip=AppLanguage.T("Показать раздачи: "+label)};AutomationProperties.SetName(radio,AppLanguage.T(filterKey+": "+label));
             radio.Checked+=(_,_)=>{if(syncing)return;filters[filterKey].SelectedItem=value;};return radio;
         }
         if(isSeries)
@@ -211,20 +211,20 @@ public partial class MainWindow
         }
 
         // ---- Russian-audio switch ----
-        var voice=new Button{Style=(Style)FindResource("PillButton"),Margin=new(0,0,10,10),Padding=new(14,0,16,0),ToolTip="Показывать только раздачи с профессиональной русской озвучкой"};
+        var voice=new Button{Style=(Style)FindResource("PillButton"),Margin=new(0,0,10,10),Padding=new(14,0,16,0),ToolTip=AppLanguage.T("Показывать только раздачи с профессиональной русской озвучкой")};
         var voiceTrack=new Border{Width=34,Height=20,CornerRadius=new(10),Margin=new(0,0,10,0),VerticalAlignment=VerticalAlignment.Center};var voiceKnob=new Border{Width=14,Height=14,CornerRadius=new(7),Margin=new(3),HorizontalAlignment=HorizontalAlignment.Left};voiceTrack.Child=voiceKnob;
-        var voiceRow=new StackPanel{Orientation=Orientation.Horizontal};voiceRow.Children.Add(voiceTrack);voiceRow.Children.Add(new TextBlock{Text="Только русская озвучка",VerticalAlignment=VerticalAlignment.Center});voice.Content=voiceRow;
-        AutomationProperties.SetName(voice,"Только русская озвучка");top.Children.Add(voice);
+        var voiceRow=new StackPanel{Orientation=Orientation.Horizontal};voiceRow.Children.Add(voiceTrack);voiceRow.Children.Add(new TextBlock{Text=AppLanguage.T("Только русская озвучка"),VerticalAlignment=VerticalAlignment.Center});voice.Content=voiceRow;
+        AutomationProperties.SetName(voice,AppLanguage.T("Только русская озвучка"));top.Children.Add(voice);
 
         // ---- sort chip ----
-        var sortChip=new Button{Style=(Style)FindResource("PillButton"),Margin=new(0,0,10,10)};AutomationProperties.SetName(sortChip,"Сортировка раздач: выбрать");top.Children.Add(sortChip);
+        var sortChip=new Button{Style=(Style)FindResource("PillButton"),Margin=new(0,0,10,10)};AutomationProperties.SetName(sortChip,AppLanguage.T("Сортировка раздач: выбрать"));top.Children.Add(sortChip);
         var sortMenu=new ToggleContextMenu{PlacementTarget=sortChip,Placement=System.Windows.Controls.Primitives.PlacementMode.Bottom,MaxHeight=380};
         foreach(var name in sorts){var entry=new MenuItem{Header=name,IsCheckable=true,Tag=name};entry.Click+=(_,_)=>{sortMenu.IsOpen=false;sort.SelectedItem=name;};sortMenu.Items.Add(entry);}
         AttachMenuToggle(sortChip,sortMenu);
 
         var toggle=new Button{Style=(Style)FindResource("PillButton"),Margin=new(0,0,10,10)};
-        var reset=new Button{Content="Сбросить",Style=(Style)FindResource("QuietButton"),Padding=new(12,0,12,0),Margin=new(0,0,10,10)};
-        AutomationProperties.SetName(reset,"Сбросить фильтры и сортировку раздач");
+        var reset=new Button{Content=AppLanguage.T("Сбросить"),Style=(Style)FindResource("QuietButton"),Padding=new(12,0,12,0),Margin=new(0,0,10,10)};
+        AutomationProperties.SetName(reset,AppLanguage.T("Сбросить фильтры и сортировку раздач"));
         top.Children.Add(toggle);top.Children.Add(reset);
         var results=new StackPanel{Margin=new(0,8,0,0)};panel.Children.Add(results);
         var recommended=ReleaseRecommendation.Pick(releases,QualityMinimum);
@@ -243,7 +243,7 @@ public partial class MainWindow
         {
             var additional=new[]{"Источник","Тип","Кодек","HDR","Субтитры"}.Count(x=>filters[x].SelectedItem?.ToString()!="Все");
             toggle.Content=ChipContent((state.More?"Скрыть фильтры":"Ещё фильтры")+(additional>0?$" · {additional}":""),true);StyleChip(toggle,additional>0);
-            AutomationProperties.SetName(toggle,state.More?"Скрыть дополнительные фильтры раздач":"Показать дополнительные фильтры раздач");
+            AutomationProperties.SetName(toggle,AppLanguage.T(state.More?"Скрыть дополнительные фильтры раздач":"Показать дополнительные фильтры раздач"));
             reset.Visibility=prefs.HidePoorQuality||state.OnlyRussian||filters.Values.Any(x=>x.SelectedItem?.ToString()!="Все")||sort.SelectedIndex!=0?Visibility.Visible:Visibility.Collapsed;
             syncing=true;var quality=filters["Качество"].SelectedItem?.ToString()??"Все";foreach(var pair in segments)pair.Value.IsChecked=pair.Key==quality;
             var season=isSeries?filters["Сезон"].SelectedItem?.ToString()??"Все":"Все";foreach(var pair in seasonButtons)pair.Value.IsChecked=pair.Key==season;syncing=false;
@@ -296,7 +296,7 @@ public partial class MainWindow
             var isBest=recommended!=null&&ReferenceEquals(recommended.Entry,entry);
             var body=new StackPanel();
             if(isBest)body.Children.Add(RecommendedPill());
-            var title=Text(entry.Title,14);title.FontWeight=FontWeights.SemiBold;title.Margin=new(0,0,0,8);body.Children.Add(title);
+            var title=TextRaw(entry.Title,14);title.FontWeight=FontWeights.SemiBold;title.Margin=new(0,0,0,8);body.Children.Add(title);
             var source=Text(ReleaseFreshness.Caption(entry,DateTime.UtcNow),12,true);source.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");source.ToolTip=ReleaseFreshness.Details(entry,DateTime.UtcNow);source.Margin=new(0,0,0,12);body.Children.Add(source);
             var summary=new WrapPanel{Margin=new(0,0,0,6)};
             if(ReleaseQuality.Poor(entry,QualityMinimum))summary.Children.Add(PoorQualityBadge(ReleaseQuality.Label(entry)));
@@ -317,12 +317,12 @@ public partial class MainWindow
             }
             body.Children.Add(details);
             var footer=new WrapPanel{HorizontalAlignment=HorizontalAlignment.Left};
-            var expand=new Button{Content=state.Expanded.Contains(key)?"Скрыть детали":"Подробнее",Style=(Style)FindResource("QuietButton"),HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,8,0),Padding=new(10,0,10,0)};
-            AutomationProperties.SetName(expand,"Показать или скрыть параметры раздачи: "+entry.Title);
+            var expand=new Button{Content=AppLanguage.T(state.Expanded.Contains(key)?"Скрыть детали":"Подробнее"),Style=(Style)FindResource("QuietButton"),HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,8,0),Padding=new(10,0,10,0)};
+            AutomationProperties.SetName(expand,AppLanguage.T("Показать или скрыть параметры раздачи: "+entry.Title));
             expand.Click+=(_,_)=>
             {
                 var open=details.Visibility!=Visibility.Visible;
-                details.Visibility=open?Visibility.Visible:Visibility.Collapsed;expand.Content=open?"Скрыть детали":"Подробнее";
+                details.Visibility=open?Visibility.Visible:Visibility.Collapsed;expand.Content=AppLanguage.T(open?"Скрыть детали":"Подробнее");
                 if(open)state.Expanded.Add(key);else state.Expanded.Remove(key);
             };
             footer.Children.Add(expand);var download=DownloadButton(entry);footer.Children.Add(download);body.Children.Add(footer);
@@ -337,7 +337,7 @@ public partial class MainWindow
             var grid=new Grid();grid.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});grid.ColumnDefinitions.Add(new(){Width=GridLength.Auto});
             var info=new StackPanel{VerticalAlignment=VerticalAlignment.Center};
             var pill=RecommendedPill();info.Children.Add(pill);
-            var title=Text(entry.Title,17);title.FontWeight=FontWeights.SemiBold;title.TextWrapping=TextWrapping.Wrap;title.MaxHeight=48;title.TextTrimming=TextTrimming.CharacterEllipsis;title.ToolTip=entry.Title;title.Margin=new(0,2,0,10);info.Children.Add(title);
+            var title=TextRaw(entry.Title,17);title.FontWeight=FontWeights.SemiBold;title.TextWrapping=TextWrapping.Wrap;title.MaxHeight=48;title.TextTrimming=TextTrimming.CharacterEllipsis;title.ToolTip=entry.Title;title.Margin=new(0,2,0,10);info.Children.Add(title);
             var tags=new WrapPanel();
             tags.Children.Add(ReleaseTag(QualityLabel(entry),true));
             foreach(var audioTag in AudioTags(entry))tags.Children.Add(audioTag);
@@ -350,9 +350,9 @@ public partial class MainWindow
             if(QueuedDownload(entry)!=null)action=ReleaseAction(entry);
             else
             {
-                var button=new Button{Name="BestReleaseDownload",Style=(Style)FindResource("PrimaryButton"),Tag=new RecommendedDownload(entry),Height=52,MinHeight=52,Padding=new(22,0,22,0),FontSize=15,ToolTip="Скачать рекомендованную раздачу"};
+                var button=new Button{Name="BestReleaseDownload",Style=(Style)FindResource("PrimaryButton"),Tag=new RecommendedDownload(entry),Height=52,MinHeight=52,Padding=new(22,0,22,0),FontSize=15,ToolTip=AppLanguage.T("Скачать рекомендованную раздачу")};
                 button.Content=IconLabel("Скачать","IconDownload",18);button.Click+=SourceDownload;
-                AutomationProperties.SetName(button,"Скачать рекомендованную раздачу: "+entry.Title);action=button;
+                AutomationProperties.SetName(button,AppLanguage.T("Скачать рекомендованную раздачу: "+entry.Title));action=button;
             }
             action.VerticalAlignment=VerticalAlignment.Center;
             // Narrow windows put the button under the details instead of beside them.
@@ -361,7 +361,7 @@ public partial class MainWindow
             grid.Children.Add(action);
             var card=new Border{Name="BestRelease",Child=grid,CornerRadius=new(20),Padding=new(20,18,20,18),Margin=new(0,0,0,16),BorderThickness=new(1)};
             card.SetResourceReference(Border.BackgroundProperty,"AccentFaint");card.SetResourceReference(Border.BorderBrushProperty,"AccentLine");
-            AutomationProperties.SetName(card,"Рекомендованная раздача: "+entry.Title);
+            AutomationProperties.SetName(card,AppLanguage.T("Рекомендованная раздача: "+entry.Title));
             return card;
         }
         void Show()
@@ -406,15 +406,15 @@ public partial class MainWindow
             {
                 if(mode==null)
                 {
-                    var plain=new TextBlock{Text=label,FontSize=11,FontWeight=FontWeights.SemiBold,VerticalAlignment=VerticalAlignment.Center};plain.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");Grid.SetColumn(plain,column);header.Children.Add(plain);return;
+                    var plain=new TextBlock{Text=AppLanguage.T(label),FontSize=11,FontWeight=FontWeights.SemiBold,VerticalAlignment=VerticalAlignment.Center};plain.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");Grid.SetColumn(plain,column);header.Children.Add(plain);return;
                 }
                 var active=state.Sort==mode;
                 var descendingByDefault=mode is "Больше отдающих" or "Выше качество";
                 var direction=descendingByDefault^(active&&state.Reverse)?" ↓":" ↑";
-                var button=new Button{Style=(Style)FindResource("LinkButton"),Content=label+(active?direction:""),FontSize=11,FontWeight=FontWeights.SemiBold,Padding=new(0,6,0,6),HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center,ToolTip=active?"Нажми ещё раз, чтобы поменять порядок":"Сортировать по этому столбцу"};
+                var button=new Button{Style=(Style)FindResource("LinkButton"),Content=label+(active?direction:""),FontSize=11,FontWeight=FontWeights.SemiBold,Padding=new(0,6,0,6),HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center,ToolTip=AppLanguage.T(active?"Нажми ещё раз, чтобы поменять порядок":"Сортировать по этому столбцу")};
                 // Clicking the active column flips its direction; any other column makes itself the order.
                 button.Click+=(_,_)=>{if(sort.SelectedItem?.ToString()==mode){state.Reverse=!state.Reverse;state.VisibleCount=60;Show();}else sort.SelectedItem=mode;};
-                button.SetResourceReference(Control.ForegroundProperty,active?"Accent":"Subtle");AutomationProperties.SetName(button,"Сортировать раздачи: "+mode);
+                button.SetResourceReference(Control.ForegroundProperty,active?"Accent":"Subtle");AutomationProperties.SetName(button,AppLanguage.T("Сортировать раздачи: "+mode));
                 Grid.SetColumn(button,column);header.Children.Add(button);
             }
             Heading("КАЧЕСТВО",0,"Выше качество");Heading("РАЗДАЧА",1,"По названию");Heading("РАЗМЕР",2,"Меньше размер");Heading("ОТДАЮТ · КАЧАЮТ",3,"Больше отдающих");Heading("ДОБАВЛЕНА",4,null);
@@ -423,10 +423,10 @@ public partial class MainWindow
             {
                 var isBest=recommended!=null&&ReferenceEquals(recommended.Entry,entry);
                 var row=RowGrid();
-                var quality=new StackPanel{VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,8,0),ToolTip=entry.Quality=="Не указано"?"Качество не указано":null};
-                var big=new TextBlock{Text=entry.Quality=="Не указано"&&ReleaseQuality.Height(entry)==null?"—":QualityLabel(entry),FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=16,FontWeight=FontWeights.SemiBold,TextTrimming=TextTrimming.CharacterEllipsis};quality.Children.Add(big);
+                var quality=new StackPanel{VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,8,0),ToolTip=AppLanguage.T(entry.Quality=="Не указано"?"Качество не указано":null)};
+                var big=new TextBlock{Text=AppLanguage.T(entry.Quality=="Не указано"&&ReleaseQuality.Height(entry)==null?"—":QualityLabel(entry)),FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=16,FontWeight=FontWeights.SemiBold,TextTrimming=TextTrimming.CharacterEllipsis};quality.Children.Add(big);
                 var under=entry.Hdr!="Не указано"?entry.Hdr:entry.Type!="Не указано"?entry.Type:"";
-                if(under.Length>0){var small=new TextBlock{Text=under,FontSize=12,Margin=new(0,2,0,0),TextTrimming=TextTrimming.CharacterEllipsis};small.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");quality.Children.Add(small);}
+                if(under.Length>0){var small=new TextBlock{Text=AppLanguage.T(under),FontSize=12,Margin=new(0,2,0,0),TextTrimming=TextTrimming.CharacterEllipsis};small.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");quality.Children.Add(small);}
                 row.Children.Add(quality);
                 var identity=new StackPanel{VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,12,0)};Grid.SetColumn(identity,1);
                 var titleLine=new DockPanel();if(isBest){var pill=RecommendedPill();pill.Margin=new(0,0,10,0);DockPanel.SetDock(pill,Dock.Left);titleLine.Children.Add(pill);}
@@ -444,8 +444,8 @@ public partial class MainWindow
                 var size=new TextBlock{Text=entry.Size.HasValue?DownloadService.FormatBytes(entry.Size.Value):"—",FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=14,VerticalAlignment=VerticalAlignment.Center};Grid.SetColumn(size,2);row.Children.Add(size);
                 var health=SeedHealth(entry);Grid.SetColumn(health,3);row.Children.Add(health);
                 var age=new StackPanel{VerticalAlignment=VerticalAlignment.Center,ToolTip=ReleaseFreshness.Details(entry,DateTime.UtcNow)};Grid.SetColumn(age,4);
-                var when=new TextBlock{Text=ReleaseFreshness.Age(entry.DataReceivedUtc,DateTime.UtcNow),FontSize=13};when.SetResourceReference(TextBlock.ForegroundProperty,"Muted");age.Children.Add(when);
-                var origin=new TextBlock{Text=ReleaseFreshness.SourceName(entry)+(ReleaseFreshness.FromIndex(entry)?" · индекс":""),FontSize=11,TextTrimming=TextTrimming.CharacterEllipsis,Margin=new(0,2,6,0)};origin.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");age.Children.Add(origin);row.Children.Add(age);
+                var when=new TextBlock{Text=AppLanguage.T(ReleaseFreshness.Age(entry.DataReceivedUtc,DateTime.UtcNow)),FontSize=13};when.SetResourceReference(TextBlock.ForegroundProperty,"Muted");age.Children.Add(when);
+                var origin=new TextBlock{Text=AppLanguage.T(ReleaseFreshness.SourceName(entry)+(ReleaseFreshness.FromIndex(entry)?" · индекс":"")),FontSize=11,TextTrimming=TextTrimming.CharacterEllipsis,Margin=new(0,2,6,0)};origin.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");age.Children.Add(origin);row.Children.Add(age);
                 var download=DownloadButton(entry);download.HorizontalAlignment=HorizontalAlignment.Right;download.VerticalAlignment=VerticalAlignment.Center;Grid.SetColumn(download,5);row.Children.Add(download);
                 var rowFrame=new Border{Child=row,CornerRadius=new(16),BorderThickness=new(1),Padding=new(16,12,16,12),Margin=new(0,0,0,8)};
                 rowFrame.SetResourceReference(Border.BackgroundProperty,isBest?"AccentFaint":"Panel");rowFrame.SetResourceReference(Border.BorderBrushProperty,isBest?"AccentLine":"EdgeSoft");results.Children.Add(rowFrame);

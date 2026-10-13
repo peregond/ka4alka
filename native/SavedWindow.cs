@@ -61,13 +61,13 @@ public partial class MainWindow
             var total=saved.Count(item=>key.Length==0||item.Section==key);
             var button=Button(label+" · "+total,()=>{savedCategory=key;savedPage=1;Render();});button.Style=(Style)FindResource("PillButton");
             button.SetResourceReference(Control.BackgroundProperty,savedCategory==key?"Selected":"Panel");
-            AutomationProperties.SetName(button,"Сохранённое: "+label);filters.Children.Add(button);
+            AutomationProperties.SetName(button,AppLanguage.T("Сохранённое: "+label));filters.Children.Add(button);
         }
         inlineCatalogFilterScroll=new ScrollViewer{Content=filters,VerticalScrollBarVisibility=ScrollBarVisibility.Disabled,HorizontalScrollBarVisibility=ScrollBarVisibility.Hidden,CanContentScroll=false};
         inlineCatalogFilterScroll.ScrollChanged+=(_,_)=>UpdateCatalogFilterOverflow();inlineCatalogFilterScroll.SizeChanged+=(_,_)=>UpdateFilterRail();
         inlineCatalogFilterScroll.PreviewMouseWheel+=(_,args)=>{if(inlineCatalogFilterScroll is not {} scroll||scroll.ScrollableWidth<=0)return;scroll.ScrollToHorizontalOffset(scroll.HorizontalOffset-args.Delta/120d*96);args.Handled=true;};
-        catalogFilterBack=ActionButton("","IconBack",()=>ScrollCatalogFilters(-1),"QuietButton");catalogFilterBack.Width=30;catalogFilterBack.Padding=new(6);catalogFilterBack.Margin=new(0,0,4,0);catalogFilterBack.ToolTip="Предыдущие фильтры";AutomationProperties.SetName(catalogFilterBack,"Фильтры: назад");DockPanel.SetDock(catalogFilterBack,Dock.Left);toolbar.Children.Add(catalogFilterBack);
-        catalogFilterForward=ActionButton("","IconChevron",()=>ScrollCatalogFilters(1),"QuietButton");catalogFilterForward.Width=30;catalogFilterForward.Padding=new(6);catalogFilterForward.Margin=new(4,0,0,0);catalogFilterForward.ToolTip="Следующие фильтры";AutomationProperties.SetName(catalogFilterForward,"Фильтры: вперёд");DockPanel.SetDock(catalogFilterForward,Dock.Right);toolbar.Children.Add(catalogFilterForward);
+        catalogFilterBack=ActionButton("","IconBack",()=>ScrollCatalogFilters(-1),"QuietButton");catalogFilterBack.Width=30;catalogFilterBack.Padding=new(6);catalogFilterBack.Margin=new(0,0,4,0);catalogFilterBack.ToolTip=AppLanguage.T("Предыдущие фильтры");AutomationProperties.SetName(catalogFilterBack,AppLanguage.T("Фильтры: назад"));DockPanel.SetDock(catalogFilterBack,Dock.Left);toolbar.Children.Add(catalogFilterBack);
+        catalogFilterForward=ActionButton("","IconChevron",()=>ScrollCatalogFilters(1),"QuietButton");catalogFilterForward.Width=30;catalogFilterForward.Padding=new(6);catalogFilterForward.Margin=new(4,0,0,0);catalogFilterForward.ToolTip=AppLanguage.T("Следующие фильтры");AutomationProperties.SetName(catalogFilterForward,AppLanguage.T("Фильтры: вперёд"));DockPanel.SetDock(catalogFilterForward,Dock.Right);toolbar.Children.Add(catalogFilterForward);
         toolbar.Children.Add(inlineCatalogFilterScroll);FilterControls.Children.Add(toolbar);UpdateFilterRail();
         ShowCatalog(filtered.Skip((savedPage-1)*CatalogPaging.Size).Take(CatalogPaging.Size).ToArray());
         var list=catalogList!;Body.Children.Remove(list);ScrollViewer.SetVerticalScrollBarVisibility(list,ScrollBarVisibility.Disabled);ScrollViewer.SetHorizontalScrollBarVisibility(list,ScrollBarVisibility.Disabled);WheelScroll.SetIsEnabled(list,false);
@@ -88,7 +88,7 @@ public partial class MainWindow
             {
                 var button=Button(label,()=>GoSavedPage(page));button.Style=(Style)FindResource("PillButton");button.IsEnabled=enabled;button.MinWidth=36;button.Margin=new(2);button.Padding=new(10,7,10,7);
                 if(page==savedPage&&int.TryParse(label,out _))button.SetResourceReference(Control.BackgroundProperty,"Selected");
-                AutomationProperties.SetName(button,int.TryParse(label,out _)?"Сохранённое: страница "+page:"Сохранённое: "+label);pages.Children.Add(button);
+                AutomationProperties.SetName(button,AppLanguage.T(int.TryParse(label,out _)?"Сохранённое: страница "+page:"Сохранённое: "+label));pages.Children.Add(button);
             }
             Page("Назад",savedPage-1,savedPage>1);foreach(var page in CatalogPaging.Numbers(savedPage,pageCount))Page(page.ToString(),page,true);Page("Далее",savedPage+1,savedPage<pageCount);content.Children.Add(pages);
         }

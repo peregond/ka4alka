@@ -25,7 +25,7 @@ public partial class MainWindow
         {
             if(started||!prefs.LanEnabled)return;started=true;
             try{await SetLanEnabledAsync(true);}
-            catch(Exception error)when(!closing&&!closed){Status.Text="Устройства в сети недоступны: "+error.Message;ErrorLog.Write(error);DiagnosticLog.Write("lan-start-failed",new{Error=error.GetType().Name});}
+            catch(Exception error)when(!closing&&!closed){Status.Text=AppLanguage.T("Устройства в сети недоступны: "+error.Message);ErrorLog.Write(error);DiagnosticLog.Write("lan-start-failed",new{Error=error.GetType().Name});}
             catch(OperationCanceledException)when(closing||closed){}
         };
     }
@@ -126,7 +126,7 @@ public partial class MainWindow
         if(!closing&&!closed&&receipt.Accepted)
         {
             SyncTimer();if(section=="Загрузки")Render();
-            Status.Text="Получена загрузка из локальной сети. "+receipt.Message;
+            Status.Text=AppLanguage.T("Получена загрузка из локальной сети. "+receipt.Message);
         }
         return receipt;
     }
@@ -134,16 +134,16 @@ public partial class MainWindow
     FrameworkElement LanDownloadAction(SourceEntry entry)
     {
         // A quiet secondary action in the row; the one primary download lives on the banner.
-        var local=new Button{Tag=entry,Margin=new(0),Padding=new(16,0,16,0),Height=44,MinHeight=44,ToolTip="Скачать на этом компьютере"};
+        var local=new Button{Tag=entry,Margin=new(0),Padding=new(16,0,16,0),Height=44,MinHeight=44,ToolTip=AppLanguage.T("Скачать на этом компьютере")};
         var localRow=new StackPanel{Orientation=Orientation.Horizontal};
         var glyph=new System.Windows.Shapes.Path{Data=(Geometry)FindResource("IconDownload"),Width=16,Height=16,Stretch=Stretch.Uniform,StrokeThickness=1.8,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,StrokeLineJoin=PenLineJoin.Round,Margin=new(0,0,8,0),VerticalAlignment=VerticalAlignment.Center};glyph.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty,"Accent");
-        localRow.Children.Add(glyph);localRow.Children.Add(new TextBlock{Text="Скачать",VerticalAlignment=VerticalAlignment.Center});local.Content=localRow;
-        AutomationProperties.SetName(local,"Скачать раздачу: "+entry.Title);local.Click+=SourceDownload;
-        var remote=new Button{Style=(Style)FindResource("IconButton"),Width=44,Height=44,Margin=new(6,0,0,0),ToolTip="Отправить на другой компьютер в сети: он скачает раздачу сам"};
+        localRow.Children.Add(glyph);localRow.Children.Add(new TextBlock{Text=AppLanguage.T("Скачать"),VerticalAlignment=VerticalAlignment.Center});local.Content=localRow;
+        AutomationProperties.SetName(local,AppLanguage.T("Скачать раздачу: "+entry.Title));local.Click+=SourceDownload;
+        var remote=new Button{Style=(Style)FindResource("IconButton"),Width=44,Height=44,Margin=new(6,0,0,0),ToolTip=AppLanguage.T("Отправить на другой компьютер в сети: он скачает раздачу сам")};
         // The laptop action only makes sense once another computer is paired; until then it stays out of every row.
         lanActionsShown=LanActionAvailable;remote.Visibility=lanActionsShown?Visibility.Visible:Visibility.Collapsed;
         remote.Content=IconLabel("","IconLaptop",18);
-        AutomationProperties.SetName(remote,"Скачать на другом устройстве: "+entry.Title);
+        AutomationProperties.SetName(remote,AppLanguage.T("Скачать на другом устройстве: "+entry.Title));
         remote.Click+=async(_,_)=>await SendReleaseToLanAsync(remote,entry);
         var actions=new StackPanel{Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center,HorizontalAlignment=HorizontalAlignment.Right};actions.Children.Add(local);actions.Children.Add(remote);return actions;
     }
@@ -151,7 +151,7 @@ public partial class MainWindow
     async Task SendReleaseToLanAsync(Button owner,SourceEntry entry)
     {
         if(closing||closed)return;
-        if(lanSending){Status.Text="Уже отправляем раздачу. Дождись подтверждения принимающего компьютера.";return;}
+        if(lanSending){Status.Text=AppLanguage.T("Уже отправляем раздачу. Дождись подтверждения принимающего компьютера.");return;}
         var media=current?.Cinema==true?DownloadMetadata.EnrichMedia(current,prefs.LiveFavorites.Concat(liveItems).Concat(catalogIndex.Recent(current.Section,200)).Append(current)):null;
         lanSending=true;
         owner.IsEnabled=false;var content=owner.Content;owner.Content=new ProgressBar{IsIndeterminate=true,Width=16,Height=3};
@@ -159,14 +159,14 @@ public partial class MainWindow
         {
             if(lanService?.IsRunning!=true)
             {
-                if(!prefs.LanEnabled){Settings(this,new RoutedEventArgs());Status.Text="Включи «Загрузки на другом компьютере» в настройках на обоих устройствах, затем вернись к выбранной раздаче.";return;}
+                if(!prefs.LanEnabled){Settings(this,new RoutedEventArgs());Status.Text=AppLanguage.T("Включи «Загрузки на другом компьютере» в настройках на обоих устройствах, затем вернись к выбранной раздаче.");return;}
                 await SetLanEnabledAsync(true);
             }
             using var requestCancellation=CancellationTokenSource.CreateLinkedTokenSource(lanLifetime.Token,reliabilityCancellation.Token);
             var device=await ChooseLanDownloadDeviceAsync(requestCancellation.Token);
             if(device==null||closing||closed)return;
             var service=lanService??throw new LanException("Устройства в сети выключены. Включи их в настройках.");
-            Status.Text="Отправляем раздачу на «"+device.Name+"»…";
+            Status.Text=AppLanguage.T("Отправляем раздачу на «"+device.Name+"»…");
             requestCancellation.CancelAfter(TimeSpan.FromSeconds(45));
             var key=ReleaseSearch.Identity(entry);
             LanDownloadRequest payload;
@@ -181,14 +181,14 @@ public partial class MainWindow
             if(closing||closed)return;
             if(receipt.Accepted)
             {
-                pendingLanDownload=null;Status.Text="Загрузка отправлена на «"+device.Name+"». "+receipt.Message;
+                pendingLanDownload=null;Status.Text=AppLanguage.T("Загрузка отправлена на «"+device.Name+"». "+receipt.Message);
                 DiagnosticLog.Write("lan-download-sent",new{payload.RequestId,receipt.Accepted});
             }
-            else Status.Text="Компьютер «"+device.Name+"» не принял раздачу: "+receipt.Message;
+            else Status.Text=AppLanguage.T("Компьютер «"+device.Name+"» не принял раздачу: "+receipt.Message);
         }
         catch(OperationCanceledException)when(closing||closed){}
-        catch(OperationCanceledException){Status.Text="Компьютер не подтвердил загрузку вовремя. Повтори отправку — одна и та же задача не добавится дважды.";}
-        catch(Exception error)when(!closing&&!closed){Status.Text="Не удалось отправить загрузку: "+error.Message;ErrorLog.Write(error);DiagnosticLog.Write("lan-send-failed",new{Error=error.GetType().Name});}
+        catch(OperationCanceledException){Status.Text=AppLanguage.T("Компьютер не подтвердил загрузку вовремя. Повтори отправку — одна и та же задача не добавится дважды.");}
+        catch(Exception error)when(!closing&&!closed){Status.Text=AppLanguage.T("Не удалось отправить загрузку: "+error.Message);ErrorLog.Write(error);DiagnosticLog.Write("lan-send-failed",new{Error=error.GetType().Name});}
         finally{lanSending=false;if(!closing&&!closed){owner.Content=content;owner.IsEnabled=true;}}
     }
 }

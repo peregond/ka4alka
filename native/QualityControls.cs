@@ -178,24 +178,24 @@ public partial class MainWindow
         {
             var oldHide=prefs.HidePoorQuality;var oldHeight=prefs.CatalogQualityHeight;
             prefs.HidePoorQuality=hide;prefs.CatalogQualityHeight=ReleaseQuality.CatalogHeight(height);
-            try{prefs.Save();}catch(Exception error){prefs.HidePoorQuality=oldHide;prefs.CatalogQualityHeight=oldHeight;Status.Text="Не удалось сохранить фильтр: "+error.Message;return;}
+            try{prefs.Save();}catch(Exception error){prefs.HidePoorQuality=oldHide;prefs.CatalogQualityHeight=oldHeight;Status.Text=AppLanguage.T("Не удалось сохранить фильтр: "+error.Message);return;}
             CancelCatalogQualityCheck();changed();
         }
         var label=prefs.CatalogQualityHeight switch{2160=>"Качество · 4K",1080=>"Качество · FullHD",720=>"Качество · HD Ready",_=>"Качество"};
         var button=Button("",()=>{});button.Style=(Style)FindResource("PillButton");button.Content=ChipContent(label);
         StyleChip(button,prefs.CatalogQualityHeight!=0);
-        button.ToolTip="Показывать фильмы и сериалы с раздачей выбранного разрешения. Экранки не считаются HD или 4K.";
-        AutomationProperties.SetName(button,"Качество каталога");
+        button.ToolTip=AppLanguage.T("Показывать фильмы и сериалы с раздачей выбранного разрешения. Экранки не считаются HD или 4K.");
+        AutomationProperties.SetName(button,AppLanguage.T("Качество каталога"));
         AutomationProperties.SetItemStatus(button,(prefs.HidePoorQuality?"Плохое качество скрыто. ":"")+(prefs.CatalogQualityHeight==0?"Любое разрешение":label));
         var menu=new ToggleContextMenu{PlacementTarget=button,Placement=System.Windows.Controls.Primitives.PlacementMode.Bottom};
         menu.SetResourceReference(Control.BackgroundProperty,"Raised");menu.SetResourceReference(Control.ForegroundProperty,"Text");
-        var hide=new MenuItem{Header="Скрывать плохое качество",Tag="hide-poor",IsCheckable=true,IsChecked=prefs.HidePoorQuality};
-        AutomationProperties.SetName(hide,"Скрывать плохое качество");
+        var hide=new MenuItem{Header=AppLanguage.T("Скрывать плохое качество"),Tag="hide-poor",IsCheckable=true,IsChecked=prefs.HidePoorQuality};
+        AutomationProperties.SetName(hide,AppLanguage.T("Скрывать плохое качество"));
         hide.Click+=(_,_)=>{menu.IsOpen=false;Save(!prefs.HidePoorQuality,prefs.CatalogQualityHeight);};menu.Items.Add(hide);menu.Items.Add(new Separator());
         foreach(var choice in new[]{(Height:0,Label:"Любое качество"),(Height:2160,Label:"4K"),(Height:1080,Label:"FullHD"),(Height:720,Label:"HD Ready")})
         {
-            var option=new MenuItem{Header=choice.Label,Tag=choice.Height,IsCheckable=true,IsChecked=prefs.CatalogQualityHeight==choice.Height};
-            option.ToolTip=choice.Height==0?"Снять ограничение по разрешению":"Есть доступная раздача "+choice.Height+"p";
+            var option=new MenuItem{Header=AppLanguage.T(choice.Label),Tag=choice.Height,IsCheckable=true,IsChecked=prefs.CatalogQualityHeight==choice.Height};
+            option.ToolTip=AppLanguage.T(choice.Height==0?"Снять ограничение по разрешению":"Есть доступная раздача "+choice.Height+"p");
             option.Click+=(_,_)=>{menu.IsOpen=false;Save(prefs.HidePoorQuality,prefs.CatalogQualityHeight==choice.Height?0:choice.Height);};menu.Items.Add(option);
         }
         AttachMenuToggle(button,menu);return button;
@@ -204,20 +204,20 @@ public partial class MainWindow
     FrameworkElement QualityControls(Action changed)
     {
         var controls=new WrapPanel{Margin=new(0,0,0,4),VerticalAlignment=VerticalAlignment.Center};
-        var hide=new CheckBox{Content="Скрыть плохое качество",IsChecked=prefs.HidePoorQuality,VerticalAlignment=VerticalAlignment.Center,Margin=new(4,6,12,6),ToolTip="Скрывать экранки и видео ниже выбранного минимума. Неизвестное качество остаётся видимым."};
+        var hide=new CheckBox{Content=AppLanguage.T("Скрыть плохое качество"),IsChecked=prefs.HidePoorQuality,VerticalAlignment=VerticalAlignment.Center,Margin=new(4,6,12,6),ToolTip=AppLanguage.T("Скрывать экранки и видео ниже выбранного минимума. Неизвестное качество остаётся видимым.")};
         hide.SetResourceReference(Control.ForegroundProperty,"Text");
-        AutomationProperties.SetName(hide,"Скрыть плохое качество");controls.Children.Add(hide);
+        AutomationProperties.SetName(hide,AppLanguage.T("Скрыть плохое качество"));controls.Children.Add(hide);
         var caption=Text("Качество",11,true);caption.VerticalAlignment=VerticalAlignment.Center;caption.Margin=new(0,0,6,0);controls.Children.Add(caption);
-        var minimum=new ComboBox{ItemsSource=new[]{"HD Ready","Full HD"},SelectedIndex=QualityMinimum==1080?1:0,Width=140,MinWidth=0,Margin=new(0,0,8,0),ToolTip="HD Ready — от 720p, Full HD — от 1080p. Экранки считаются плохими при любом разрешении."};
-        AutomationProperties.SetName(minimum,"Качество раздач");controls.Children.Add(minimum);
+        var minimum=new ComboBox{ItemsSource=new[]{"HD Ready","Full HD"},SelectedIndex=QualityMinimum==1080?1:0,Width=140,MinWidth=0,Margin=new(0,0,8,0),ToolTip=AppLanguage.T("HD Ready — от 720p, Full HD — от 1080p. Экранки считаются плохими при любом разрешении.")};
+        AutomationProperties.SetName(minimum,AppLanguage.T("Качество раздач"));controls.Children.Add(minimum);
         void Save()
         {
             prefs.HidePoorQuality=hide.IsChecked==true;prefs.MinimumReleaseHeight=minimum.SelectedIndex==1?1080:720;
-            try{prefs.Save();}catch(Exception error){Status.Text="Не удалось сохранить фильтр: "+error.Message;}
+            try{prefs.Save();}catch(Exception error){Status.Text=AppLanguage.T("Не удалось сохранить фильтр: "+error.Message);}
             changed();
         }
         hide.Checked+=(_,_)=>Save();hide.Unchecked+=(_,_)=>Save();minimum.SelectionChanged+=(_,_)=>Save();
         return controls;
     }
-    static TextBlock PoorQualityBadge(string label)=>new(){Text=label,FontSize=11,FontWeight=FontWeights.Medium,ToolTip=label=="Экранка"?"Экранная запись: плохое качество изображения":"Видео ниже выбранного минимального качества",Margin=new(0,0,7,0),VerticalAlignment=VerticalAlignment.Center};
+    static TextBlock PoorQualityBadge(string label)=>new(){Text=AppLanguage.T(label),FontSize=11,FontWeight=FontWeights.Medium,ToolTip=AppLanguage.T(label=="Экранка"?"Экранная запись: плохое качество изображения":"Видео ниже выбранного минимального качества"),Margin=new(0,0,7,0),VerticalAlignment=VerticalAlignment.Center};
 }

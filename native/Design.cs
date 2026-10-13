@@ -18,11 +18,11 @@ public partial class MainWindow
             System.Windows.Data.BindingOperations.ClearBinding(icon,Shape.StrokeProperty);
             icon.Fill=new SolidColorBrush(Color.FromRgb(224,79,98));icon.Stroke=icon.Fill;
         }
-        row.Children.Add(icon);if(label.Length>0)row.Children.Add(new TextBlock{Text=label,VerticalAlignment=VerticalAlignment.Center});return row;
+        row.Children.Add(icon);if(label.Length>0){var caption=new TextBlock{VerticalAlignment=VerticalAlignment.Center};UiText.Bind(caption,label);row.Children.Add(caption);}return row;
     }
     Button ActionButton(string label,string icon,Action action,string style="QuietButton")
     {
-        var button=Button(label,action);button.Content=IconLabel(label,icon);button.Style=(Style)FindResource(style);System.Windows.Automation.AutomationProperties.SetName(button,label);return button;
+        var button=Button(label,action);button.Content=IconLabel(label,icon);button.Style=(Style)FindResource(style);System.Windows.Automation.AutomationProperties.SetName(button,AppLanguage.T(label));return button;
     }
     void ClearSearch(object sender,RoutedEventArgs e)
     {

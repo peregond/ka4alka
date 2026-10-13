@@ -78,16 +78,16 @@ public partial class MainWindow
     {
         var stack=new StackPanel{Name="GameFilters"};
         var row=new DockPanel();stack.Children.Add(row);
-        var refresh=ActionButton("","IconRefresh",RefreshGames,"PillButton");refresh.Name="GameRefresh";refresh.ToolTip="Обновить каталог";AutomationProperties.SetName(refresh,"Обновить каталог");
+        var refresh=ActionButton("","IconRefresh",RefreshGames,"PillButton");refresh.Name="GameRefresh";refresh.ToolTip=AppLanguage.T("Обновить каталог");AutomationProperties.SetName(refresh,AppLanguage.T("Обновить каталог"));
         refresh.Padding=new(0);refresh.Width=compactHeight?36:40;refresh.MinHeight=compactHeight?36:40;refresh.VerticalAlignment=VerticalAlignment.Top;refresh.Margin=new(8,0,0,8);DockPanel.SetDock(refresh,Dock.Right);row.Children.Add(refresh);
-        var reset=ActionButton(ActualWidth<640?"":"Сбросить всё","IconReset",()=>{gameShelf="";gameGenre="";gamePage=1;gameKey="";ResetCatalogNavigationPosition();Render();},"PillButton");reset.Name="GameResetFilters";reset.ToolTip="Сбросить подборку и жанр. Поиск сохраняется.";AutomationProperties.SetName(reset,"Сбросить выбранные фильтры");if(ActualWidth<640){reset.Padding=new(0);reset.Width=compactHeight?36:40;}reset.MinHeight=compactHeight?36:40;reset.VerticalAlignment=VerticalAlignment.Top;reset.Margin=new(8,0,0,8);DockPanel.SetDock(reset,Dock.Right);row.Children.Add(reset);
+        var reset=ActionButton(ActualWidth<640?"":"Сбросить всё","IconReset",()=>{gameShelf="";gameGenre="";gamePage=1;gameKey="";ResetCatalogNavigationPosition();Render();},"PillButton");reset.Name="GameResetFilters";reset.ToolTip=AppLanguage.T("Сбросить подборку и жанр. Поиск сохраняется.");AutomationProperties.SetName(reset,AppLanguage.T("Сбросить выбранные фильтры"));if(ActualWidth<640){reset.Padding=new(0);reset.Width=compactHeight?36:40;}reset.MinHeight=compactHeight?36:40;reset.VerticalAlignment=VerticalAlignment.Top;reset.Margin=new(8,0,0,8);DockPanel.SetDock(reset,Dock.Right);row.Children.Add(reset);
         var chips=new WrapPanel();row.Children.Add(chips);
         void Chip(string label,string shelf)
         {
             var active=gameQuery.Length==0&&(shelf.Length==0?gameShelf.Length==0&&gameGenre.Length==0:gameShelf==shelf);
             var button=Button("",()=>OpenGameList(shelf,shelf.Length==0?"":gameGenre));button.Style=(Style)FindResource("PillButton");button.Content=ChipContent(label,false);StyleChip(button,active);
             button.HorizontalContentAlignment=HorizontalAlignment.Center;button.MinHeight=compactHeight?36:40;button.FontSize=14;button.Padding=new(16,0,16,0);button.Margin=new(0,0,8,8);
-            button.Name="GameChip"+(shelf.Length==0?"All":shelf);AutomationProperties.SetName(button,label);chips.Children.Add(button);
+            button.Name="GameChip"+(shelf.Length==0?"All":shelf);AutomationProperties.SetName(button,AppLanguage.T(label));chips.Children.Add(button);
         }
         Chip("Все","");foreach(var sort in GameBrowse.Sorts)Chip(GameBrowse.SortName(sort),sort);
         stack.Children.Add(BuildGenreRail());
@@ -97,15 +97,15 @@ public partial class MainWindow
     FrameworkElement BuildGenreRail()
     {
         var rail=new DockPanel{Name="GameGenres"};
-        gameGenreBack=ActionButton("","IconBack",()=>ScrollGameGenres(-1),"QuietButton");gameGenreBack.Width=30;gameGenreBack.Padding=new(6);gameGenreBack.Margin=new(0,0,4,8);gameGenreBack.ToolTip="Предыдущие жанры";gameGenreBack.Visibility=Visibility.Collapsed;AutomationProperties.SetName(gameGenreBack,"Жанры: назад");DockPanel.SetDock(gameGenreBack,Dock.Left);rail.Children.Add(gameGenreBack);
-        gameGenreForward=ActionButton("","IconChevron",()=>ScrollGameGenres(1),"QuietButton");gameGenreForward.Width=30;gameGenreForward.Padding=new(6);gameGenreForward.Margin=new(4,0,0,8);gameGenreForward.ToolTip="Следующие жанры";gameGenreForward.Visibility=Visibility.Collapsed;AutomationProperties.SetName(gameGenreForward,"Жанры: вперёд");DockPanel.SetDock(gameGenreForward,Dock.Right);rail.Children.Add(gameGenreForward);
+        gameGenreBack=ActionButton("","IconBack",()=>ScrollGameGenres(-1),"QuietButton");gameGenreBack.Width=30;gameGenreBack.Padding=new(6);gameGenreBack.Margin=new(0,0,4,8);gameGenreBack.ToolTip=AppLanguage.T("Предыдущие жанры");gameGenreBack.Visibility=Visibility.Collapsed;AutomationProperties.SetName(gameGenreBack,AppLanguage.T("Жанры: назад"));DockPanel.SetDock(gameGenreBack,Dock.Left);rail.Children.Add(gameGenreBack);
+        gameGenreForward=ActionButton("","IconChevron",()=>ScrollGameGenres(1),"QuietButton");gameGenreForward.Width=30;gameGenreForward.Padding=new(6);gameGenreForward.Margin=new(4,0,0,8);gameGenreForward.ToolTip=AppLanguage.T("Следующие жанры");gameGenreForward.Visibility=Visibility.Collapsed;AutomationProperties.SetName(gameGenreForward,AppLanguage.T("Жанры: вперёд"));DockPanel.SetDock(gameGenreForward,Dock.Right);rail.Children.Add(gameGenreForward);
         var pills=new StackPanel{Orientation=Orientation.Horizontal};
         foreach(var genre in GameGenres.All)
         {
             var key=genre.Key;var active=gameQuery.Length==0&&gameGenre==key;
             var pill=Button("",()=>OpenGameList(gameShelf,gameGenre==key?"":key));pill.Style=(Style)FindResource("PillButton");pill.Content=ChipContent(genre.Chip,false);StyleChip(pill,active);
             pill.HorizontalContentAlignment=HorizontalAlignment.Center;pill.MinHeight=compactHeight?34:38;pill.FontSize=13;pill.Padding=new(14,0,14,0);pill.Margin=new(0,0,8,8);
-            pill.Name="GameGenre"+genre.Key;AutomationProperties.SetName(pill,"Жанр: "+genre.Name);pills.Children.Add(pill);
+            pill.Name="GameGenre"+genre.Key;AutomationProperties.SetName(pill,AppLanguage.T("Жанр: "+genre.Name));pills.Children.Add(pill);
         }
         var scroll=gameGenreScroll=new ScrollViewer{Content=pills,VerticalScrollBarVisibility=ScrollBarVisibility.Disabled,HorizontalScrollBarVisibility=ScrollBarVisibility.Hidden,CanContentScroll=false};
         scroll.ScrollChanged+=(_,_)=>UpdateGameGenreOverflow();scroll.SizeChanged+=(_,_)=>UpdateGameGenreOverflow();
@@ -249,7 +249,7 @@ public partial class MainWindow
         void Page(string label,int page,bool enabled)
         {
             var button=Button(label,()=>{gamePage=page;gameKey="";ResetCatalogNavigationPosition();Render();});button.Style=(Style)FindResource("PillButton");button.IsEnabled=enabled&&!gameLoading;button.MinWidth=36;button.Padding=new(10,7,10,7);button.Margin=new(2);
-            AutomationProperties.SetName(button,label);footer.Children.Add(button);
+            AutomationProperties.SetName(button,AppLanguage.T(label));footer.Children.Add(button);
         }
         Page("Назад",gamePage-1,gamePage>1);
         var number=Text(gamePage.ToString(),13);number.FontWeight=FontWeights.SemiBold;number.VerticalAlignment=VerticalAlignment.Center;number.Margin=new(12,0,12,0);footer.Children.Add(number);

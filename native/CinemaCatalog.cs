@@ -112,11 +112,11 @@ public partial class MainWindow
         var heading=Text("Новые в библиотеке",13);heading.FontWeight=FontWeights.SemiBold;heading.Margin=new(0,0,0,14);catalogRailPreview.Children.Add(heading);
         foreach(var item in cards.Take(3))
         {
-            var button=Button("",()=>{current=item;Render();});button.Style=(Style)FindResource("PosterButton");button.Padding=new(4);button.Margin=new(0,0,0,10);button.HorizontalContentAlignment=HorizontalAlignment.Stretch;System.Windows.Automation.AutomationProperties.SetName(button,"Открыть "+item.Title);
+            var button=Button("",()=>{current=item;Render();});button.Style=(Style)FindResource("PosterButton");button.Padding=new(4);button.Margin=new(0,0,0,10);button.HorizontalContentAlignment=HorizontalAlignment.Stretch;System.Windows.Automation.AutomationProperties.SetName(button,AppLanguage.T("Открыть "+item.Title));
             var row=new Grid();row.ColumnDefinitions.Add(new(){Width=new GridLength(42)});row.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});button.Content=row;
             var poster=new Border{Width=42,Height=63,CornerRadius=new(6),ClipToBounds=true,Background=item.Cover};poster.SizeChanged+=(_,_)=>ClipPoster(poster);var image=new Image{DataContext=item,Stretch=Stretch.UniformToFill};image.Loaded+=SourceCover;poster.Child=image;row.Children.Add(poster);
             var info=new StackPanel{Margin=new(10,5,0,0)};Grid.SetColumn(info,1);row.Children.Add(info);
-            var title=Text(item.Title,12);title.MaxHeight=34;title.TextTrimming=TextTrimming.CharacterEllipsis;title.Margin=new(0,0,0,6);info.Children.Add(title);info.Children.Add(Text(item.Year>0?item.Year.ToString():"",11,true));catalogRailPreview.Children.Add(button);
+            var title=TextRaw(item.Title,12);title.MaxHeight=34;title.TextTrimming=TextTrimming.CharacterEllipsis;title.Margin=new(0,0,0,6);info.Children.Add(title);info.Children.Add(Text(item.Year>0?item.Year.ToString():"",11,true));catalogRailPreview.Children.Add(button);
         }
     }
 }

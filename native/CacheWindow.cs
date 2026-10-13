@@ -14,8 +14,8 @@ public partial class MainWindow
     }
     async Task ShowCacheSizeAsync(TextBlock label)
     {
-        try{var usage=await Task.Run(()=>CacheFiles.Current.UsageAsync());label.Text="Занято "+CacheSize(usage.Bytes)+" из 1 ГБ";}
-        catch{label.Text="Не удалось подсчитать размер кэша.";}
+        try{var usage=await Task.Run(()=>CacheFiles.Current.UsageAsync());label.Text=AppLanguage.T("Занято "+CacheSize(usage.Bytes)+" из 1 ГБ");}
+        catch{label.Text=AppLanguage.T("Не удалось подсчитать размер кэша.");}
     }
     async Task<CacheUsage> ClearCacheAsync()
     {

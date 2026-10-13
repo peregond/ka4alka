@@ -70,7 +70,7 @@ public partial class MainWindow
         {
             var button=new Button{Style=(Style)FindResource(primary?"PrimaryButton":typeof(Button)),Height=52,MinHeight=52,Margin=new(0,0,10,0),Padding=new(22,0,22,0),FontSize=15};
             if(!primary){button.SetResourceReference(Control.BackgroundProperty,"BannerAction");button.SetResourceReference(Control.BorderBrushProperty,"BannerEdge");button.Foreground=(Brush)FindResource("BannerText");}
-            button.Content=IconLabel(text,icon,18);AutomationProperties.SetName(button,text);return button;
+            button.Content=IconLabel(text,icon,18);AutomationProperties.SetName(button,AppLanguage.T(text));return button;
         }
         var aboutAction=Action("Подробнее","IconInfo",false);
         var favorite=new Button{Style=(Style)FindResource("IconButton"),Width=52,Height=52,Margin=new(0)};favorite.SetResourceReference(Control.BackgroundProperty,"BannerAction");favorite.SetResourceReference(Control.BorderBrushProperty,"BannerEdge");favorite.Foreground=(Brush)FindResource("BannerText");
@@ -81,7 +81,7 @@ public partial class MainWindow
         Button Arrow(string icon,string name)
         {
             var button=new Button{Style=(Style)FindResource("RoundIconButton"),Width=40,Height=40,Margin=new(6,0,0,0)};button.Foreground=(Brush)FindResource("BannerText");
-            button.Content=IconLabel("",icon,16);AutomationProperties.SetName(button,name);button.ToolTip=name;return button;
+            button.Content=IconLabel("",icon,16);AutomationProperties.SetName(button,AppLanguage.T(name));button.ToolTip=name;return button;
         }
         var games=section=="Игры";
         var previous=Arrow("IconChevronLeft",games?"Предыдущая игра":"Предыдущий фильм");var next=Arrow("IconChevron",games?"Следующая игра":"Следующий фильм");controls.Children.Add(previous);controls.Children.Add(next);
@@ -113,10 +113,10 @@ public partial class MainWindow
         var item=view.Slides[index];
         DetachFeatureWatch(view);view.Bound=item;
         view.Poster.DataContext=item;if(view.LiteCover.Tag is Image lite)lite.DataContext=item;
-        view.Eyebrow.Text=index==0?"В центре внимания":item.Section=="Игры"?"Стоит поиграть":"Стоит посмотреть";
+        view.Eyebrow.Text=AppLanguage.T(index==0?"В центре внимания":item.Section=="Игры"?"Стоит поиграть":"Стоит посмотреть");
         view.Title.Text=item.Title;view.Title.ToolTip=item.Title;
         view.About.Tag=item;view.Frame.Tag=item;
-        AutomationProperties.SetName(view.About,"Подробнее: "+item.Title);
+        AutomationProperties.SetName(view.About,AppLanguage.T("Подробнее: "+item.Title));
         RebuildFeatureMeta(view,item);UpdateFeaturePeople(view,item);UpdateFeatureFavorite(view);UpdateFeatureDots(view);
         view.Watch=(_,e)=>{if(e.PropertyName is null or nameof(MediaItem.PosterQuality)or nameof(MediaItem.CardRating)or nameof(MediaItem.CardGenre)){RebuildFeatureMeta(view,item);}};
         item.PropertyChanged+=view.Watch;
@@ -126,9 +126,9 @@ public partial class MainWindow
         view.Meta.Children.Clear();
         TextBlock Label(string text,bool bold=false)
         {
-            var label=new TextBlock{Text=text,FontSize=14,FontWeight=bold?FontWeights.Bold:FontWeights.Normal,Foreground=(Brush)FindResource("BannerMuted"),VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,12,4)};return label;
+            var label=new TextBlock{Text=AppLanguage.T(text),FontSize=14,FontWeight=bold?FontWeights.Bold:FontWeights.Normal,Foreground=(Brush)FindResource("BannerMuted"),VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,12,4)};return label;
         }
-        Border Badge(string text)=>new(){BorderBrush=(Brush)FindResource("BannerBadgeEdge"),BorderThickness=new(1),CornerRadius=new(6),Padding=new(6,2,6,2),Margin=new(0,0,8,4),VerticalAlignment=VerticalAlignment.Center,Child=new TextBlock{Text=text,FontSize=11,FontWeight=FontWeights.Bold,Foreground=(Brush)FindResource("BannerText")}};
+        Border Badge(string text)=>new(){BorderBrush=(Brush)FindResource("BannerBadgeEdge"),BorderThickness=new(1),CornerRadius=new(6),Padding=new(6,2,6,2),Margin=new(0,0,8,4),VerticalAlignment=VerticalAlignment.Center,Child=new TextBlock{Text=AppLanguage.T(text),FontSize=11,FontWeight=FontWeights.Bold,Foreground=(Brush)FindResource("BannerText")}};
         if(item.Section=="Игры")
         {
             // The list row already knows the year, genre, price and reviews; the store details add the score, the studio and the exact price.
@@ -137,7 +137,7 @@ public partial class MainWindow
             if(game?.Review is {} reviewed){percent=reviewed.Percent;count=reviewed.Count;tone=reviewed.Tone;verdict=reviewed.Label;}
             else if(store is {HasReview:true}){percent=store.ReviewPercent;count=store.ReviewCount;tone=store.ReviewTone;verdict=store.ReviewLabel;}
             if(percent>0&&tone.Length>0)view.Meta.Children.Add(GameReviewChip(percent,tone,verdict,count));
-            if(game is {Metacritic:>0})view.Meta.Children.Add(new TextBlock{Text="Metacritic "+game.Metacritic,FontSize=14,FontWeight=FontWeights.Bold,Foreground=(Brush)FindResource("BannerText"),VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,12,4),ToolTip="Оценка критиков на Metacritic"});
+            if(game is {Metacritic:>0})view.Meta.Children.Add(new TextBlock{Text="Metacritic "+game.Metacritic,FontSize=14,FontWeight=FontWeights.Bold,Foreground=(Brush)FindResource("BannerText"),VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,12,4),ToolTip=AppLanguage.T("Оценка критиков на Metacritic")});
             view.Meta.Children.Add(Label("Игра"));
             if(store is {Soon:true,Released.Length:>0})view.Meta.Children.Add(Label("Выйдет "+store.SoonLabel));
             else if(info.Year>0)view.Meta.Children.Add(Label(info.Year.ToString()));
@@ -160,7 +160,7 @@ public partial class MainWindow
         if(qualities.Count==0&&item.PosterQuality.Length>0)qualities.Add(item.PosterQuality);
         foreach(var quality in qualities)
         {
-            var badge=new Border{BorderBrush=(Brush)FindResource("BannerBadgeEdge"),BorderThickness=new(1),CornerRadius=new(6),Padding=new(6,2,6,2),Margin=new(0,0,8,4),VerticalAlignment=VerticalAlignment.Center,Child=new TextBlock{Text=quality,FontSize=11,FontWeight=FontWeights.Bold,Foreground=(Brush)FindResource("BannerText")}};
+            var badge=new Border{BorderBrush=(Brush)FindResource("BannerBadgeEdge"),BorderThickness=new(1),CornerRadius=new(6),Padding=new(6,2,6,2),Margin=new(0,0,8,4),VerticalAlignment=VerticalAlignment.Center,Child=new TextBlock{Text=AppLanguage.T(quality),FontSize=11,FontWeight=FontWeights.Bold,Foreground=(Brush)FindResource("BannerText")}};
             view.Meta.Children.Add(badge);
         }
     }
@@ -170,7 +170,7 @@ public partial class MainWindow
         {
             // A game's studio comes with its details, which the games home loads for the banner slides.
             var studio=gameDetails.TryGetValue(item.Id,out var game)?game.Developers:"";
-            view.People.Text=studio.Length>0?"Разработчик "+studio:"";view.People.Visibility=studio.Length>0&&!featureCompactText?Visibility.Visible:Visibility.Collapsed;return;
+            view.People.Text=AppLanguage.T(studio.Length>0?"Разработчик "+studio:"");view.People.Visibility=studio.Length>0&&!featureCompactText?Visibility.Visible:Visibility.Collapsed;return;
         }
         // Only credits that the item already carries; no extra requests are made for the banner.
         var director=item.People.Where(x=>x.Role=="Режиссёры").Select(x=>x.Name).Take(1).ToArray();
@@ -184,7 +184,7 @@ public partial class MainWindow
     {
         var saved=view.Bound!=null&&IsSaved(view.Bound);
         view.Favorite.Content=IconLabel("",saved?"IconHeartFilled":"IconHeart",20);
-        var name=saved?"Сохранено":"Сохранить";view.Favorite.ToolTip=name;AutomationProperties.SetName(view.Favorite,name);
+        var name=saved?"Сохранено":"Сохранить";view.Favorite.ToolTip=name;AutomationProperties.SetName(view.Favorite,AppLanguage.T(name));
     }
     void UpdateFeatureDots(FeatureCarouselView view)
     {

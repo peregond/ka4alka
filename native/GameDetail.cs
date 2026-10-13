@@ -62,7 +62,7 @@ public partial class MainWindow
         hero.ColumnDefinitions.Add(new(){Width=GridLength.Auto});hero.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});hero.RowDefinitions.Add(new(){Height=GridLength.Auto});
         artwork.Children.Add(hero);
         var coverGrid=new Grid();
-        coverGrid.Children.Add(new TextBlock{Text="Обложка\nнедоступна",Foreground=(Brush)FindResource("BannerMuted"),Opacity=.75,TextAlignment=TextAlignment.Center,VerticalAlignment=VerticalAlignment.Center,FontSize=11});
+        coverGrid.Children.Add(new TextBlock{Text=AppLanguage.T("Обложка\nнедоступна"),Foreground=(Brush)FindResource("BannerMuted"),Opacity=.75,TextAlignment=TextAlignment.Center,VerticalAlignment=VerticalAlignment.Center,FontSize=11});
         coverGrid.Children.Add(cover);
         gameCapsule=new Border{Name="GameCapsule",Width=320,Height=320*215/460d,CornerRadius=new(14),ClipToBounds=true,Background=item.Cover,BorderBrush=(Brush)FindResource("BannerChip"),BorderThickness=new(1),HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,28,0),Child=coverGrid};
         gameCapsule.SizeChanged+=(sender,_)=>ClipPoster((Border)sender);
@@ -75,7 +75,7 @@ public partial class MainWindow
         RenderGameHeading(item,detail);
 
         var description=new StackPanel{Name="GameDescription",Margin=new(0,0,0,16)};info.Children.Add(description);
-        var synopsis=gameDescription=detailSynopsis=new TextBlock{Name="GameSynopsis",Text=detail!=null?GameDescriptionText(item):"Загружаем описание…",FontSize=15,LineHeight=23,LineStackingStrategy=LineStackingStrategy.BlockLineHeight,Foreground=(Brush)FindResource("BannerMuted"),TextWrapping=TextWrapping.Wrap,TextTrimming=TextTrimming.CharacterEllipsis,MaxHeight=descriptionExpanded?double.PositiveInfinity:69};
+        var synopsis=gameDescription=detailSynopsis=new TextBlock{Name="GameSynopsis",Text=AppLanguage.T(detail!=null?GameDescriptionText(item):"Загружаем описание…"),FontSize=15,LineHeight=23,LineStackingStrategy=LineStackingStrategy.BlockLineHeight,Foreground=(Brush)FindResource("BannerMuted"),TextWrapping=TextWrapping.Wrap,TextTrimming=TextTrimming.CharacterEllipsis,MaxHeight=descriptionExpanded?double.PositiveInfinity:69};
         description.Children.Add(synopsis);
         // While the description is on its way its place breathes instead of saying "loading".
         if(detail==null){synopsis.Visibility=Visibility.Collapsed;gameSynopsisSkeleton=SynopsisSkeleton();description.Children.Add(gameSynopsisSkeleton);}
@@ -115,8 +115,8 @@ public partial class MainWindow
     // "👍 93% · Очень положительные": Steam's verdict on the game, in the colour of that verdict.
     FrameworkElement GameReviewChip(int percent,string tone,string label,int count)
     {
-        var chip=new StackPanel{Name="GameReview",Orientation=Orientation.Horizontal,Margin=new(0,0,14,4),ToolTip=(label.Length>0?label+" · ":"")+percent+"% положительных отзывов Steam"+(count>0?" из "+GameNumbers.Count(count):"")};
-        AutomationProperties.SetName(chip,"Отзывы Steam: "+percent+"%");
+        var chip=new StackPanel{Name="GameReview",Orientation=Orientation.Horizontal,Margin=new(0,0,14,4),ToolTip=AppLanguage.T((label.Length>0?label+" · ":"")+percent+"% положительных отзывов Steam"+(count>0?" из "+GameNumbers.Count(count):""))};
+        AutomationProperties.SetName(chip,AppLanguage.T("Отзывы Steam: "+percent+"%"));
         chip.Children.Add(new TextBlock{Text="👍",FontSize=13,Foreground=ToneInk(tone),Margin=new(0,0,5,0),VerticalAlignment=VerticalAlignment.Center});
         chip.Children.Add(new TextBlock{Text=percent+"%",FontSize=14,FontWeight=FontWeights.Bold,Foreground=(Brush)FindResource("BannerText"),VerticalAlignment=VerticalAlignment.Center});
         if(label.Length>0)chip.Children.Add(new TextBlock{Text="  "+label,FontSize=12,Foreground=(Brush)FindResource("BannerMuted"),VerticalAlignment=VerticalAlignment.Center});
@@ -124,19 +124,19 @@ public partial class MainWindow
     }
     Border GameBadge(string text,Brush? ink=null,string? tip=null,string? name=null)
     {
-        var badge=new Border{BorderBrush=ink??(Brush)FindResource("BannerBadgeEdge"),BorderThickness=new(1),CornerRadius=new(6),Padding=new(6,2,6,2),Margin=new(0,0,8,4),VerticalAlignment=VerticalAlignment.Center,ToolTip=tip,Child=new TextBlock{Text=text,FontSize=11,FontWeight=FontWeights.Bold,Foreground=ink??(Brush)FindResource("BannerText")}};
+        var badge=new Border{BorderBrush=ink??(Brush)FindResource("BannerBadgeEdge"),BorderThickness=new(1),CornerRadius=new(6),Padding=new(6,2,6,2),Margin=new(0,0,8,4),VerticalAlignment=VerticalAlignment.Center,ToolTip=tip,Child=new TextBlock{Text=AppLanguage.T(text),FontSize=11,FontWeight=FontWeights.Bold,Foreground=ink??(Brush)FindResource("BannerText")}};
         if(name!=null)badge.Name=name;return badge;
     }
     // A discount is a filled green block in front of the price, as it is on the cards.
     FrameworkElement GamePriceBadge(string price,int discount,string original)
     {
-        var row=new StackPanel{Name="GamePrice",Orientation=Orientation.Horizontal,Margin=new(0,0,8,4),VerticalAlignment=VerticalAlignment.Center,ToolTip=discount>0&&original.Length>0?"Скидка "+discount+"%. Обычная цена — "+original:"Цена в Steam"};
+        var row=new StackPanel{Name="GamePrice",Orientation=Orientation.Horizontal,Margin=new(0,0,8,4),VerticalAlignment=VerticalAlignment.Center,ToolTip=AppLanguage.T(discount>0&&original.Length>0?"Скидка "+discount+"%. Обычная цена — "+original:"Цена в Steam")};
         if(discount>0)
         {
             var block=new Border{CornerRadius=new(6,0,0,6),Padding=new(6,2,6,2)};block.SetResourceReference(Border.BackgroundProperty,"Primary");
             var label=new TextBlock{Text="−"+discount+"%",FontSize=11,FontWeight=FontWeights.Bold};label.SetResourceReference(TextBlock.ForegroundProperty,"PrimaryInk");block.Child=label;row.Children.Add(block);
         }
-        row.Children.Add(new Border{BorderBrush=(Brush)FindResource("BannerBadgeEdge"),BorderThickness=new(1),CornerRadius=discount>0?new(0,6,6,0):new(6),Padding=new(6,2,6,2),Child=new TextBlock{Text=price,FontSize=11,FontWeight=FontWeights.Bold,Foreground=(Brush)FindResource("BannerText")}});
+        row.Children.Add(new Border{BorderBrush=(Brush)FindResource("BannerBadgeEdge"),BorderThickness=new(1),CornerRadius=discount>0?new(0,6,6,0):new(6),Padding=new(6,2,6,2),Child=new TextBlock{Text=AppLanguage.T(price),FontSize=11,FontWeight=FontWeights.Bold,Foreground=(Brush)FindResource("BannerText")}});
         return row;
     }
     static (string Short,string Long) RussianText(GameRussian russian)=>russian switch
@@ -156,7 +156,7 @@ public partial class MainWindow
             gameCaption.Children.Clear();
             void Part(string text,string? name=null)
             {
-                var label=new TextBlock{Text=text,FontSize=12,FontWeight=FontWeights.SemiBold,Foreground=(Brush)FindResource("BannerMuted"),VerticalAlignment=VerticalAlignment.Center};if(name!=null)label.Name=name;gameCaption.Children.Add(label);
+                var label=new TextBlock{Text=AppLanguage.T(text),FontSize=12,FontWeight=FontWeights.SemiBold,Foreground=(Brush)FindResource("BannerMuted"),VerticalAlignment=VerticalAlignment.Center};if(name!=null)label.Name=name;gameCaption.Children.Add(label);
             }
             Part("ИГРА");
             if(detail is {ComingSoon:true,ReleaseDate.Length:>0}){Part("  ·  ");Part("ВЫЙДЕТ "+detail.ReleaseDate.Replace(" г.","").ToUpperInvariant(),"GameYear");}
@@ -172,14 +172,14 @@ public partial class MainWindow
         if(percent>0&&tone.Length>0)gameMetaRow.Children.Add(GameReviewChip(percent,tone,verdict,count));
         if(detail is {Metacritic:>0})
         {
-            var rating=new StackPanel{Orientation=Orientation.Horizontal,Margin=new(0,0,14,4),ToolTip="Оценка критиков на Metacritic · "+detail.Metacritic};
+            var rating=new StackPanel{Orientation=Orientation.Horizontal,Margin=new(0,0,14,4),ToolTip=AppLanguage.T("Оценка критиков на Metacritic · "+detail.Metacritic)};
             var star=new TextBlock{Text="★",FontSize=14,Margin=new(0,0,5,0),VerticalAlignment=VerticalAlignment.Center};star.SetResourceReference(TextBlock.ForegroundProperty,"RatingInk");rating.Children.Add(star);
-            rating.Children.Add(new TextBlock{Text=detail.Metacritic.ToString(),FontSize=14,FontWeight=FontWeights.Bold,Foreground=(Brush)FindResource("BannerText"),VerticalAlignment=VerticalAlignment.Center});
+            rating.Children.Add(new TextBlock{Text=AppLanguage.T(detail.Metacritic.ToString()),FontSize=14,FontWeight=FontWeights.Bold,Foreground=(Brush)FindResource("BannerText"),VerticalAlignment=VerticalAlignment.Center});
             rating.Children.Add(new TextBlock{Text=" Metacritic",FontSize=12,Foreground=(Brush)FindResource("BannerMuted"),VerticalAlignment=VerticalAlignment.Center});
             gameMetaRow.Children.Add(rating);
         }
         var traits=string.Join(" · ",new[]{item.Genre!="Windows"?item.AllGenres:"",detail?.Developers??""}.Where(x=>!string.IsNullOrWhiteSpace(x)));
-        if(traits.Length>0)gameMetaRow.Children.Add(new TextBlock{Name="GameTraits",Text=traits,FontSize=14,Foreground=(Brush)FindResource("BannerMuted"),TextWrapping=TextWrapping.Wrap,VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,12,4)});
+        if(traits.Length>0)gameMetaRow.Children.Add(new TextBlock{Name="GameTraits",Text=AppLanguage.T(traits),FontSize=14,Foreground=(Brush)FindResource("BannerMuted"),TextWrapping=TextWrapping.Wrap,VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,12,4)});
         gameMetaRow.Children.Add(GameBadge("Windows"));
         if(detail!=null&&RussianText(detail.Russian) is {Short.Length:>0} russian)gameMetaRow.Children.Add(GameBadge(russian.Short,detail.Russian==GameRussian.Absent?null:ToneGood,russian.Long,"GameRussian"));
         if(detail is {Age:>=12})gameMetaRow.Children.Add(GameBadge(detail.Age+"+",null,"Возрастное ограничение в Steam"));
@@ -216,7 +216,7 @@ public partial class MainWindow
         {
             var button=new Button{Style=(Style)FindResource(primary?"PrimaryButton":typeof(Button)),Height=52,MinHeight=52,Padding=new(22,0,22,0),FontSize=15,Margin=new(0,0,10,8)};
             if(!primary){button.SetResourceReference(Control.BackgroundProperty,"BannerAction");button.SetResourceReference(Control.BorderBrushProperty,"BannerEdge");button.Foreground=(Brush)FindResource("BannerText");}
-            button.Content=IconLabel(text,icon,18);AutomationProperties.SetName(button,text);button.Click+=(_,_)=>click();return button;
+            button.Content=IconLabel(text,icon,18);AutomationProperties.SetName(button,AppLanguage.T(text));button.Click+=(_,_)=>click();return button;
         }
         if(done!=null)
         {
@@ -229,11 +229,11 @@ public partial class MainWindow
         }
         else if(recommended!=null)
         {
-            var button=new Button{Name="GameDownload",Style=(Style)FindResource("PrimaryButton"),Tag=recommended,Height=52,MinHeight=52,Padding=new(22,0,22,0),FontSize=15,Margin=new(0,0,10,8),ToolTip="Скачать рекомендованную раздачу: "+recommended.Title};
+            var button=new Button{Name="GameDownload",Style=(Style)FindResource("PrimaryButton"),Tag=recommended,Height=52,MinHeight=52,Padding=new(22,0,22,0),FontSize=15,Margin=new(0,0,10,8),ToolTip=AppLanguage.T("Скачать рекомендованную раздачу: "+recommended.Title)};
             var row=new StackPanel{Orientation=Orientation.Horizontal};
             row.Children.Add(IconLabel("Скачать","IconDownload",18));
-            if(recommended.Size.HasValue)row.Children.Add(new TextBlock{Text=DownloadService.FormatBytes(recommended.Size.Value),FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=14,FontWeight=FontWeights.Medium,Opacity=.75,Margin=new(10,0,0,0),VerticalAlignment=VerticalAlignment.Center});
-            button.Content=row;AutomationProperties.SetName(button,"Скачать раздачу: "+recommended.Title);button.Click+=SourceDownload;gameActions.Children.Add(button);
+            if(recommended.Size.HasValue)row.Children.Add(new TextBlock{Text=AppLanguage.T(DownloadService.FormatBytes(recommended.Size.Value)),FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=14,FontWeight=FontWeights.Medium,Opacity=.75,Margin=new(10,0,0,0),VerticalAlignment=VerticalAlignment.Center});
+            button.Content=row;AutomationProperties.SetName(button,AppLanguage.T("Скачать раздачу: "+recommended.Title));button.Click+=SourceDownload;gameActions.Children.Add(button);
         }
         else if(gameReleasesLoading)
         {
@@ -247,7 +247,7 @@ public partial class MainWindow
         var saved=IsSaved(item);
         Button favorite=null!;favorite=new Button{Name="GameFavorite",Style=(Style)FindResource("IconButton"),Width=52,Height=52,Margin=new(0,0,10,8)};
         favorite.SetResourceReference(Control.BackgroundProperty,"BannerAction");favorite.SetResourceReference(Control.BorderBrushProperty,"BannerEdge");favorite.Foreground=(Brush)FindResource("BannerText");
-        void Paint(){var now=IsSaved(item);favorite.Content=IconLabel("",now?"IconHeartFilled":"IconHeart",20);favorite.ToolTip=now?"Сохранено":"Сохранить";AutomationProperties.SetName(favorite,now?"Сохранено":"Сохранить");}
+        void Paint(){var now=IsSaved(item);favorite.Content=IconLabel("",now?"IconHeartFilled":"IconHeart",20);favorite.ToolTip=AppLanguage.T(now?"Сохранено":"Сохранить");AutomationProperties.SetName(favorite,AppLanguage.T(now?"Сохранено":"Сохранить"));}
         Paint();favorite.Click+=(_,_)=>{ToggleSaved(current?.Id==item.Id?current:item);Paint();UpdateSavedCount();};
         gameActions.Children.Add(favorite);
     }
@@ -310,8 +310,8 @@ public partial class MainWindow
             if(detail.Price.Length>0)about.Children.Add(Fact("Цена в Steam",detail.Discount>0&&detail.OriginalPrice.Length>0?detail.Price+" (−"+detail.Discount+"%, обычная "+detail.OriginalPrice+")":detail.Price));
         }
         var links=new WrapPanel{Margin=new(0,8,0,0)};
-        var steam=ActionButton("Открыть в Steam","IconExternal",()=>OpenGameLink(item.PageUrl!),"PillButton");steam.Name="GameSteamLink";steam.Margin=new(0,0,10,8);steam.ToolTip="Страница игры в Steam";links.Children.Add(steam);
-        var steamDb=ActionButton("SteamDB","IconExternal",()=>OpenGameLink("https://steamdb.info/app/"+gameSteamId+"/"),"PillButton");steamDb.Name="GameSteamDbLink";steamDb.Margin=new(0,0,10,8);steamDb.ToolTip="Цены, статистика игроков и история изменений на SteamDB";links.Children.Add(steamDb);
+        var steam=ActionButton("Открыть в Steam","IconExternal",()=>OpenGameLink(item.PageUrl!),"PillButton");steam.Name="GameSteamLink";steam.Margin=new(0,0,10,8);steam.ToolTip=AppLanguage.T("Страница игры в Steam");links.Children.Add(steam);
+        var steamDb=ActionButton("SteamDB","IconExternal",()=>OpenGameLink("https://steamdb.info/app/"+gameSteamId+"/"),"PillButton");steamDb.Name="GameSteamDbLink";steamDb.Margin=new(0,0,10,8);steamDb.ToolTip=AppLanguage.T("Цены, статистика игроков и история изменений на SteamDB");links.Children.Add(steamDb);
         about.Children.Add(links);
         grid.Children.Add(about);
         gameAbout.Child=grid;UpdateGameDetailLayout();
@@ -319,7 +319,7 @@ public partial class MainWindow
     void OpenGameLink(string address)
     {
         try{System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(address){UseShellExecute=true});}
-        catch(Exception error){Status.Text="Не удалось открыть страницу: "+error.Message;}
+        catch(Exception error){Status.Text=AppLanguage.T("Не удалось открыть страницу: "+error.Message);}
     }
 
     // ---------- responsive layout ----------
@@ -376,7 +376,7 @@ public partial class MainWindow
             {
                 if(Active()&&gameDescription!=null)
                 {
-                    gameDescription.Text="Описание временно недоступно. Поиск раздач продолжается.";gameDescription.Visibility=Visibility.Visible;
+                    gameDescription.Text=AppLanguage.T("Описание временно недоступно. Поиск раздач продолжается.");gameDescription.Visibility=Visibility.Visible;
                     if(gameSynopsisSkeleton!=null&&gameSynopsisSkeleton.Parent is Panel skeletonHost){skeletonHost.Children.Remove(gameSynopsisSkeleton);gameSynopsisSkeleton=null;}
                     if(gameAbout!=null&&current!=null)RenderGameAbout(current,new(current,"","","",""));
                 }
@@ -429,7 +429,7 @@ public partial class MainWindow
             Button Arrow(string icon,string name,string tip,HorizontalAlignment side,int direction)
             {
                 var button=new Button{Name=name,Style=(Style)FindResource("IconButton"),Width=44,Height=44,Margin=new(14,0,14,0),HorizontalAlignment=side,VerticalAlignment=VerticalAlignment.Center,ToolTip=tip};
-                button.SetResourceReference(Control.BackgroundProperty,"PosterBadge");button.Foreground=(Brush)FindResource("BannerText");button.Content=IconLabel("",icon,18);AutomationProperties.SetName(button,tip);
+                button.SetResourceReference(Control.BackgroundProperty,"PosterBadge");button.Foreground=(Brush)FindResource("BannerText");button.Content=IconLabel("",icon,18);AutomationProperties.SetName(button,AppLanguage.T(tip));
                 button.Click+=(_,e)=>{e.Handled=true;stage.Focus();Step(direction);};return button;
             }
             stage.Children.Add(Arrow("IconBack","GameShotPrevious","Предыдущий скриншот",HorizontalAlignment.Left,-1));
@@ -444,8 +444,8 @@ public partial class MainWindow
             {
                 var number=index;var thumbImage=new Image{Stretch=Stretch.UniformToFill};RenderOptions.SetBitmapScalingMode(thumbImage,BitmapScalingMode.HighQuality);
                 var thumb=new Border{Width=160,Height=90,CornerRadius=new(10),BorderThickness=new(2),Child=thumbImage};thumb.SetResourceReference(Border.BackgroundProperty,"PanelAlt");thumb.SizeChanged+=(sender,_)=>ClipPoster((Border)sender);
-                var button=new Button{Name="GameShot"+(index+1),Style=(Style)FindResource("PosterButton"),Padding=new(0),Margin=new(0,6,10,10),Content=thumb,Tag=thumb,ToolTip="Скриншот "+(index+1)};
-                AutomationProperties.SetName(button,"Скриншот "+(index+1)+" из "+gameShots.Length);button.Click+=(_,_)=>{stage.Focus();SelectGameShot(number,token,true);};strip.Children.Add(button);
+                var button=new Button{Name="GameShot"+(index+1),Style=(Style)FindResource("PosterButton"),Padding=new(0),Margin=new(0,6,10,10),Content=thumb,Tag=thumb,ToolTip=AppLanguage.T("Скриншот "+(index+1))};
+                AutomationProperties.SetName(button,AppLanguage.T("Скриншот "+(index+1)+" из "+gameShots.Length));button.Click+=(_,_)=>{stage.Focus();SelectGameShot(number,token,true);};strip.Children.Add(button);
                 _=LoadGameShotImage(thumbImage,gameShots[index].Thumb,320,token,()=>true);
             }
             var scroll=gameShotScroll=new ScrollViewer{Content=strip,VerticalScrollBarVisibility=ScrollBarVisibility.Disabled,HorizontalScrollBarVisibility=ScrollBarVisibility.Hidden,CanContentScroll=false,Margin=new(-6,8,-6,0),Padding=new(6,0,6,0)};
@@ -508,12 +508,12 @@ public partial class MainWindow
         var failed=gameSourceChecks.Any(x=>x.State is SourceState.TimedOut or SourceState.Unavailable);
         var status=new WrapPanel{Name="GameReleaseStatus",Margin=new(0,0,0,10),VerticalAlignment=VerticalAlignment.Center};host.Children.Add(status);
         var summary=new TextBlock{FontSize=13,VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,12,10)};summary.SetResourceReference(TextBlock.ForegroundProperty,failed&&!gameReleasesLoading?"Warning":"Muted");
-        summary.Text=gameReleasesLoading?"Ищем раздачи… · найдено "+releases.Length:failed?"Часть источников недоступна — обнови поиск позже.":releases.Length>0?"Источники ответили":"";
+        summary.Text=AppLanguage.T(gameReleasesLoading?"Ищем раздачи… · найдено "+releases.Length:failed?"Часть источников недоступна — обнови поиск позже.":releases.Length>0?"Источники ответили":"");
         var now=DateTime.UtcNow;summary.ToolTip=gameSourceChecks.Length==0?null:string.Join("\n",gameSourceChecks.Select(x=>x.Name+": "+ReleaseFreshness.SourceStateText(x,now)));
         if(summary.Text.Length>0)status.Children.Add(summary);
         if(!gameReleasesLoading)
         {
-            var refresh=ActionButton("Обновить поиск","IconRefresh",()=>{gameDetailRequest?.Cancel();gameDetailId=null;Render();},"PillButton");refresh.Name="GameReleaseRetry";refresh.Margin=new(0,0,0,10);AutomationProperties.SetName(refresh,"Обновить поиск раздач");status.Children.Add(refresh);
+            var refresh=ActionButton("Обновить поиск","IconRefresh",()=>{gameDetailRequest?.Cancel();gameDetailId=null;Render();},"PillButton");refresh.Name="GameReleaseRetry";refresh.Margin=new(0,0,0,10);AutomationProperties.SetName(refresh,AppLanguage.T("Обновить поиск раздач"));status.Children.Add(refresh);
         }
         if(releases.Length==0)
         {
@@ -539,7 +539,7 @@ public partial class MainWindow
 
         Button Chip(string name)
         {
-            var chip=new Button{Style=(Style)FindResource("PillButton"),Margin=new(0,0,10,10)};AutomationProperties.SetName(chip,name);top.Children.Add(chip);return chip;
+            var chip=new Button{Style=(Style)FindResource("PillButton"),Margin=new(0,0,10,10)};AutomationProperties.SetName(chip,AppLanguage.T(name));top.Children.Add(chip);return chip;
         }
         ToggleContextMenu Menu(Button chip)
         {
@@ -554,10 +554,10 @@ public partial class MainWindow
         if(sources.Length>1)
         {
             sourceChip=Chip("Источник раздач: выбрать");sourceMenu=Menu(sourceChip);
-            foreach(var name in new[]{"Все"}.Concat(sources)){var entry=new MenuItem{Header=name=="Все"?"Все источники":name,IsCheckable=true,Tag=name};entry.Click+=(_,_)=>{sourceMenu.IsOpen=false;state.Source=name;state.VisibleCount=40;Show();};sourceMenu.Items.Add(entry);}
+            foreach(var name in new[]{"Все"}.Concat(sources)){var entry=new MenuItem{Header=AppLanguage.T(name=="Все"?"Все источники":name),IsCheckable=true,Tag=name};entry.Click+=(_,_)=>{sourceMenu.IsOpen=false;state.Source=name;state.VisibleCount=40;Show();};sourceMenu.Items.Add(entry);}
             AttachMenuToggle(sourceChip,sourceMenu);
         }
-        reset=new Button{Content="Сбросить",Style=(Style)FindResource("QuietButton"),Padding=new(12,0,12,0),Margin=new(0,0,10,10)};AutomationProperties.SetName(reset,"Сбросить сортировку и источник раздач");
+        reset=new Button{Content=AppLanguage.T("Сбросить"),Style=(Style)FindResource("QuietButton"),Padding=new(12,0,12,0),Margin=new(0,0,10,10)};AutomationProperties.SetName(reset,AppLanguage.T("Сбросить сортировку и источник раздач"));
         reset.Click+=(_,_)=>{state.Sort=sorts[0];state.Source="Все";state.Reverse=false;state.VisibleCount=40;Show();};top.Children.Add(reset);
         void UpdateChips()
         {
@@ -595,7 +595,7 @@ public partial class MainWindow
             var isBest=recommended!=null&&ReferenceEquals(recommended.Entry,entry);
             var body=new StackPanel();
             if(isBest)body.Children.Add(RecommendedPill());
-            var title=Text(entry.Title,14);title.FontWeight=FontWeights.SemiBold;title.Margin=new(0,0,0,8);body.Children.Add(title);
+            var title=TextRaw(entry.Title,14);title.FontWeight=FontWeights.SemiBold;title.Margin=new(0,0,0,8);body.Children.Add(title);
             var source=Text(ReleaseFreshness.Caption(entry,DateTime.UtcNow),12,true);source.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");source.ToolTip=ReleaseFreshness.Details(entry,DateTime.UtcNow);source.Margin=new(0,0,0,12);body.Children.Add(source);
             var summary=new WrapPanel{Margin=new(0,0,0,6)};foreach(var tag in Tags(entry,true))summary.Children.Add(tag);body.Children.Add(summary);
             if(isBest)body.Children.Add(ReasonLine(recommended!.Reason));
@@ -611,7 +611,7 @@ public partial class MainWindow
             var grid=new Grid();grid.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});grid.ColumnDefinitions.Add(new(){Width=GridLength.Auto});
             var info=new StackPanel{VerticalAlignment=VerticalAlignment.Center};
             info.Children.Add(RecommendedPill());
-            var title=Text(entry.Title,17);title.FontWeight=FontWeights.SemiBold;title.MaxHeight=48;title.TextTrimming=TextTrimming.CharacterEllipsis;title.ToolTip=entry.Title;title.Margin=new(0,2,0,10);info.Children.Add(title);
+            var title=TextRaw(entry.Title,17);title.FontWeight=FontWeights.SemiBold;title.MaxHeight=48;title.TextTrimming=TextTrimming.CharacterEllipsis;title.ToolTip=entry.Title;title.Margin=new(0,2,0,10);info.Children.Add(title);
             var tags=new WrapPanel();foreach(var tag in Tags(entry,false))tags.Children.Add(tag);
             if(entry.Size.HasValue)tags.Children.Add(ReleaseTag(DownloadService.FormatBytes(entry.Size.Value)));
             if(entry.Seeds>0)tags.Children.Add(ReleaseTag($"Отдают: {entry.Seeds.Value}",false,ReleaseFreshness.ConnectionNote));
@@ -622,9 +622,9 @@ public partial class MainWindow
             if(QueuedDownload(entry)!=null)action=ReleaseAction(entry);
             else
             {
-                var button=new Button{Name="GameBestDownload",Style=(Style)FindResource("PrimaryButton"),Tag=new RecommendedDownload(entry),Height=52,MinHeight=52,Padding=new(22,0,22,0),FontSize=15,ToolTip="Скачать рекомендованную раздачу"};
+                var button=new Button{Name="GameBestDownload",Style=(Style)FindResource("PrimaryButton"),Tag=new RecommendedDownload(entry),Height=52,MinHeight=52,Padding=new(22,0,22,0),FontSize=15,ToolTip=AppLanguage.T("Скачать рекомендованную раздачу")};
                 button.Content=IconLabel("Скачать","IconDownload",18);button.Click+=SourceDownload;
-                AutomationProperties.SetName(button,"Скачать рекомендованную раздачу: "+entry.Title);action=button;
+                AutomationProperties.SetName(button,AppLanguage.T("Скачать рекомендованную раздачу: "+entry.Title));action=button;
             }
             action.VerticalAlignment=VerticalAlignment.Center;
             // Narrow windows put the button under the details instead of beside them.
@@ -633,7 +633,7 @@ public partial class MainWindow
             grid.Children.Add(action);
             var card=new Border{Name="GameBestRelease",Child=grid,CornerRadius=new(20),Padding=new(20,18,20,18),Margin=new(0,0,0,16),BorderThickness=new(1)};
             card.SetResourceReference(Border.BackgroundProperty,"AccentFaint");card.SetResourceReference(Border.BorderBrushProperty,"AccentLine");
-            AutomationProperties.SetName(card,"Рекомендованная раздача: "+entry.Title);
+            AutomationProperties.SetName(card,AppLanguage.T("Рекомендованная раздача: "+entry.Title));
             return card;
         }
         void Show()
@@ -673,14 +673,14 @@ public partial class MainWindow
             {
                 if(mode==null)
                 {
-                    var plain=new TextBlock{Text=label,FontSize=11,FontWeight=FontWeights.SemiBold,VerticalAlignment=VerticalAlignment.Center};plain.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");Grid.SetColumn(plain,column);header.Children.Add(plain);return;
+                    var plain=new TextBlock{Text=AppLanguage.T(label),FontSize=11,FontWeight=FontWeights.SemiBold,VerticalAlignment=VerticalAlignment.Center};plain.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");Grid.SetColumn(plain,column);header.Children.Add(plain);return;
                 }
                 var active=state.Sort==mode;
                 var descendingByDefault=mode is "Больше отдающих" or "Больше размер";
                 var direction=descendingByDefault^(active&&state.Reverse)?" ↓":" ↑";
-                var button=new Button{Style=(Style)FindResource("LinkButton"),Content=label+(active?direction:""),FontSize=11,FontWeight=FontWeights.SemiBold,Padding=new(0,6,0,6),HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center,ToolTip=active?"Нажми ещё раз, чтобы поменять порядок":"Сортировать по этому столбцу"};
+                var button=new Button{Style=(Style)FindResource("LinkButton"),Content=label+(active?direction:""),FontSize=11,FontWeight=FontWeights.SemiBold,Padding=new(0,6,0,6),HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center,ToolTip=AppLanguage.T(active?"Нажми ещё раз, чтобы поменять порядок":"Сортировать по этому столбцу")};
                 button.Click+=(_,_)=>{if(state.Sort==mode)state.Reverse=!state.Reverse;else{state.Sort=mode;state.Reverse=false;}state.VisibleCount=40;Show();};
-                button.SetResourceReference(Control.ForegroundProperty,active?"Accent":"Subtle");AutomationProperties.SetName(button,"Сортировать раздачи: "+mode);
+                button.SetResourceReference(Control.ForegroundProperty,active?"Accent":"Subtle");AutomationProperties.SetName(button,AppLanguage.T("Сортировать раздачи: "+mode));
                 Grid.SetColumn(button,column);header.Children.Add(button);
             }
             Heading("ТИП",0,null);Heading("РАЗДАЧА",1,"По названию");Heading("РАЗМЕР",2,"Меньше размер");Heading("ОТДАЮТ · КАЧАЮТ",3,"Больше отдающих");Heading("ДОБАВЛЕНА",4,null);
@@ -689,7 +689,7 @@ public partial class MainWindow
             {
                 var isBest=recommended!=null&&ReferenceEquals(recommended.Entry,entry);
                 var row=RowGrid();
-                var kind=new TextBlock{Text=GameReleaseInfo.Kind(entry),FontSize=15,FontWeight=FontWeights.SemiBold,VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,8,0),TextTrimming=TextTrimming.CharacterEllipsis};row.Children.Add(kind);
+                var kind=new TextBlock{Text=AppLanguage.T(GameReleaseInfo.Kind(entry)),FontSize=15,FontWeight=FontWeights.SemiBold,VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,8,0),TextTrimming=TextTrimming.CharacterEllipsis};row.Children.Add(kind);
                 var identity=new StackPanel{VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,12,0)};Grid.SetColumn(identity,1);
                 var titleLine=new DockPanel();if(isBest){var pill=RecommendedPill();pill.Margin=new(0,0,10,0);DockPanel.SetDock(pill,Dock.Left);titleLine.Children.Add(pill);}
                 var title=new TextBlock{Text=entry.Title,FontSize=14,FontWeight=FontWeights.SemiBold,TextTrimming=TextTrimming.CharacterEllipsis,ToolTip=entry.Title,VerticalAlignment=VerticalAlignment.Center};titleLine.Children.Add(title);identity.Children.Add(titleLine);
@@ -701,8 +701,8 @@ public partial class MainWindow
                 var size=new TextBlock{Text=entry.Size.HasValue?DownloadService.FormatBytes(entry.Size.Value):"—",FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=14,VerticalAlignment=VerticalAlignment.Center};Grid.SetColumn(size,2);row.Children.Add(size);
                 var health=SeedHealth(entry);Grid.SetColumn(health,3);row.Children.Add(health);
                 var age=new StackPanel{VerticalAlignment=VerticalAlignment.Center,ToolTip=ReleaseFreshness.Details(entry,DateTime.UtcNow)};Grid.SetColumn(age,4);
-                var when=new TextBlock{Text=ReleaseFreshness.Age(entry.DataReceivedUtc,DateTime.UtcNow),FontSize=13};when.SetResourceReference(TextBlock.ForegroundProperty,"Muted");age.Children.Add(when);
-                var origin=new TextBlock{Text=ReleaseFreshness.SourceName(entry)+(ReleaseFreshness.FromIndex(entry)?" · индекс":""),FontSize=11,TextTrimming=TextTrimming.CharacterEllipsis,Margin=new(0,2,6,0)};origin.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");age.Children.Add(origin);row.Children.Add(age);
+                var when=new TextBlock{Text=AppLanguage.T(ReleaseFreshness.Age(entry.DataReceivedUtc,DateTime.UtcNow)),FontSize=13};when.SetResourceReference(TextBlock.ForegroundProperty,"Muted");age.Children.Add(when);
+                var origin=new TextBlock{Text=AppLanguage.T(ReleaseFreshness.SourceName(entry)+(ReleaseFreshness.FromIndex(entry)?" · индекс":"")),FontSize=11,TextTrimming=TextTrimming.CharacterEllipsis,Margin=new(0,2,6,0)};origin.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");age.Children.Add(origin);row.Children.Add(age);
                 var download=ReleaseAction(entry);download.HorizontalAlignment=HorizontalAlignment.Right;download.VerticalAlignment=VerticalAlignment.Center;Grid.SetColumn(download,5);row.Children.Add(download);
                 var rowFrame=new Border{Child=row,CornerRadius=new(16),BorderThickness=new(1),Padding=new(16,12,16,12),Margin=new(0,0,0,8)};
                 rowFrame.SetResourceReference(Border.BackgroundProperty,isBest?"AccentFaint":"Panel");rowFrame.SetResourceReference(Border.BorderBrushProperty,isBest?"AccentLine":"EdgeSoft");results.Children.Add(rowFrame);

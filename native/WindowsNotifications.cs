@@ -132,7 +132,7 @@ public sealed class WindowsNotifications : IDisposable
                 ShellNotifyIcon(SetVersion, ref version);
             }
             var balloon = Data(); balloon.Flags = InfoFlag;
-            balloon.InfoTitle = Clean(title, 63); balloon.Info = Clean(body, 255);
+            balloon.InfoTitle = Clean(AppLanguage.T(title), 63); balloon.Info = Clean(AppLanguage.T(body), 255);
             balloon.InfoFlags = UserIcon | LargeIcon;
             balloon.BalloonIcon = icon;
             if (!ShellNotifyIcon(Modify, ref balloon)) { ClearPending(); return Unavailable("shell-rejected-notification"); }

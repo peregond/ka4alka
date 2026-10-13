@@ -134,16 +134,16 @@ public partial class MainWindow
     {
         if(!SearchActive||!full&&searchCategory!=""||!full&&peopleSearchItems.Length==0&&!PeopleSearchLoading)return;
         var heading=Text("Люди",20);heading.FontWeight=FontWeights.SemiBold;heading.Margin=new(0,0,0,10);parent.Children.Add(heading);
-        if(PeopleSearchLoading){var loading=Text("Ищем актёров, режиссёров и операторов…",12,true);AutomationProperties.SetName(loading,"Поиск участников");parent.Children.Add(loading);}
+        if(PeopleSearchLoading){var loading=Text("Ищем актёров, режиссёров и операторов…",12,true);AutomationProperties.SetName(loading,AppLanguage.T("Поиск участников"));parent.Children.Add(loading);}
         var row=new WrapPanel{Margin=new(0,0,0,12)};parent.Children.Add(row);
         foreach(var person in peopleSearchItems.Take(full?40:6))
         {
             var button=Button(person.Name,()=>OpenSearchPerson(person));button.Tag=person;button.Style=(Style)FindResource("PillButton");
             button.Width=144;button.Padding=new(10);button.Margin=new(0,0,12,12);button.VerticalContentAlignment=VerticalAlignment.Top;button.HorizontalContentAlignment=HorizontalAlignment.Stretch;
             var tile=new StackPanel();tile.Children.Add(PersonPortrait(person,112,140));
-            var name=Text(person.Name,13);name.FontWeight=FontWeights.SemiBold;name.TextAlignment=TextAlignment.Center;name.MaxHeight=38;name.TextTrimming=TextTrimming.CharacterEllipsis;name.Margin=new(0,0,0,5);tile.Children.Add(name);
+            var name=TextRaw(person.Name,13);name.FontWeight=FontWeights.SemiBold;name.TextAlignment=TextAlignment.Center;name.MaxHeight=38;name.TextTrimming=TextTrimming.CharacterEllipsis;name.Margin=new(0,0,0,5);tile.Children.Add(name);
             var role=Text(person.Role,11,true);role.TextAlignment=TextAlignment.Center;role.Margin=new(0);tile.Children.Add(role);button.Content=tile;
-            AutomationProperties.SetName(button,"Открыть участника "+person.Name);button.ToolTip=person.Name;row.Children.Add(button);
+            AutomationProperties.SetName(button,AppLanguage.T("Открыть участника "+person.Name));button.ToolTip=person.Name;row.Children.Add(button);
         }
         if(full&&peopleSearchItems.Length==0&&!PeopleSearchLoading)
             parent.Children.Add(Text(peopleSearchError.Length>0?peopleSearchError:"Участники не найдены. Попробуй указать имя и фамилию.",13,true));

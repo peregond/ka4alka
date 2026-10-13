@@ -23,7 +23,7 @@ public partial class MainWindow:Window
     MediaItem? current;
     public MainWindow()
     {
-        InitializeComponent();
+        AppLanguage.Set(prefs.UiLanguage);InitializeComponent();
         prefs.LiteMode=PerformanceBudget.DefaultLiteMode(prefs.LiteModeConfigured,prefs.LiteMode);
         InitializeStatusToast();InitializeShareLinks();
         onlineIndex=new(sourceClient,relays:new IndexRelays(sourceClient));sourceClient.TorrentRelay=onlineIndex.RelayTorrent;sharedCatalog=new(sourceClient);
@@ -41,12 +41,12 @@ public partial class MainWindow:Window
         ContentRendered+=(_,_)=>{_=RestoreCatalogIndexAsync();_=MaintainCacheAsync();_=RefreshSharedCatalogAsync();};
         EnableAdaptiveLayout();
         EnableShortcuts();InitializeDownloadDrop();
-        try{downloads=new(null,prefs.MaxDownloadKbps,prefs.MaxUploadKbps);}catch(Exception e){downloads=newEmpty(prefs.MaxDownloadKbps,prefs.MaxUploadKbps);Status.Text="Не удалось прочитать очередь: "+e.Message;}
+        try{downloads=new(null,prefs.MaxDownloadKbps,prefs.MaxUploadKbps);}catch(Exception e){downloads=newEmpty(prefs.MaxDownloadKbps,prefs.MaxUploadKbps);Status.Text=AppLanguage.T("Не удалось прочитать очередь: "+e.Message);}
         InitializeDownloadReliability();
         InitializeLanDevices();
         foreach(var name in new[]{"Фильмы","Сериалы","Игры"}) { var n=name;var b=ActionButton(n,NavIcon(n),()=>{if(n=="Игры")ShowGames();else ShowCatalogSection(n);},"NavButton");b.Tag=n;b.ToolTip=n;b.HorizontalContentAlignment=HorizontalAlignment.Left;b.Margin=new(0,0,0,5);Navigation.Children.Add(b); }
         refresh.Tick+=(_,_)=>RefreshDownloadsReliably();
-        ContentRendered+=async(_,_)=>{if(!prefs.AutoResumeDownloads||downloads.PendingResumeCount==0)return;Status.Text="Продолжаем загрузки…";var resumed=await downloads.ResumePendingAsync();Status.Text=resumed>0?$"Продолжено загрузок: {resumed}":"Не удалось продолжить загрузки. Проверь очередь.";if(!closed){SyncTimer();if(section=="Загрузки")Render();}};
+        ContentRendered+=async(_,_)=>{if(!prefs.AutoResumeDownloads||downloads.PendingResumeCount==0)return;Status.Text=AppLanguage.T("Продолжаем загрузки…");var resumed=await downloads.ResumePendingAsync();Status.Text=AppLanguage.T(resumed>0?$"Продолжено загрузок: {resumed}":"Не удалось продолжить загрузки. Проверь очередь.");if(!closed){SyncTimer();if(section=="Загрузки")Render();}};
         StateChanged+=(_,_)=>SyncTimer();searchDelay.Tick+=(_,_)=>{searchDelay.Stop();if(section is "Фильмы" or "Сериалы"){current=null;Render();}};
         Closing+=OnClosing;ready=true;ApplyLiteMode();ApplyTheme();ApplyCompactLayout();Render();
     }
@@ -80,9 +80,10 @@ public partial class MainWindow:Window
             catch(Exception error){if(!closed)ErrorLog.Write(error);}
         }
     }
-    static TextBlock Text(string value,double size=13,bool muted=false){var t=new TextBlock{Text=value,FontSize=size,TextWrapping=TextWrapping.Wrap,Margin=new(0,0,0,8)};t.SetResourceReference(TextBlock.ForegroundProperty,muted?"Muted":"Text");return t;}
-    static Button Button(string label,Action action){var b=new Button{Content=label};b.Click+=(_,_)=>action();return b;}
-    static Button AsyncButton(string label,Func<Task> action){var b=new Button{Content=label};b.Click+=async(_,_)=>{b.IsEnabled=false;try{await action();}catch(Exception e){MessageBox.Show(e.Message,"Качалка");}finally{b.IsEnabled=true;}};return b;}
+    static TextBlock Text(string value,double size=13,bool muted=false){var t=new TextBlock{Text=AppLanguage.T(value),FontSize=size,TextWrapping=TextWrapping.Wrap,Margin=new(0,0,0,8)};t.SetResourceReference(TextBlock.ForegroundProperty,muted?"Muted":"Text");return t;}
+    static TextBlock TextRaw(string value,double size=13,bool muted=false){var t=Text("",size,muted);t.Text=value;return t;}
+    static Button Button(string label,Action action){var b=new Button{Content=AppLanguage.T(label)};b.Click+=(_,_)=>action();return b;}
+    static Button AsyncButton(string label,Func<Task> action){var b=new Button{Content=AppLanguage.T(label)};b.Click+=async(_,_)=>{b.IsEnabled=false;try{await action();}catch(Exception e){LocalizedDialog.Show(AppLanguage.T(e.Message),AppLanguage.T("Качалка"));}finally{b.IsEnabled=true;}};return b;}
     void SyncTimer(){if(!closed&&(downloads.EngineCreated||section=="Загрузки"&&WindowState!=WindowState.Minimized))refresh.Start();else refresh.Stop();}
     void SearchChanged(object sender,TextChangedEventArgs e){if(!ready)return;ClearSearchButton.Visibility=Search.Text.Length>0?Visibility.Visible:Visibility.Collapsed;searchDelay.Stop();}
     void ShowCatalogSection(string name)
@@ -125,7 +126,7 @@ public partial class MainWindow:Window
         if(activePerson!=null||current!=null||section is not ("Фильмы" or "Сериалы")||!SearchActive)CancelPeopleSearch(!SearchActive);
         try{catalogList=null;detailHero=null;detailMetaRow=null;detailRatings=null;detailInfo=null;detailPoster=null;detailSynopsis=null;detailTitle=null;detailDescription=null;descriptionToggle=null;inlineCatalogFilters=null;inlineCatalogFilterScroll=null;catalogToolbar=null;catalogRefreshButton=null;catalogFilterBack=null;catalogFilterForward=null;catalogFiltersCompact=null;catalogFilterCaptions.Clear();catalogRailPreview=null;discoveryHero=null;gameShelfViews.Clear();gameFilterRow=null;gameGenreScroll=null;gameGenreBack=null;gameGenreForward=null;if(carousel!=null)DetachFeatureWatch(carousel);carousel=null;discoveryShelf=null;ReturnFiltersPanel();FilterControls.Children.Clear();PageHeader.Children.Clear();ClearBack();AddTorrentButton.Visibility=section=="Загрузки"?Visibility.Collapsed:Visibility.Visible;Body.Children.Clear();Body.RowDefinitions.Clear();SyncTimer();UpdateFilterRail();
         SearchBar.Visibility=current!=null||section is "Фильмы" or "Сериалы" or "Игры" or "Сохранённое" or "Загрузки"?Visibility.Visible:Visibility.Collapsed;
-        SearchPlaceholder.Text=compactSearch?"Поиск":section=="Игры"?"Найти игру для Windows":"Найти фильм, сериал или человека";
+        SearchPlaceholder.Text=AppLanguage.T(compactSearch?"Поиск":section=="Игры"?"Найти игру для Windows":"Найти фильм, сериал или человека");
         ContextLabel.Visibility=SearchBar.Visibility==Visibility.Visible||section is "Загрузки" or "Настройки"?Visibility.Collapsed:Visibility.Visible;ContextLabel.Text=section;
         downloadView=null;downloadList=null;
         RenderNavSelection();UpdateDownloadsWidget();
@@ -169,7 +170,7 @@ public partial class MainWindow:Window
         SetBack(SavedBackLabel()??DownloadBackLabel()??section,CinemaBack);
         var intro=new Grid{Margin=new(0,8,0,20)};intro.ColumnDefinitions.Add(new(){Width=new GridLength(180)});intro.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});
         var cover=new Border{Background=item.Cover,CornerRadius=new(18),Height=225,Margin=new(0,0,20,0)};intro.Children.Add(cover);
-        var info=new StackPanel();Grid.SetColumn(info,1);intro.Children.Add(info);info.Children.Add(Text(item.Title,28));info.Children.Add(Text(item.Subtitle,12,true));
+        var info=new StackPanel();Grid.SetColumn(info,1);intro.Children.Add(info);info.Children.Add(TextRaw(item.Title,28));info.Children.Add(Text(item.Subtitle,12,true));
         if(item.Cinema){info.Children.Add(Text($"Кинопоиск  {item.Kinopoisk}     IMDb  {item.Imdb}",16));info.Children.Add(Text("Демонстрационные оценки",11,true));}
         info.Children.Add(Text("Здесь появятся описание и информация из подключённого каталога.",13,true));info.Children.Add(ActionButton(IsSaved(item)?"Сохранено":"Сохранить",IsSaved(item)?"IconHeartFilled":"IconHeart",()=>{ToggleSaved(item);Render();},"PillButton"));panel.Children.Add(intro);
         if(!item.Cinema){panel.Children.Add(Text("Источники для этого раздела пока не подключены.",14,true));return;}
@@ -186,12 +187,12 @@ public partial class MainWindow:Window
     }
     void AddTorrent(object sender,RoutedEventArgs e)
     {
-        if(!EnsureDownloadFolder()){Status.Text="Папка для загрузок не выбрана. Её можно выбрать в настройках.";return;}
-        var dialog=new Window{ShowInTaskbar=false,Title="Добавить торрент",Owner=this,Width=Math.Min(560,Math.Max(320,ActualWidth-32)),MaxHeight=Math.Max(280,MaxHeight-80),SizeToContent=SizeToContent.Height,WindowStartupLocation=WindowStartupLocation.CenterOwner,ResizeMode=ResizeMode.NoResize};
+        if(!EnsureDownloadFolder()){Status.Text=AppLanguage.T("Папка для загрузок не выбрана. Её можно выбрать в настройках.");return;}
+        var dialog=new Window{ShowInTaskbar=false,Title=AppLanguage.T("Добавить торрент"),Owner=this,Width=Math.Min(560,Math.Max(320,ActualWidth-32)),MaxHeight=Math.Max(280,MaxHeight-80),SizeToContent=SizeToContent.Height,WindowStartupLocation=WindowStartupLocation.CenterOwner,ResizeMode=ResizeMode.NoResize};
         var p=new StackPanel{Margin=new Thickness(24)};dialog.Content=new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=p,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};var title=Text("Добавить загрузку",23);title.FontWeight=FontWeights.SemiBold;p.Children.Add(title);p.Children.Add(Text("Вставь magnet-ссылку или выбери файл .torrent.",13,true));var input=new TextBox{Margin=new(0,8,0,18)};p.Children.Add(input);dialog.ContentRendered+=(_,_)=>input.Focus();
         p.Children.Add(Text("Папка загрузки: "+prefs.Folder+". Изменить её можно в настройках.",12,true));
         var error=Text("",12);var actions=new WrapPanel();
-        async Task Add(string source){if(closing||closed)return;try{var added=await downloads.Add(source.Trim(),prefs.Folder);if(closing||closed)return;dialog.Close();section="Загрузки";current=null;Render();Status.Text=added.LowSpacePaused?added.SpacePauseMessage:"Раздача добавлена. Ищем участников.";}catch(Exception)when(closing||closed){}catch(Exception ex){error.Text=ex.Message;}}
+        async Task Add(string source){if(closing||closed)return;try{var added=await downloads.Add(source.Trim(),prefs.Folder);if(closing||closed)return;dialog.Close();section="Загрузки";current=null;Render();Status.Text=AppLanguage.T(added.LowSpacePaused?added.SpacePauseMessage:"Раздача добавлена. Ищем участников.");}catch(Exception)when(closing||closed){}catch(Exception ex){error.Text=AppLanguage.T(ex.Message);}}
         var start=AsyncButton("Начать загрузку",()=>Add(input.Text));start.Style=(Style)FindResource("PrimaryButton");start.IsDefault=true;actions.Children.Add(start);actions.Children.Add(AsyncButton("Выбрать .torrent",async()=>{var f=new OpenFileDialog{Filter="BitTorrent (*.torrent)|*.torrent"};if(f.ShowDialog(dialog)==true)await Add(f.FileName);}));p.Children.Add(actions);p.Children.Add(error);p.Children.Add(Text("После скачивания клиент продолжает раздачу. Нажми «Пауза», чтобы остановить её.",12,true));dialog.ShowDialog();
     }
     internal Func<DownloadItem,bool>? missingFilesConfirm;
@@ -199,20 +200,20 @@ public partial class MainWindow:Window
     {
         if(!item.FilesMissing)await downloads.Toggle(item);
         if(!item.FilesMissing)return;
-        var confirm=missingFilesConfirm?.Invoke(item)??MessageBox.Show(this,
-            "Файлы загрузки «"+item.DisplayName+"» не найдены. Скачать недостающие файлы заново?", "Повторное скачивание",
+        var confirm=missingFilesConfirm?.Invoke(item)??LocalizedDialog.Show(this,
+            AppLanguage.T("Файлы загрузки «"+item.DisplayName+"» не найдены. Скачать недостающие файлы заново?"), AppLanguage.T("Повторное скачивание"),
             MessageBoxButton.YesNo,MessageBoxImage.Question,MessageBoxResult.No)==MessageBoxResult.Yes;
         if(confirm)await downloads.RedownloadAsync(item);
     }
-    async void ToggleDownload(object sender,RoutedEventArgs e){try{await ToggleDownloadItem((DownloadItem)((FrameworkElement)sender).Tag);}catch(Exception ex){Status.Text=ex.Message;}finally{SyncTimer();}}
+    async void ToggleDownload(object sender,RoutedEventArgs e){try{await ToggleDownloadItem((DownloadItem)((FrameworkElement)sender).Tag);}catch(Exception ex){Status.Text=AppLanguage.T(ex.Message);}finally{SyncTimer();}}
     async void RecheckDownloadFiles(object sender,RoutedEventArgs e)
-    {try{await downloads.CheckCompletedFilesAsync(true);}catch(Exception error){Status.Text=error.Message;}}
+    {try{await downloads.CheckCompletedFilesAsync(true);}catch(Exception error){Status.Text=AppLanguage.T(error.Message);}}
 
     async void RemoveDownload(object sender,RoutedEventArgs e)
     {
         var item=(DownloadItem)((FrameworkElement)sender).Tag;
-        if(item.Busy){Status.Text="Подожди завершения текущей операции с загрузкой.";return;}
-        try{await downloads.Remove(item);if(downloads.Items.Contains(item)){Status.Text="Загрузка ещё занята. Повтори удаление после завершения операции.";return;}Render();Status.Text="Загрузка удалена из очереди. Файлы сохранены.";}catch(Exception ex){Status.Text=ex.Message;}finally{SyncTimer();}
+        if(item.Busy){Status.Text=AppLanguage.T("Подожди завершения текущей операции с загрузкой.");return;}
+        try{await downloads.Remove(item);if(downloads.Items.Contains(item)){Status.Text=AppLanguage.T("Загрузка ещё занята. Повтори удаление после завершения операции.");return;}Render();Status.Text=AppLanguage.T("Загрузка удалена из очереди. Файлы сохранены.");}catch(Exception ex){Status.Text=AppLanguage.T(ex.Message);}finally{SyncTimer();}
     }
     void OpenFolder(object sender,RoutedEventArgs e){var d=(DownloadItem)((Button)sender).Tag;if(Directory.Exists(d.Folder))Process.Start(new ProcessStartInfo(d.Folder){UseShellExecute=true});}
     void ApplyTheme()
@@ -230,16 +231,16 @@ public partial class MainWindow:Window
     async void OnClosing(object? sender,CancelEventArgs e)
     {
         if(closed)return;e.Cancel=true;if(closing)return;closing=true;StopCoverViewport();
-        DiagnosticLog.Write("closing",new{QueueCount=downloads.Items.Count});Status.Text="Сохраняем загрузки и закрываем приложение…";
+        DiagnosticLog.Write("closing",new{QueueCount=downloads.Items.Count});Status.Text=AppLanguage.T("Сохраняем загрузки и закрываем приложение…");
         IsEnabled=false;StopDownloadReliability();var lanStopped=StopLanDevicesAsync();personRequest?.Cancel();updateCancellation.Cancel();catalogRefreshTimer.Stop();refresh.Stop();searchDelay.Stop();liveRequest?.Cancel();sourceRequest?.Cancel();archiveRequest?.Cancel();gameCatalogRequest?.Cancel();gameDetailRequest?.Cancel();broadcastRequest?.Cancel();
         ResetDiscoveryData();CancelDetailMetadata();CancelCatalogQualityCheck();CancelPeopleSearch();foreach(var view in releaseViews.Values)view.Request?.Cancel();
         bool saved=false;
         try{prefs.Save();await downloads.Close();await lanStopped;saved=true;DiagnosticLog.Write("closed",new{QueueSaved=true});}
-        catch(Exception ex){ErrorLog.Write(ex);MessageBox.Show(ex.Message,"Не удалось сохранить очередь");}
+        catch(Exception ex){ErrorLog.Write(ex);LocalizedDialog.Show(AppLanguage.T(ex.Message),AppLanguage.T("Не удалось сохранить очередь"));}
         finally
         {
             closed=true;
-            if(saved)try{LaunchPreparedUpdate();}catch(Exception ex){MessageBox.Show(ex.Message,"Обновление не установлено");}
+            if(saved)try{LaunchPreparedUpdate();}catch(Exception ex){LocalizedDialog.Show(AppLanguage.T(ex.Message),AppLanguage.T("Обновление не установлено"));}
             sourceClient.Dispose();updateClient.Dispose();_ = Dispatcher.BeginInvoke(Close);
         }
     }

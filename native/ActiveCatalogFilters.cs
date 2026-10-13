@@ -26,8 +26,8 @@ public partial class MainWindow
     Button AddCatalogResetButton()
     {
         var reset=ActionButton("Сбросить всё","IconReset",ResetAllCatalogFilters,"PillButton");
-        reset.Name="ResetActiveCatalogFilters";reset.ToolTip="Сбросить фильтры, подборку и сортировку. Поиск и скрытие плохого качества сохранятся.";
-        AutomationProperties.SetName(reset,"Сбросить выбранные фильтры");return reset;
+        reset.Name="ResetActiveCatalogFilters";reset.ToolTip=AppLanguage.T("Сбросить фильтры, подборку и сортировку. Поиск и скрытие плохого качества сохранятся.");
+        AutomationProperties.SetName(reset,AppLanguage.T("Сбросить выбранные фильтры"));return reset;
     }
     void RenderActiveCatalogFilters()
     {
@@ -35,7 +35,7 @@ public partial class MainWindow
         if(PeopleOnlySearch)return;
         var filters=ActiveCatalogFilters();if(filters.Length==0)return;
         var row=new WrapPanel{Name="ActiveCatalogFilters"};
-        AutomationProperties.SetName(row,"Выбранные фильтры");
+        AutomationProperties.SetName(row,AppLanguage.T("Выбранные фильтры"));
         foreach(var filter in filters)
         {
             var button=Button(filter.Label+" ×",()=>ChangeCatalogFilter(filter.Clear));
@@ -45,8 +45,8 @@ public partial class MainWindow
             var close=new TextBlock{Text="×",Margin=new(6,0,0,0),VerticalAlignment=VerticalAlignment.Center};Grid.SetColumn(close,1);label.Children.Add(close);button.Content=label;button.MaxWidth=190;
             button.SetResourceReference(Control.BackgroundProperty,"AccentSoft");
             button.Margin=new(0,0,6,4);button.Padding=new(10,5,10,5);button.MinHeight=28;button.FontSize=11;
-            button.ToolTip="Снять фильтр: "+filter.Label;
-            AutomationProperties.SetName(button,"Снять фильтр: "+filter.Label);row.Children.Add(button);
+            button.ToolTip=AppLanguage.T("Снять фильтр: "+filter.Label);
+            AutomationProperties.SetName(button,AppLanguage.T("Снять фильтр: "+filter.Label));row.Children.Add(button);
         }
         activeCatalogFilterScroll=new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=row,Margin=new(0,7,0,0),MaxHeight=compactHeight?68:double.PositiveInfinity,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};
         FilterControls.Children.Add(activeCatalogFilterScroll);

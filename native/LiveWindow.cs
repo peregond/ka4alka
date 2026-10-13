@@ -183,7 +183,7 @@ public partial class MainWindow
         var sortBar=new StackPanel{Orientation=Orientation.Horizontal,Margin=new(8,0,0,0)};
         if(SearchActive)SearchTabs(tabs);
         else {
-        topAll=Button("",()=>{favoritesOnly=false;catalogLastPage=null;livePage=1;Render();});topAll.Style=(Style)FindResource("PillButton");topAll.Content=ChipContent("Все",false);StyleChip(topAll,!favoritesOnly&&!ActiveCatalogFilters().Any());System.Windows.Automation.AutomationProperties.SetName(topAll,"Все");tabs.Children.Add(topAll);
+        topAll=Button("",()=>{favoritesOnly=false;catalogLastPage=null;livePage=1;Render();});topAll.Style=(Style)FindResource("PillButton");topAll.Content=ChipContent("Все",false);StyleChip(topAll,!favoritesOnly&&!ActiveCatalogFilters().Any());System.Windows.Automation.AutomationProperties.SetName(topAll,AppLanguage.T("Все"));tabs.Children.Add(topAll);
         }
         if(!PeopleOnlySearch)
         {
@@ -193,7 +193,7 @@ public partial class MainWindow
         if(!PeopleOnlySearch)sortBar.Children.Add(AddCatalogResetButton());
         if(!favoritesOnly)
         {
-            var refresh=ActionButton("","IconRefresh",()=>{onlineIndex.RetryNow();ResetCatalogQualityChecks();catalogPages.Clear();ResetDiscoveryData();catalogRefreshRequested=true;liveKey="";Render();},"PillButton");catalogRefreshButton=refresh;refresh.ToolTip="Обновить каталог";System.Windows.Automation.AutomationProperties.SetName(refresh,"Обновить каталог");refresh.Padding=new(0);refresh.Width=40;refresh.Margin=new(8,0,0,8);sortBar.Children.Add(refresh);
+            var refresh=ActionButton("","IconRefresh",()=>{onlineIndex.RetryNow();ResetCatalogQualityChecks();catalogPages.Clear();ResetDiscoveryData();catalogRefreshRequested=true;liveKey="";Render();},"PillButton");catalogRefreshButton=refresh;refresh.ToolTip=AppLanguage.T("Обновить каталог");System.Windows.Automation.AutomationProperties.SetName(refresh,AppLanguage.T("Обновить каталог"));refresh.Padding=new(0);refresh.Width=40;refresh.Margin=new(8,0,0,8);sortBar.Children.Add(refresh);
         }
         inlineCatalogFilters=tabs;
         inlineCatalogFilterScroll=new ScrollViewer{Content=tabs,VerticalScrollBarVisibility=ScrollBarVisibility.Disabled,HorizontalScrollBarVisibility=ScrollBarVisibility.Hidden,CanContentScroll=false};
@@ -204,9 +204,9 @@ public partial class MainWindow
             if(inlineCatalogFilterScroll is not {} scroll||scroll.ScrollableWidth<=0)return;
             scroll.ScrollToHorizontalOffset(scroll.HorizontalOffset-args.Delta/120d*96);args.Handled=true;
         };
-        catalogFilterBack=ActionButton("","IconBack",()=>ScrollCatalogFilters(-1),"QuietButton");catalogFilterBack.ToolTip="Предыдущие фильтры";System.Windows.Automation.AutomationProperties.SetName(catalogFilterBack,"Фильтры: назад");catalogFilterBack.Padding=new(6);catalogFilterBack.Width=32;catalogFilterBack.MinHeight=40;catalogFilterBack.Margin=new(0,0,4,8);DockPanel.SetDock(catalogFilterBack,Dock.Left);toolbar.Children.Add(catalogFilterBack);
+        catalogFilterBack=ActionButton("","IconBack",()=>ScrollCatalogFilters(-1),"QuietButton");catalogFilterBack.ToolTip=AppLanguage.T("Предыдущие фильтры");System.Windows.Automation.AutomationProperties.SetName(catalogFilterBack,AppLanguage.T("Фильтры: назад"));catalogFilterBack.Padding=new(6);catalogFilterBack.Width=32;catalogFilterBack.MinHeight=40;catalogFilterBack.Margin=new(0,0,4,8);DockPanel.SetDock(catalogFilterBack,Dock.Left);toolbar.Children.Add(catalogFilterBack);
         DockPanel.SetDock(sortBar,Dock.Right);toolbar.Children.Add(sortBar);
-        catalogFilterForward=ActionButton("","IconChevron",()=>ScrollCatalogFilters(1),"QuietButton");catalogFilterForward.ToolTip="Следующие фильтры";System.Windows.Automation.AutomationProperties.SetName(catalogFilterForward,"Фильтры: вперёд");catalogFilterForward.Padding=new(6);catalogFilterForward.Width=32;catalogFilterForward.MinHeight=40;catalogFilterForward.Margin=new(4,0,0,8);DockPanel.SetDock(catalogFilterForward,Dock.Right);toolbar.Children.Add(catalogFilterForward);
+        catalogFilterForward=ActionButton("","IconChevron",()=>ScrollCatalogFilters(1),"QuietButton");catalogFilterForward.ToolTip=AppLanguage.T("Следующие фильтры");System.Windows.Automation.AutomationProperties.SetName(catalogFilterForward,AppLanguage.T("Фильтры: вперёд"));catalogFilterForward.Padding=new(6);catalogFilterForward.Width=32;catalogFilterForward.MinHeight=40;catalogFilterForward.Margin=new(4,0,0,8);DockPanel.SetDock(catalogFilterForward,Dock.Right);toolbar.Children.Add(catalogFilterForward);
         toolbar.Children.Add(inlineCatalogFilterScroll);FilterControls.Children.Add(toolbar);
         RenderActiveCatalogFilters();
         UpdateFilterRail();
@@ -249,7 +249,7 @@ public partial class MainWindow
         {
             var button=Button(label,()=>GoCatalogPage(page));button.Style=(Style)FindResource("PillButton");button.IsEnabled=enabled&&!liveLoading;button.MinWidth=36;button.Padding=new(10,7,10,7);button.Margin=new(2);
             if(page==livePage&&int.TryParse(label,out _)){button.SetResourceReference(Control.BackgroundProperty,"Selected");button.FontWeight=FontWeights.SemiBold;}
-            System.Windows.Automation.AutomationProperties.SetName(button,int.TryParse(label,out _)?"Страница "+page:label);numbers.Children.Add(button);
+            System.Windows.Automation.AutomationProperties.SetName(button,AppLanguage.T(int.TryParse(label,out _)?"Страница "+page:label));numbers.Children.Add(button);
         }
         PageButton("Назад",livePage-1,livePage>1);
         if(CatalogPaging.Numbers(livePage,catalogLastPage)[0]>1){PageButton("1",1,true);numbers.Children.Add(Text("…",12,true));}
@@ -290,12 +290,12 @@ public partial class MainWindow
             button.Content=ChipContent(full,!sorting,sorting?"IconFilter":null);
             catalogFilterCaptions[button]=new(full,compact);
             StyleChip(button,!sorting&&selected!=items[0].Key);
-            button.ToolTip=label+": "+current.Label;System.Windows.Automation.AutomationProperties.SetName(button,label);
+            button.ToolTip=label+": "+current.Label;System.Windows.Automation.AutomationProperties.SetName(button,AppLanguage.T(label));
             var menu=new ToggleContextMenu{PlacementTarget=button,Placement=System.Windows.Controls.Primitives.PlacementMode.Bottom,MaxHeight=360};
             menu.SetResourceReference(Control.BackgroundProperty,"Raised");menu.SetResourceReference(Control.ForegroundProperty,"Text");
             foreach(var item in items)
             {
-                var option=new MenuItem{Header=item.Label,Tag=item.Key,IsCheckable=true,IsChecked=item.Key==selected};
+                var option=new MenuItem{Header=AppLanguage.T(item.Label),Tag=item.Key,IsCheckable=true,IsChecked=item.Key==selected};
                 option.Click+=(_,_)=>{menu.IsOpen=false;if(item.Key!=selected)ChangeCatalogFilter(()=>changed(item.Key));};menu.Items.Add(option);
             }
             AttachMenuToggle(button,menu);(sorting?sortTarget??target:target).Children.Add(button);

@@ -64,21 +64,21 @@ public partial class MainWindow
         var titles=new StackPanel{VerticalAlignment=VerticalAlignment.Center};downloadHeadingHost=titles;heading.Children.Add(titles);
         var title=Text("Загрузки",28);downloadHeading=title;title.FontFamily=(FontFamily)FindResource("DisplayFont");title.FontWeight=FontWeights.Bold;title.Margin=new(0,0,16,0);title.VerticalAlignment=VerticalAlignment.Center;titles.Children.Add(title);
         downloadSummary=Text("",14,true);downloadSummary.TextWrapping=TextWrapping.NoWrap;downloadSummary.TextTrimming=TextTrimming.CharacterEllipsis;downloadSummary.Margin=new(0,4,0,0);titles.Children.Add(downloadSummary);
-        var controls=ActionButton("Управление","IconSettings",()=>{});downloadControls=controls;controls.Margin=new(0,0,10,0);controls.Padding=new(16,0,16,0);controls.Height=48;controls.MinHeight=48;controls.ToolTip="Управление загрузками и раздачами";AutomationProperties.SetName(controls,"Управление загрузками");
+        var controls=ActionButton("Управление","IconSettings",()=>{});downloadControls=controls;controls.Margin=new(0,0,10,0);controls.Padding=new(16,0,16,0);controls.Height=48;controls.MinHeight=48;controls.ToolTip=AppLanguage.T("Управление загрузками и раздачами");AutomationProperties.SetName(controls,AppLanguage.T("Управление загрузками"));
         var commands=Menu();controls.ContextMenu=commands;
         foreach(var command in new[]{("Начать загрузки",false,false,"IconPlay"),("Остановить загрузки",false,true,"IconPause"),("Запустить раздачи",true,false,"IconPlay"),("Остановить раздачи",true,true,"IconPause")})
         {
-            var choice=MenuEntry(command.Item1,command.Item4);choice.IsEnabled=downloads.Items.Count>0;choice.ToolTip=command.Item2?"Для завершённых торрентов":"Для незавершённых загрузок";
+            var choice=MenuEntry(command.Item1,command.Item4);choice.IsEnabled=downloads.Items.Count>0;choice.ToolTip=AppLanguage.T(command.Item2?"Для завершённых торрентов":"Для незавершённых загрузок");
             choice.Click+=async(_,_)=>
             {
                 if(downloadCommandBusy)return;downloadCommandBusy=true;controls.IsEnabled=false;
-                try{var count=await downloads.SetGroupAsync(command.Item2,command.Item3);Status.Text=$"Задач изменено: {count}";RefreshDownloadView();}
-                catch(Exception error){Status.Text="Не удалось изменить очередь: "+error.Message;}
+                try{var count=await downloads.SetGroupAsync(command.Item2,command.Item3);Status.Text=AppLanguage.T($"Задач изменено: {count}");RefreshDownloadView();}
+                catch(Exception error){Status.Text=AppLanguage.T("Не удалось изменить очередь: "+error.Message);}
                 finally{downloadCommandBusy=false;controls.IsEnabled=true;SyncTimer();}
             };commands.Items.Add(choice);
         }
         commands.Items.Add(new Separator());var limits=MenuEntry("Лимиты скорости…","IconSettings");limits.Click+=(_,_)=>DownloadLimits();commands.Items.Add(limits);controls.Click+=(_,_)=>OpenDownloadMenu(controls);toolbar.Children.Add(controls);
-        var add=ActionButton("Добавить торрент","IconPlus",()=>AddTorrent(this,new RoutedEventArgs()),"PrimaryButton");add.Margin=new(0);add.Height=48;add.MinHeight=48;add.Padding=new(20,0,20,0);AutomationProperties.SetName(add,"Добавить торрент в очередь");downloadAddButton=add;toolbar.Children.Add(add);
+        var add=ActionButton("Добавить торрент","IconPlus",()=>AddTorrent(this,new RoutedEventArgs()),"PrimaryButton");add.Margin=new(0);add.Height=48;add.MinHeight=48;add.Padding=new(20,0,20,0);AutomationProperties.SetName(add,AppLanguage.T("Добавить торрент в очередь"));downloadAddButton=add;toolbar.Children.Add(add);
 
         // Tiles: speed in, speed out, free disk space.
         downloadTiles=new Grid{Name="DownloadTiles",Margin=new(0,0,0,16)};PageHeader.Children.Add(downloadTiles);
@@ -88,7 +88,7 @@ public partial class MainWindow
             var stack=new StackPanel();
             var head=new StackPanel{Orientation=Orientation.Horizontal,Margin=new(0,0,0,10)};
             var glyph=new System.Windows.Shapes.Path{Data=(Geometry)FindResource(icon),Width=13,Height=13,Stretch=Stretch.Uniform,StrokeThickness=1.8,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,StrokeLineJoin=PenLineJoin.Round,Margin=new(0,0,7,0),VerticalAlignment=VerticalAlignment.Center};glyph.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty,accentKey);head.Children.Add(glyph);
-            var label=new TextBlock{Text=caption,FontSize=12,VerticalAlignment=VerticalAlignment.Center};label.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");head.Children.Add(label);stack.Children.Add(head);
+            var label=new TextBlock{Text=AppLanguage.T(caption),FontSize=12,VerticalAlignment=VerticalAlignment.Center};label.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");head.Children.Add(label);stack.Children.Add(head);
             var numbers=new StackPanel{Orientation=Orientation.Horizontal};
             value=new TextBlock{FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=24,FontWeight=FontWeights.SemiBold,VerticalAlignment=VerticalAlignment.Bottom};value.SetResourceReference(TextBlock.ForegroundProperty,"Text");
             unit=new TextBlock{FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=14,Margin=new(8,0,0,4),VerticalAlignment=VerticalAlignment.Bottom};unit.SetResourceReference(TextBlock.ForegroundProperty,"Muted");
@@ -100,7 +100,7 @@ public partial class MainWindow
         var diskTile=Tile(2,"IconFolder","Диск","Muted",out var diskValue,out var diskUnit);tileDiskValue=diskValue;tileDiskCaption=diskUnit;
         if(diskTile.Child is StackPanel diskStack&&diskStack.Children[0] is StackPanel diskHead&&diskHead.Children[1] is TextBlock diskLabel)
         {
-            diskLabel.Text="Диск · "+System.IO.Path.GetPathRoot(prefs.Folder)+"  ·  папка Ka4alka";
+            diskLabel.Text=AppLanguage.T("Диск · "+System.IO.Path.GetPathRoot(prefs.Folder)+"  ·  папка Ka4alka");
             tileDiskPercent=new TextBlock{FontSize=12,HorizontalAlignment=HorizontalAlignment.Right};tileDiskPercent.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");
             diskStack.Children.Add(tileDiskBar=new ProgressBar{Minimum=0,Maximum=100,Height=4,Margin=new(0,10,0,0),BorderThickness=new(0)});tileDiskBar.SetResourceReference(Control.BackgroundProperty,"Track");tileDiskBar.SetResourceReference(Control.ForegroundProperty,"Subtle");
         }
@@ -109,20 +109,20 @@ public partial class MainWindow
 
         // Tabs and sort.
         var tabsRow=new DockPanel{Margin=new(0,0,0,16)};PageHeader.Children.Add(tabsRow);
-        var order=ActionButton(DownloadSortChoices.First(x=>x.Key==downloadSort).Label,"IconFilter",()=>{},"PillButton");downloadOrder=order;order.Margin=new(12,0,0,0);order.Padding=new(14,0,16,0);AutomationProperties.SetName(order,"Сортировка загрузок");order.ContextMenu=Menu();
+        var order=ActionButton(DownloadSortChoices.First(x=>x.Key==downloadSort).Label,"IconFilter",()=>{},"PillButton");downloadOrder=order;order.Margin=new(12,0,0,0);order.Padding=new(14,0,16,0);AutomationProperties.SetName(order,AppLanguage.T("Сортировка загрузок"));order.ContextMenu=Menu();
         foreach(var entry in DownloadSortChoices)
         {
             var choice=MenuEntry(entry.Label);choice.Tag=entry.Key;choice.IsCheckable=true;choice.IsChecked=downloadSort==entry.Key;
             choice.Click+=(_,_)=>
             {
                 var previous=downloadSort;downloadSort=entry.Key;prefs.DownloadSort=entry.Key;
-                try{prefs.Save();}catch(Exception error){downloadSort=previous;prefs.DownloadSort=previous;choice.IsChecked=false;Status.Text="Не удалось сохранить сортировку: "+error.Message;return;}
+                try{prefs.Save();}catch(Exception error){downloadSort=previous;prefs.DownloadSort=previous;choice.IsChecked=false;Status.Text=AppLanguage.T("Не удалось сохранить сортировку: "+error.Message);return;}
                 foreach(MenuItem other in order.ContextMenu.Items)other.IsChecked=Equals(other.Tag,downloadSort);
                 FitDownloadsToolbar();if(downloadView!=null)downloadView.CustomSort=DownloadOrdering.Comparer(entry.Sort);if(downloadView?.Cast<DownloadItem>().FirstOrDefault() is {} first)downloadList?.ScrollIntoView(first);
             };order.ContextMenu.Items.Add(choice);
         }
         order.Click+=(_,_)=>OpenDownloadMenu(order);DockPanel.SetDock(order,Dock.Right);tabsRow.Children.Add(order);
-        var segmentFrame=new Border{CornerRadius=new(12),BorderThickness=new(1),Padding=new(4),HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center};segmentFrame.SetResourceReference(Border.BackgroundProperty,"Panel");segmentFrame.SetResourceReference(Border.BorderBrushProperty,"EdgeSoft");AutomationProperties.SetName(segmentFrame,"Вкладки загрузок");
+        var segmentFrame=new Border{CornerRadius=new(12),BorderThickness=new(1),Padding=new(4),HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center};segmentFrame.SetResourceReference(Border.BackgroundProperty,"Panel");segmentFrame.SetResourceReference(Border.BorderBrushProperty,"EdgeSoft");AutomationProperties.SetName(segmentFrame,AppLanguage.T("Вкладки загрузок"));
         var segmentRow=new StackPanel{Orientation=Orientation.Horizontal};segmentFrame.Child=segmentRow;
         // On narrow windows the strip scrolls sideways instead of being cut off; the wheel still scrolls the page.
         var segmentScroll=new ScrollViewer{Name="DownloadTabsScroll",Content=segmentFrame,HorizontalScrollBarVisibility=ScrollBarVisibility.Auto,VerticalScrollBarVisibility=ScrollBarVisibility.Disabled,HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center};
@@ -131,8 +131,8 @@ public partial class MainWindow
         foreach(var (key,label) in new[]{("all","Все"),("active","Качаются"),("seeding","Раздаются"),("errors","Ошибки")})
         {
             var count=new TextBlock{FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=11,Opacity=.7,Margin=new(6,1,0,0),VerticalAlignment=VerticalAlignment.Center};downloadTabCounts[key]=count;
-            var content=new StackPanel{Orientation=Orientation.Horizontal};content.Children.Add(new TextBlock{Text=label,VerticalAlignment=VerticalAlignment.Center});content.Children.Add(count);
-            var tab=new RadioButton{Style=(Style)FindResource("SegmentButton"),GroupName="DownloadTabs",Content=content,IsChecked=downloadTab==key,Tag=key};AutomationProperties.SetName(tab,"Загрузки: "+label);
+            var content=new StackPanel{Orientation=Orientation.Horizontal};content.Children.Add(new TextBlock{Text=AppLanguage.T(label),VerticalAlignment=VerticalAlignment.Center});content.Children.Add(count);
+            var tab=new RadioButton{Style=(Style)FindResource("SegmentButton"),GroupName="DownloadTabs",Content=content,IsChecked=downloadTab==key,Tag=key};AutomationProperties.SetName(tab,AppLanguage.T("Загрузки: "+label));
             tab.Checked+=(_,_)=>{downloadTab=key;if(downloadView!=null){downloadView.Refresh();}};
             segmentRow.Children.Add(tab);
         }
@@ -140,7 +140,7 @@ public partial class MainWindow
         if(downloads.Items.Count>0)
         {
             downloadView=new ListCollectionView(downloads.Items){CustomSort=DownloadOrdering.Comparer(DownloadSortChoices.First(x=>x.Key==downloadSort).Sort),Filter=x=>x is DownloadItem item&&MatchesDownloadTab(item)};
-            downloadList=new ListBox{ItemsSource=downloadView,ItemTemplate=(DataTemplate)FindResource("DownloadRow"),Margin=new(-6,0,-6,0),Padding=new(6,0,6,0)};AutomationProperties.SetName(downloadList,"Очередь загрузок");
+            downloadList=new ListBox{ItemsSource=downloadView,ItemTemplate=(DataTemplate)FindResource("DownloadRow"),Margin=new(-6,0,-6,0),Padding=new(6,0,6,0)};AutomationProperties.SetName(downloadList,AppLanguage.T("Очередь загрузок"));
             if(downloadReturnItem is {} returned&&downloads.Items.Contains(returned))
             {
                 var list=downloadList;list.Loaded+=(_,_)=>list.ScrollIntoView(returned);
@@ -168,12 +168,12 @@ public partial class MainWindow
         var row=new Grid{HorizontalAlignment=HorizontalAlignment.Center};row.ColumnDefinitions.Add(new(){Width=GridLength.Auto});row.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});row.ColumnDefinitions.Add(new(){Width=GridLength.Auto});
         var disc=new Border{Width=44,Height=44,CornerRadius=new(22),Margin=new(0,0,16,0),Child=new System.Windows.Shapes.Path{Data=(Geometry)FindResource("IconMagnet"),Width=20,Height=20,Stretch=Stretch.Uniform,StrokeThickness=1.8,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,StrokeLineJoin=PenLineJoin.Round}};disc.SetResourceReference(Border.BackgroundProperty,"AccentSoft");((System.Windows.Shapes.Path)disc.Child).SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty,"Accent");
         Grid.SetColumn(disc,0);row.Children.Add(disc);
-        var text=new TextBlock{Text="Перетащите .torrent-файл сюда или вставьте magnet-ссылку",FontSize=14,VerticalAlignment=VerticalAlignment.Center,TextWrapping=TextWrapping.Wrap,MaxWidth=420};text.SetResourceReference(TextBlock.ForegroundProperty,"Muted");Grid.SetColumn(text,1);row.Children.Add(text);
+        var text=new TextBlock{Text=AppLanguage.T("Перетащите .torrent-файл сюда или вставьте magnet-ссылку"),FontSize=14,VerticalAlignment=VerticalAlignment.Center,TextWrapping=TextWrapping.Wrap,MaxWidth=420};text.SetResourceReference(TextBlock.ForegroundProperty,"Muted");Grid.SetColumn(text,1);row.Children.Add(text);
         var key=new Border{CornerRadius=new(7),BorderThickness=new(1),Padding=new(7,4,7,4),Margin=new(16,0,0,0),VerticalAlignment=VerticalAlignment.Center,Child=new TextBlock{Text="Ctrl V",FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=11}};key.SetResourceReference(Border.BackgroundProperty,"Raised");key.SetResourceReference(Border.BorderBrushProperty,"Edge");((TextBlock)key.Child).SetResourceReference(TextBlock.ForegroundProperty,"Muted");Grid.SetColumn(key,2);row.Children.Add(key);
         var host=new Grid();host.Children.Add(dash);host.Children.Add(row);zone.Child=host;
         // On very narrow windows the shortcut hint goes away so the sentence keeps enough room.
         zone.SizeChanged+=(_,e)=>{var small=e.NewSize.Width<340;key.Visibility=small?Visibility.Collapsed:Visibility.Visible;zone.Padding=small?new(14,14,14,14):new(28,20,28,20);disc.Margin=small?new(0,0,10,0):new(0,0,16,0);};
-        AutomationProperties.SetName(zone,"Перетащите .torrent-файл или вставьте magnet-ссылку");
+        AutomationProperties.SetName(zone,AppLanguage.T("Перетащите .torrent-файл или вставьте magnet-ссылку"));
         // The window handles the actual drop; the zone only shows the target while the pointer is over it.
         return zone;
     }
@@ -184,7 +184,7 @@ public partial class MainWindow
         void Speed(TextBlock value,TextBlock? unit,long rate)
         {
             var text=DownloadService.FormatBytes(rate);var cut=text.LastIndexOf(' ');
-            value.Text=cut>0?text[..cut]:text;if(unit!=null)unit.Text=(cut>0?text[(cut+1)..]:"Б")+"/с";
+            value.Text=cut>0?text[..cut]:text;if(unit!=null)unit.Text=AppLanguage.T((cut>0?text[(cut+1)..]:"Б")+"/с");
         }
         Speed(tileDownValue,tileDownUnit,down);Speed(tileUpValue!,tileUpUnit,up);
         if(DateTime.UtcNow-diskReadUtc>TimeSpan.FromSeconds(10)&&!diskReading)
@@ -211,7 +211,7 @@ public partial class MainWindow
         if(section!="Загрузки"||tileDiskValue==null||tileDiskCaption==null||tileDiskBar==null)return;
         if(diskTotal<=0){tileDiskValue.Text="—";tileDiskCaption.Text="";tileDiskBar.Value=0;return;}
         var text=DownloadService.FormatBytes(diskFree);var cut=text.LastIndexOf(' ');
-        tileDiskValue.Text=cut>0?text[..cut]:text;tileDiskCaption.Text=(cut>0?text[(cut+1)..]:"Б")+" свободно";
+        tileDiskValue.Text=cut>0?text[..cut]:text;tileDiskCaption.Text=AppLanguage.T((cut>0?text[(cut+1)..]:"Б")+" свободно");
         tileDiskBar.Value=Math.Clamp((diskTotal-diskFree)*100d/diskTotal,0,100);
         // Less than 10 GB free is a warning; less than what active downloads still need is an error.
         var needed=DownloadSpace.SafetyBytes+downloads.Items.Where(x=>!x.Completed).Sum(x=>x.Files.Sum(f=>Math.Max(0,(long)(f.Size*(1-Math.Clamp(f.Progress,0,100)/100)))));
@@ -226,7 +226,7 @@ public partial class MainWindow
         downloadControls.Content=IconLabel(tiny?"":"Управление","IconSettings");
         if(downloadAddButton!=null)downloadAddButton.Content=IconLabel(tiny?"":"Добавить торрент","IconPlus");
         var label=DownloadSortChoices.FirstOrDefault(x=>x.Key==downloadSort).Label??"Сначала новые";
-        downloadOrder.Content=ChipContent(tiny?"":label,false,"IconFilter");downloadOrder.ToolTip="Сортировка: "+label;
+        downloadOrder.Content=ChipContent(tiny?"":label,false,"IconFilter");downloadOrder.ToolTip=AppLanguage.T("Сортировка: "+label);
         if(downloadHeading!=null)downloadHeading.FontSize=ActualWidth>0&&ActualWidth<400?16:ActualWidth<440?20:shortView?22:28;
         foreach(var count in downloadTabCounts.Values)count.Visibility=ActualWidth>0&&ActualWidth<640?Visibility.Collapsed:Visibility.Visible;
         if(downloadHeadingHost!=null)downloadHeadingHost.Visibility=veryShort?Visibility.Collapsed:Visibility.Visible;
@@ -259,7 +259,7 @@ public partial class MainWindow
             if(active>0)parts.Add($"{active} в работе");
             if(seeding>0)parts.Add($"{seeding} {Plural(seeding,"раздаётся","раздаются","раздаются")}");
             if(errors>0)parts.Add($"{errors} с ошибкой");
-            downloadSummary.Text=string.Join(" · ",parts);downloadSummary.ToolTip=downloadSummary.Text;
+            downloadSummary.Text=string.Join(" · ",parts.Select(AppLanguage.T));downloadSummary.ToolTip=downloadSummary.Text;
         }
         foreach(var (key,label) in downloadTabCounts)
             label.Text=(key switch{"active"=>active,"seeding"=>seeding,"errors"=>errors,_=>all.Count}).ToString();
@@ -318,7 +318,7 @@ public partial class MainWindow
         var menu=new ContextMenu{PlacementTarget=button,Placement=System.Windows.Controls.Primitives.PlacementMode.Bottom,HorizontalOffset=0,VerticalOffset=4};downloadMenus.Add(menu);
         MenuItem Entry(string text,string icon,string name,RoutedEventHandler click,string? tip=null,bool danger=false)
         {
-            var entry=MenuEntry(text,icon);entry.Tag=item;AutomationProperties.SetName(entry,name);entry.ToolTip=tip;entry.Click+=click;
+            var entry=MenuEntry(text,icon);entry.Tag=item;AutomationProperties.SetName(entry,AppLanguage.T(name));entry.ToolTip=tip;entry.Click+=click;
             if(danger){entry.SetResourceReference(Control.ForegroundProperty,"Danger");if(entry.Icon is Path glyph){BindingOperations.ClearBinding(glyph,Shape.StrokeProperty);glyph.SetResourceReference(Shape.StrokeProperty,"Danger");}}
             menu.Items.Add(entry);return entry;
         }
@@ -357,14 +357,14 @@ public partial class MainWindow
     async Task AddDroppedSource(string source)
     {
         if(closing||closed)return;
-        if(!EnsureDownloadFolder()){Status.Text="Папка для загрузок не выбрана. Её можно выбрать в настройках.";return;}
+        if(!EnsureDownloadFolder()){Status.Text=AppLanguage.T("Папка для загрузок не выбрана. Её можно выбрать в настройках.");return;}
         try
         {
             var added=await downloads.Add(source,prefs.Folder);if(closing||closed)return;
             section="Загрузки";current=null;activePerson=null;Render();
-            Status.Text=added.LowSpacePaused?added.SpacePauseMessage:"Раздача добавлена. Ищем участников.";
+            Status.Text=AppLanguage.T(added.LowSpacePaused?added.SpacePauseMessage:"Раздача добавлена. Ищем участников.");
         }
-        catch(Exception error)when(!closing&&!closed){Status.Text=error.Message;}
+        catch(Exception error)when(!closing&&!closed){Status.Text=AppLanguage.T(error.Message);}
     }
     async void RepairDownloadMetadata()
     {
@@ -389,7 +389,7 @@ public partial class MainWindow
             }
         }
         catch(OperationCanceledException)when(closed||updateCancellation.IsCancellationRequested){}
-        catch(Exception error){if(!closed)Status.Text="Не удалось восстановить обложки: "+error.Message;}
+        catch(Exception error){if(!closed)Status.Text=AppLanguage.T("Не удалось восстановить обложки: "+error.Message);}
         finally{downloadMetadataBusy=false;}
     }
     ContextMenu Menu()
@@ -398,37 +398,37 @@ public partial class MainWindow
     }
     MenuItem MenuEntry(string label,string? icon=null)
     {
-        var entry=new MenuItem{Header=label};AutomationProperties.SetName(entry,label);
+        var entry=new MenuItem{Header=AppLanguage.T(label)};AutomationProperties.SetName(entry,AppLanguage.T(label));
         if(icon!=null){var path=new Path{Data=(Geometry)FindResource(icon),Width=16,Height=16,Stretch=Stretch.Uniform,StrokeThickness=1.7,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,StrokeLineJoin=PenLineJoin.Round};path.SetBinding(Shape.StrokeProperty,new Binding("Foreground"){Source=entry});entry.Icon=path;}
         return entry;
     }
     void OpenDownloadMenu(Button button){var menu=button.ContextMenu;if(menu==null)return;menu.PlacementTarget=button;menu.IsOpen=true;}
     void DownloadLimits()
     {
-        var dialog=new Window{ShowInTaskbar=false,Title="Лимиты скорости",Owner=this,Width=Math.Min(440,Math.Max(320,ActualWidth-32)),MaxHeight=Math.Max(260,SystemParameters.WorkArea.Height-40),SizeToContent=SizeToContent.Height,WindowStartupLocation=WindowStartupLocation.CenterOwner,ResizeMode=ResizeMode.NoResize};
+        var dialog=new Window{ShowInTaskbar=false,Title=AppLanguage.T("Лимиты скорости"),Owner=this,Width=Math.Min(440,Math.Max(320,ActualWidth-32)),MaxHeight=Math.Max(260,SystemParameters.WorkArea.Height-40),SizeToContent=SizeToContent.Height,WindowStartupLocation=WindowStartupLocation.CenterOwner,ResizeMode=ResizeMode.NoResize};
         var panel=new StackPanel{Margin=new(24)};dialog.Content=new ScrollViewer{Content=panel,Style=(Style)FindResource("PageScroll"),VerticalScrollBarVisibility=ScrollBarVisibility.Auto};
         var title=Text("Скорость передачи",22);title.FontWeight=FontWeights.SemiBold;panel.Children.Add(title);panel.Children.Add(Text("Общий лимит для всей очереди. 0 — без ограничения.",12,true));
-        TextBox Field(string label,int value){panel.Children.Add(Text(label,12));var field=new TextBox{Text=value.ToString(),Margin=new(0,0,0,14)};AutomationProperties.SetName(field,label);panel.Children.Add(field);return field;}
+        TextBox Field(string label,int value){panel.Children.Add(Text(label,12));var field=new TextBox{Text=value.ToString(),Margin=new(0,0,0,14)};AutomationProperties.SetName(field,AppLanguage.T(label));panel.Children.Add(field);return field;}
         var down=Field("Загрузка, КБ/с",downloads.DownloadLimitKbps);var up=Field("Отдача, КБ/с",downloads.UploadLimitKbps);var error=Text("",12);error.SetResourceReference(TextBlock.ForegroundProperty,"Danger");panel.Children.Add(error);
         var actions=new WrapPanel();panel.Children.Add(actions);
         var apply=AsyncButton("Применить",async()=>
         {
-            if(!int.TryParse(down.Text,out var d)||!int.TryParse(up.Text,out var u)||d<0||u<0||d>int.MaxValue/1024||u>int.MaxValue/1024){error.Text="Укажи целое число от 0 до 2097151 КБ/с.";return;}
+            if(!int.TryParse(down.Text,out var d)||!int.TryParse(up.Text,out var u)||d<0||u<0||d>int.MaxValue/1024||u>int.MaxValue/1024){error.Text=AppLanguage.T("Укажи целое число от 0 до 2097151 КБ/с.");return;}
             var oldD=downloads.DownloadLimitKbps;var oldU=downloads.UploadLimitKbps;
             try
             {
                 await downloads.SetLimitsAsync(d,u);prefs.MaxDownloadKbps=d;prefs.MaxUploadKbps=u;
                 try{prefs.Save();}catch{prefs.MaxDownloadKbps=oldD;prefs.MaxUploadKbps=oldU;await downloads.SetLimitsAsync(oldD,oldU);throw;}
-                Status.Text="Лимиты скорости сохранены.";dialog.Close();
-            }catch(Exception ex){error.Text=ex.Message;}
-        });apply.Style=(Style)FindResource("PrimaryButton");apply.IsDefault=true;AutomationProperties.SetName(apply,"Применить лимиты");actions.Children.Add(apply);var cancel=Button("Отмена",dialog.Close);cancel.IsCancel=true;actions.Children.Add(cancel);dialog.ShowDialog();
+                Status.Text=AppLanguage.T("Лимиты скорости сохранены.");dialog.Close();
+            }catch(Exception ex){error.Text=AppLanguage.T(ex.Message);}
+        });apply.Style=(Style)FindResource("PrimaryButton");apply.IsDefault=true;AutomationProperties.SetName(apply,AppLanguage.T("Применить лимиты"));actions.Children.Add(apply);var cancel=Button("Отмена",dialog.Close);cancel.IsCancel=true;actions.Children.Add(cancel);dialog.ShowDialog();
     }
     async void DeleteDownloadFiles(object sender,RoutedEventArgs e)
     {
         var item=(DownloadItem)((FrameworkElement)sender).Tag;
-        if(item.Busy){Status.Text="Подожди завершения текущей операции с загрузкой.";return;}
-        if(MessageBox.Show(this,"Удалить «"+item.DisplayName+"» из загрузок вместе со скачанными и частичными файлами?\n\nЭто действие нельзя отменить. Другие файлы в папке останутся.","Удалить загрузку и файлы",MessageBoxButton.YesNo,MessageBoxImage.Warning,MessageBoxResult.No)!=MessageBoxResult.Yes)return;
-        if(item.Busy){Status.Text="Загрузка ещё занята. Повтори удаление после завершения операции.";return;}
-        try{await downloads.Remove(item,true);if(downloads.Items.Contains(item)){Status.Text="Загрузка ещё занята. Повтори удаление после завершения операции.";return;}Render();Status.Text="Загрузка и её файлы удалены.";}catch(Exception error){Status.Text="Не удалось удалить файлы: "+error.Message;}finally{SyncTimer();}
+        if(item.Busy){Status.Text=AppLanguage.T("Подожди завершения текущей операции с загрузкой.");return;}
+        if(LocalizedDialog.Show(this,AppLanguage.T("Удалить «"+item.DisplayName+"» из загрузок вместе со скачанными и частичными файлами?\n\nЭто действие нельзя отменить. Другие файлы в папке останутся."),AppLanguage.T("Удалить загрузку и файлы"),MessageBoxButton.YesNo,MessageBoxImage.Warning,MessageBoxResult.No)!=MessageBoxResult.Yes)return;
+        if(item.Busy){Status.Text=AppLanguage.T("Загрузка ещё занята. Повтори удаление после завершения операции.");return;}
+        try{await downloads.Remove(item,true);if(downloads.Items.Contains(item)){Status.Text=AppLanguage.T("Загрузка ещё занята. Повтори удаление после завершения операции.");return;}Render();Status.Text=AppLanguage.T("Загрузка и её файлы удалены.");}catch(Exception error){Status.Text=AppLanguage.T("Не удалось удалить файлы: "+error.Message);}finally{SyncTimer();}
     }
 }

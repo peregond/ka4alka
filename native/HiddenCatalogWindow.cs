@@ -12,11 +12,11 @@ public partial class MainWindow
         void Save(Action change)
         {
             var titles=prefs.HiddenTitles.ToList();var genres=new HashSet<string>(prefs.HiddenGenres);
-            try{change();prefs.Save();if(section=="Игры")Dispatcher.BeginInvoke(new Action(()=>{if(section=="Игры"&&current==null)Render();}));else ScheduleCatalogEvidenceRefresh();Status.Text="Каталог настроен. Вернуть скрытое можно в настройках.";}
-            catch(Exception error){prefs.HiddenTitles=titles;prefs.HiddenGenres=genres;Status.Text="Не удалось сохранить выбор: "+error.Message;}
+            try{change();prefs.Save();if(section=="Игры")Dispatcher.BeginInvoke(new Action(()=>{if(section=="Игры"&&current==null)Render();}));else ScheduleCatalogEvidenceRefresh();Status.Text=AppLanguage.T("Каталог настроен. Вернуть скрытое можно в настройках.");}
+            catch(Exception error){prefs.HiddenTitles=titles;prefs.HiddenGenres=genres;Status.Text=AppLanguage.T("Не удалось сохранить выбор: "+error.Message);}
         }
         var hidden=HiddenCatalog.TitleHidden(item,prefs.HiddenTitles);
-        var title=new MenuItem{Header=hidden?"Вернуть в каталог":item.Section=="Сериалы"?"Скрыть сериал из каталога":item.Section=="Игры"?"Скрыть игру из каталога":"Скрыть фильм из каталога"};
+        var title=new MenuItem{Header=AppLanguage.T(hidden?"Вернуть в каталог":item.Section=="Сериалы"?"Скрыть сериал из каталога":item.Section=="Игры"?"Скрыть игру из каталога":"Скрыть фильм из каталога")};
         title.Click+=(_,_)=>Save(()=>
         {
             if(hidden)prefs.HiddenTitles.RemoveAll(row=>row.Section==item.Section&&(row.CatalogId==item.Id||row.Identity==HiddenCatalog.Title(item).Identity));
@@ -25,10 +25,10 @@ public partial class MainWindow
         var genreChoices=HiddenCatalog.Genres(item,PersonalGenreChoices);
         if(genreChoices.Length>0)
         {
-            var group=new MenuItem{Header="Скрыть жанр"};
+            var group=new MenuItem{Header=AppLanguage.T("Скрыть жанр")};
             foreach(var choice in genreChoices)
             {
-                var option=new MenuItem{Header=choice.Label,IsCheckable=true,IsChecked=prefs.HiddenGenres.Contains(choice.Key)};
+                var option=new MenuItem{Header=AppLanguage.T(choice.Label),IsCheckable=true,IsChecked=prefs.HiddenGenres.Contains(choice.Key)};
                 option.Click+=(_,_)=>Save(()=>{if(option.IsChecked)prefs.HiddenGenres.Add(choice.Key);else prefs.HiddenGenres.Remove(choice.Key);});group.Items.Add(option);
             }
             menu.Items.Add(group);
@@ -42,7 +42,7 @@ public partial class MainWindow
     void RenderHiddenCatalogSettings(StackPanel target)
     {
         var genres=new WrapPanel();target.Children.Add(genres);
-        var search=new TextBox{ToolTip="Найти скрытое название",Margin=new(0,12,0,0)};target.Children.Add(Text("Поиск по скрытым названиям",12,true));target.Children.Add(search);
+        var search=new TextBox{ToolTip=AppLanguage.T("Найти скрытое название"),Margin=new(0,12,0,0)};target.Children.Add(Text("Поиск по скрытым названиям",12,true));target.Children.Add(search);
         var titleRows=new StackPanel{Margin=new(0,16,0,0)};target.Children.Add(titleRows);
         var note=Text("",12,true);target.Children.Add(note);
         void UpdateTitles()
@@ -56,23 +56,23 @@ public partial class MainWindow
                 var restore=Button("Вернуть",()=>
                 {
                     var previous=prefs.HiddenTitles.ToList();prefs.HiddenTitles.Remove(hidden);
-                    try{prefs.Save();UpdateTitles();note.Text="Название возвращено в каталог.";}
-                    catch(Exception error){prefs.HiddenTitles=previous;note.Text="Не удалось сохранить: "+error.Message;}
+                    try{prefs.Save();UpdateTitles();note.Text=AppLanguage.T("Название возвращено в каталог.");}
+                    catch(Exception error){prefs.HiddenTitles=previous;note.Text=AppLanguage.T("Не удалось сохранить: "+error.Message);}
                 });restore.Style=(Style)FindResource("QuietButton");DockPanel.SetDock(restore,Dock.Right);row.Children.Add(restore);
-                row.Children.Add(Text(hidden.Title+(hidden.Year>0?" · "+hidden.Year:"")+" · "+hidden.Section,13));rows.Children.Add(row);
+                row.Children.Add(TextRaw(hidden.Title+(hidden.Year>0?" · "+hidden.Year:"")+" · "+AppLanguage.T(hidden.Section),13));rows.Children.Add(row);
             }
             titleRows.Children.Add(new ScrollViewer{Content=rows,MaxHeight=260,VerticalScrollBarVisibility=ScrollBarVisibility.Auto});
         }
         foreach(var choice in PersonalGenreChoices.OrderBy(choice=>choice.Label))
         {
             var box=new CheckBox{Content=choice.Label,IsChecked=prefs.HiddenGenres.Contains(choice.Key),Margin=new(0,0,16,10),MinWidth=125};
-            box.ToolTip="Не показывать жанр в каталоге и подборках";
+            box.ToolTip=AppLanguage.T("Не показывать жанр в каталоге и подборках");
             box.Click+=(_,_)=>
             {
                 var previous=new HashSet<string>(prefs.HiddenGenres);
                 if(box.IsChecked==true)prefs.HiddenGenres.Add(choice.Key);else prefs.HiddenGenres.Remove(choice.Key);
-                try{prefs.Save();note.Text="Выбор жанров сохранён.";}
-                catch(Exception error){prefs.HiddenGenres=previous;box.IsChecked=previous.Contains(choice.Key);note.Text="Не удалось сохранить: "+error.Message;}
+                try{prefs.Save();note.Text=AppLanguage.T("Выбор жанров сохранён.");}
+                catch(Exception error){prefs.HiddenGenres=previous;box.IsChecked=previous.Contains(choice.Key);note.Text=AppLanguage.T("Не удалось сохранить: "+error.Message);}
             };genres.Children.Add(box);
         }
         search.TextChanged+=(_,_)=>UpdateTitles();

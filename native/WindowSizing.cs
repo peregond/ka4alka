@@ -161,7 +161,7 @@ public partial class MainWindow
         SearchBar.Margin=new Thickness(0,0,tiny?8:12,0);SearchBar.Height=control;Search.MinHeight=control;
         Search.Padding=new Thickness(narrowSearch?12:48,0,narrowSearch?72:110,0);
         SearchMagnifier.Visibility=narrowSearch?Visibility.Collapsed:Visibility.Visible;
-        SearchPlaceholder.Text=narrowSearch?"Поиск":section=="Игры"?"Найти игру для Windows":"Найти фильм, сериал или человека";SearchPlaceholder.Margin=new Thickness(narrowSearch?12:48,0,narrowSearch?72:110,0);
+        SearchPlaceholder.Text=AppLanguage.T(narrowSearch?"Поиск":section=="Игры"?"Найти игру для Windows":"Найти фильм, сериал или человека");SearchPlaceholder.Margin=new Thickness(narrowSearch?12:48,0,narrowSearch?72:110,0);
         foreach(var subtitle in PageHeader.Children.OfType<TextBlock>().Where(x=>Equals(x.Tag,"CatalogSubtitle")))subtitle.Visibility=shortView?Visibility.Collapsed:Visibility.Visible;
         RenderNavSelection();
         UpdateSavedCount();UpdateDownloadsWidget();

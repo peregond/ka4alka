@@ -21,7 +21,7 @@ public partial class MainWindow
         public void Set(MediaItem[] source,bool loading)
         {
             items=source.DistinctBy(item=>item.Id).Take(40).ToArray();
-            state.Text=loading?"Загружаем подборку…":"Подборка пока недоступна.";
+            state.Text=AppLanguage.T(loading?"Загружаем подборку…":"Подборка пока недоступна.");
             // While a shelf is still loading it shows grey poster shapes instead of a sentence.
             skeleton.Visibility=items.Length==0&&loading?Visibility.Visible:Visibility.Collapsed;
             state.Visibility=items.Length==0&&!loading?Visibility.Visible:Visibility.Collapsed;
@@ -55,12 +55,12 @@ public partial class MainWindow
         // The mouse usually rests on the left (sidebar), so "Ещё" sits right next to the shelf title.
         var header=new StackPanel{Orientation=Orientation.Horizontal,Margin=new(0,0,0,12)};sectionPanel.Children.Add(header);
         var heading=Text(title,22);heading.Name="Discovery"+id+"Heading";heading.FontWeight=FontWeights.Bold;heading.Margin=new(0);heading.VerticalAlignment=VerticalAlignment.Center;header.Children.Add(heading);
-        var all=new Button{Style=(Style)FindResource("QuietButton"),MinHeight=32,Height=32,Margin=new(14,0,0,0),Padding=new(10,0,6,0),FontSize=14,FontWeight=FontWeights.SemiBold,VerticalAlignment=VerticalAlignment.Center,ToolTip="Показать: "+title};
+        var all=new Button{Style=(Style)FindResource("QuietButton"),MinHeight=32,Height=32,Margin=new(14,0,0,0),Padding=new(10,0,6,0),FontSize=14,FontWeight=FontWeights.SemiBold,VerticalAlignment=VerticalAlignment.Center,ToolTip=AppLanguage.T("Показать: "+title)};
         all.SetResourceReference(Control.ForegroundProperty,"Accent");
-        var allRow=new StackPanel{Orientation=Orientation.Horizontal};allRow.Children.Add(new TextBlock{Text="Ещё",VerticalAlignment=VerticalAlignment.Center});
+        var allRow=new StackPanel{Orientation=Orientation.Horizontal};allRow.Children.Add(new TextBlock{Text=AppLanguage.T("Ещё"),VerticalAlignment=VerticalAlignment.Center});
         var chevron=new System.Windows.Shapes.Path{Data=(Geometry)FindResource("IconChevron"),Width=13,Height=13,Stretch=Stretch.Uniform,StrokeThickness=1.9,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,StrokeLineJoin=PenLineJoin.Round,Margin=new(4,1,0,0),VerticalAlignment=VerticalAlignment.Center};
         chevron.SetBinding(System.Windows.Shapes.Shape.StrokeProperty,new System.Windows.Data.Binding("Foreground"){Source=all});allRow.Children.Add(chevron);all.Content=allRow;
-        all.Click+=(_,_)=>open();AutomationProperties.SetName(all,"Все: "+title);header.Children.Add(all);
+        all.Click+=(_,_)=>open();AutomationProperties.SetName(all,AppLanguage.T("Все: "+title));header.Children.Add(all);
         var state=Text("Загружаем подборку…",13,true);state.Margin=new(0,0,0,16);sectionPanel.Children.Add(state);
         var skeleton=PosterSkeleton(rows,"Discovery"+id+"Skeleton");skeleton.Visibility=Visibility.Collapsed;sectionPanel.Children.Add(skeleton);
         var row=new ContentControl{Name="Discovery"+id+"Row",ContentTemplate=(DataTemplate)FindResource(template),Margin=new(0,0,0,0)};sectionPanel.Children.Add(row);

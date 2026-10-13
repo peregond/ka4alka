@@ -35,6 +35,14 @@ public partial class MainWindow
         }
         settingsPersonNavigation=null;Render();
     }
+    void ChangeInterfaceLanguage(string language)
+    {
+        prefs.UiLanguage=AppLanguage.Normalize(language);prefs.Save();AppLanguage.Set(prefs.UiLanguage);
+        foreach(var item in downloads.Items)item.Refresh();
+        layoutInitialized=false;ApplyCompactLayout();Render();UpdateLoadingStateAfterLanguageChange();
+        foreach(var button in Navigation.Children.OfType<Button>())if(button.Tag is string name)AutomationProperties.SetName(button,AppLanguage.T(name));
+    }
+    void UpdateLoadingStateAfterLanguageChange(){RefreshLoadingIndicator();RefreshSidebarUpdate();UpdateDownloadsWidget();}
     void RenderSettings()
     {
         SetBack("Вернуться",ReturnFromSettings);
@@ -73,9 +81,13 @@ public partial class MainWindow
         }
         void Feedback(TextBlock notice,string message,bool error=false)
         {
-            notice.Text=message;notice.SetResourceReference(TextBlock.ForegroundProperty,error?"Danger":"Accent");notice.Visibility=Visibility.Visible;Status.Text=message;
+            notice.Text=AppLanguage.T(message);notice.SetResourceReference(TextBlock.ForegroundProperty,error?"Danger":"Accent");notice.Visibility=Visibility.Visible;Status.Text=AppLanguage.T(message);
         }
         var appearance=Card("Внешний вид","Тема оформления и режим для слабых компьютеров.","IconTheme");
+        var languageLabel=Text("Язык интерфейса",13);languageLabel.FontWeight=FontWeights.SemiBold;appearance.Children.Add(languageLabel);
+        var language=new ComboBox{Name="SettingsLanguage",ItemsSource=new[]{"Русский","English"},SelectedIndex=prefs.UiLanguage=="en"?1:0,MaxWidth=320,MinWidth=0,HorizontalAlignment=HorizontalAlignment.Left,Margin=new(0,0,0,12)};
+        AutomationProperties.SetName(language,AppLanguage.T("Язык интерфейса"));appearance.Children.Add(language);
+        language.SelectionChanged+=(_,_)=>{if(language.SelectedIndex<0)return;ChangeInterfaceLanguage(language.SelectedIndex==1?"en":"ru");};
         var themeCaption=Text("Тема",13);themeCaption.FontWeight=FontWeights.SemiBold;themeCaption.SetResourceReference(TextBlock.ForegroundProperty,"TextSoft");themeCaption.Margin=new(0,0,0,10);appearance.Children.Add(themeCaption);
         var themes=new UniformGrid{Columns=2,Margin=new(0,0,-12,-12)};appearance.Children.Add(themes);
         themes.SizeChanged+=(_,_)=>{var columns=ScrollStableWidth(themes)>=440?2:1;if(themes.Columns!=columns)themes.Columns=columns;};
@@ -85,9 +97,9 @@ public partial class MainWindow
             var theme=Button("",()=>
             {
                 var previous=prefs.Light;prefs.Light=light;
-                try{prefs.Save();}catch(Exception error){prefs.Light=previous;Status.Text="Не удалось сохранить тему: "+error.Message;return;}
+                try{prefs.Save();}catch(Exception error){prefs.Light=previous;Status.Text=AppLanguage.T("Не удалось сохранить тему: "+error.Message);return;}
                 ApplyTheme();Render();
-                FindVisual<Button>(Body,b=>AutomationProperties.GetName(b)==(light?"Светлая тема":"Тёмная тема"))?.Focus();
+                FindVisual<Button>(Body,b=>AutomationProperties.GetName(b)==AppLanguage.T(light?"Светлая тема":"Тёмная тема"))?.Focus();
             });
             theme.Style=(Style)FindResource("ChoiceCard");theme.Padding=new(12);theme.Margin=new(0,0,12,12);theme.BorderThickness=new(2);theme.HorizontalContentAlignment=HorizontalAlignment.Stretch;
             theme.SetResourceReference(Control.BackgroundProperty,"PanelAlt");
@@ -114,15 +126,15 @@ public partial class MainWindow
             themeLabel.Children.Add(radio);
             var label=Text(light?"Светлая":"Тёмная",14);label.Margin=new(0);label.FontWeight=FontWeights.SemiBold;label.VerticalAlignment=VerticalAlignment.Center;themeLabel.Children.Add(label);
             themeContent.Children.Add(themeLabel);theme.Content=themeContent;
-            AutomationProperties.SetName(theme,light?"Светлая тема":"Тёмная тема");themes.Children.Add(theme);
+            AutomationProperties.SetName(theme,AppLanguage.T(light?"Светлая тема":"Тёмная тема"));themes.Children.Add(theme);
         }
         Divider(appearance);
         // Lite mode drops decorative backdrops; posters, catalog and every function stay.
         var liteTitle=new WrapPanel();liteTitle.Children.Add(SwitchTitle("Лёгкий режим"));
-        var litePill=PillRadius.Apply(new Border{Padding=new(9,2,9,2),Margin=new(10,2,0,2),VerticalAlignment=VerticalAlignment.Center,Child=new TextBlock{Text="Для слабых ноутбуков",FontSize=11,FontWeight=FontWeights.SemiBold}});litePill.SetResourceReference(Border.BackgroundProperty,"Raised");((TextBlock)litePill.Child).SetResourceReference(TextBlock.ForegroundProperty,"Muted");liteTitle.Children.Add(litePill);
+        var litePill=PillRadius.Apply(new Border{Padding=new(9,2,9,2),Margin=new(10,2,0,2),VerticalAlignment=VerticalAlignment.Center,Child=new TextBlock{Text=AppLanguage.T("Для слабых ноутбуков"),FontSize=11,FontWeight=FontWeights.SemiBold}});litePill.SetResourceReference(Border.BackgroundProperty,"Raised");((TextBlock)litePill.Child).SetResourceReference(TextBlock.ForegroundProperty,"Muted");liteTitle.Children.Add(litePill);
         var liteContent=new StackPanel();liteContent.Children.Add(liteTitle);var liteHint=Hint("Без фоновых обложек и лишних эффектов. Автоматически включается на слабых компьютерах; здесь можно изменить выбор. Постеры и каталог остаются на месте.");liteHint.Margin=new(0,4,0,0);liteContent.Children.Add(liteHint);
         var lite=new CheckBox{Name="SettingsLiteMode",Style=(Style)FindResource("SettingsSwitch"),Content=liteContent,IsChecked=prefs.LiteMode,VerticalContentAlignment=VerticalAlignment.Center};
-        AutomationProperties.SetName(lite,"Лёгкий режим");appearance.Children.Add(lite);
+        AutomationProperties.SetName(lite,AppLanguage.T("Лёгкий режим"));appearance.Children.Add(lite);
         var liteNotice=Notice(appearance);
         lite.Click+=(_,_)=>
         {
@@ -137,11 +149,11 @@ public partial class MainWindow
         var homeCountries=CatalogChoices.Countries.OrderBy(choice=>choice.Label).ToArray();
         var homeCountry=new ComboBox{Name="SettingsHomeCountry",ItemsSource=homeCountries,SelectedItem=homeCountries.First(choice=>choice.Key==CatalogRegions.HomeCountry(prefs.HomeCountry)),MaxWidth=320,HorizontalAlignment=HorizontalAlignment.Left,MinWidth=0,Margin=new(0,4,0,10)};
         homeCountry.SetBinding(FrameworkElement.WidthProperty,new System.Windows.Data.Binding(nameof(FrameworkElement.ActualWidth)){Source=catalogue});
-        AutomationProperties.SetName(homeCountry,"Страна отечественных подборок");catalogue.Children.Add(homeCountry);
+        AutomationProperties.SetName(homeCountry,AppLanguage.T("Страна отечественных подборок"));catalogue.Children.Add(homeCountry);
         var countryHint=Hint("Учитываем страну производства. Фильмы совместного производства с выбранной страной тоже входят в отечественные подборки.");countryHint.Margin=new(0,8,0,0);catalogue.Children.Add(countryHint);
         var countryNotice=Notice(catalogue);
         var tmdbLogo=new Image{Name="TmdbLogo",Source=new System.Windows.Media.Imaging.BitmapImage(new Uri("pack://application:,,,/Assets/tmdb-logo.png")),Width=128,Height=17,Stretch=Stretch.Uniform,HorizontalAlignment=HorizontalAlignment.Left,Margin=new(0,18,0,8)};
-        AutomationProperties.SetName(tmdbLogo,"The Movie Database — источник широких фонов");catalogue.Children.Add(tmdbLogo);
+        AutomationProperties.SetName(tmdbLogo,AppLanguage.T("The Movie Database — источник широких фонов"));catalogue.Children.Add(tmdbLogo);
         var artworkAttribution=Hint("Широкие фоны — TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.");artworkAttribution.Name="TmdbAttribution";catalogue.Children.Add(artworkAttribution);
         // TheTVDB's licence for small projects requires this credit with a direct link to the site.
         var tvdbAttribution=Hint("Описания сериалов, которых нет в русском каталоге — ");tvdbAttribution.Name="TvdbAttribution";tvdbAttribution.Margin=new(0,8,0,0);
@@ -175,21 +187,21 @@ public partial class MainWindow
         var folderNotice=Notice(files);
         var changeFolder=Button("Изменить",()=>
         {
-            var picker=new OpenFolderDialog{Title="Выберите папку — внутри будет создана Ka4alka для загрузок",InitialDirectory=Directory.Exists(prefs.Folder)?prefs.Folder:Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)};
+            var picker=new OpenFolderDialog{Title=AppLanguage.T("Выберите папку — внутри будет создана Ka4alka для загрузок"),InitialDirectory=Directory.Exists(prefs.Folder)?prefs.Folder:Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)};
             if(picker.ShowDialog(this)!=true)return;
             try{SetDownloadFolder(picker.FolderName);folder.Text=prefs.Folder;folder.ToolTip=prefs.Folder;Feedback(folderNotice,"Папка загрузок сохранена.");}
             catch(Exception error){Feedback(folderNotice,"Не удалось сохранить папку: "+error.Message,true);}
-        });changeFolder.Height=48;changeFolder.MinHeight=48;changeFolder.Margin=new(0,0,10,0);AutomationProperties.SetName(changeFolder,"Изменить папку");Grid.SetColumn(changeFolder,1);folderRow.Children.Add(changeFolder);
-        var openFolder=new Button{Style=(Style)FindResource("IconButton"),Width=48,Height=48,ToolTip="Открыть в проводнике",Content=IconLabel("","IconExternal",18)};
+        });changeFolder.Height=48;changeFolder.MinHeight=48;changeFolder.Margin=new(0,0,10,0);AutomationProperties.SetName(changeFolder,AppLanguage.T("Изменить папку"));Grid.SetColumn(changeFolder,1);folderRow.Children.Add(changeFolder);
+        var openFolder=new Button{Style=(Style)FindResource("IconButton"),Width=48,Height=48,ToolTip=AppLanguage.T("Открыть в проводнике"),Content=IconLabel("","IconExternal",18)};
         openFolder.Click+=(_,_)=>
         {
             try{if(!Directory.Exists(prefs.Folder))throw new DirectoryNotFoundException("Папка недоступна. Выбери другую папку для загрузок.");System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(prefs.Folder){UseShellExecute=true});}
             catch(Exception error){Feedback(folderNotice,error.Message,true);}
-        };AutomationProperties.SetName(openFolder,"Открыть папку");Grid.SetColumn(openFolder,2);folderRow.Children.Add(openFolder);
+        };AutomationProperties.SetName(openFolder,AppLanguage.T("Открыть папку"));Grid.SetColumn(openFolder,2);folderRow.Children.Add(openFolder);
         Divider(files);
         var resumeLabel=SwitchTitle("Продолжать активные загрузки при запуске");
         var resume=new CheckBox{Name="SettingsAutoResume",Style=(Style)FindResource("SettingsSwitch"),Content=resumeLabel,IsChecked=prefs.AutoResumeDownloads,VerticalContentAlignment=VerticalAlignment.Center,Margin=new(0,0,0,8)};
-        resume.SetResourceReference(Control.ForegroundProperty,"Text");AutomationProperties.SetName(resume,"Продолжать активные загрузки при запуске");
+        resume.SetResourceReference(Control.ForegroundProperty,"Text");AutomationProperties.SetName(resume,AppLanguage.T("Продолжать активные загрузки при запуске"));
         files.Children.Add(resume);files.Children.Add(Hint("Загрузки, поставленные на паузу вручную, останутся на паузе."));
         var resumeNotice=Notice(files);
         void SaveResume()
@@ -201,7 +213,7 @@ public partial class MainWindow
         resume.Click+=(_,_)=>SaveResume();
         Divider(files);
         var recovery=new CheckBox{Name="SettingsAutoRecover",Style=(Style)FindResource("SettingsSwitch"),Content=SwitchTitle("Восстанавливать подключения после обрыва сети"),IsChecked=prefs.AutoRecoverDownloads,Margin=new(0,0,0,8)};
-        AutomationProperties.SetName(recovery,"Восстанавливать загрузки после обрыва сети");files.Children.Add(recovery);
+        AutomationProperties.SetName(recovery,AppLanguage.T("Восстанавливать загрузки после обрыва сети"));files.Children.Add(recovery);
         files.Children.Add(Hint("Активные загрузки продолжатся при возвращении сети и после сна. Задачи на ручной паузе останутся на паузе."));
         var recoveryNotice=Notice(files);
         recovery.Click+=(_,_)=>
@@ -215,7 +227,7 @@ public partial class MainWindow
         files.Children.Add(Hint("Перед началом и во время скачивания проверяем место для оставшихся файлов и других активных загрузок на том же диске. Оставляем запас 256 МБ. Если места не хватает, загрузка встанет на паузу: освободи место и нажми «Продолжить»."));
         var notifications=Card("Уведомления","Windows сообщит о завершении загрузки, ошибке или нехватке места.","IconBell");
         var notify=new CheckBox{Name="SettingsNotifyDownloads",Style=(Style)FindResource("SettingsSwitch"),Content=SwitchTitle("Уведомления о загрузках"),IsChecked=prefs.NotifyDownloads,Margin=new(0,0,0,8)};
-        AutomationProperties.SetName(notify,"Уведомления Windows о загрузках");notifications.Children.Add(notify);
+        AutomationProperties.SetName(notify,AppLanguage.T("Уведомления Windows о загрузках"));notifications.Children.Add(notify);
         notifications.Children.Add(Hint("Повторяющиеся ошибки не создают поток уведомлений. Нажатие на уведомление откроет очередь. Windows может скрывать уведомления в режиме «Не беспокоить»."));
         var notificationNotice=Notice(notifications);
         notify.Click+=(_,_)=>
@@ -225,11 +237,11 @@ public partial class MainWindow
             catch(Exception error){prefs.NotifyDownloads=previous;notify.IsChecked=previous;Feedback(notificationNotice,"Не удалось сохранить настройки: "+error.Message,true);}
         };
         var testNotification=ActionButton("Проверить уведомление","IconInfo",()=>Feedback(notificationNotice,ShowTestDownloadNotification()?"Уведомление передано Windows. Если оно скрыто, проверь настройки уведомлений и режим «Не беспокоить».":prefs.NotifyDownloads?"Windows не приняла уведомление. Попробуй ещё раз.":"Включи уведомления о загрузках для проверки.",!prefs.NotifyDownloads));
-        AutomationProperties.SetName(testNotification,"Проверить уведомление Windows");notifications.Children.Add(testNotification);
+        AutomationProperties.SetName(testNotification,AppLanguage.T("Проверить уведомление Windows"));notifications.Children.Add(testNotification);
         var system=Card("Запуск и Windows","Автозапуск и подключения участников раздачи.","IconPower");
         var startupNotice=Notice(system);
         var startup=new CheckBox{Name="SettingsStartup",Content=SwitchTitle("Открывать Качалку при входе в Windows"),IsChecked=WindowsIntegration.StartupEnabled,Style=(Style)FindResource("SettingsSwitch"),Margin=new(0,0,0,12)};
-        AutomationProperties.SetName(startup,"Запускать Качалку вместе с Windows");system.Children.Add(startup);
+        AutomationProperties.SetName(startup,AppLanguage.T("Запускать Качалку вместе с Windows"));system.Children.Add(startup);
         startup.Click+=(_,_)=>
         {
             try{WindowsIntegration.SetStartup(startup.IsChecked==true);Feedback(startupNotice,startup.IsChecked==true?"Качалка будет открываться при входе в Windows.":"Автозапуск выключен.");}
@@ -244,7 +256,7 @@ public partial class MainWindow
             try{Feedback(firewallNotice,await WindowsIntegration.AllowFirewallAsync()?"Исключение для Качалки добавлено.":"Запрос отменён. Настройки брандмауэра не изменены.");}
             catch(Exception error){ErrorLog.Write(error);Feedback(firewallNotice,error.Message,true);}
         });
-        AutomationProperties.SetName(firewall,"Разрешить Качалку в брандмауэре");firewall.HorizontalAlignment=HorizontalAlignment.Left;system.Children.Add(firewall);
+        AutomationProperties.SetName(firewall,AppLanguage.T("Разрешить Качалку в брандмауэре"));firewall.HorizontalAlignment=HorizontalAlignment.Left;system.Children.Add(firewall);
         RenderLanSettings(Card("Устройства в сети","Отправляй загрузки на другой компьютер с Качалкой.","IconLaptop"));
         RenderUpdateSettings(Card("Обновления","Приложение всегда под рукой в актуальной версии.","IconRefresh"));
         var cache=Card("Кэш","Постеры, фотографии и данные каталога: до 1 ГБ. Раз в неделю удаляем данные, не использованные за последние семь дней. При заполнении — самые давно не открывавшиеся.","IconStorage");
@@ -253,10 +265,10 @@ public partial class MainWindow
         var clearCache=AsyncButton("Очистить кэш",async()=>
         {
             var result=await ClearCacheAsync();
-            cacheSize.Text="Занято "+CacheSize(result.Bytes)+" из 1 ГБ";
+            cacheSize.Text=AppLanguage.T("Занято "+CacheSize(result.Bytes)+" из 1 ГБ");
             Feedback(cacheNotice,"Освобождено "+CacheSize(result.FreedBytes)+(result.Failed>0?". Некоторые файлы заняты — очистка повторится автоматически.":"."));
         });
-        clearCache.Name="ClearCacheButton";AutomationProperties.SetName(clearCache,"Очистить кэш");clearCache.HorizontalAlignment=HorizontalAlignment.Left;cache.Children.Add(clearCache);
+        clearCache.Name="ClearCacheButton";AutomationProperties.SetName(clearCache,AppLanguage.T("Очистить кэш"));clearCache.HorizontalAlignment=HorizontalAlignment.Left;cache.Children.Add(clearCache);
         cache.Children.Add(Hint("Скачанные файлы, очередь загрузок, избранное и настройки сохраняются."));
         _=ShowCacheSizeAsync(cacheSize);
         var diagnostics=Card("Помощь и диагностика","Отчёт поможет разобраться с ошибкой. Пути к личным папкам и ключи доступа скрываются.","IconHelp");
@@ -281,9 +293,9 @@ public partial class MainWindow
             catch(Exception){Feedback(communityNotice,"Не удалось открыть Telegram. Попробуй открыть ссылку в браузере.",true);}
         }
         var news=ActionButton("Новости в Telegram","IconBell",()=>OpenTelegram("https://t.me/ka4alkacc"));
-        news.ToolTip="https://t.me/ka4alkacc";AutomationProperties.SetName(news,"Новости в Telegram");communityActions.Children.Add(news);
+        news.ToolTip="https://t.me/ka4alkacc";AutomationProperties.SetName(news,AppLanguage.T("Новости в Telegram"));communityActions.Children.Add(news);
         var help=ActionButton("Сообщить об ошибке","IconHelp",()=>OpenTelegram("https://t.me/+6sT2ocaKvLxlNmRi"));
-        help.ToolTip="Открыть чат поддержки в Telegram";AutomationProperties.SetName(help,"Сообщить об ошибке");communityActions.Children.Add(help);
+        help.ToolTip=AppLanguage.T("Открыть чат поддержки в Telegram");AutomationProperties.SetName(help,AppLanguage.T("Сообщить об ошибке"));communityActions.Children.Add(help);
 
         // Sections run from what people change often to what they set once or open when something goes wrong;
         // on wide windows the list on the left groups them the same way and jumps between the cards.
@@ -311,7 +323,7 @@ public partial class MainWindow
                 MarkSection(jump);settingsScroll.UpdateLayout();
                 settingsScroll.ScrollToVerticalOffset(Math.Max(0,frame.TransformToAncestor(content).Transform(new Point()).Y));
             };
-            AutomationProperties.SetName(jump,"Раздел: "+name);sectionNav.Children.Add(jump);if(activeSection==null)MarkSection(jump);
+            AutomationProperties.SetName(jump,AppLanguage.T("Раздел: "+name));sectionNav.Children.Add(jump);if(activeSection==null)MarkSection(jump);
         }
         settingsLayout.SizeChanged+=(_,_)=>
         {
@@ -320,6 +332,6 @@ public partial class MainWindow
         };
         var about=new WrapPanel{Margin=new(4,4,0,12)};content.Children.Add(about);
         var appName=Text("Качалка",13);appName.FontWeight=FontWeights.SemiBold;appName.Margin=new(0,0,10,4);about.Children.Add(appName);
-        var version=new TextBlock{Text="Версия "+(typeof(MainWindow).Assembly.GetName().Version?.ToString(3)??""),FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=12,Margin=new(0,1,0,4)};version.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");about.Children.Add(version);
+        var version=new TextBlock{Text=AppLanguage.T("Версия "+(typeof(MainWindow).Assembly.GetName().Version?.ToString(3)??"")),FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=12,Margin=new(0,1,0,4)};version.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");about.Children.Add(version);
     }
 }

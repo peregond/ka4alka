@@ -20,7 +20,7 @@ public partial class MainWindow
         var openCard=reported==null?null:ShareLink.Create(reported);
         var privatePaths=new[]{prefs.Folder,Preferences.DataDir,Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)}.Concat(downloads.Items.Select(item=>item.Folder)).ToArray();
         var area=SystemParameters.WorkArea;
-        var window=new Window{ShowInTaskbar=false,Owner=this,Title="Сообщить об ошибке",Width=Math.Min(700,Math.Max(340,area.Width-40)),Height=Math.Min(730,Math.Max(360,area.Height-40)),MinWidth=340,MinHeight=360,WindowStartupLocation=WindowStartupLocation.CenterOwner,UseLayoutRounding=true,FontFamily=FontFamily,FontSize=13};
+        var window=new Window{ShowInTaskbar=false,Owner=this,Title=AppLanguage.T("Сообщить об ошибке"),Width=Math.Min(700,Math.Max(340,area.Width-40)),Height=Math.Min(730,Math.Max(360,area.Height-40)),MinWidth=340,MinHeight=360,WindowStartupLocation=WindowStartupLocation.CenterOwner,UseLayoutRounding=true,FontFamily=FontFamily,FontSize=13};
         window.Resources.MergedDictionaries.Add(Resources);
         window.SetResourceReference(Control.BackgroundProperty,"Bg");window.SetResourceReference(Control.ForegroundProperty,"Text");
         var root=new DockPanel{Margin=new(20)};window.Content=root;
@@ -32,7 +32,7 @@ public partial class MainWindow
         var open=Button("Открыть форму GitHub",()=>{});open.Name="OpenBugReport";open.Style=(Style)FindResource("PrimaryButton");open.Padding=new(12,7,12,7);open.Margin=new(0,0,6,6);actions.Children.Add(open);
         var close=Button("Закрыть",window.Close);close.Style=(Style)FindResource("QuietButton");close.IsCancel=true;close.Padding=new(10,7,10,7);close.Margin=new(0,0,0,6);actions.Children.Add(close);
         var scroll=new ScrollViewer{Style=(Style)FindResource("PageScroll"),VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};
-        AutomationProperties.SetName(scroll,"Предпросмотр отчёта об ошибке");root.Children.Add(scroll);
+        AutomationProperties.SetName(scroll,AppLanguage.T("Предпросмотр отчёта об ошибке"));root.Children.Add(scroll);
         var body=new StackPanel();scroll.Content=body;
         var heading=Text("Поможем разобраться",23);heading.FontWeight=FontWeights.SemiBold;body.Children.Add(heading);
         body.Children.Add(Text("Опиши проблему и просмотри отчёт. Кнопка откроет заполненную форму GitHub в браузере; отправишь её уже там.",13,true));
@@ -40,10 +40,10 @@ public partial class MainWindow
         {
             var caption=Text(label,13);caption.FontWeight=FontWeights.Medium;caption.Margin=new(0,10,0,7);body.Children.Add(caption);
             var box=new TextBox{Name=name,AcceptsReturn=true,TextWrapping=TextWrapping.Wrap,Height=height,MaxLength=maxLength,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,Padding=new(10),Margin=new(0),IsUndoEnabled=false};
-            AutomationProperties.SetName(box,label);body.Children.Add(box);return box;
+            AutomationProperties.SetName(box,AppLanguage.T(label));body.Children.Add(box);return box;
         }
         var problem=Field("Что произошло?","BugReportProblem",80,4000);
-        problem.ToolTip="Например: загрузка остановилась после возвращения из сна, хотя интернет уже работает.";
+        problem.ToolTip=AppLanguage.T("Например: загрузка остановилась после возвращения из сна, хотя интернет уже работает.");
         var steps=Field("Как повторить · необязательно","BugReportSteps",66,4000);
         var preview=Field("Диагностика · можно удалить лишнее","BugReportPreview",190,250_000);preview.IsReadOnly=true;preview.FontSize=12;
         body.Children.Add(Text("Пути к папкам, magnet-ссылки и ключи доступа скрываются. Названия загрузок могут остаться в отчёте — при желании удали их здесь.",11,true));
@@ -56,19 +56,19 @@ public partial class MainWindow
             if(closed)return;
             var ready=Ready();copy.IsEnabled=ready;save.IsEnabled=ready&&!saving;
             open.IsEnabled=ready&&draft!.FormUri!=null;
-            open.Content=draft?.RequiresClipboard==true?"Скопировать и открыть GitHub":"Открыть форму GitHub";
-            AutomationProperties.SetName(open,open.Content.ToString());
+            open.Content=AppLanguage.T(draft?.RequiresClipboard==true?"Скопировать и открыть GitHub":"Открыть форму GitHub");
+            AutomationProperties.SetName(open,AppLanguage.T(open.Content.ToString()));
         }
         void RefreshNotice()
         {
             if(closed)return;
             RefreshActions();
-            if(loading){notice.Text="Собираем диагностику… Можно уже описать проблему.";return;}
-            if(problem.Text.Trim().Length==0)notice.Text="Напиши, что произошло, чтобы подготовить отчёт.";
-            else if(!Ready())notice.Text="Подготавливаем очищенный отчёт…";
-            else if(draft!.DescriptionTooLong)notice.Text="Описание слишком длинное для ссылки. Скопируй или сохрани полный отчёт: текст и шаги сохранены целиком.";
-            else if(draft.RequiresClipboard)notice.Text="Весь отчёт не помещается в ссылку. Скопируем его целиком и откроем форму с описанием; диагностику вставь из буфера обмена.";
-            else notice.Text="Отчёт готов. Проверь его перед открытием формы GitHub.";
+            if(loading){notice.Text=AppLanguage.T("Собираем диагностику… Можно уже описать проблему.");return;}
+            if(problem.Text.Trim().Length==0)notice.Text=AppLanguage.T("Напиши, что произошло, чтобы подготовить отчёт.");
+            else if(!Ready())notice.Text=AppLanguage.T("Подготавливаем очищенный отчёт…");
+            else if(draft!.DescriptionTooLong)notice.Text=AppLanguage.T("Описание слишком длинное для ссылки. Скопируй или сохрани полный отчёт: текст и шаги сохранены целиком.");
+            else if(draft.RequiresClipboard)notice.Text=AppLanguage.T("Весь отчёт не помещается в ссылку. Скопируем его целиком и откроем форму с описанием; диагностику вставь из буфера обмена.");
+            else notice.Text=AppLanguage.T("Отчёт готов. Проверь его перед открытием формы GitHub.");
         }
         void ScheduleDraft()
         {
@@ -96,7 +96,7 @@ public partial class MainWindow
                 draft=result;appliedRevision=requestedRevision;RefreshNotice();
             }
             catch(OperationCanceledException)when(closed){}
-            catch(Exception error){if(!closed&&requestedRevision==revision)notice.Text="Не удалось подготовить отчёт: "+DiagnosticReport.Redact(error.Message,privatePaths);}
+            catch(Exception error){if(!closed&&requestedRevision==revision)notice.Text=AppLanguage.T("Не удалось подготовить отчёт: "+DiagnosticReport.Redact(error.Message,privatePaths));}
             finally
             {
                 building=false;
@@ -108,8 +108,8 @@ public partial class MainWindow
         copy.Click+=(_,_)=>
         {
             if(!Ready())return;
-            try{Copy(draft!.FullReport);notice.Text="Полный очищенный отчёт скопирован.";}
-            catch(Exception error){notice.Text="Не удалось скопировать отчёт: "+DiagnosticReport.Redact(error.Message,privatePaths);}
+            try{Copy(draft!.FullReport);notice.Text=AppLanguage.T("Полный очищенный отчёт скопирован.");}
+            catch(Exception error){notice.Text=AppLanguage.T("Не удалось скопировать отчёт: "+DiagnosticReport.Redact(error.Message,privatePaths));}
         };
         save.Click+=async(_,_)=>
         {
@@ -118,15 +118,15 @@ public partial class MainWindow
             try
             {
                 var report=draft!.FullReport;
-                if(saveAsyncReport!=null){await saveAsyncReport(report,token);if(!closed)notice.Text="Отчёт сохранён.";return;}
-                if(saveReport!=null){saveReport(report);notice.Text="Отчёт сохранён.";return;}
-                var picker=new SaveFileDialog{Title="Сохранить отчёт об ошибке",FileName="Kachalka-bug-report.txt",Filter="Текстовый отчёт (*.txt)|*.txt",DefaultExt=".txt",AddExtension=true};
+                if(saveAsyncReport!=null){await saveAsyncReport(report,token);if(!closed)notice.Text=AppLanguage.T("Отчёт сохранён.");return;}
+                if(saveReport!=null){saveReport(report);notice.Text=AppLanguage.T("Отчёт сохранён.");return;}
+                var picker=new SaveFileDialog{Title=AppLanguage.T("Сохранить отчёт об ошибке"),FileName="Kachalka-bug-report.txt",Filter="Текстовый отчёт (*.txt)|*.txt",DefaultExt=".txt",AddExtension=true};
                 if(picker.ShowDialog(window)!=true)return;
                 await File.WriteAllTextAsync(picker.FileName,report,token);
-                if(!closed)notice.Text="Отчёт сохранён. Его можно приложить к сообщению об ошибке.";
+                if(!closed)notice.Text=AppLanguage.T("Отчёт сохранён. Его можно приложить к сообщению об ошибке.");
             }
             catch(OperationCanceledException)when(closed){}
-            catch(Exception error){if(!closed)notice.Text="Не удалось сохранить отчёт: "+DiagnosticReport.Redact(error.Message,privatePaths);}
+            catch(Exception error){if(!closed)notice.Text=AppLanguage.T("Не удалось сохранить отчёт: "+DiagnosticReport.Redact(error.Message,privatePaths));}
             finally{saving=false;RefreshActions();}
         };
         open.Click+=(_,_)=>
@@ -136,9 +136,9 @@ public partial class MainWindow
                 if(!Ready()||draft?.FormUri is not Uri uri)return;
                 if(draft.RequiresClipboard)Copy(draft.FullReport);
                 if(openBrowser!=null)openBrowser(uri);else Process.Start(new ProcessStartInfo(uri.AbsoluteUri){UseShellExecute=true});
-                notice.Text="Форма открыта в браузере. Проверь данные и нажми отправку на GitHub.";
+                notice.Text=AppLanguage.T("Форма открыта в браузере. Проверь данные и нажми отправку на GitHub.");
             }
-            catch(Exception error){notice.Text="Не удалось открыть форму. Можно скопировать или сохранить отчёт: "+DiagnosticReport.Redact(error.Message,privatePaths);}
+            catch(Exception error){notice.Text=AppLanguage.T("Не удалось открыть форму. Можно скопировать или сохранить отчёт: "+DiagnosticReport.Redact(error.Message,privatePaths));}
         };
         problem.TextChanged+=(_,_)=>ScheduleDraft();steps.TextChanged+=(_,_)=>ScheduleDraft();preview.TextChanged+=(_,_)=>ScheduleDraft();
         window.Closed+=(_,_)=>{closed=true;debounce.Stop();cts.Cancel();cts.Dispose();};
@@ -156,7 +156,7 @@ public partial class MainWindow
             catch(Exception error)
             {
                 if(closed)return;
-                preview.Text="Не удалось прочитать логи: "+DiagnosticReport.Redact(error.Message,privatePaths);preview.IsReadOnly=false;loading=false;ScheduleDraft();
+                preview.Text=AppLanguage.T("Не удалось прочитать логи: "+DiagnosticReport.Redact(error.Message,privatePaths));preview.IsReadOnly=false;loading=false;ScheduleDraft();
             }
         };
         RefreshNotice();return window;

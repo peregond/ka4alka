@@ -27,10 +27,10 @@ public partial class MainWindow
             foreach(var person in item.People)
             {
                 var button=Button(person.Name,()=>OpenPerson(person,item));button.Name="CinemaPersonTile";button.Tag=person;button.Style=(Style)FindResource("PersonTileButton");
-                var tile=new StackPanel();var portrait=PersonPortrait(person,96,120,item);portrait.Name="CinemaPersonPortrait";portrait.BorderThickness=new(0);portrait.HorizontalAlignment=HorizontalAlignment.Center;tile.Children.Add(portrait);var name=Text(person.Name,12);name.TextAlignment=TextAlignment.Center;name.MinHeight=28;name.MaxHeight=32;name.TextTrimming=TextTrimming.CharacterEllipsis;name.Margin=new(0);tile.Children.Add(name);
+                var tile=new StackPanel();var portrait=PersonPortrait(person,96,120,item);portrait.Name="CinemaPersonPortrait";portrait.BorderThickness=new(0);portrait.HorizontalAlignment=HorizontalAlignment.Center;tile.Children.Add(portrait);var name=TextRaw(person.Name,12);name.TextAlignment=TextAlignment.Center;name.MinHeight=28;name.MaxHeight=32;name.TextTrimming=TextTrimming.CharacterEllipsis;name.Margin=new(0);tile.Children.Add(name);
                 var role=Text(person.Role switch{"Актёры"=>"В ролях","Режиссёры"=>"Режиссёр","Операторы"=>"Оператор",_=>person.Role},10,true);role.TextAlignment=TextAlignment.Center;role.TextWrapping=TextWrapping.NoWrap;role.TextTrimming=TextTrimming.CharacterEllipsis;role.Margin=new(0,3,0,0);tile.Children.Add(role);button.Content=tile;
                 button.Margin=new(0,0,8,8);button.BorderThickness=new(0);button.MinHeight=0;button.HorizontalContentAlignment=HorizontalAlignment.Stretch;button.VerticalContentAlignment=VerticalAlignment.Top;button.ToolTip=person.Name+" · "+person.Role;
-                AutomationProperties.SetName(button,"Открыть карточку: "+person.Name+", "+person.Role);row.Children.Add(button);
+                AutomationProperties.SetName(button,AppLanguage.T("Открыть карточку: "+person.Name+", "+person.Role));row.Children.Add(button);
             }
         }
         var participantContent=new Grid();participantContent.RowDefinitions.Add(new(){Height=GridLength.Auto});participantContent.RowDefinitions.Add(new(){Height=GridLength.Auto});
@@ -47,8 +47,8 @@ public partial class MainWindow
             for(var index=0;index<grid.Children.Count;index++)grid.Children[index].Visibility=expanded||index<shown?Visibility.Visible:Visibility.Collapsed;
             var hidden=grid.Children.Count-shown;
             more.Visibility=hidden>0?Visibility.Visible:Visibility.Collapsed;
-            more.Content=expanded?"Свернуть":"Ещё "+hidden;
-            AutomationProperties.SetName(more,expanded?"Свернуть список участников":"Показать всех участников: ещё "+hidden);
+            more.Content=AppLanguage.T(expanded?"Свернуть":"Ещё "+hidden);
+            AutomationProperties.SetName(more,AppLanguage.T(expanded?"Свернуть список участников":"Показать всех участников: ещё "+hidden));
         }
         more.Click+=(_,_)=>{crewExpanded=crewExpanded==item.Id?null:item.Id;LimitCrew();};
         limitCrew=LimitCrew;LimitCrew();
@@ -87,8 +87,8 @@ public partial class MainWindow
         {
             var button=Button(film.Title+" · "+(film.Year>0?film.Year.ToString():"Год неизвестен")+(CinemaMetadata.Rating(film)>0?" · КП "+film.Kinopoisk:""),()=>{dialog.Close();current=film;section=film.Section;Render();});
             button.HorizontalAlignment=HorizontalAlignment.Stretch;button.HorizontalContentAlignment=HorizontalAlignment.Left;
-            button.Content=new TextBlock{Text=button.Content.ToString(),TextWrapping=TextWrapping.Wrap};
-            AutomationProperties.SetName(button,"Открыть "+film.Title);body.Children.Add(button);
+            button.Content=new TextBlock{Text=AppLanguage.T(button.Content.ToString()),TextWrapping=TextWrapping.Wrap};
+            AutomationProperties.SetName(button,AppLanguage.T("Открыть "+film.Title));body.Children.Add(button);
         }
     }
     CinemaPerson? activePerson;
@@ -124,7 +124,7 @@ public partial class MainWindow
                 body.Children.Remove(status);CinemaFilms(body,"Фильмы и сериалы",LiveCatalog.Parse(bytes,"Фильмы").Concat(LiveCatalog.Parse(bytes,"Сериалы")),dialog);
             }
             catch(OperationCanceledException){}
-            catch{if(!request.IsCancellationRequested)status.Text="Не удалось загрузить подборку. Попробуй открыть её позже.";}
+            catch{if(!request.IsCancellationRequested)status.Text=AppLanguage.T("Не удалось загрузить подборку. Попробуй открыть её позже.");}
         };
         dialog.ShowDialog();
     }

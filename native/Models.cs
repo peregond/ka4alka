@@ -111,6 +111,7 @@ public class Preferences
     public string Folder { get;set; }=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),"Downloads","Ka4alka");
     public bool FolderConfigured {get;set;}
     public bool Light {get;set;}=false;
+    public string UiLanguage {get;set;}="ru";
     public bool LiteMode {get;set;}
     public bool LiteModeConfigured {get;set;}
     public bool LanEnabled {get;set;}
@@ -142,6 +143,7 @@ public class Preferences
             if(!prefs.QualityFilterConfigured){prefs.HidePoorQuality=true;prefs.QualityFilterConfigured=true;}
             prefs.HiddenGenres??=[];prefs.HiddenTitles??=[];prefs.HiddenTitles=prefs.HiddenTitles.Where(row=>row!=null&&row.Title is {Length:<=300}&&row.Identity is {Length:<=500}).Take(1000).ToList();
             prefs.CatalogQualityHeight=ReleaseQuality.CatalogHeight(prefs.CatalogQualityHeight);
+            prefs.UiLanguage=AppLanguage.Normalize(prefs.UiLanguage);
             prefs.HomeCountry=CatalogRegions.HomeCountry(prefs.HomeCountry);
             return prefs;
         }

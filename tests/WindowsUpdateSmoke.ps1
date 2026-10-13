@@ -29,7 +29,7 @@ try{
  if($LASTEXITCODE -ne 0){throw 'Updater tests failed'}
  ./tests/StableUpdateComponents.ps1
  ./build.ps1 -Test -OutputDir ('dist/Kachalka-'+$short)
- foreach($scenario in @('dpi','close','cache','download-reliability','person-performance','startup-performance','cover-viewport','home-availability','games','catalog-navigation','release-freshness','interface-polish','bug-report','lan')){
+ foreach($scenario in @('dpi','close','cache','download-reliability','person-performance','startup-performance','cover-viewport','home-availability','games','catalog-navigation','release-freshness','interface-polish','language','bug-report','lan')){
    $scenarioDirectory=if($scenario -in @('dpi','close','cache')){$scenario+'-reliability'}elseif($scenario -eq 'lan'){'lan-ui'}else{$scenario}
    $scenarioEvidence=Join-Path $root ('test-output/'+$scenarioDirectory)
    $scenarioUi=Start-Process (Join-Path $root ('dist/Kachalka-'+$short+'/Kachalka.exe')) -ArgumentList @('--'+$scenario+'-smoke-test',('"'+$scenarioEvidence+'"')) -PassThru

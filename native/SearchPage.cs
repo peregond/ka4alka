@@ -27,7 +27,7 @@ public partial class MainWindow
             var loading=choice.Item1=="Люди"?PeopleSearchLoading:choice.Item1==""?liveLoading||PeopleSearchLoading:liveLoading;
             var button=Button(choice.Item2+(loading?"":" · "+count),()=>{searchCategory=choice.Item1;livePage=1;catalogLastPage=null;Render();});
             button.Style=(Style)FindResource("PillButton");button.SetResourceReference(Control.BackgroundProperty,searchCategory==choice.Item1?"Selected":"Panel");
-            System.Windows.Automation.AutomationProperties.SetName(button,"Результаты: "+choice.Item2);panel.Children.Add(button);
+            System.Windows.Automation.AutomationProperties.SetName(button,AppLanguage.T("Результаты: "+choice.Item2));panel.Children.Add(button);
         }
     }
     void RefreshLoadingIndicator()
@@ -38,6 +38,6 @@ public partial class MainWindow
         // A film page shows breathing placeholders in place of its synopsis and releases instead of this bar.
         var loading=activePerson!=null||current!=null?false:section is "Фильмы" or "Сериалы"?liveLoading&&!favoritesOnly:section=="Источники"?searching:section=="Игры"?gameLoading||gameShelfLoading.Count>0:section is "Музыка" or "Программы"?archiveLoading:section is "ТВ-каналы" or "Радио" or "Спорт"?broadcastLoading:false;
         LoadingIndicator.Visibility=loading?Visibility.Visible:Visibility.Collapsed;
-        LoadingLabel.Text=details?"Загружаем информацию…":SearchActive&&(section is "Фильмы" or "Сериалы")?"Ищем фильмы и сериалы…":"Загружаем страницу…";
+        LoadingLabel.Text=AppLanguage.T(details?"Загружаем информацию…":SearchActive&&(section is "Фильмы" or "Сериалы")?"Ищем фильмы и сериалы…":"Загружаем страницу…");
     }
 }
