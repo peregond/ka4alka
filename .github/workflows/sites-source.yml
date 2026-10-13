@@ -25,7 +25,7 @@ jobs:
         run: node tests/source-integrity.mjs
       - name: Package the exact committed source
         run: node scripts/prepare-sites-source.mjs "$RUNNER_TEMP/sites-source"
-      - name: Verify and build the actual publication archive
+      - name: Verify the actual publication archive
         shell: bash
         run: |
           set -euo pipefail
@@ -49,6 +49,11 @@ jobs:
           node tests/title-identity.mjs
           node tests/source-integrity.mjs
           node node_modules/typescript/bin/tsc --noEmit --incremental false
+      - name: Build the identical verified source in the repository checkout
+        working-directory: web-index
+        run: |
+          node scripts/verify-source.mjs "$RUNNER_TEMP/sites-source/source-manifest.json"
+          npm run install:ci
           npm run build
       - uses: actions/upload-artifact@v4
         with:
