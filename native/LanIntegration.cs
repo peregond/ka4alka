@@ -96,7 +96,7 @@ public partial class MainWindow
     {
         if(closing||closed)return;
         var shown=LanActionAvailable;if(shown==lanActionsShown)return;lanActionsShown=shown;
-        foreach(var button in VisualElements<Button>(Body).Where(x=>AutomationProperties.GetName(x).StartsWith("Скачать на другом устройстве: ",StringComparison.Ordinal)))
+        foreach(var button in VisualElements<Button>(Body).Where(x=>AutomationProperties.GetName(x).StartsWith(AppLanguage.T("Скачать на другом устройстве: "),StringComparison.Ordinal)))
             button.Visibility=shown?Visibility.Visible:Visibility.Collapsed;
     }
 
