@@ -1,7 +1,12 @@
+using System.IO;
+using System.Security.Cryptography;
+using System.Text;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 namespace Kachalka;
 
@@ -27,6 +32,11 @@ public partial class MainWindow
     TextBlock? gameReleaseCount;
     string gameActionState="";
     int gameSteamId;
+    // The screenshot gallery under the banner: one large picture, the strip of thumbnails and the request that fills them.
+    StackPanel? gameGallery;
+    GameShot[] gameShots=[];int gameShotIndex;
+    Image? gameShotImage;TextBlock? gameShotCounter;StackPanel? gameShotStrip;ScrollViewer? gameShotScroll;
+    CancellationTokenSource? gameGalleryRequest;
 
     void RenderGameDetail(MediaItem game)
     {
@@ -79,11 +89,12 @@ public partial class MainWindow
         gameActions=new WrapPanel{Name="GameActions",Margin=new(0,0,0,-8)};info.Children.Add(gameActions);
         BuildGameActions(item);
 
-        var cards=new Grid{Name="GameCards",Margin=new(0,0,0,28)};cards.RowDefinitions.Add(new(){Height=GridLength.Auto});cards.RowDefinitions.Add(new(){Height=GridLength.Auto});panel.Children.Add(cards);cards.Children.Add(heroFrame);
+        var cards=new Grid{Name="GameCards",Margin=new(0,0,0,28)};for(var row=0;row<3;row++)cards.RowDefinitions.Add(new(){Height=GridLength.Auto});panel.Children.Add(cards);cards.Children.Add(heroFrame);
+        gameGallery=new StackPanel{Name="GameGallery",Margin=new(0,24,0,0),Visibility=Visibility.Collapsed};Grid.SetRow(gameGallery,1);cards.Children.Add(gameGallery);
         gameAbout=new Border{Name="GameAbout",CornerRadius=new(20),Padding=new(24),BorderThickness=new(1),Margin=new(0,20,0,0),VerticalAlignment=VerticalAlignment.Top};
         gameAbout.SetResourceReference(Border.BackgroundProperty,"Panel");gameAbout.SetResourceReference(Border.BorderBrushProperty,"EdgeSoft");
-        Grid.SetRow(gameAbout,1);cards.Children.Add(gameAbout);
-        RenderGameAbout(item,detail);
+        Grid.SetRow(gameAbout,2);cards.Children.Add(gameAbout);
+        RenderGameAbout(item,detail);RenderGameGallery(detail);
 
         // ---- releases ----
         var titleRow=new StackPanel{Orientation=Orientation.Horizontal,Margin=new(0,0,0,16)};gameReleaseAnchor=titleRow;
@@ -97,9 +108,49 @@ public partial class MainWindow
     }
     static string GameDescriptionText(MediaItem item)=>string.IsNullOrWhiteSpace(item.Description)?"Описание пока недоступно.":item.Description;
 
+    // The banner is always dark, so the review colours are the bright ones of the dark theme in either theme.
+    static readonly Brush ToneGood=Frozen("#5BE3B5"),ToneMixed=Frozen("#F2B35B"),ToneBad=Frozen("#FF8A7A");
+    static Brush Frozen(string color){var brush=new SolidColorBrush((Color)ColorConverter.ConvertFromString(color));brush.Freeze();return brush;}
+    static Brush ToneInk(string tone)=>tone switch{"mixed"=>ToneMixed,"negative"=>ToneBad,_=>ToneGood};
+    // "👍 93% · Очень положительные": Steam's verdict on the game, in the colour of that verdict.
+    FrameworkElement GameReviewChip(int percent,string tone,string label,int count)
+    {
+        var chip=new StackPanel{Name="GameReview",Orientation=Orientation.Horizontal,Margin=new(0,0,14,4),ToolTip=(label.Length>0?label+" · ":"")+percent+"% положительных отзывов Steam"+(count>0?" из "+GameNumbers.Count(count):"")};
+        AutomationProperties.SetName(chip,"Отзывы Steam: "+percent+"%");
+        chip.Children.Add(new TextBlock{Text="👍",FontSize=13,Foreground=ToneInk(tone),Margin=new(0,0,5,0),VerticalAlignment=VerticalAlignment.Center});
+        chip.Children.Add(new TextBlock{Text=percent+"%",FontSize=14,FontWeight=FontWeights.Bold,Foreground=(Brush)FindResource("BannerText"),VerticalAlignment=VerticalAlignment.Center});
+        if(label.Length>0)chip.Children.Add(new TextBlock{Text="  "+label,FontSize=12,Foreground=(Brush)FindResource("BannerMuted"),VerticalAlignment=VerticalAlignment.Center});
+        return chip;
+    }
+    Border GameBadge(string text,Brush? ink=null,string? tip=null,string? name=null)
+    {
+        var badge=new Border{BorderBrush=ink??(Brush)FindResource("BannerBadgeEdge"),BorderThickness=new(1),CornerRadius=new(6),Padding=new(6,2,6,2),Margin=new(0,0,8,4),VerticalAlignment=VerticalAlignment.Center,ToolTip=tip,Child=new TextBlock{Text=text,FontSize=11,FontWeight=FontWeights.Bold,Foreground=ink??(Brush)FindResource("BannerText")}};
+        if(name!=null)badge.Name=name;return badge;
+    }
+    // A discount is a filled green block in front of the price, as it is on the cards.
+    FrameworkElement GamePriceBadge(string price,int discount,string original)
+    {
+        var row=new StackPanel{Name="GamePrice",Orientation=Orientation.Horizontal,Margin=new(0,0,8,4),VerticalAlignment=VerticalAlignment.Center,ToolTip=discount>0&&original.Length>0?"Скидка "+discount+"%. Обычная цена — "+original:"Цена в Steam"};
+        if(discount>0)
+        {
+            var block=new Border{CornerRadius=new(6,0,0,6),Padding=new(6,2,6,2)};block.SetResourceReference(Border.BackgroundProperty,"Primary");
+            var label=new TextBlock{Text="−"+discount+"%",FontSize=11,FontWeight=FontWeights.Bold};label.SetResourceReference(TextBlock.ForegroundProperty,"PrimaryInk");block.Child=label;row.Children.Add(block);
+        }
+        row.Children.Add(new Border{BorderBrush=(Brush)FindResource("BannerBadgeEdge"),BorderThickness=new(1),CornerRadius=discount>0?new(0,6,6,0):new(6),Padding=new(6,2,6,2),Child=new TextBlock{Text=price,FontSize=11,FontWeight=FontWeights.Bold,Foreground=(Brush)FindResource("BannerText")}});
+        return row;
+    }
+    static (string Short,string Long) RussianText(GameRussian russian)=>russian switch
+    {
+        GameRussian.Voiced=>("Русская озвучка","В игре есть русский интерфейс, субтитры и озвучка."),
+        GameRussian.Interface=>("Русский язык","В игре есть русский интерфейс и субтитры, озвучки нет."),
+        GameRussian.Absent=>("Нет русского","Steam не указывает русский язык. Раздачи с переводом смотри ниже."),
+        _=>("","")
+    };
+
     // The caption, title and rating line change when the store details arrive.
     void RenderGameHeading(MediaItem item,GameDetails? detail)
     {
+        var store=item.Store;
         if(gameCaption!=null)
         {
             gameCaption.Children.Clear();
@@ -108,12 +159,17 @@ public partial class MainWindow
                 var label=new TextBlock{Text=text,FontSize=12,FontWeight=FontWeights.SemiBold,Foreground=(Brush)FindResource("BannerMuted"),VerticalAlignment=VerticalAlignment.Center};if(name!=null)label.Name=name;gameCaption.Children.Add(label);
             }
             Part("ИГРА");
-            if(item.Year>0){Part("  ·  ");Part(item.Year.ToString(),"GameYear");}
+            if(detail is {ComingSoon:true,ReleaseDate.Length:>0}){Part("  ·  ");Part("ВЫЙДЕТ "+detail.ReleaseDate.Replace(" г.","").ToUpperInvariant(),"GameYear");}
+            else if(item.Year>0){Part("  ·  ");Part(item.Year.ToString(),"GameYear");}
             Part("  ·  ");Part("WINDOWS");
         }
         if(gameTitle!=null){gameTitle.Text=item.Title;gameTitle.ToolTip=item.Title;}
         if(gameMetaRow==null)return;
         gameMetaRow.Children.Clear();
+        int percent=0,count=0;var tone="";var verdict="";
+        if(detail?.Review is {} reviewed){percent=reviewed.Percent;count=reviewed.Count;tone=reviewed.Tone;verdict=reviewed.Label;}
+        else if(store is {HasReview:true}){percent=store.ReviewPercent;count=store.ReviewCount;tone=store.ReviewTone;verdict=store.ReviewLabel;}
+        if(percent>0&&tone.Length>0)gameMetaRow.Children.Add(GameReviewChip(percent,tone,verdict,count));
         if(detail is {Metacritic:>0})
         {
             var rating=new StackPanel{Orientation=Orientation.Horizontal,Margin=new(0,0,14,4),ToolTip="Оценка критиков на Metacritic · "+detail.Metacritic};
@@ -124,8 +180,15 @@ public partial class MainWindow
         }
         var traits=string.Join(" · ",new[]{item.Genre!="Windows"?item.AllGenres:"",detail?.Developers??""}.Where(x=>!string.IsNullOrWhiteSpace(x)));
         if(traits.Length>0)gameMetaRow.Children.Add(new TextBlock{Name="GameTraits",Text=traits,FontSize=14,Foreground=(Brush)FindResource("BannerMuted"),TextWrapping=TextWrapping.Wrap,VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,12,4)});
-        foreach(var badge in new[]{"Windows",detail?.Price??""}.Where(x=>x.Length>0))
-            gameMetaRow.Children.Add(new Border{BorderBrush=(Brush)FindResource("BannerBadgeEdge"),BorderThickness=new(1),CornerRadius=new(6),Padding=new(6,2,6,2),Margin=new(0,0,8,4),VerticalAlignment=VerticalAlignment.Center,Child=new TextBlock{Text=badge,FontSize=11,FontWeight=FontWeights.Bold,Foreground=(Brush)FindResource("BannerText")}});
+        gameMetaRow.Children.Add(GameBadge("Windows"));
+        if(detail!=null&&RussianText(detail.Russian) is {Short.Length:>0} russian)gameMetaRow.Children.Add(GameBadge(russian.Short,detail.Russian==GameRussian.Absent?null:ToneGood,russian.Long,"GameRussian"));
+        if(detail is {Age:>=12})gameMetaRow.Children.Add(GameBadge(detail.Age+"+",null,"Возрастное ограничение в Steam"));
+        var price=detail is {Price.Length:>0}?detail.Price:store is {HasPrice:true}?store.Price:"";
+        if(price.Length>0)
+        {
+            var discount=detail is {Price.Length:>0}?detail.Discount:store?.Discount??0;var original=detail is {Price.Length:>0}?detail.OriginalPrice:store?.OriginalPrice??"";
+            gameMetaRow.Children.Add(GamePriceBadge(price,discount,original));
+        }
     }
 
     // ---------- main action: follows the state of the game ----------
@@ -237,9 +300,14 @@ public partial class MainWindow
         {
             if(detail.Developers.Length>0)about.Children.Add(Fact("Разработчик",detail.Developers));
             if(detail.Publishers.Length>0)about.Children.Add(Fact("Издатель",detail.Publishers));
-            if(item.Year>0)about.Children.Add(Fact("Год выхода",item.Year.ToString()));
+            if(detail.ReleaseDate.Length>0)about.Children.Add(Fact(detail.ComingSoon?"Выйдет":"Дата выхода",detail.ReleaseDate));
+            else if(item.Year>0)about.Children.Add(Fact("Год выхода",item.Year.ToString()));
             if(item.Genre!="Windows"&&item.AllGenres.Length>0)about.Children.Add(Fact("Жанры",item.AllGenres));
-            if(detail.Price.Length>0)about.Children.Add(Fact("Цена в Steam",detail.Price));
+            if(detail.Traits.Length>0)about.Children.Add(Fact("Режимы",string.Join(", ",detail.Traits)));
+            if(RussianText(detail.Russian) is {Short.Length:>0} language)about.Children.Add(Fact("Русский язык",detail.Russian switch{GameRussian.Voiced=>"Интерфейс, субтитры и озвучка",GameRussian.Interface=>"Интерфейс и субтитры, озвучки нет",_=>"Официально не поддерживается"}));
+            if(detail.Review is {} review)about.Children.Add(Fact("Отзывы Steam",review.Label+" · "+review.Percent+"% из "+GameNumbers.Count(review.Count)));
+            if(detail.Age>0)about.Children.Add(Fact("Возраст",detail.Age+"+"));
+            if(detail.Price.Length>0)about.Children.Add(Fact("Цена в Steam",detail.Discount>0&&detail.OriginalPrice.Length>0?detail.Price+" (−"+detail.Discount+"%, обычная "+detail.OriginalPrice+")":detail.Price));
         }
         var links=new WrapPanel{Margin=new(0,8,0,0)};
         var steam=ActionButton("Открыть в Steam","IconExternal",()=>OpenGameLink(item.PageUrl!),"PillButton");steam.Name="GameSteamLink";steam.Margin=new(0,0,10,8);steam.ToolTip="Страница игры в Steam";links.Children.Add(steam);
@@ -301,7 +369,7 @@ public partial class MainWindow
                     gameDescription.Text=GameDescriptionText(detail.Item);gameDescription.Visibility=Visibility.Visible;
                     if(gameSynopsisSkeleton!=null&&gameSynopsisSkeleton.Parent is Panel skeletonHost){skeletonHost.Children.Remove(gameSynopsisSkeleton);gameSynopsisSkeleton=null;}
                 }
-                RenderGameAbout(detail.Item,detail);
+                RenderGameAbout(detail.Item,detail);RenderGameGallery(detail);
             }
             catch(OperationCanceledException)when(token.IsCancellationRequested){}
             catch(Exception error)
@@ -329,6 +397,104 @@ public partial class MainWindow
             finally{if(Active()){gameReleasesLoading=false;RenderGameReleases();}}
         }
         try{await Task.WhenAll(Metadata(),Releases());}finally{if(ReferenceEquals(gameDetailRequest,request))gameDetailRequest=null;request.Dispose();}
+    }
+
+    // ---------- screenshots ----------
+    // One large picture with arrows and a strip of thumbnails; a click moves on, the arrow keys work when the picture has focus.
+    void RenderGameGallery(GameDetails? detail)
+    {
+        if(gameGallery==null)return;
+        gameGalleryRequest?.Cancel();gameGalleryRequest=null;gameGallery.Children.Clear();gameShotImage=null;gameShotCounter=null;gameShotStrip=null;gameShotScroll=null;
+        gameShots=detail?.Gallery??[];gameShotIndex=0;
+        if(prefs.LiteMode||gameShots.Length==0){gameGallery.Visibility=Visibility.Collapsed;return;}
+        gameGallery.Visibility=Visibility.Visible;var request=gameGalleryRequest=new CancellationTokenSource();var token=request.Token;
+        var heading=new StackPanel{Orientation=Orientation.Horizontal,Margin=new(2,0,0,14)};
+        var title=Text("Скриншоты",22);title.FontWeight=FontWeights.Bold;title.Margin=new(0);title.VerticalAlignment=VerticalAlignment.Center;heading.Children.Add(title);
+        var counter=gameShotCounter=new TextBlock{Name="GameShotCounter",FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=14,Margin=new(10,3,0,0),VerticalAlignment=VerticalAlignment.Center};counter.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");heading.Children.Add(counter);
+        gameGallery.Children.Add(heading);
+
+        var stage=new Grid{Name="GameShotStage",Height=400,Focusable=true,FocusVisualStyle=null,Cursor=Cursors.Hand};stage.SetResourceReference(Panel.BackgroundProperty,"PanelAlt");
+        var frame=new Border{CornerRadius=new(18),Child=stage};
+        frame.SizeChanged+=(_,e)=>
+        {
+            if(e.NewSize.Width<=0)return;var height=Math.Clamp(e.NewSize.Width*9/16,200,460);if(Math.Abs(stage.Height-height)>1)stage.Height=height;
+            var clip=new RectangleGeometry(new Rect(0,0,e.NewSize.Width,Math.Max(1,stage.Height)),18,18);clip.Freeze();stage.Clip=clip;
+        };
+        var picture=gameShotImage=new Image{Name="GameShotImage",Stretch=Stretch.UniformToFill};RenderOptions.SetBitmapScalingMode(picture,BitmapScalingMode.HighQuality);stage.Children.Add(picture);
+        void Step(int direction){if(gameShots.Length>1)SelectGameShot(((gameShotIndex+direction)%gameShots.Length+gameShots.Length)%gameShots.Length,token,true);}
+        stage.MouseLeftButtonUp+=(_,_)=>{stage.Focus();Step(1);};
+        stage.KeyDown+=(_,e)=>{if(e.Key==Key.Right){Step(1);e.Handled=true;}else if(e.Key==Key.Left){Step(-1);e.Handled=true;}};
+        if(gameShots.Length>1)
+        {
+            Button Arrow(string icon,string name,string tip,HorizontalAlignment side,int direction)
+            {
+                var button=new Button{Name=name,Style=(Style)FindResource("IconButton"),Width=44,Height=44,Margin=new(14,0,14,0),HorizontalAlignment=side,VerticalAlignment=VerticalAlignment.Center,ToolTip=tip};
+                button.SetResourceReference(Control.BackgroundProperty,"PosterBadge");button.Foreground=(Brush)FindResource("BannerText");button.Content=IconLabel("",icon,18);AutomationProperties.SetName(button,tip);
+                button.Click+=(_,e)=>{e.Handled=true;stage.Focus();Step(direction);};return button;
+            }
+            stage.Children.Add(Arrow("IconBack","GameShotPrevious","Предыдущий скриншот",HorizontalAlignment.Left,-1));
+            stage.Children.Add(Arrow("IconChevron","GameShotNext","Следующий скриншот",HorizontalAlignment.Right,1));
+        }
+        gameGallery.Children.Add(frame);
+
+        if(gameShots.Length>1)
+        {
+            var strip=gameShotStrip=new StackPanel{Name="GameShotStrip",Orientation=Orientation.Horizontal,Margin=new(0,0,0,2)};
+            for(var index=0;index<gameShots.Length;index++)
+            {
+                var number=index;var thumbImage=new Image{Stretch=Stretch.UniformToFill};RenderOptions.SetBitmapScalingMode(thumbImage,BitmapScalingMode.HighQuality);
+                var thumb=new Border{Width=160,Height=90,CornerRadius=new(10),BorderThickness=new(2),Child=thumbImage};thumb.SetResourceReference(Border.BackgroundProperty,"PanelAlt");thumb.SizeChanged+=(sender,_)=>ClipPoster((Border)sender);
+                var button=new Button{Name="GameShot"+(index+1),Style=(Style)FindResource("PosterButton"),Padding=new(0),Margin=new(0,6,10,10),Content=thumb,Tag=thumb,ToolTip="Скриншот "+(index+1)};
+                AutomationProperties.SetName(button,"Скриншот "+(index+1)+" из "+gameShots.Length);button.Click+=(_,_)=>{stage.Focus();SelectGameShot(number,token,true);};strip.Children.Add(button);
+                _=LoadGameShotImage(thumbImage,gameShots[index].Thumb,320,token,()=>true);
+            }
+            var scroll=gameShotScroll=new ScrollViewer{Content=strip,VerticalScrollBarVisibility=ScrollBarVisibility.Disabled,HorizontalScrollBarVisibility=ScrollBarVisibility.Hidden,CanContentScroll=false,Margin=new(-6,8,-6,0),Padding=new(6,0,6,0)};
+            scroll.PreviewMouseWheel+=(_,e)=>{if(scroll.ScrollableWidth<=0)return;scroll.ScrollToHorizontalOffset(scroll.HorizontalOffset-e.Delta/120d*120);e.Handled=true;};
+            gameGallery.Children.Add(scroll);
+        }
+        SelectGameShot(0,token,false);
+    }
+    void SelectGameShot(int index,CancellationToken token,bool reveal)
+    {
+        if(gameShotImage==null||gameShots.Length==0||token.IsCancellationRequested)return;
+        gameShotIndex=Math.Clamp(index,0,gameShots.Length-1);var shot=gameShots[gameShotIndex];var picture=gameShotImage;
+        if(gameShotCounter!=null)gameShotCounter.Text=(gameShotIndex+1)+" / "+gameShots.Length;
+        if(gameShotStrip!=null)
+            for(var position=0;position<gameShotStrip.Children.Count;position++)
+                if(gameShotStrip.Children[position] is Button {Tag: Border thumb})
+                {
+                    var active=position==gameShotIndex;thumb.SetResourceReference(Border.BorderBrushProperty,active?"Accent":"EdgeSoft");thumb.Opacity=active?1:.72;
+                    if(active&&reveal&&gameShotScroll!=null&&gameShotStrip.Children[position] is FrameworkElement chosen)chosen.BringIntoView();
+                }
+        // The thumbnail is already on screen, so it stands in for the large picture until that arrives.
+        picture.Source=coverCache.TryGetValue(shot.Thumb+"|320",out var preview)?preview:null;
+        var wanted=gameShotIndex;
+        _=LoadGameShotImage(picture,shot.Full,1280,token,()=>gameShotIndex==wanted&&ReferenceEquals(gameShotImage,picture));
+    }
+    async Task LoadGameShotImage(Image image,string url,int decodeWidth,CancellationToken token,Func<bool> wanted)
+    {
+        var key=url+"|"+decodeWidth;
+        if(coverCache.TryGetValue(key,out var cached)){if(wanted())image.Source=cached;return;}
+        try
+        {
+            await coverSlots.WaitAsync(token);
+            try
+            {
+                if(!coverCache.TryGetValue(key,out var bitmap))
+                {
+                    var path=System.IO.Path.Combine(Preferences.DataDir,"covers",Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(url)))+".img");
+                    (bitmap,_)=await CoverCache.Load(path,4*1024*1024,ct=>sourceClient.Read(new Uri(url),4*1024*1024,ct),bytes=>
+                    {
+                        using var stream=new MemoryStream(bytes);var result=new BitmapImage();result.BeginInit();result.CacheOption=BitmapCacheOption.OnLoad;result.DecodePixelWidth=decodeWidth;result.StreamSource=stream;result.EndInit();result.Freeze();return result;
+                    },token);
+                    token.ThrowIfCancellationRequested();coverCache.Put(key,bitmap);
+                }
+                if(!closing&&!closed&&wanted()){image.Source=bitmap;FadeInCover(image);}
+            }
+            finally{coverSlots.Release();}
+        }
+        catch(OperationCanceledException)when(token.IsCancellationRequested){}
+        catch(Exception error){ErrorLog.Write(error);}
     }
 
     // ---------- releases ----------

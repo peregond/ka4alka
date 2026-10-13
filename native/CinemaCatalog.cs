@@ -103,7 +103,7 @@ public partial class MainWindow
     void UpdateDiscoveryLayout()
     {
         if(discoveryHero!=null)ArrangeFeatureCarousel(Body.ActualWidth);
-        foreach(var shelf in discoveryShelves.Values)shelf.Resize(Math.Max(1,catalogColumns));
+        foreach(var shelf in discoveryShelves.Values.Concat(gameShelfViews.Values))shelf.Resize(Math.Max(1,catalogColumns));
     }
     void AddRailPreview(MediaItem[] cards)
     {

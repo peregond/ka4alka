@@ -43,32 +43,31 @@ public partial class MainWindow
     string DiscoveryShelfTitle(DiscoveryShelfKind kind)=>kind switch
     {
         DiscoveryShelfKind.Popular=>"Популярное",
-        DiscoveryShelfKind.New=>section=="Фильмы"?"Новые фильмы":section=="Игры"?"Новые игры":"Новые сериалы",
+        DiscoveryShelfKind.New=>section=="Фильмы"?"Новые фильмы":"Новые сериалы",
         DiscoveryShelfKind.Foreign=>section=="Фильмы"?"Иностранные фильмы":"Иностранные сериалы",
         _=>section=="Фильмы"?"Отечественные фильмы":"Отечественные сериалы"
     };
-    DiscoveryShelfView AddDiscoveryShelf(Panel parent,DiscoveryShelfKind kind)
+    DiscoveryShelfView AddDiscoveryShelf(Panel parent,DiscoveryShelfKind kind)=>AddShelf(parent,kind.ToString(),DiscoveryShelfTitle(kind),()=>OpenDiscoveryShelf(kind),"MediaRow",1);
+    // A titled shelf with its "Ещё" button; the film home and the games home both build theirs here. Game capsules fill two rows, posters one.
+    DiscoveryShelfView AddShelf(Panel parent,string id,string title,Action open,string template,int rows)
     {
-        var sectionPanel=new StackPanel{Name="Discovery"+kind+"Section",Margin=new(0,0,0,12)};parent.Children.Add(sectionPanel);
+        var sectionPanel=new StackPanel{Name="Discovery"+id+"Section",Margin=new(0,0,0,12)};parent.Children.Add(sectionPanel);
         // The mouse usually rests on the left (sidebar), so "Ещё" sits right next to the shelf title.
         var header=new StackPanel{Orientation=Orientation.Horizontal,Margin=new(0,0,0,12)};sectionPanel.Children.Add(header);
-        var title=DiscoveryShelfTitle(kind);
-        var heading=Text(title,22);heading.Name="Discovery"+kind+"Heading";heading.FontWeight=FontWeights.Bold;heading.Margin=new(0);heading.VerticalAlignment=VerticalAlignment.Center;header.Children.Add(heading);
+        var heading=Text(title,22);heading.Name="Discovery"+id+"Heading";heading.FontWeight=FontWeights.Bold;heading.Margin=new(0);heading.VerticalAlignment=VerticalAlignment.Center;header.Children.Add(heading);
         var all=new Button{Style=(Style)FindResource("QuietButton"),MinHeight=32,Height=32,Margin=new(14,0,0,0),Padding=new(10,0,6,0),FontSize=14,FontWeight=FontWeights.SemiBold,VerticalAlignment=VerticalAlignment.Center,ToolTip="Показать: "+title};
         all.SetResourceReference(Control.ForegroundProperty,"Accent");
         var allRow=new StackPanel{Orientation=Orientation.Horizontal};allRow.Children.Add(new TextBlock{Text="Ещё",VerticalAlignment=VerticalAlignment.Center});
         var chevron=new System.Windows.Shapes.Path{Data=(Geometry)FindResource("IconChevron"),Width=13,Height=13,Stretch=Stretch.Uniform,StrokeThickness=1.9,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,StrokeLineJoin=PenLineJoin.Round,Margin=new(4,1,0,0),VerticalAlignment=VerticalAlignment.Center};
         chevron.SetBinding(System.Windows.Shapes.Shape.StrokeProperty,new System.Windows.Data.Binding("Foreground"){Source=all});allRow.Children.Add(chevron);all.Content=allRow;
-        all.Click+=(_,_)=>OpenDiscoveryShelf(kind);AutomationProperties.SetName(all,"Все: "+title);header.Children.Add(all);
+        all.Click+=(_,_)=>open();AutomationProperties.SetName(all,"Все: "+title);header.Children.Add(all);
         var state=Text("Загружаем подборку…",13,true);state.Margin=new(0,0,0,16);sectionPanel.Children.Add(state);
-        var games=section=="Игры";
-        var skeleton=PosterSkeleton(games?2:1,"Discovery"+kind+"Skeleton");skeleton.Visibility=Visibility.Collapsed;sectionPanel.Children.Add(skeleton);
-        var row=new ContentControl{Name="Discovery"+kind+"Row",ContentTemplate=(DataTemplate)FindResource(games?"GameRow":"MediaRow"),Margin=new(0,0,0,0)};sectionPanel.Children.Add(row);
-        return new(row,state,all,skeleton){Changed=ApplyPosterDownloads,Rows=games?2:1};
+        var skeleton=PosterSkeleton(rows,"Discovery"+id+"Skeleton");skeleton.Visibility=Visibility.Collapsed;sectionPanel.Children.Add(skeleton);
+        var row=new ContentControl{Name="Discovery"+id+"Row",ContentTemplate=(DataTemplate)FindResource(template),Margin=new(0,0,0,0)};sectionPanel.Children.Add(row);
+        return new(row,state,all,skeleton){Changed=ApplyPosterDownloads,Rows=rows};
     }
     void OpenDiscoveryShelf(DiscoveryShelfKind kind)
     {
-        if(section=="Игры"){OpenGameList(kind==DiscoveryShelfKind.New?"new":"popular");return;}
         if(kind==DiscoveryShelfKind.New)
         {
             CancelCatalogPositionRestoreForUserJump();

@@ -131,14 +131,20 @@ public partial class MainWindow
         Border Badge(string text)=>new(){BorderBrush=(Brush)FindResource("BannerBadgeEdge"),BorderThickness=new(1),CornerRadius=new(6),Padding=new(6,2,6,2),Margin=new(0,0,8,4),VerticalAlignment=VerticalAlignment.Center,Child=new TextBlock{Text=text,FontSize=11,FontWeight=FontWeights.Bold,Foreground=(Brush)FindResource("BannerText")}};
         if(item.Section=="Игры")
         {
-            // Year and genre arrive with the store details; until then the slide only knows its title.
-            gameDetails.TryGetValue(item.Id,out var game);var info=game?.Item??item;
+            // The list row already knows the year, genre, price and reviews; the store details add the score, the studio and the exact price.
+            gameDetails.TryGetValue(item.Id,out var game);var info=game?.Item??item;var store=item.Store;
+            int percent=0,count=0;var tone="";var verdict="";
+            if(game?.Review is {} reviewed){percent=reviewed.Percent;count=reviewed.Count;tone=reviewed.Tone;verdict=reviewed.Label;}
+            else if(store is {HasReview:true}){percent=store.ReviewPercent;count=store.ReviewCount;tone=store.ReviewTone;verdict=store.ReviewLabel;}
+            if(percent>0&&tone.Length>0)view.Meta.Children.Add(GameReviewChip(percent,tone,verdict,count));
             if(game is {Metacritic:>0})view.Meta.Children.Add(new TextBlock{Text="Metacritic "+game.Metacritic,FontSize=14,FontWeight=FontWeights.Bold,Foreground=(Brush)FindResource("BannerText"),VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,12,4),ToolTip="Оценка критиков на Metacritic"});
             view.Meta.Children.Add(Label("Игра"));
-            if(info.Year>0)view.Meta.Children.Add(Label(info.Year.ToString()));
+            if(store is {Soon:true,Released.Length:>0})view.Meta.Children.Add(Label("Выйдет "+store.SoonLabel));
+            else if(info.Year>0)view.Meta.Children.Add(Label(info.Year.ToString()));
             if(info.Genre.Length>0&&info.Genre!="Windows")view.Meta.Children.Add(Label(info.CardGenre));
             view.Meta.Children.Add(Badge("Windows"));
-            if(game is {Price.Length:>0})view.Meta.Children.Add(Badge(game.Price));
+            if(game is {Price.Length:>0})view.Meta.Children.Add(GamePriceBadge(game.Price,game.Discount,game.OriginalPrice));
+            else if(store is {HasPrice:true})view.Meta.Children.Add(GamePriceBadge(store.Price,store.Discount,store.OriginalPrice));
             return;
         }
         if(item.HasCardRating)
