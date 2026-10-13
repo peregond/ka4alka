@@ -290,7 +290,7 @@ public partial class MainWindow
             button.Content=ChipContent(full,!sorting,sorting?"IconFilter":null);
             catalogFilterCaptions[button]=new(full,compact);
             StyleChip(button,!sorting&&selected!=items[0].Key);
-            button.ToolTip=label+": "+current.Label;System.Windows.Automation.AutomationProperties.SetName(button,AppLanguage.T(label));
+            button.ToolTip=AppLanguage.T(label)+": "+AppLanguage.T(current.Label);System.Windows.Automation.AutomationProperties.SetName(button,AppLanguage.T(label));
             var menu=new ToggleContextMenu{PlacementTarget=button,Placement=System.Windows.Controls.Primitives.PlacementMode.Bottom,MaxHeight=360};
             menu.SetResourceReference(Control.BackgroundProperty,"Raised");menu.SetResourceReference(Control.ForegroundProperty,"Text");
             foreach(var item in items)

@@ -44,7 +44,7 @@ public partial class MainWindow:Window
         try{downloads=new(null,prefs.MaxDownloadKbps,prefs.MaxUploadKbps);}catch(Exception e){downloads=newEmpty(prefs.MaxDownloadKbps,prefs.MaxUploadKbps);Status.Text=AppLanguage.T("Не удалось прочитать очередь: "+e.Message);}
         InitializeDownloadReliability();
         InitializeLanDevices();
-        foreach(var name in new[]{"Фильмы","Сериалы","Игры"}) { var n=name;var b=ActionButton(n,NavIcon(n),()=>{if(n=="Игры")ShowGames();else ShowCatalogSection(n);},"NavButton");b.Tag=n;b.ToolTip=n;b.HorizontalContentAlignment=HorizontalAlignment.Left;b.Margin=new(0,0,0,5);Navigation.Children.Add(b); }
+        foreach(var name in new[]{"Фильмы","Сериалы","Игры"}) { var n=name;var b=ActionButton(n,NavIcon(n),()=>{if(n=="Игры")ShowGames();else ShowCatalogSection(n);},"NavButton");b.Tag=n;b.ToolTip=AppLanguage.T(n);b.HorizontalContentAlignment=HorizontalAlignment.Left;b.Margin=new(0,0,0,5);Navigation.Children.Add(b); }
         refresh.Tick+=(_,_)=>RefreshDownloadsReliably();
         ContentRendered+=async(_,_)=>{if(!prefs.AutoResumeDownloads||downloads.PendingResumeCount==0)return;Status.Text=AppLanguage.T("Продолжаем загрузки…");var resumed=await downloads.ResumePendingAsync();Status.Text=AppLanguage.T(resumed>0?$"Продолжено загрузок: {resumed}":"Не удалось продолжить загрузки. Проверь очередь.");if(!closed){SyncTimer();if(section=="Загрузки")Render();}};
         StateChanged+=(_,_)=>SyncTimer();searchDelay.Tick+=(_,_)=>{searchDelay.Stop();if(section is "Фильмы" or "Сериалы"){current=null;Render();}};

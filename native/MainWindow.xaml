@@ -103,7 +103,7 @@
        <ProgressBar x:Name="PosterProgress" Minimum="0" Maximum="100" Value="{Binding DownloadPercent,Mode=OneWay}" Height="4" VerticalAlignment="Bottom" BorderThickness="0" Background="#BF0A0C0F" Foreground="{DynamicResource Accent}" IsHitTestVisible="False" ToolTip="{local:Tr Text='Скачивается'}"><ProgressBar.Style><Style TargetType="ProgressBar"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding HasDownloadProgress}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></ProgressBar.Style></ProgressBar>
       </Grid></Border>
       <TextBlock x:Name="CardTitleText" Text="{Binding Title}" Margin="2,10,2,0" Height="36" FontSize="14" LineHeight="18" FontWeight="SemiBold" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding Title}"/>
-      <TextBlock x:Name="CardGenreText" Text="{Binding CardMeta}" Height="16" Margin="2,2,2,0" FontSize="12" Foreground="{DynamicResource Subtle}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding CardMeta}"/>
+      <TextBlock x:Name="CardGenreText" Text="{Binding CardMeta, Converter={x:Static local:UiText.Instance}, ConverterParameter=@meta}" Height="16" Margin="2,2,2,0" FontSize="12" Foreground="{DynamicResource Subtle}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding CardMeta, Converter={x:Static local:UiText.Instance}, ConverterParameter=@meta}"/>
      </StackPanel>
     </Button>
    </DataTemplate></ItemsControl.ItemTemplate></local:PosterRow>
@@ -124,7 +124,7 @@
       <TextBlock x:Name="GameTitleText" Text="{Binding Title}" Margin="2,10,2,0" Height="36" FontSize="14" LineHeight="18" FontWeight="SemiBold" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding Title}"/>
       <Grid x:Name="GameMetaRow" Height="16" Margin="2,2,2,0"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
        <TextBlock x:Name="GameReviewText" Grid.Column="0" Text="{Binding Store.ReviewText}" Margin="0,0,7,0" FontSize="12" FontWeight="SemiBold" ToolTip="{Binding Store.ReviewTip}" AutomationProperties.Name="{local:Tr Text='Отзывы Steam'}"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/><Setter Property="Foreground" Value="{DynamicResource Accent}"/><Style.Triggers><DataTrigger Binding="{Binding Store.HasReview}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger><DataTrigger Binding="{Binding Store.ReviewTone}" Value="mixed"><Setter Property="Foreground" Value="{DynamicResource Warning}"/></DataTrigger><DataTrigger Binding="{Binding Store.ReviewTone}" Value="negative"><Setter Property="Foreground" Value="{DynamicResource Danger}"/></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
-       <TextBlock x:Name="GameMetaText" Grid.Column="1" Text="{Binding CardMeta}" FontSize="12" Foreground="{DynamicResource Subtle}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding CardMeta}"/>
+       <TextBlock x:Name="GameMetaText" Grid.Column="1" Text="{Binding CardMeta, Converter={x:Static local:UiText.Instance}, ConverterParameter=@meta}" FontSize="12" Foreground="{DynamicResource Subtle}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding CardMeta, Converter={x:Static local:UiText.Instance}, ConverterParameter=@meta}"/>
       </Grid>
      </StackPanel>
     </Button>

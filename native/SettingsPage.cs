@@ -37,10 +37,12 @@ public partial class MainWindow
     }
     void ChangeInterfaceLanguage(string language)
     {
-        prefs.UiLanguage=AppLanguage.Normalize(language);prefs.Save();AppLanguage.Set(prefs.UiLanguage);
+        var previous=prefs.UiLanguage;prefs.UiLanguage=AppLanguage.Normalize(language);
+        try{prefs.Save();}catch(Exception error){prefs.UiLanguage=previous;Status.Text=AppLanguage.T("Не удалось сохранить язык: "+error.Message);Render();return;}
+        AppLanguage.Set(prefs.UiLanguage);Status.Text="";
         foreach(var item in downloads.Items)item.Refresh();
         layoutInitialized=false;ApplyCompactLayout();Render();UpdateLoadingStateAfterLanguageChange();
-        foreach(var button in Navigation.Children.OfType<Button>())if(button.Tag is string name)AutomationProperties.SetName(button,AppLanguage.T(name));
+        foreach(var button in Navigation.Children.OfType<Button>())if(button.Tag is string name){AutomationProperties.SetName(button,AppLanguage.T(name));button.ToolTip=AppLanguage.T(name);}
     }
     void UpdateLoadingStateAfterLanguageChange(){RefreshLoadingIndicator();RefreshSidebarUpdate();UpdateDownloadsWidget();}
     void RenderSettings()
@@ -314,7 +316,7 @@ public partial class MainWindow
             if(!sectionFrames.TryGetValue(name,out var frame))continue;
             if(name==sections[0])
             {
-                var label=Text(caption.ToUpperInvariant(),11);label.FontWeight=FontWeights.SemiBold;label.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");
+                var label=Text(AppLanguage.T(caption).ToUpperInvariant(),11);label.FontWeight=FontWeights.SemiBold;label.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");
                 label.Margin=new(14,sectionNav.Children.Count==0?4:18,0,6);sectionNav.Children.Add(label);
             }
             var jump=new Button{Style=(Style)FindResource("QuietButton"),Content=IconLabel(name,sectionIcons[name],17),HorizontalContentAlignment=HorizontalAlignment.Left,MinHeight=40,Height=40,Padding=new(14,0,14,0),Margin=new(0,0,0,2),FontSize=14};

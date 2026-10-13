@@ -62,7 +62,7 @@ public partial class MainWindow
         var heading=new DockPanel{Margin=new(0,0,0,16)};downloadHeadingRow=heading;PageHeader.Children.Add(heading);
         var toolbar=new WrapPanel{HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Center};downloadToolbar=toolbar;DockPanel.SetDock(toolbar,Dock.Right);heading.Children.Add(toolbar);
         var titles=new StackPanel{VerticalAlignment=VerticalAlignment.Center};downloadHeadingHost=titles;heading.Children.Add(titles);
-        var title=Text("Загрузки",28);downloadHeading=title;title.FontFamily=(FontFamily)FindResource("DisplayFont");title.FontWeight=FontWeights.Bold;title.Margin=new(0,0,16,0);title.VerticalAlignment=VerticalAlignment.Center;titles.Children.Add(title);
+        var title=Text("Загрузки",28);downloadHeading=title;title.TextWrapping=TextWrapping.NoWrap;title.TextTrimming=TextTrimming.CharacterEllipsis;title.FontFamily=(FontFamily)FindResource("DisplayFont");title.FontWeight=FontWeights.Bold;title.Margin=new(0,0,16,0);title.VerticalAlignment=VerticalAlignment.Center;titles.Children.Add(title);
         downloadSummary=Text("",14,true);downloadSummary.TextWrapping=TextWrapping.NoWrap;downloadSummary.TextTrimming=TextTrimming.CharacterEllipsis;downloadSummary.Margin=new(0,4,0,0);titles.Children.Add(downloadSummary);
         var controls=ActionButton("Управление","IconSettings",()=>{});downloadControls=controls;controls.Margin=new(0,0,10,0);controls.Padding=new(16,0,16,0);controls.Height=48;controls.MinHeight=48;controls.ToolTip=AppLanguage.T("Управление загрузками и раздачами");AutomationProperties.SetName(controls,AppLanguage.T("Управление загрузками"));
         var commands=Menu();controls.ContextMenu=commands;
