@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { SiteLanguageProvider } from "@/components/site-language";
 
 export const metadata: Metadata = {
   title: "Ка4алка Онл@йн — фильмы, сериалы и раздачи",
@@ -18,7 +19,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ru">
-      <body className="antialiased">{children}</body>
+      <body className="antialiased"><SiteLanguageProvider>{children}</SiteLanguageProvider></body>
     </html>
   );
 }

@@ -11,29 +11,27 @@ import { ReleaseList } from "@/components/release-list";
 import { normalize, type Media, type Section } from "@/lib/catalog-source";
 import type { Release } from "@/lib/index-store";
 import seed from "@/app/data/starter.json";
-import "./catalog-page.css";
+import { LanguageSwitcher, LocalizedMetadata, useSiteLanguage } from "@/components/site-language";
+import { catalogCount } from "@/lib/site-language";
 
 const initial = seed as Media[];
 const savedPosters = new Map(initial.filter(item=>item.poster?.startsWith("/posters/")).map(item=>[item.id,item.poster!]));
 const posterSrc = (item:Media) => savedPosters.get(item.id) ?? (item.poster?.startsWith("https://")?`/api/poster?src=${encodeURIComponent(item.poster)}`:null);
-const countLabel = (count:number, section:Section) => {
-  const forms = section === "movies" ? ["фильм", "фильма", "фильмов"] : ["сериал", "сериала", "сериалов"];
-  const form = count % 100 >= 11 && count % 100 <= 14 ? 2 : count % 10 === 1 ? 0 : count % 10 >= 2 && count % 10 <= 4 ? 1 : 2;
-  return `${count} ${forms[form]}`;
-};
 
 function PosterImage({item,className,lazy=false,rating=false}:{item:Media;className:string;lazy?:boolean;rating?:boolean}) {
+  const { t } = useSiteLanguage();
   const [attempt,setAttempt]=useState(0);
   const primary=posterSrc(item);
   const secondary=item.poster?.startsWith("https://")?item.poster:null;
   const src=attempt===0?primary:attempt===1&&secondary!==primary?secondary:null;
   return <span className={className}>
-    {src?<img src={src} alt="" loading={lazy?"lazy":"eager"} referrerPolicy="no-referrer" onError={()=>setAttempt(value=>value+1)}/>:<span className="poster-fallback" aria-hidden="true"><Clapperboard size={24}/><span>Постер недоступен</span></span>}
+    {src?<img src={src} alt="" loading={lazy?"lazy":"eager"} referrerPolicy="no-referrer" onError={()=>setAttempt(value=>value+1)}/>:<span className="poster-fallback" aria-hidden="true"><Clapperboard size={24}/><span>{t('Постер недоступен')}</span></span>}
     {rating&&item.kinopoisk&&item.kinopoisk!=="—"?<span className="poster-rating">★ {item.kinopoisk}</span>:null}
   </span>;
 }
 
 export default function Home() {
+  const { language, t } = useSiteLanguage();
   const [section,setSection] = useState<Section>("movies");
   const [query,setQuery] = useState("");
   const [selected,setSelected] = useState<Media|null>(null);
@@ -89,23 +87,24 @@ export default function Home() {
   const switchSection=(next:Section)=>{setSection(next);setPage(1);setSelected(null);setMobileNavOpen(false);window.scrollTo({top:0,behavior:"smooth"})};
 
   return <SidebarProvider style={{"--sidebar-width":"14.5rem"} as CSSProperties}>
+    <LocalizedMetadata title="Ка4алка Онл@йн — фильмы, сериалы и раздачи" description="Поиск фильмов, сериалов и вариантов загрузки в одном каталоге."/>
     <Sidebar collapsible="offcanvas" className="index-sidebar">
-      <SidebarHeader className="brand-header"><button type="button" className="brand-home" onClick={goHome} aria-label="На главную — Ка4алка Онл@йн"><span className="brand-mark"><Clapperboard size={22}/></span><span className="brand-copy"><strong>Ка4алка</strong><span>Онл@йн</span></span></button></SidebarHeader>
-      <SidebarContent className="nav-content"><p className="nav-caption">КАТАЛОГ</p><SidebarMenu>
-        <SidebarMenuItem><SidebarMenuButton isActive={section==="movies"} onClick={()=>switchSection("movies")}><Film size={19}/><span>Фильмы</span></SidebarMenuButton></SidebarMenuItem>
-        <SidebarMenuItem><SidebarMenuButton isActive={section==="series"} onClick={()=>switchSection("series")}><Tv size={19}/><span>Сериалы</span></SidebarMenuButton></SidebarMenuItem>
+      <SidebarHeader className="brand-header"><button type="button" className="brand-home" onClick={goHome} aria-label={t('На главную — Ка4алка Онл@йн')}><span className="brand-mark"><img src="/brand/logo.png" width={45} height={45} alt="" /></span><span className="brand-copy"><strong>{t('Ка4алка')}</strong><span>{t('Онл@йн')}</span></span></button></SidebarHeader>
+      <SidebarContent className="nav-content"><p className="nav-caption">{t('КАТАЛОГ')}</p><SidebarMenu>
+        <SidebarMenuItem><SidebarMenuButton isActive={section==="movies"} onClick={()=>switchSection("movies")}><Film size={19}/><span>{t('Фильмы')}</span></SidebarMenuButton></SidebarMenuItem>
+        <SidebarMenuItem><SidebarMenuButton isActive={section==="series"} onClick={()=>switchSection("series")}><Tv size={19}/><span>{t('Сериалы')}</span></SidebarMenuButton></SidebarMenuItem>
       </SidebarMenu></SidebarContent>
     </Sidebar>
     <SidebarInset className="index-main">
-      <header className="topbar"><button type="button" className="mobile-menu" aria-label="Открыть разделы" aria-expanded={mobileNavOpen} aria-controls="mobile-navigation" onClick={()=>setMobileNavOpen(true)}><PanelLeft size={21}/></button><div className="topbar-name">Каталог <span>/</span> {section==="movies"?"Фильмы":"Сериалы"}</div><div className="topbar-state">{catalogBusy?"Обновляем каталог…":catalogState}</div></header>
-      <div className="workspace"><div className="workspace-head"><div><p className="eyebrow">КИНОТЕКА</p><h1>{section==="movies"?"Фильмы":"Сериалы"}</h1><p className="lead">Найди, что посмотреть сегодня</p></div><div className="result-count">{countLabel(items.length,section)}</div></div>
-        <div className="search-wrap"><Search size={20} aria-hidden="true"/><Input value={query} onChange={event=>{setQuery(event.target.value);setPage(1)}} placeholder={section==="movies"?"Название фильма, год…":"Название сериала, год…"} aria-label="Поиск по каталогу"/></div>
-        <div className="content-label"><span>{query?"Результаты поиска":section==="movies"?"Новые фильмы":"Новые сериалы"}</span><span className="hairline"/></div>
-        {items.length?<div className="poster-grid">{items.map(item=><button type="button" className="poster-card" key={item.id} onClick={()=>openMedia(item)} aria-label={`Открыть ${item.title}`}><PosterImage key={item.poster??item.id} item={item} className="poster-frame" lazy rating/><span className="poster-title">{item.title}</span><span className="poster-meta">{item.year||"Год неизвестен"}</span></button>)}</div>:<div className="empty-state"><Search size={28}/><h2>Ничего не нашлось</h2><p>Попробуй другое название или убери год из запроса.</p></div>}
-        {!query&&hasMore&&<button className="more-button catalog-more" onClick={()=>setPage(value=>value+1)} disabled={catalogBusy}>Показать ещё</button>}
+      <header className="topbar"><button type="button" className="mobile-menu" aria-label={t('Открыть разделы')} aria-expanded={mobileNavOpen} aria-controls="mobile-navigation" onClick={()=>setMobileNavOpen(true)}><PanelLeft size={21}/></button><div className="topbar-name">{t('Каталог')} <span>/</span> {t(section==="movies"?"Фильмы":"Сериалы")}</div><div className="topbar-state">{t(catalogBusy?"Обновляем каталог…":catalogState)}</div><LanguageSwitcher/></header>
+      <div className="workspace"><div className="workspace-head"><div><p className="eyebrow">{t('КИНОТЕКА')}</p><h1>{t(section==="movies"?"Фильмы":"Сериалы")}</h1><p className="lead">{t('Найди, что посмотреть сегодня')}</p></div><div className="result-count">{catalogCount(language,items.length,section)}</div></div>
+        <div className="search-wrap"><Search size={20} aria-hidden="true"/><Input value={query} onChange={event=>{setQuery(event.target.value);setPage(1)}} placeholder={t(section==="movies"?"Название фильма, год…":"Название сериала, год…")} aria-label={t('Поиск по каталогу')}/></div>
+        <div className="content-label"><span>{t(query?"Результаты поиска":section==="movies"?"Новые фильмы":"Новые сериалы")}</span><span className="hairline"/></div>
+        {items.length?<div className="poster-grid">{items.map(item=><button type="button" className="poster-card" key={item.id} onClick={()=>openMedia(item)} aria-label={t("Открыть {title}",{title:item.title})}><PosterImage key={item.poster??item.id} item={item} className="poster-frame" lazy rating/><span className="poster-title">{item.title}</span><span className="poster-meta">{item.year||t("Год неизвестен")}</span></button>)}</div>:<div className="empty-state"><Search size={28}/><h2>{t('Ничего не нашлось')}</h2><p>{t('Попробуй другое название или убери год из запроса.')}</p></div>}
+        {!query&&hasMore&&<button className="more-button catalog-more" onClick={()=>setPage(value=>value+1)} disabled={catalogBusy}>{t('Показать ещё')}</button>}
       </div>
     </SidebarInset>
-    <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}><SheetContent id="mobile-navigation" className="mobile-nav-sheet" side="left"><SheetHeader><SheetTitle>Ка4алка Онл@йн</SheetTitle><SheetDescription>Каталог фильмов и сериалов</SheetDescription></SheetHeader><nav className="mobile-nav-list" aria-label="Разделы каталога"><button type="button" aria-current={section==="movies"?"page":undefined} onClick={()=>switchSection("movies")}><Film size={20}/>Фильмы</button><button type="button" aria-current={section==="series"?"page":undefined} onClick={()=>switchSection("series")}><Tv size={20}/>Сериалы</button></nav></SheetContent></Sheet>
-    <Sheet open={selected!==null} onOpenChange={open=>{if(!open)setSelected(null)}}><SheetContent className="detail-sheet" side="right">{selected&&<div className="detail-scroll"><SheetHeader className="detail-header"><p className="eyebrow">{selected.section==="movies"?"ФИЛЬМ":"СЕРИАЛ"} · {selected.year}</p><SheetTitle>{selected.title}</SheetTitle><SheetDescription>{selected.originalTitle&&selected.originalTitle!==selected.title?selected.originalTitle:"Подробности"}</SheetDescription></SheetHeader><div className="detail-top"><PosterImage key={selected.poster??selected.id} item={selected} className="detail-poster"/><div className="detail-facts"><div className="rating">Кинопоиск <strong>{selected.kinopoisk||"—"}</strong></div><div className="rating">IMDb <strong>{selected.imdb||"—"}</strong></div></div></div><p className="detail-description">{selected.description||"Описание скоро появится."}</p><a className="source-link" href={selected.pageUrl} target="_blank" rel="noreferrer">Страница в каталоге <ArrowUpRight size={17}/></a><ReleaseList key={selected.id} items={releases} error={releaseError}/></div>}</SheetContent></Sheet>
+    <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}><SheetContent id="mobile-navigation" className="mobile-nav-sheet" side="left"><SheetHeader><SheetTitle>{t('Ка4алка Онл@йн')}</SheetTitle><SheetDescription>{t('Каталог фильмов и сериалов')}</SheetDescription></SheetHeader><nav className="mobile-nav-list" aria-label={t('Разделы каталога')}><button type="button" aria-current={section==="movies"?"page":undefined} onClick={()=>switchSection("movies")}><Film size={20}/>{t('Фильмы')}</button><button type="button" aria-current={section==="series"?"page":undefined} onClick={()=>switchSection("series")}><Tv size={20}/>{t('Сериалы')}</button></nav></SheetContent></Sheet>
+    <Sheet open={selected!==null} onOpenChange={open=>{if(!open)setSelected(null)}}><SheetContent className="detail-sheet" side="right">{selected&&<div className="detail-scroll"><SheetHeader className="detail-header"><p className="eyebrow">{t(selected.section==="movies"?"ФИЛЬМ":"СЕРИАЛ")} · {selected.year}</p><SheetTitle>{selected.title}</SheetTitle><SheetDescription>{selected.originalTitle&&selected.originalTitle!==selected.title?selected.originalTitle:t("Подробности")}</SheetDescription></SheetHeader><div className="detail-top"><PosterImage key={selected.poster??selected.id} item={selected} className="detail-poster"/><div className="detail-facts"><div className="rating">{t('Кинопоиск')} <strong>{selected.kinopoisk||"—"}</strong></div><div className="rating">IMDb <strong>{selected.imdb||"—"}</strong></div></div></div><p className="detail-description">{selected.description||t("Описание скоро появится.")}</p><a className="source-link" href={selected.pageUrl} target="_blank" rel="noreferrer">{t('Страница в каталоге')} <ArrowUpRight size={17}/></a><ReleaseList key={selected.id} items={releases} error={releaseError}/></div>}</SheetContent></Sheet>
   </SidebarProvider>;
 }
