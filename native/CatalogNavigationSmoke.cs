@@ -218,7 +218,7 @@ public partial class MainWindow
         Check(current==null&&Scroll().VerticalOffset<1,"explicit Films navigation from a detail resets the route instead of restoring its previous scroll");
         // User input must win over an in-flight return-to-card restoration.
         Scroll().ScrollToVerticalOffset(400);await Settle();var wheelPosition=CaptureCatalogPosition()!;
-        Click(Card(wheelPosition.ItemId!.Value));await Settle();CinemaBack();
+        Click(Card(wheelPosition.ItemId!.Value));await Settle();CinemaBack();await Settle();
         var wheelViewer=Scroll();
         foreach(var delta in new[]{-12,-120})
         {
