@@ -120,7 +120,6 @@ public partial class MainWindow
         Check(savedFilm!=null&&VisualElements<System.Windows.Shapes.Path>(savedFilm).Any(x=>x.Fill!=null),"saved movie detail heart is filled too");
         await QualitySmoke(Check);
         await SearchDownloadsSmoke(output,Check);
-        await CheckModernQueueVirtualization(output,Check);
         Close();
     }
 
@@ -154,7 +153,7 @@ public partial class MainWindow
             foreach(var item in fixtures)downloads.Items.Add(item);
             current=null;section="Загрузки";Width=1280;Height=800;Render();
             await Task.Delay(150);UpdateLayout();
-            var queue=FindVisual<ListBox>(Body,x=>AutomationProperties.GetName(x)=="Очередь загрузок")??throw new Exception("Queue performance fixture is missing.");
+            var queue=FindVisual<ListBox>(Body,x=>AutomationProperties.GetName(x)==AppLanguage.T("Очередь загрузок"))??throw new Exception("Queue performance fixture is missing.");
             check(queue.Items.Count==200&&VirtualizingPanel.GetIsVirtualizing(queue)&&VirtualizingPanel.GetVirtualizationMode(queue)==VirtualizationMode.Recycling&&ScrollViewer.GetCanContentScroll(queue),"200-item download queue keeps native recycling virtualization enabled");
             var scroller=FindVisual<ScrollViewer>(queue,_=>true)??throw new Exception("Queue scrolling fixture is missing.");
             scroller.ScrollToBottom();await Task.Delay(150);UpdateLayout();
