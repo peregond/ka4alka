@@ -9,7 +9,7 @@ public sealed class UiText : IValueConverter
 {
     public static UiText Instance {get;}=new();
     public static void Bind(TextBlock block,string source)=>block.SetBinding(TextBlock.TextProperty,new Binding(nameof(LanguageState.Version)){Source=LanguageState.Instance,Converter=Instance,ConverterParameter=source,Mode=BindingMode.OneWay});
-    public object Convert(object value,Type targetType,object parameter,CultureInfo culture)=>parameter as string switch
+    public object Convert(object value,Type targetType,object parameter,CultureInfo culture)=>(parameter as string) switch
     {
         "@genres"=>AppLanguage.Genres(value?.ToString()),
         "@meta"=>string.Join(" · ",(value?.ToString()??"").Split(" · ").Select(AppLanguage.Genres)),

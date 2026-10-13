@@ -30,7 +30,7 @@ public partial class MainWindow
                 Check(VisualElements<TextBlock>(SidePanel).Any(text=>text.Text==name),"Sidebar translates: "+name);
             Check(VisualElements<TextBlock>(Body).Any(text=>text.Text=="Interface language"),"Settings expose the localized language label.");
             Check(VisualElements<TextBlock>(Body).Any(text=>text.Text=="Appearance"),"Appearance section translates without rebuilding preferences.");
-            Shot("settings-english");
+            FindVisual<ComboBox>(Body,box=>box.Name=="SettingsLanguage")!.BringIntoView();await Settle();Shot("settings-english");
             section="Фильмы";current=null;liveKey=CurrentCatalogKey;Render();await Settle();
             Check(VisualElements<TextBlock>(Body).Any(text=>text.Text=="Popular"),"Movie shelves translate in English.");
             Check(VisualElements<TextBlock>(RootGrid).Any(text=>text.Text=="Genre"),"Catalog filters translate while preserving their canonical selection values.");
