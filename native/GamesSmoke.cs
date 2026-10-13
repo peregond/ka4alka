@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
 using System.IO;
 using System.Text.Json;
 using System.Windows;
@@ -23,6 +25,15 @@ public partial class MainWindow
             UpdateLayout();
             var bitmap=new RenderTargetBitmap(Math.Max(1,(int)Math.Ceiling(ActualWidth)),Math.Max(1,(int)Math.Ceiling(ActualHeight)),96,96,PixelFormats.Pbgra32);bitmap.Render(this);
             var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(bitmap));using var stream=File.Create(Path.Combine(output,name+".png"));png.Save(stream);
+        }
+        // Persist fixture images as well as caching them: weak machines deliberately
+        // evict decoded pictures at 12 MB, just as an ordinary app session does.
+        void CacheArt(string key,BitmapImage bitmap)
+        {
+            coverCache.Put(key,bitmap);
+            var url=key.Split('|')[0];var folder=Path.Combine(Preferences.DataDir,"covers");Directory.CreateDirectory(folder);
+            var path=Path.Combine(folder,Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(url)))+".img");
+            var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(bitmap));using var file=File.Create(path);png.Save(file);
         }
         // Covers and the hero picture are drawn here and placed in the decoded cache, so the page needs no network.
         BitmapImage Art(string title,string from,string to,int width,int height)
@@ -58,8 +69,8 @@ public partial class MainWindow
         {
             var url="https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/"+entry.Item1+"/capsule_231x87.jpg";
             var item=GameCatalog.Item(entry.Item1,entry.Item2,url) with{Store=stores[index],Genre=genres[index],Year=GameRelease.Parse(stores[index].Released,new DateTime(2026,10,12)).Year};
-            coverCache.Put(url+"|"+PosterDecodeWidth,Art(entry.Item2,palette[index].Item1,palette[index].Item2,460,215));
-            coverCache.Put(GameCatalog.HeroImage(item)!,Art(entry.Item2,palette[index].Item1,palette[index].Item2,1280,413));
+            CacheArt(url+"|"+PosterDecodeWidth,Art(entry.Item2,palette[index].Item1,palette[index].Item2,460,215));
+            CacheArt(GameCatalog.HeroImage(item)!,Art(entry.Item2,palette[index].Item1,palette[index].Item2,1280,413));
             return item;
         }).ToArray();
         var game=games[4];var spotlight=games[0];
@@ -68,7 +79,7 @@ public partial class MainWindow
         {
             var thumb="https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/"+id+"/ss_"+number+".600x338.jpg";var full="https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/"+id+"/ss_"+number+".1920x1080.jpg";
             var tone=palette[(index+number)%palette.Length];
-            coverCache.Put(thumb+"|320",Art("Скриншот "+(number+1),tone.Item1,tone.Item2,320,180));coverCache.Put(full+"|1280",Art("Скриншот "+(number+1),tone.Item1,tone.Item2,1280,720));
+            CacheArt(thumb+"|320",Art("Скриншот "+(number+1),tone.Item1,tone.Item2,320,180));CacheArt(full+"|1280",Art("Скриншот "+(number+1),tone.Item1,tone.Item2,1280,720));
             return new GameShot(thumb,full);
         }).ToArray();
         // The first shelves are held back by hand so the pending page can be checked; every other request answers at once.
