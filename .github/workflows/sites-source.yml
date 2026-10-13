@@ -20,9 +20,6 @@ jobs:
           node-version: '24'
           cache: npm
           cache-dependency-path: web-index/package-lock.json
-      - name: Install locked dependencies
-        working-directory: web-index
-        run: npm run install:ci
       - name: Verify source integrity regression
         working-directory: web-index
         run: node tests/source-integrity.mjs
@@ -44,9 +41,9 @@ jobs:
           with zipfile.ZipFile(archive) as source:
               source.extractall(os.environ['SITES_CANDIDATE'])
           PY
-          ln -s "$GITHUB_WORKSPACE/web-index/node_modules" "$candidate/node_modules"
           cd "$candidate"
           node scripts/verify-source.mjs "$RUNNER_TEMP/sites-source/source-manifest.json"
+          npm run install:ci
           node tests/title-lookup.mjs
           node tests/release-performance.mjs
           node tests/title-identity.mjs
