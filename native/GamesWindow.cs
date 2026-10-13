@@ -80,7 +80,7 @@ public partial class MainWindow
         var row=new DockPanel();stack.Children.Add(row);
         var refresh=ActionButton("","IconRefresh",RefreshGames,"PillButton");refresh.Name="GameRefresh";refresh.ToolTip="Обновить каталог";AutomationProperties.SetName(refresh,"Обновить каталог");
         refresh.Padding=new(0);refresh.Width=compactHeight?36:40;refresh.MinHeight=compactHeight?36:40;refresh.VerticalAlignment=VerticalAlignment.Top;refresh.Margin=new(8,0,0,8);DockPanel.SetDock(refresh,Dock.Right);row.Children.Add(refresh);
-        var reset=ActionButton("Сбросить всё","IconReset",()=>{gameShelf="";gameGenre="";gamePage=1;gameKey="";ResetCatalogNavigationPosition();Render();},"PillButton");reset.Name="GameResetFilters";reset.MinHeight=compactHeight?36:40;reset.VerticalAlignment=VerticalAlignment.Top;reset.Margin=new(8,0,0,8);DockPanel.SetDock(reset,Dock.Right);row.Children.Add(reset);
+        var reset=ActionButton(ActualWidth<640?"":"Сбросить всё","IconReset",()=>{gameShelf="";gameGenre="";gamePage=1;gameKey="";ResetCatalogNavigationPosition();Render();},"PillButton");reset.Name="GameResetFilters";reset.ToolTip="Сбросить подборку и жанр. Поиск сохраняется.";AutomationProperties.SetName(reset,"Сбросить выбранные фильтры");if(ActualWidth<640){reset.Padding=new(0);reset.Width=compactHeight?36:40;}reset.MinHeight=compactHeight?36:40;reset.VerticalAlignment=VerticalAlignment.Top;reset.Margin=new(8,0,0,8);DockPanel.SetDock(reset,Dock.Right);row.Children.Add(reset);
         var chips=new WrapPanel();row.Children.Add(chips);
         void Chip(string label,string shelf)
         {

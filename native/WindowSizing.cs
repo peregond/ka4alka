@@ -192,7 +192,7 @@ public partial class MainWindow
                 button.Width=iconOnly?(shortChip?36:40):double.NaN;
             }
             button.HorizontalContentAlignment=HorizontalAlignment.Center;button.MinHeight=shortChip?36:40;button.FontSize=compact?13:14;
-            button.Padding=new(compact?12:16,0,compact?12:16,0);button.Margin=new(0,0,8,8);
+            button.Padding=button.Name=="ResetActiveCatalogFilters"&&width<560?new(0):new(compact?12:16,0,compact?12:16,0);button.Margin=new(0,0,8,8);
         }
         if(catalogRefreshButton!=null){catalogRefreshButton.Padding=new(0);catalogRefreshButton.Width=shortChip?36:40;catalogRefreshButton.MinHeight=shortChip?36:40;catalogRefreshButton.Margin=new(8,0,0,8);}
         UpdateCatalogFilterOverflow();UpdateDiscoveryLayout();
