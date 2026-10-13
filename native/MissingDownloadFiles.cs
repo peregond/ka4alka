@@ -49,6 +49,7 @@ public sealed partial class DownloadService
     {
         if(closeRequested)return Task.CompletedTask;
         if(checkingCompletedFiles)return force?CheckAfterCurrentAsync(completedFilesCheck):completedFilesCheck;
+        if(!Items.Any(item=>item.HasCompletedDownload||item.FilesMissing))return Task.CompletedTask;
         if(!force&&DateTime.UtcNow-lastCompletedFilesCheck<TimeSpan.FromSeconds(10))return Task.CompletedTask;
         return completedFilesCheck=CheckCompletedFilesCoreAsync();
     }
