@@ -219,7 +219,7 @@ public partial class MainWindow
         // ---- sort chip ----
         var sortChip=new Button{Style=(Style)FindResource("PillButton"),Margin=new(0,0,10,10)};AutomationProperties.SetName(sortChip,AppLanguage.T("Сортировка раздач: выбрать"));top.Children.Add(sortChip);
         var sortMenu=new ToggleContextMenu{PlacementTarget=sortChip,Placement=System.Windows.Controls.Primitives.PlacementMode.Bottom,MaxHeight=380};
-        foreach(var name in sorts){var entry=new MenuItem{Header=name,IsCheckable=true,Tag=name};entry.Click+=(_,_)=>{sortMenu.IsOpen=false;sort.SelectedItem=name;};sortMenu.Items.Add(entry);}
+        foreach(var name in sorts){var entry=new MenuItem{Header=AppLanguage.T(name),IsCheckable=true,Tag=name};entry.Click+=(_,_)=>{sortMenu.IsOpen=false;sort.SelectedItem=name;};sortMenu.Items.Add(entry);}
         AttachMenuToggle(sortChip,sortMenu);
 
         var toggle=new Button{Style=(Style)FindResource("PillButton"),Margin=new(0,0,10,10)};

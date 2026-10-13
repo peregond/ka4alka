@@ -21,6 +21,6 @@ static class SearchLanguageTests
         Check(ReleaseRecommendation.Pick(rows,preferredLanguage:"ru")?.Entry==russian,"the primary download recommendation retains Russian priority in Russian mode");
         Check(ReleaseRecommendation.Pick([russian],preferredLanguage:"en")?.Entry==russian,"a Russian fallback remains downloadable when no English release exists");
         Check(ReleaseRecommendation.Pick([dead],preferredLanguage:"en")==null,"language preference cannot bypass minimum seeder safeguards");
-        Check(ReleaseRecommendation.Pick(rows,preferredLanguage:"en")!.Reason.Contains("английская озвучка"),"recommendations describe evidenced English audio only");
+        Check(ReleaseRecommendation.Pick(rows,preferredLanguage:"en")!.Reason.Contains("английская озвучка",StringComparison.OrdinalIgnoreCase),"recommendations describe evidenced English audio only");
     }
 }
