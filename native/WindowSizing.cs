@@ -220,7 +220,7 @@ public partial class MainWindow
     void UpdateCatalogColumns(bool force=false)
     {
         // The games home has shelves but no list, so it still follows the window width.
-        if(catalogList==null&&!(section=="Игры"&&discoveryShelves.Count>0))return;
+        if(catalogList==null&&!(section=="Игры"&&gameShelfViews.Count>0))return;
         var width=Body.ActualWidth>0?Body.ActualWidth:Math.Max(1,Width-(compactWidth?64:236)-2*contentGutter);
         var columns=GameGrid?WindowSizing.GameColumns(width):WindowSizing.PosterColumns(width);
         if(!force&&columns==catalogColumns)return;
