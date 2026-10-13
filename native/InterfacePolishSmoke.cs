@@ -34,6 +34,18 @@ public partial class MainWindow
         {
             MaxWidth=1800;MaxHeight=1000;MinWidth=width;MinHeight=height;Width=width;Height=height;await Settle();
         }
+        async Task WaitForPosterRealization()
+        {
+            var deadline=DateTime.UtcNow.AddSeconds(3);
+            while(DateTime.UtcNow<deadline)
+            {
+                UpdateLayout();
+                var posters=VisualElements<Border>(Body).Count(element=>element.Name=="CardPoster"&&element.IsVisible);
+                var titles=VisualElements<TextBlock>(Body).Count(element=>element.Name=="CardTitleText"&&element.IsVisible);
+                if(posters>0&&posters==titles)return;
+                await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ContextIdle);await Task.Delay(40);
+            }
+        }
         void CheckCards(string stage)
         {
             var posters=VisualElements<Border>(Body).Where(element=>element.Name=="CardPoster"&&element.IsVisible).ToArray();
@@ -51,7 +63,7 @@ public partial class MainWindow
                 prefs.Light=light;ApplyTheme();Render();await Settle();SearchSubmitButton.Focus();await Settle();
                 Check(InterfacePalette.For(light).All(pair=>pair.Value.IsFrozen&&ReferenceEquals(FindResource(pair.Key),pair.Value)),"Theme reuses its frozen palette: "+(light?"light":"dark"));
                 Check(SearchShortcutHint.IsVisible&&SearchPlaceholder.Margin.Right>=70,"Wide idle search shows its keyboard hint with reserved text space: "+(light?"light":"dark"));
-                CheckCards(light?"light":"dark");Shot("interface-"+(light?"light":"dark"));
+                await WaitForPosterRealization();CheckCards(light?"light":"dark");Shot("interface-"+(light?"light":"dark"));
             }
             // A RenderTargetBitmap can capture a viewport larger than the actual
             // GitHub runner desktop. Native input cannot reach that viewport:
