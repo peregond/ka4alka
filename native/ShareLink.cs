@@ -79,10 +79,10 @@ public static class ShareLink
     static string Escape(string value)
     {
         var result=new StringBuilder();
+        Span<byte> bytes=stackalloc byte[4];
         foreach(var rune in value.EnumerateRunes())
         {
             if(Rune.IsLetterOrDigit(rune)||rune.Value is '-' or '.' or '_' or '~'){result.Append(rune.ToString());continue;}
-            Span<byte> bytes=stackalloc byte[4];
             var count=rune.EncodeToUtf8(bytes);
             for(var i=0;i<count;i++)result.Append('%').Append(bytes[i].ToString("X2"));
         }

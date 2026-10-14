@@ -14,6 +14,8 @@ static class ShareLinkTests
         var series=new MediaItem(-2,"Чёрное зеркало","Сериалы","",0,"—","—","#526B69"){PageUrl=LiveCatalog.Base+"/tvseries/black-mirror"};
         Check(ShareLink.Create(series)=="kachalka://series/black-mirror?title=Чёрное%20зеркало","a series link without a year leaves the year out");
         Check(ShareLink.Parse(ShareLink.Create(series))?.PageUrl==LiveCatalog.Base+"/tvseries/black-mirror","a series link opens the series page");
+        var unicodeTitle="Кино 🎬 + 100% & / ?";
+        Check(ShareLink.Parse(ShareLink.Create(film with{Title=unicodeTitle}))?.Title==unicodeTitle,"four-byte Unicode and query delimiters round-trip without changing the shared title");
         Check(ShareLink.Parse("kachalka://movie/avengers-endgame-2019?title=%D0%9C%D1%81%D1%82%D0%B8%D1%82%D0%B5%D0%BB%D0%B8&year=2019/") is {Title:"Мстители",Year:2019},"a link a browser percent-encoded still reads back");
         Check(ShareLink.Parse("Посмотри: Курьер (2026) KACHALKA://movie/kurer-2026?title=Курьер&year=2026.")?.Slug=="kurer-2026","a link inside a short message is found, whatever the letter case and trailing punctuation");
         Check(ShareLink.Parse("kachalka://movie/kurer-2026") is {Title:"",Year:0},"the title and year are optional");
