@@ -72,6 +72,7 @@ public partial class App : Application
             };
         }
         RegisterSmoke("--games-smoke-test",window.GamesSmokeTest);
+        RegisterSmoke("--search-downloads-smoke-test",window.SearchDownloadsSmokeTest);
         RegisterSmoke("--home-availability-smoke-test",window.HomeAvailabilitySmokeTest);
         RegisterSmoke("--startup-performance-smoke-test",window.StartupPerformanceSmokeTest);
         RegisterSmoke("--cover-viewport-smoke-test",window.CoverViewportSmokeTest);

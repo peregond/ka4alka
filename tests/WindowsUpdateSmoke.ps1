@@ -62,12 +62,21 @@ try{
  if(Test-Path (Join-Path $designEvidence 'error.txt')){throw (Get-Content (Join-Path $designEvidence 'error.txt') -Raw)}
  if(-not(Test-Path (Join-Path $designEvidence 'design.json'))){throw 'Modern design UI evidence missing'}
  Get-Content (Join-Path $designEvidence 'design.json')
- $catalogEvidence=Join-Path $root 'test-output/catalog-paging'
- $ui=Start-Process (Join-Path $root ('dist/Kachalka-'+$short+'/Kachalka.exe')) -ArgumentList @('--catalog-paging-smoke-test',('"'+$catalogEvidence+'"')) -PassThru
- if(-not $ui.WaitForExit(60000)){ $ui.Kill($true);throw 'Catalog UI smoke timed out' }
- if(Test-Path (Join-Path $catalogEvidence 'error.txt')){if(Test-Path (Join-Path $catalogEvidence 'checks.txt')){Get-Content (Join-Path $catalogEvidence 'checks.txt') | Write-Output};throw (Get-Content (Join-Path $catalogEvidence 'error.txt') -Raw)}
- if(-not(Test-Path (Join-Path $catalogEvidence 'checks.txt'))){throw 'Catalog UI evidence missing'}
- Get-Content (Join-Path $catalogEvidence 'checks.txt')
+ # Separate windows keep catalog layout and search/download navigation within
+ # their own bounded deadlines. Every assertion runs; neither fixture waits for
+ # the other's hundreds of layout, mouse and dialog checks.
+ foreach($scenario in @('catalog-paging','search-downloads')){
+   $scenarioEvidence=Join-Path $root ('test-output/'+$scenario)
+   $ui=Start-Process (Join-Path $root ('dist/Kachalka-'+$short+'/Kachalka.exe')) -ArgumentList @('--'+$scenario+'-smoke-test',('"'+$scenarioEvidence+'"')) -PassThru
+   if(-not $ui.WaitForExit(60000)){
+     $ui.Kill($true)
+     if(Test-Path (Join-Path $scenarioEvidence 'checks.txt')){Get-Content (Join-Path $scenarioEvidence 'checks.txt') | Write-Output}
+     throw ($scenario+' UI smoke timed out')
+   }
+   if(Test-Path (Join-Path $scenarioEvidence 'error.txt')){if(Test-Path (Join-Path $scenarioEvidence 'checks.txt')){Get-Content (Join-Path $scenarioEvidence 'checks.txt') | Write-Output};throw (Get-Content (Join-Path $scenarioEvidence 'error.txt') -Raw)}
+   if(-not(Test-Path (Join-Path $scenarioEvidence 'checks.txt'))){throw ($scenario+' UI evidence missing')}
+   Get-Content (Join-Path $scenarioEvidence 'checks.txt')
+ }
  $downloadEvidence=Join-Path $root 'test-output/download-end-to-end'
  $downloadUi=Start-Process (Join-Path $root ('dist/Kachalka-'+$short+'/Kachalka.exe')) -ArgumentList @('--end-to-end-smoke-test',('"'+$downloadEvidence+'"')) -PassThru
  if(-not $downloadUi.WaitForExit(60000)){ $downloadUi.Kill($true);throw 'Download and poster UI smoke timed out' }

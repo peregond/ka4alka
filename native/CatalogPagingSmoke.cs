@@ -119,7 +119,6 @@ public partial class MainWindow
         var savedFilm=FindVisual<Button>(RootGrid,x=>AutomationProperties.GetName(x)=="Сохранено")??FindVisual<Button>(Body,x=>AutomationProperties.GetName(x)=="Сохранено");
         Check(savedFilm!=null&&VisualElements<System.Windows.Shapes.Path>(savedFilm).Any(x=>x.Fill!=null),"saved movie detail heart is filled too");
         await QualitySmoke(Check);
-        await SearchDownloadsSmoke(output,Check);
         Close();
     }
 

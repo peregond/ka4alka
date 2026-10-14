@@ -14,6 +14,23 @@ using System.Windows.Threading;
 namespace Kachalka;
 public partial class MainWindow
 {
+    public async Task SearchDownloadsSmokeTest(string output)
+    {
+        Directory.CreateDirectory(output);liveRequest?.Cancel();ResetDiscoveryData();searchDelay.Stop();
+        current=null;section="Фильмы";Search.Text="";searchDelay.Stop();submittedQuery="";searchCategory="";
+        favoritesOnly=false;ResetCatalogFilters();livePage=1;liveKey="";
+        MaxWidth=1800;MaxHeight=1000;MinWidth=1280;MinHeight=300;Width=1280;Height=800;
+        var checks=0;
+        void Check(bool ok,string label)
+        {
+            if(!ok)throw new Exception(label);
+            checks++;File.AppendAllText(Path.Combine(output,"checks.txt"),"PASS: "+label+Environment.NewLine);
+        }
+        await SearchDownloadsSmoke(output,Check);
+        File.WriteAllText(Path.Combine(output,"checks.json"),JsonSerializer.Serialize(new{Checks=checks,UnifiedSearch=true,Downloads=true,SavedNavigation=true}));
+        Close();
+    }
+
     [StructLayout(LayoutKind.Sequential)] struct DownloadSmokePoint {public int X,Y;}
     [DllImport("user32.dll",SetLastError=true)] static extern bool GetCursorPos(out DownloadSmokePoint point);
     [DllImport("user32.dll",SetLastError=true)] static extern bool SetCursorPos(int x,int y);
