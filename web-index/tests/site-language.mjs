@@ -37,7 +37,7 @@ for(const language of ['en','es']){
  }
 }
 // Ensure each literal translation call resolves; guards accidental whitespace keys.
-for(const name of ['catalog-page.tsx','release-list.tsx','product-preview.tsx','site-language.tsx']){
+for(const name of ['catalog-page.tsx','release-list.tsx','product-preview.tsx','site-language.tsx','landing-page.tsx','scroll-header.tsx']){
  const source=ts.createSourceFile(name,fs.readFileSync(new URL(`../components/${name}`,import.meta.url),'utf8'),ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
  const visit=node=>{
   if(ts.isCallExpression(node)&&ts.isIdentifier(node.expression)&&node.expression.text==='t'&&ts.isStringLiteral(node.arguments[0]))assert.ok(node.arguments[0].text in dictionaries.ru,`${name}: missing ${node.arguments[0].text}`);
