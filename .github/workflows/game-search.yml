@@ -14,7 +14,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: game-search-${{ github.ref }}-${{ github.event_name }}
+  group: game-search-${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 jobs:
   game-releases:
