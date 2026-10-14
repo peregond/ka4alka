@@ -164,5 +164,9 @@
   "Нет. Качалка сама работает с magnet-ссылками и .torrent-файлами: добавляет задачи, скачивает и позволяет управлять очередью внутри приложения.": "No. Ka4alka handles magnet links and .torrent files itself: add tasks, download and manage your queue in the app.",
   "Как получать новые версии?": "How do I get updates?",
   "Приложение проверяет обновления с GitHub. Управлять проверкой и установкой можно в настройках. Очередь и пользовательские настройки сохраняются при обновлении.": "The app checks GitHub for updates. Control checking and installation in Settings. Your queue and preferences are preserved when updating.",
-  "Исходный код": "Source code"
+  "Исходный код": "Source code",
+  "Качалка — на главную": "Ka4alka — home",
+  "Основная навигация": "Main navigation",
+  "Раздача передаётся с ноутбука на домашний компьютер в одной локальной сети": "A release is sent from a laptop to a home computer on the same local network",
+  "Твой вечер. Играй, смотри, качай. Фильмы, сериалы и игры, поиск раздач и управление загрузками в одном приложении. Скачать Качалку для Windows 10/11.": "Your evening, your way. Play, watch and download movies, TV shows and games, find releases and manage downloads in one app. Download Ka4alka for Windows 10/11."
 }

@@ -1,5 +1,10 @@
-import CatalogPage from "@/components/catalog-page";
+import { LandingPage } from "@/components/landing-page";
+import { getLatestRelease } from "@/lib/app-release";
 
-export default function Home() {
-  return <CatalogPage/>;
+export const dynamic = "force-dynamic";
+
+export default async function Home() {
+  const release = await getLatestRelease();
+  return <LandingPage release={release} />;
 }
+
