@@ -1,0 +1,37 @@
+name: Windows game release search
+on:
+  workflow_dispatch:
+  workflow_call:
+  push:
+    branches: [claude/quirky-hopper-1vlmj6]
+    paths:
+      - 'native/GameReleaseSources.cs'
+      - 'native/KnabenSource.cs'
+      - 'tests/GameCatalogTests.cs'
+      - 'tests/GameReleaseProbe.cs'
+      - 'tests/Fixtures/*games*'
+      - '.github/workflows/game-search.yml'
+permissions:
+  contents: read
+concurrency:
+  group: game-search-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+jobs:
+  game-releases:
+    runs-on: windows-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Verify game search formats and source orchestration
+        run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --games-only
+      - name: Verify live downloadable releases for four Steam games
+        run: dotnet run --project tests/Kachalka.Tests.csproj -c Release --no-build -- --probe-game-releases
+      - name: Preserve game source checks
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-game-releases
+          path: test-output/transfer-*/game-releases/*

@@ -4,7 +4,7 @@ namespace Kachalka;
 
 public static class GameReleaseSources
 {
-    static readonly Regex MetadataTags=new(@"\[(?:P|L|DL|P2P|Scene|Portable|RUS\b[^\]]*|ENG\b[^\]]*|MULTI\d*\b[^\]]*|v\.?\s*\d[^\]]*|RePack\b[^\]]*|(?:FitGirl|DODI)(?:\s+Repack)?)\]",RegexOptions.IgnoreCase|RegexOptions.CultureInvariant|RegexOptions.Compiled);
+    static readonly Regex MetadataTags=new(@"\[(?:P|L|DL|PC|РС|ПК|CD|DVD|RIP|P2P|Scene|Portable|RUS\b[^\]]*|ENG\b[^\]]*|MULTI\d*\b[^\]]*|v\.?\s*\d[^\]]*|RePack\b[^\]]*|(?:FitGirl|DODI)(?:\s+Repack)?)\]",RegexOptions.IgnoreCase|RegexOptions.CultureInvariant|RegexOptions.Compiled);
     public static string[] Queries(MediaItem game)=>new[]{game.OriginalTitle}.Concat(MediaIdentity.Queries(game))
         .Where(name=>!string.IsNullOrWhiteSpace(name)).Select(name=>name!.Replace("™","").Replace("®","").Replace('’','\'').Trim())
         .Where(name=>name.Length>0).Distinct(StringComparer.OrdinalIgnoreCase).Take(3).ToArray();
