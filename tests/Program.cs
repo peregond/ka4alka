@@ -55,6 +55,7 @@ if(args.Contains("--home-availability-only")){HiddenCatalogTests.Run();await UXR
 if(args.Contains("--missing-files-only")){await MissingDownloadFilesTests.Run(root);return;}
 if(args.Contains("--language-only")){LanguageResourceTests.Run();SearchLanguageTests.Run();await UnifiedSearchTests.Run();return;}
 if(args.Contains("--games-only")){await GameCatalogTests.Run(root);return;}
+if(args.Contains("--probe-game-releases")){await GameReleaseProbe.Run(root);return;}
 if(args.Contains("--metadata-only")){await MediaMetadataTests.Run();return;}
 if(args.Contains("--imdb-suggestions-only")){await ImdbSuggestionTests.Run();return;}
 if(args.Contains("--portraits-only")){await CinemaPortraitTests.Run();return;}
