@@ -48,10 +48,16 @@ public partial class MainWindow
             await Until(()=>retained.Any(image=>image.Source!=null),"Visible popular posters did not arrive.");
             var images=retained.Where(image=>image.Source!=null).Select(image=>(Image:image,Source:image.Source)).ToArray();
             Check(images.Length>0,"visible posters exist before delayed evidence: "+category+" lite="+lite);
-            using var recording=new CancellationTokenSource();var inputDelays=new List<double>();
+            using var recording=new CancellationTokenSource();var postedInputDelays=new List<double>();var inputDelays=new List<double>();var refreshTimes=new List<double>();
+            catalogRefreshMeasured=ms=>refreshTimes.Add(ms);
+            // A native Dispatcher timer measures the input queue directly. The worker probe below
+            // is retained separately: its elapsed time also includes preemption of its sending thread.
+            var previousInput=Stopwatch.GetTimestamp();
+            var inputTimer=new DispatcherTimer(DispatcherPriority.Input){Interval=TimeSpan.FromMilliseconds(25)};
+            inputTimer.Tick+=(_,_)=>{var now=Stopwatch.GetTimestamp();inputDelays.Add(Math.Max(0,Stopwatch.GetElapsedTime(previousInput,now).TotalMilliseconds-25));previousInput=now;};inputTimer.Start();
             var input=Task.Run(async()=>
             {
-                try{while(!recording.IsCancellationRequested){await Task.Delay(25,recording.Token);var sent=Stopwatch.GetTimestamp();await Dispatcher.InvokeAsync(()=>inputDelays.Add(Stopwatch.GetElapsedTime(sent).TotalMilliseconds),DispatcherPriority.Input,recording.Token);}}
+                try{while(!recording.IsCancellationRequested){await Task.Delay(25,recording.Token);var sent=Stopwatch.GetTimestamp();await Dispatcher.InvokeAsync(()=>postedInputDelays.Add(Stopwatch.GetElapsedTime(sent).TotalMilliseconds),DispatcherPriority.Input,recording.Token);}}
                 catch(OperationCanceledException){}
             });
             var frames=new List<double>();long lastFrame=0;
@@ -70,12 +76,12 @@ public partial class MainWindow
                     await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.Background);
                 }
             }
-            finally{CompositionTarget.Rendering-=rendered;recording.Cancel();await input;}
-            inputDelays.Sort();frames.Sort();
+            finally{CompositionTarget.Rendering-=rendered;inputTimer.Stop();catalogRefreshMeasured=null;recording.Cancel();await input;}
+            inputDelays.Sort();postedInputDelays.Sort();refreshTimes.Sort();frames.Sort();
             var p95=inputDelays.Count==0?0:inputDelays[(int)((inputDelays.Count-1)*.95)];
-            samples.Add(new{Section=category,Lite=lite,BackgroundPageRebuilds=renderCount-baseline,RetainedPosters=images.Length,InputSamples=inputDelays.Count,InputP95Ms=p95,InputMaxMs=inputDelays.DefaultIfEmpty().Max(),FrameP95Ms=frames.Count==0?0:frames[(int)((frames.Count-1)*.95)]});
+            samples.Add(new{Section=category,Lite=lite,BackgroundPageRebuilds=renderCount-baseline,RetainedPosters=images.Length,InputSamples=inputDelays.Count,InputP95Ms=p95,InputMaxMs=inputDelays.DefaultIfEmpty().Max(),WorkerInputP95Ms=postedInputDelays.Count==0?0:postedInputDelays[(int)((postedInputDelays.Count-1)*.95)],RefreshP95Ms=refreshTimes.Count==0?0:refreshTimes[(int)((refreshTimes.Count-1)*.95)],RefreshMaxMs=refreshTimes.DefaultIfEmpty().Max(),FrameMaxMs=frames.DefaultIfEmpty().Max(),FrameP95Ms=frames.Count==0?0:frames[(int)((frames.Count-1)*.95)]});
             await File.WriteAllTextAsync(Path.Combine(output,"measurements.json"),JsonSerializer.Serialize(samples,new JsonSerializerOptions{WriteIndented=true}));
-            Check(inputDelays.Count>10&&p95<200,"native input continues during slow catalog loading: "+category+" lite="+lite+" samples="+inputDelays.Count+" p95="+p95.ToString("F2"));
+            Check(inputDelays.Count>10&&p95<200&&inputDelays.Max()<1000,"native input continues during slow catalog loading: "+category+" lite="+lite+" samples="+inputDelays.Count+" p95="+p95.ToString("F2"));
         }
         await File.WriteAllTextAsync(Path.Combine(output,"checks.json"),JsonSerializer.Serialize(new{Checks=checks,Samples=samples},new JsonSerializerOptions{WriteIndented=true}));Close();
     }

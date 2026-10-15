@@ -5,9 +5,11 @@ public partial class MainWindow
 {
     // Release checks only change evidence and membership. Keep the ScrollViewer, filter controls,
     // poster containers and their decoded images alive throughout those background results.
+    internal Action<double>? catalogRefreshMeasured;
     bool RefreshCatalogInPlace()
     {
         if(closed||current!=null||activePerson!=null||section is not ("Фильмы" or "Сериалы")||catalogList==null||catalogRows==null||catalogEmptyHost==null)return false;
+        var refreshStart=catalogRefreshMeasured==null?0:System.Diagnostics.Stopwatch.GetTimestamp();
         var rawPage=CatalogPageItems();
         var cards=rawPage.Where(item=>(!DiscoveryCatalog||RecommendableTitle(item))&&CatalogQualityMatches(item)).ToArray();
         var membershipChanged=!catalogDisplay.Select(item=>item.Id).SequenceEqual(cards.Select(item=>item.Id));
@@ -32,7 +34,7 @@ public partial class MainWindow
             RefreshDiscoveryHero(banners);
         }
         ApplyPosterDownloads(cards);RefreshLoadingIndicator();UpdateDiscoveryLayout();
-        RestoreCatalogReflow(position);return true;
+        RestoreCatalogReflow(position);catalogRefreshMeasured?.Invoke(System.Diagnostics.Stopwatch.GetElapsedTime(refreshStart).TotalMilliseconds);return true;
     }
 
     void RefreshDiscoveryHero(MediaItem[] banners)
