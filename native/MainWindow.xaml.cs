@@ -221,7 +221,7 @@ public partial class MainWindow:Window
     void OpenFolder(object sender,RoutedEventArgs e){var d=(DownloadItem)((Button)sender).Tag;if(Directory.Exists(d.Folder))Process.Start(new ProcessStartInfo(d.Folder){UseShellExecute=true});}
     void ApplyTheme()
     {
-        ApplyInterfaceTheme(prefs.Light);
+        ApplyInterfaceTheme(prefs.Light);posterWave=null;
         // A sun with rays in the light theme and a filled crescent in the dark one.
         ThemeIcon.Data=(Geometry)FindResource(prefs.Light?"IconSun":"IconMoon");
         if(prefs.Light)ThemeIcon.Fill=null;else ThemeIcon.SetResourceReference(System.Windows.Shapes.Shape.FillProperty,"Text");

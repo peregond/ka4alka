@@ -95,7 +95,7 @@ public partial class MainWindow
     }
     void CoverVisibilityChanged(Image image,CoverRequest state,CoverViewport.Position position)
     {
-        if(!position.Near||closing||closed){CancelCover(state);CancelFeatureCover(state);CancelCoverRatings(state);if(image.Tag?.ToString()=="FeaturePoster")state.FeatureAttempted=false;image.Source=null;return;}
+        if(!position.Near||closing||closed){CancelCover(state);CancelFeatureCover(state);CancelCoverRatings(state);if(image.Tag?.ToString()=="FeaturePoster")state.FeatureAttempted=false;image.Source=null;SyncPosterShimmer(image,state);return;}
         var item=image.DataContext;var url=CoverUrl(item);
         if(!ReferenceEquals(state.Context,item)||state.Url!=url)
         {
@@ -103,7 +103,7 @@ public partial class MainWindow
         }
         if(!position.Visible)CancelCoverRatings(state);
         else if(item is MediaItem card&&card.IsLive&&card.Cinema&&!ReferenceEquals(state.RatingsContext,item)){state.RatingsContext=item;var ratings=state.RatingsRequest=new CancellationTokenSource();_=UpdateVisibleCardRatings(card,state,ratings);}
-        if(image.Tag?.ToString()!="FeaturePoster")_=LoadCover(image,state,item,url);
+        if(image.Tag?.ToString()!="FeaturePoster"){_=LoadCover(image,state,item,url);SyncPosterShimmer(image,state);}
         if(image.Tag?.ToString()=="FeaturePoster"&&item is MediaItem feature&&!state.FeatureAttempted&&state.FeatureRequest==null)
             _=LoadFeatureCover(image,state,feature);
     }
@@ -185,7 +185,7 @@ public partial class MainWindow
                 }
             }
         }
-        finally{if(ReferenceEquals(state.Request,request))state.Request=null;request.Dispose();}
+        finally{if(ReferenceEquals(state.Request,request))state.Request=null;request.Dispose();SyncPosterShimmer(image,state);}
     }
     // Catalog covers come straight from the image host. Where that host is slow, blocked or refuses us, the same
     // cover is asked from the site's proxy instead, as the website does; other covers have no second way.
@@ -212,6 +212,7 @@ public partial class MainWindow
             state.PresentationPending=false;
             if(!closing&&!closed&&image.IsLoaded&&ReferenceEquals(image.DataContext,item)&&CoverUrl(image.DataContext)==url&&CoverViewportFor(image)?.Measure(image).Near==true)
                 image.Source=bitmap;
+            SyncPosterShimmer(image,state);
         });
     }
     static void CancelCover(CoverRequest state){state.PresentationVersion++;state.PresentationPending=false;var request=state.Request;state.Request=null;request?.Cancel();}
