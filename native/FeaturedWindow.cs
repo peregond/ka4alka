@@ -13,6 +13,7 @@ public partial class MainWindow
     readonly Dictionary<string,DiscoveryShelfView> featuredShelves=[];
     TextBlock? featuredState;
     StackPanel? featuredPanel;
+    Button? featuredRetry;
     internal Func<CancellationToken,Task<FeaturedGroup[]>>? featuredProvider;
     void ShowFeatured()
     {
@@ -31,7 +32,7 @@ public partial class MainWindow
     void CancelFeaturedWork()
     {
         featuredHubRequest?.Cancel();featuredHubRequest?.Dispose();featuredHubRequest=null;
-        featuredShelves.Clear();featuredState=null;featuredPanel=null;
+        featuredShelves.Clear();featuredState=null;featuredPanel=null;featuredRetry=null;
         if(current==null&&section is not (FeaturedSection or "Настройки"))featuredReturn=null;
     }
     void OpenFeaturedCollection(string id)
@@ -57,6 +58,7 @@ public partial class MainWindow
             foreach(var collection in definitions)AddFeaturedShelf(panel,collection);
             featuredState=Text("Загружаем подборки…",13,true);panel.Children.Add(featuredState);
         }
+        featuredRetry=Button("Повторить загрузку",ReloadFeatured);featuredRetry.Style=(Style)FindResource("QuietButton");featuredRetry.Visibility=Visibility.Collapsed;PageHeader.Children.Add(featuredRetry);
         if(featuredGroups!=null)RefreshFeaturedRows();else ReloadFeatured();
         ResizeFeaturedShelves();
     }
@@ -79,6 +81,7 @@ public partial class MainWindow
             var groups=featuredProvider!=null?await featuredProvider(token).WaitAsync(token):await Load();
             if(token.IsCancellationRequested||closed||section!=FeaturedSection||current!=null)return;
             featuredGroups=groups;
+            if(featuredRetry!=null)featuredRetry.Visibility=Visibility.Collapsed;
             RefreshFeaturedRows();
             async Task<FeaturedGroup[]> Load()
             {
@@ -92,7 +95,8 @@ public partial class MainWindow
         {
             if(closed||token.IsCancellationRequested)return;
             ErrorLog.Write(error);
-            foreach(var shelf in featuredShelves.Values)shelf.Set([],false);
+            if(featuredGroups==null)foreach(var shelf in featuredShelves.Values)shelf.Set([],false);
+            if(featuredRetry!=null)featuredRetry.Visibility=Visibility.Visible;
             if(featuredState!=null){featuredState.Text=AppLanguage.T("Не удалось загрузить подборки. Попробуй ещё раз.");featuredState.Visibility=Visibility.Visible;}
         }
     }
@@ -102,10 +106,22 @@ public partial class MainWindow
         if(section!=FeaturedSection||current!=null||featuredGroups==null)return;
         if(featuredCollectionId.Length==0)
         {
-            foreach(var group in featuredGroups)
+            var active=featuredGroups.Select(group=>group.Collection.Id).ToHashSet(StringComparer.Ordinal);
+            foreach(var id in featuredShelves.Keys.Where(id=>!active.Contains(id)).ToArray())
             {
+                if(featuredShelves[id].Row.Parent is UIElement row)featuredPanel?.Children.Remove(row);
+                featuredShelves.Remove(id);
+            }
+            for(var index=0;index<featuredGroups.Length;index++)
+            {
+                var group=featuredGroups[index];
                 if(!featuredShelves.ContainsKey(group.Collection.Id)&&featuredPanel!=null)AddFeaturedShelf(featuredPanel,group.Collection);
-                if(featuredShelves.TryGetValue(group.Collection.Id,out var shelf))shelf.Set(FeaturedVisible(group),false);
+                if(featuredShelves.TryGetValue(group.Collection.Id,out var shelf))
+                {
+                    if(featuredPanel!=null&&shelf.Row.Parent is UIElement row&&featuredPanel.Children.IndexOf(row)!=index)
+                    {featuredPanel.Children.Remove(row);featuredPanel.Children.Insert(index,row);}
+                    shelf.Set(FeaturedVisible(group),false);
+                }
             }
             if(featuredState!=null)featuredState.Visibility=Visibility.Collapsed;
         }
