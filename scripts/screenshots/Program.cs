@@ -11,6 +11,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Interop;
 using System.Windows.Threading;
 using Kachalka;
 
@@ -167,14 +168,7 @@ internal static class Program
         window.UpdateLayout();
         if(VisiblePosters(window).Any(image=>!Loaded(image)))throw new InvalidOperationException("Refusing to capture pending visible posters: "+filename);
         var content=window.Content as FrameworkElement??throw new InvalidOperationException("Actual application client area is missing.");
-        var dpi=VisualTreeHelper.GetDpi(content);var width=(int)Math.Ceiling(content.ActualWidth*dpi.DpiScaleX);var height=(int)Math.Ceiling(content.ActualHeight*dpi.DpiScaleY);
-        var bitmap=new RenderTargetBitmap(width,height,dpi.PixelsPerInchX,dpi.PixelsPerInchY,PixelFormats.Pbgra32);
-        // Window.Background is normally painted by the containing Window.
-        // Render its actual brush under the actual client area, just as WPF
-        // does onscreen, while excluding the native title bar and frame.
-        var background=new DrawingVisual();
-        using(var drawing=background.RenderOpen())drawing.DrawRectangle(window.Background,null,new Rect(0,0,content.ActualWidth,content.ActualHeight));
-        bitmap.Render(background);bitmap.Render(content);
+        var bitmap=CaptureClient(window);var width=bitmap.PixelWidth;var height=bitmap.PixelHeight;
         var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(bitmap));using(var file=File.Create(Path.Combine(outputDirectory,filename)))png.Save(file);
         var posters=VisiblePosters(window);
         captures.Add(new{File=filename,Language=CaptureLanguage,Width=width,Height=height,LoadedVisiblePosters=posters.Count(Loaded),PendingVisiblePosters=posters.Count(image=>!Loaded(image)),
@@ -182,11 +176,49 @@ internal static class Program
         Console.WriteLine("Captured "+filename+" from actual public "+typeof(Kachalka.App).Assembly.GetName().Version!.ToString(3)+" client area.");
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    struct NativeRect { public int Left,Top,Right,Bottom; }
+    [StructLayout(LayoutKind.Sequential)]
+    struct NativePoint { public int X,Y; }
+    [DllImport("user32.dll")] static extern bool GetClientRect(IntPtr window,out NativeRect rectangle);
+    [DllImport("user32.dll")] static extern bool ClientToScreen(IntPtr window,ref NativePoint point);
+    [DllImport("user32.dll")] static extern IntPtr GetDC(IntPtr window);
+    [DllImport("user32.dll")] static extern int ReleaseDC(IntPtr window,IntPtr dc);
+    [DllImport("gdi32.dll")] static extern IntPtr CreateCompatibleDC(IntPtr dc);
+    [DllImport("gdi32.dll")] static extern IntPtr CreateCompatibleBitmap(IntPtr dc,int width,int height);
+    [DllImport("gdi32.dll")] static extern IntPtr SelectObject(IntPtr dc,IntPtr item);
+    [DllImport("gdi32.dll")] static extern bool DeleteObject(IntPtr item);
+    [DllImport("gdi32.dll")] static extern bool DeleteDC(IntPtr dc);
+    [DllImport("gdi32.dll")] static extern bool BitBlt(IntPtr target,int x,int y,int width,int height,IntPtr source,int sourceX,int sourceY,uint operation);
+    [DllImport("dwmapi.dll")] static extern int DwmFlush();
+    static BitmapSource CaptureClient(MainWindow window)
+    {
+        // Read the actual composed Windows pixels. RenderTargetBitmap can
+        // retain clipped glyph cache regions after live text/layout updates.
+        var handle=new WindowInteropHelper(window).Handle;
+        if(!GetClientRect(handle,out var rectangle))throw new InvalidOperationException("Cannot measure the released Windows client area.");
+        var origin=new NativePoint();
+        if(!ClientToScreen(handle,ref origin))throw new InvalidOperationException("Cannot locate the released application on the capture desktop.");
+        DwmFlush();
+        var width=rectangle.Right-rectangle.Left;var height=rectangle.Bottom-rectangle.Top;
+        var desktop=GetDC(IntPtr.Zero);var memory=CreateCompatibleDC(desktop);var bitmap=CreateCompatibleBitmap(desktop,width,height);var previous=SelectObject(memory,bitmap);
+        try
+        {
+            if(!BitBlt(memory,0,0,width,height,desktop,origin.X,origin.Y,0x00CC0020|0x40000000))throw new InvalidOperationException("Windows client capture failed.");
+            var source=Imaging.CreateBitmapSourceFromHBitmap(bitmap,IntPtr.Zero,Int32Rect.Empty,BitmapSizeOptions.FromEmptyOptions());
+            source.Freeze();var pixels=new byte[width*height*4];source.CopyPixels(pixels,width*4,0);
+            if(pixels.Distinct().Count()<32)throw new InvalidOperationException("Windows did not compose the real application; refusing a blank screenshot.");
+            return source;
+        }
+        finally {SelectObject(memory,previous);DeleteObject(bitmap);DeleteDC(memory);ReleaseDC(IntPtr.Zero,desktop);}
+    }
+
     static async Task Capture(Kachalka.App app)
     {
         await Until(()=>app.MainWindow is MainWindow window&&window.IsLoaded,TimeSpan.FromSeconds(25),"Actual public application startup did not create its main window.");
         var window=(MainWindow)app.MainWindow;
         if(AppLanguage.Current!=CaptureLanguage)throw new InvalidOperationException("Released app did not apply the requested interface language.");
+        window.Topmost=true;window.Activate();
         window.WindowState=WindowState.Normal;window.MaxWidth=1920;window.MaxHeight=1200;window.Width=1440;window.Height=900;window.Left=0;window.Top=0;
         await Settle(window);
         await Until(()=>Field(window,"liveLoading") is false&&Field(window,"liveItems") is IEnumerable rows&&rows.Cast<object>().Any(),TimeSpan.FromSeconds(80),"Actual default source catalogue did not load.");
@@ -229,7 +261,7 @@ internal static class Program
         File.WriteAllText(Path.Combine(outputDirectory,"capture-info.json"),JsonSerializer.Serialize(new
         {
             Version=typeof(Kachalka.App).Assembly.GetName().Version!.ToString(3),ReleaseDllSha256=Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(releasedDll))),
-            Language=CaptureLanguage,ActualApplicationStartup=true,ModifiedApplicationBinary=false,SyntheticMedia=false,Utc=DateTimeOffset.UtcNow,Captures=captures,Skipped=skipped
+            Language=CaptureLanguage,CaptureMethod="Windows desktop client pixels",ActualApplicationStartup=true,ModifiedApplicationBinary=false,SyntheticMedia=false,Utc=DateTimeOffset.UtcNow,Captures=captures,Skipped=skipped
         },new JsonSerializerOptions{WriteIndented=true}));
     }
 }
