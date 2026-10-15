@@ -244,7 +244,7 @@ public partial class MainWindow
             var created=new CoverRequest();
             created.Changed=(sender,args)=>
             {
-                if((args.PropertyName is null or "" or nameof(DownloadItem.ImageUrl) or nameof(MediaItem.DisplayImageUrl))&&key.IsLoaded&&ReferenceEquals(key.DataContext,sender))SourceCover(key,new RoutedEventArgs());
+                if((args.PropertyName==nameof(MediaItem.DisplayImageUrl)||(sender is DownloadItem&&(args.PropertyName is null or "" or nameof(DownloadItem.ImageUrl))))&&key.IsLoaded&&ReferenceEquals(key.DataContext,sender))SourceCover(key,new RoutedEventArgs());
             };
             key.Unloaded+=(_,_)=>
             {
@@ -264,7 +264,9 @@ public partial class MainWindow
     }
     void SourceCoverChanged(object sender,DependencyPropertyChangedEventArgs e)
     {
-        var image=(Image)sender;var state=ObserveDownloadCover(image);CancelCover(state);CancelFeatureCover(state);CancelCoverRatings(state);state.Context=null;state.Url=null;state.RetryAfterUtc=default;state.NextCacheTouchUtc=default;state.FeatureAttempted=false;state.RatingsContext=null;image.Source=null;
+        var image=(Image)sender;var state=ObserveDownloadCover(image);
+        var url=CoverUrl(e.NewValue);var keep=image.Tag?.ToString()!="FeaturePoster"&&url!=null&&state.Url==url&&image.Source!=null;
+        CancelCover(state);CancelFeatureCover(state);CancelCoverRatings(state);state.Context=e.NewValue;state.Url=url;state.RetryAfterUtc=default;state.NextCacheTouchUtc=default;state.FeatureAttempted=false;state.RatingsContext=null;if(!keep)image.Source=null;
         if(image.IsLoaded)SourceCover(image,new RoutedEventArgs());
     }
     void AddIndexer()

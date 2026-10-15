@@ -123,7 +123,7 @@ public partial class MainWindow
         view.About.Tag=item;view.Frame.Tag=item;
         AutomationProperties.SetName(view.About,AppLanguage.T("Подробнее: "+item.DisplayTitle));
         RebuildFeatureMeta(view,item);UpdateFeaturePeople(view,item);UpdateFeatureFavorite(view);UpdateFeatureDots(view);
-        view.Watch=(_,e)=>{if(e.PropertyName is null){view.Title.Text=item.DisplayTitle;view.Title.ToolTip=item.DisplayTitle;UpdateFeaturePeople(view,item);UpdateFeatureSummary(view,item);}
+        view.Watch=(_,e)=>{if(e.PropertyName is null or nameof(MediaItem.DisplayTitle) or nameof(MediaItem.DisplayDescription) or nameof(MediaItem.DisplayPeople)){view.Title.Text=item.DisplayTitle;view.Title.ToolTip=item.DisplayTitle;UpdateFeaturePeople(view,item);UpdateFeatureSummary(view,item);}
             if(e.PropertyName is null or nameof(MediaItem.PosterQuality)or nameof(MediaItem.CardRating)or nameof(MediaItem.CardGenre)){RebuildFeatureMeta(view,item);}};
         item.PropertyChanged+=view.Watch;
         StartFeatureSummary(view,item);

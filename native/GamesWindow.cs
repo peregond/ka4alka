@@ -155,8 +155,12 @@ public partial class MainWindow
     void GameShelfLoaded(string key)
     {
         if(!GameHome)return;
-        // The banner is made from the popular shelf, so that page is built again once it arrives.
-        if(key=="popular"){Render();return;}
+        // Populate the existing hero host; neighbouring shelves may already have their images.
+        if(key=="popular")
+        {
+            var banners=GameShelfItems("popular").Take(5).ToArray();RefreshDiscoveryHero(banners);
+            if(banners.Length>0)StartGameBannerDetails(banners);
+        }
         if(gameShelfViews.TryGetValue(key,out var shelf))shelf.Set(GameShelfItems(key),gameShelfLoading.Contains(key));
         EnsureGameHome();
         UpdateDiscoveryLayout();ApplyPosterDownloads();RefreshLoadingIndicator();
@@ -172,7 +176,7 @@ public partial class MainWindow
             discoveryHero=new Grid{Margin=new(0,0,0,28)};discoveryHero.Children.Add(BuildFeatureCarousel(banners));content.Children.Add(discoveryHero);
             StartGameBannerDetails(banners);
         }
-        else if(gameShelfLoading.Contains("popular"))content.Children.Add(BannerSkeleton());
+        else if(gameShelfLoading.Contains("popular")){discoveryHero=new Grid();discoveryHero.Children.Add(BannerSkeleton());content.Children.Add(discoveryHero);}
         BuildGameFilters();content.Children.Add(TakeFiltersPanel());
         // The games the player has already queued come first, so what they are playing is one click away.
         var library=GameLibrary();

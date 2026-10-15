@@ -15,7 +15,7 @@ public record MediaItem(int Id, string Title, string Section, string Genre, int 
     [JsonIgnore] public string? DisplayDescription=>AppLanguage.Current=="en"&&Cinema?english?.Description:Description;
     [JsonIgnore] public CinemaPerson[] DisplayPeople=>AppLanguage.Current=="en"&&Cinema?english?.People??[]:People;
     [JsonIgnore] public string DisplayCountry=>AppLanguage.Current=="en"&&Cinema?string.Join(", ",english?.Countries??[]):Country;
-    public void SetEnglish(EnglishMedia? value){if(Equals(english,value))return;english=value;PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(null));PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(DisplayImageUrl)));}
+    public void SetEnglish(EnglishMedia? value){if(Equals(english,value))return;var prior=DisplayImageUrl;english=value;Notify(nameof(DisplayTitle),nameof(DisplayDescription),nameof(DisplayPeople),nameof(DisplayCountry),nameof(AllGenres),nameof(CardGenre),nameof(CardMeta));if(prior!=DisplayImageUrl)Notify(nameof(DisplayImageUrl));}
     public string? PageUrl {get;init;}
     public string? OnlineId {get;init;}
     public string? ImageUrl {get;init;}
@@ -89,7 +89,18 @@ public record MediaItem(int Id, string Title, string Section, string Genre, int 
         if(value!=OnlyPoorQuality){OnlyPoorQuality=value;PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(OnlyPoorQuality)));}
         if(quality!=bestQuality){bestQuality=quality;PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(BestQuality)));PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(HasQuality)));}
     }
-    public void SetScores(string kp,string imdb,string? genre=null){if(!string.IsNullOrWhiteSpace(genre))liveGenre=genre;liveKp=kp;liveImdb=imdb;liveScores=$"КП {kp}   IMDb {imdb}";PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(null));}
+    void Notify(params string[] names){foreach(var name in names)PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(name));}
+    public void SetScores(string kp,string imdb,string? genre=null)
+    {
+        var kpChanged=kp!=(liveKp??Kinopoisk);var imdbChanged=imdb!=(liveImdb??Imdb);
+        var genreChanged=!string.IsNullOrWhiteSpace(genre)&&InlineMetadata(genre)!=InlineMetadata(liveGenre??Genre);
+        if(!kpChanged&&!imdbChanged&&!genreChanged)return;
+        if(genreChanged){liveGenre=genre;Notify(nameof(AllGenres),nameof(CardGenre),nameof(CardMeta));}
+        liveKp=kp;liveImdb=imdb;liveScores=$"КП {kp}   IMDb {imdb}";
+        if(kpChanged)Notify(nameof(KpDisplay),nameof(KpAvailable));
+        if(imdbChanged)Notify(nameof(ImdbDisplay),nameof(ImdbAvailable));
+        if(kpChanged||imdbChanged)Notify(nameof(CardRating),nameof(HasCardRating),nameof(CardRatingSource),nameof(Scores));
+    }
     [JsonIgnore] public string Subtitle => Cinema ? string.Join(" · ",new[]{Section=="Сериалы"?"Сериал":Section=="Игры"?"Игра для Windows":"Фильм",Year>0?Year.ToString():null,InlineMetadata(Genre)}.Where(x=>!string.IsNullOrWhiteSpace(x))) : "Демонстрационный каталог";
     [JsonIgnore] public Brush Cover { get { var b = new LinearGradientBrush((Color)ColorConverter.ConvertFromString(Color), (Color)ColorConverter.ConvertFromString("#20262E"), 75); b.Freeze(); return b; } }
 }

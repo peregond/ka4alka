@@ -36,6 +36,7 @@ public partial class MainWindow
     double activeScaleX,activeScaleY;
     bool sizingQueued,compactWidth,compactHeight,tinyWidth,veryCompactHeight,compactSearch,layoutInitialized;
     ListBox? catalogList;
+    System.Collections.ObjectModel.ObservableCollection<CatalogRow>? catalogRows;
     IReadOnlyList<MediaItem> catalogDisplay=[];
     int catalogColumns;
 
@@ -239,7 +240,7 @@ public partial class MainWindow
         if(!force&&columns==catalogColumns)return;
         var position=CaptureCatalogReflow();
         catalogColumns=columns;
-        if(catalogList!=null){catalogList.ItemsSource=catalogDisplay.Chunk(columns).Select(x=>new CatalogRow(x,columns)).ToArray();ApplyPosterDownloads(catalogDisplay);}
+        if(catalogList!=null){catalogRows=new(catalogDisplay.Chunk(columns).Select(x=>new CatalogRow(x,columns)));catalogList.ItemsSource=catalogRows;ApplyPosterDownloads(catalogDisplay);}
         UpdateDiscoveryLayout();
         RestoreCatalogReflow(position);
     }

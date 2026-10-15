@@ -125,7 +125,7 @@ public partial class MainWindow
     CatalogScrollPosition? CaptureCatalogReflow()=>navigationPendingPosition??CaptureCatalogPosition();
     void RestoreCatalogReflow(CatalogScrollPosition? saved)
     {
-        if(saved==null||navigationScroll==null)return;
+        if(saved==null||navigationScroll==null||WheelScroll.IsMoving(navigationScroll)||DateTime.UtcNow<navigationUserScrollUntil)return;
         navigationRestoreAttempts=0;navigationPendingPosition=saved;ScheduleCatalogPositionRestore();
     }
     void CatalogNavigationLoaded(object sender,RoutedEventArgs args)=>ScheduleCatalogPositionRestore();

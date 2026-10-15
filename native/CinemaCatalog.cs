@@ -32,7 +32,7 @@ public partial class MainWindow
             discoveryHero.Children.Add(BuildFeatureCarousel(banners));
             content.Children.Add(discoveryHero);
         }
-        else if(liveLoading||CatalogQualityChecking||featuredRequests.Contains(section))content.Children.Add(BannerSkeleton());
+        else if(liveLoading||CatalogQualityChecking||featuredRequests.Contains(section)){discoveryHero=new Grid();discoveryHero.Children.Add(BannerSkeleton());content.Children.Add(discoveryHero);}
         if(filterRow!=null)content.Children.Add(filterRow);
         var regions=DiscoveryRegionalItems(section,prefs.HomeCountry,cards);
         var order=section=="Фильмы"?new[]{DiscoveryShelfKind.Popular,DiscoveryShelfKind.New,DiscoveryShelfKind.Foreign,DiscoveryShelfKind.Native}:new[]{DiscoveryShelfKind.Popular,DiscoveryShelfKind.Foreign,DiscoveryShelfKind.New,DiscoveryShelfKind.Native};

@@ -42,6 +42,11 @@ static class CatalogBatchTests
         show.SetScores("8.3","8.1","\nдетектив\n , \r\n триллер\n");
         Check(show.CardGenre=="детектив, триллер","late series metadata cannot introduce line breaks into card layout");
         Check((show with{Genre=""}).Subtitle=="Сериал · 2025","empty metadata does not add a dangling separator");
+        var notifications=new List<string?>();show.PropertyChanged+=(_,args)=>notifications.Add(args.PropertyName);
+        show.SetScores("8.3","8.1","детектив, триллер");
+        Check(notifications.Count==0,"identical ratings and normalized genres do not invalidate card bindings");
+        show.SetScores("8.4","8.1","драма");
+        Check(notifications.Contains(nameof(MediaItem.CardRating))&&notifications.Contains(nameof(MediaItem.CardMeta))&&!notifications.Any(name=>string.IsNullOrEmpty(name)||name is nameof(MediaItem.Cover) or nameof(MediaItem.DisplayImageUrl)),"late ratings only notify changed text and badge fields, never poster bindings");
         foreach(var rate in new[]{60,120})
         {
             var position=0d;var velocity=0d;var monotonic=true;

@@ -267,6 +267,12 @@ public partial class MainWindow
             await Until(()=>posters.All(x=>x.Source!=null),"Real catalog slots did not fill with decoded posters.");
             var after=posters.Select(x=>VisualTreeHelper.GetParent(x) as FrameworkElement).Select(x=>x!.TransformToAncestor(row).TransformBounds(new Rect(new Point(),x.RenderSize))).ToArray();
             if(!bounds.Zip(after).All(pair=>Math.Abs(pair.First.X-pair.Second.X)<.5&&Math.Abs(pair.First.Y-pair.Second.Y)<.5&&Math.Abs(pair.First.Width-pair.Second.Width)<.5&&Math.Abs(pair.First.Height-pair.Second.Height)<.5))throw new Exception("Poster arrival shifted the catalog grid.");
+            var retained=posters[0].Source;
+            posters[0].DataContext=cards[0] with{Kinopoisk="8.5"};
+            if(!ReferenceEquals(posters[0].Source,retained))throw new Exception("Refreshing same-URL poster metadata erased a decoded image.");
+            for(var update=0;update<12;update++)cards[1].SetScores((7+update*.01).ToString(System.Globalization.CultureInfo.InvariantCulture),"8.0","драма");
+            await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.Background);
+            if(posters.Any(image=>image.Source==null))throw new Exception("Rating updates flashed an existing poster back to its placeholder.");
             data.Update(cards.Select((card,index)=>index==3?card with{Title="Обновлённое название"}:card).ToArray());UpdateLayout();
             var buttons=VisualElements<Button>(row).Where(x=>x.Tag is MediaItem).ToArray();
             if(!Enumerable.Range(0,8).Where(index=>index!=3).All(index=>ReferenceEquals(originalButtons[index],buttons[index])))throw new Exception("Changing one card recreated its neighbouring placeholders.");

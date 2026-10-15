@@ -218,12 +218,7 @@ public partial class MainWindow
             Body.Children.Add(new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=people,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});
             return;
         }
-        IEnumerable<MediaItem> shown=favoritesOnly?prefs.LiveFavorites.Where(x=>x.Section==section&&x.Title.Contains(submittedQuery,StringComparison.CurrentCultureIgnoreCase)).DistinctBy(x=>x.Id).Where(selection.Matches):SearchActive?UnifiedSearch.Filter(liveItems,searchCategory).Where(selection.Matches):liveItems;
-        if(favoritesOnly)shown=catalogOrder=="По рейтингу"?shown.OrderByDescending(CatalogPaging.Rating):shown.OrderByDescending(x=>x.Year);
-        var local=favoritesOnly||SearchActive;
-        var all=shown.Where(x=>favoritesOnly||SearchActive||!NoDownloads(x)&&PersonallyVisible(x)).ToArray();
-        if(local&&!liveLoading){catalogLastPage=Math.Max(1,(all.Length+CatalogPaging.Size-1)/CatalogPaging.Size);livePage=Math.Min(livePage,catalogLastPage.Value);catalogHasNext=livePage<catalogLastPage;}
-        var rawPage=local?all.Skip((livePage-1)*CatalogPaging.Size).Take(CatalogPaging.Size).ToArray():all;
+        var rawPage=CatalogPageItems();
         StartCatalogQualityCheck(rawPage);
         var cards=rawPage.Where(item=>(!DiscoveryCatalog||RecommendableTitle(item))&&CatalogQualityMatches(item)).ToArray();
         ShowCatalog(cards);
@@ -235,15 +230,7 @@ public partial class MainWindow
         // lists keep the row pinned under the search so selected-filter chips never move the list below them.
         AddDiscovery(content,cards,DiscoveryCatalog?TakeFiltersPanel():null);
         content.Children.Add(list);
-        if(cards.Length==0&&liveLoading&&!CatalogQualityChecking)content.Children.Add(PosterSkeleton(2,"CatalogSkeleton"));
-        else if(cards.Length==0)
-        {
-            var empty=new StackPanel{HorizontalAlignment=HorizontalAlignment.Center,MaxWidth=370,Margin=new(24)};
-            var label=Text(liveLoading?"Загружаем подборку…":CatalogQualityChecking?(prefs.CatalogQualityHeight==0?"Проверяем варианты загрузки…":"Проверяем качество раздач…"):liveError.Length>0?"Каталог пока недоступен":SearchActive&&peopleSearchItems.Length>0?"Фильмы и сериалы не найдены":"Ничего не найдено",23);label.FontWeight=FontWeights.SemiBold;label.TextAlignment=TextAlignment.Center;empty.Children.Add(label);
-            var hint=Text(liveLoading?"Это займёт несколько секунд.":CatalogQualityChecking?"Фильмы появятся по мере проверки источников.":favoritesOnly?"Сохраняй фильмы и сериалы из карточки — они останутся под рукой.":!SearchActive&&(prefs.HiddenTitles.Count>0||prefs.HiddenGenres.Count>0)?"Проверь скрытые названия и жанры в настройках или выбери другую страницу.":"Попробуй другую страницу, запрос или сбрось фильтры.",13,true);hint.TextAlignment=TextAlignment.Center;empty.Children.Add(hint);
-            if(!liveLoading){var retry=ActionButton("Сбросить фильтры","IconRefresh",()=>ChangeCatalogFilter(()=>{favoritesOnly=false;ResetCatalogFilters();prefs.HidePoorQuality=false;prefs.CatalogQualityHeight=0;ResetCatalogQualityChecks();prefs.Save();}));retry.HorizontalAlignment=HorizontalAlignment.Center;empty.Children.Add(retry);}
-            content.Children.Add(empty);
-        }
+        catalogEmptyHost=new StackPanel();content.Children.Add(catalogEmptyHost);UpdateCatalogEmptyState(cards);
         var footer=new StackPanel{HorizontalAlignment=HorizontalAlignment.Center,Margin=new(5,18,8,18)};
         var numbers=new WrapPanel{HorizontalAlignment=HorizontalAlignment.Center};
         void PageButton(string label,int page,bool enabled)
@@ -261,6 +248,34 @@ public partial class MainWindow
         content.Children.Add(footer);
         Body.Children.Add(new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=content,Margin=new(-6,-6,-6,0),VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});
         UpdateFilterRail();
+    }
+    StackPanel? catalogEmptyHost;
+    string catalogEmptyKey="";
+    void UpdateCatalogEmptyState(MediaItem[] cards)
+    {
+        if(catalogEmptyHost==null)return;
+        var key=cards.Length>0?"ready":$"{liveLoading}|{CatalogQualityChecking}|{liveError}|{favoritesOnly}|{SearchActive}|{peopleSearchItems.Length}";
+        if(catalogEmptyKey==key&&catalogEmptyHost.Children.Count>0||key=="ready"&&catalogEmptyHost.Children.Count==0){catalogEmptyKey=key;return;}
+        catalogEmptyKey=key;catalogEmptyHost.Children.Clear();
+        if(cards.Length==0&&liveLoading&&!CatalogQualityChecking)catalogEmptyHost.Children.Add(PosterSkeleton(2,"CatalogSkeleton"));
+        else if(cards.Length==0)
+        {
+            var empty=new StackPanel{HorizontalAlignment=HorizontalAlignment.Center,MaxWidth=370,Margin=new(24)};
+            var label=Text(liveLoading?"Загружаем подборку…":CatalogQualityChecking?(prefs.CatalogQualityHeight==0?"Проверяем варианты загрузки…":"Проверяем качество раздач…"):liveError.Length>0?"Каталог пока недоступен":SearchActive&&peopleSearchItems.Length>0?"Фильмы и сериалы не найдены":"Ничего не найдено",23);label.FontWeight=FontWeights.SemiBold;label.TextAlignment=TextAlignment.Center;empty.Children.Add(label);
+            var hint=Text(liveLoading?"Это займёт несколько секунд.":CatalogQualityChecking?"Фильмы появятся по мере проверки источников.":favoritesOnly?"Сохраняй фильмы и сериалы из карточки — они останутся под рукой.":!SearchActive&&(prefs.HiddenTitles.Count>0||prefs.HiddenGenres.Count>0)?"Проверь скрытые названия и жанры в настройках или выбери другую страницу.":"Попробуй другую страницу, запрос или сбрось фильтры.",13,true);hint.TextAlignment=TextAlignment.Center;empty.Children.Add(hint);
+            if(!liveLoading){var retry=ActionButton("Сбросить фильтры","IconRefresh",()=>ChangeCatalogFilter(()=>{favoritesOnly=false;ResetCatalogFilters();prefs.HidePoorQuality=false;prefs.CatalogQualityHeight=0;ResetCatalogQualityChecks();prefs.Save();}));retry.HorizontalAlignment=HorizontalAlignment.Center;empty.Children.Add(retry);}
+            catalogEmptyHost.Children.Add(empty);
+        }
+    }
+    MediaItem[] CatalogPageItems()
+    {
+        var selection=CatalogSelection;
+        IEnumerable<MediaItem> shown=favoritesOnly?prefs.LiveFavorites.Where(x=>x.Section==section&&x.Title.Contains(submittedQuery,StringComparison.CurrentCultureIgnoreCase)).DistinctBy(x=>x.Id).Where(selection.Matches):SearchActive?UnifiedSearch.Filter(liveItems,searchCategory).Where(selection.Matches):liveItems;
+        if(favoritesOnly)shown=catalogOrder=="По рейтингу"?shown.OrderByDescending(CatalogPaging.Rating):shown.OrderByDescending(x=>x.Year);
+        var local=favoritesOnly||SearchActive;
+        var all=shown.Where(x=>favoritesOnly||SearchActive||!NoDownloads(x)&&PersonallyVisible(x)).ToArray();
+        if(local&&!liveLoading){catalogLastPage=Math.Max(1,(all.Length+CatalogPaging.Size-1)/CatalogPaging.Size);livePage=Math.Min(livePage,catalogLastPage.Value);catalogHasNext=livePage<catalogLastPage;}
+        return local?all.Skip((livePage-1)*CatalogPaging.Size).Take(CatalogPaging.Size).ToArray():all;
     }
     // The filter row lives in the page flow on the catalog (after the banner) and is returned to the header elsewhere.
     Border TakeFiltersPanel()
@@ -315,9 +330,7 @@ public partial class MainWindow
     }
     void RenderCatalogKeepingPosition()
     {
-        // Render retains the visible title through CatalogNavigation. Replaying
-        // the old pixel offset would undo its anchor when a row is inserted.
-        Render();
+        if(!RefreshCatalogInPlace())Render();
     }
     async Task FetchCatalog(string key,string category,string query,int page)
     {
