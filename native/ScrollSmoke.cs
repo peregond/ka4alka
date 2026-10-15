@@ -8,6 +8,16 @@ namespace Kachalka;
 
 public partial class MainWindow
 {
+    public async Task WheelInputSmokeTest(string output)
+    {
+        System.IO.Directory.CreateDirectory(output);metadataLifetime.Cancel();liveRequest?.Cancel();catalogRefreshTimer.Stop();searchDelay.Stop();refresh.Stop();CancelCatalogQualityCheck();ResetDiscoveryData();
+        section="Фильмы";current=null;activePerson=null;submittedQuery="";Search.Text="";favoritesOnly=false;livePage=1;ResetCatalogFilters();catalogCollection="popular";
+        prefs.HidePoorQuality=false;prefs.CatalogQualityHeight=0;prefs.HiddenGenres=[];prefs.HiddenTitles=[];
+        liveItems=Enumerable.Range(1,40).Select(id=>new MediaItem(-997000-id,"Проверка прокрутки "+id,section,"драма",2026,"7.0","7.0","#526B69")).ToArray();
+        liveLoading=false;liveKey=CurrentCatalogKey;Render();await Task.Delay(150);UpdateLayout();
+        var checks=await CheckWheelScrolling();
+        await System.IO.File.WriteAllTextAsync(System.IO.Path.Combine(output,"checks.json"),System.Text.Json.JsonSerializer.Serialize(checks));Close();
+    }
     async Task<object> CheckWheelScrolling()
     {
         var previous=WheelScroll.SmoothOverride;
