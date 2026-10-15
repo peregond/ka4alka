@@ -23,7 +23,7 @@ public partial class MainWindow
     UiWorkQueue<Image>? posterPresentation;
     sealed class CoverRequest
     {
-        public DownloadItem? Subject;
+        public INotifyPropertyChanged? Subject;
         public EventHandler<PropertyChangedEventArgs>? Changed;
         public object? Context;
         public string? Url;
@@ -193,13 +193,14 @@ public partial class MainWindow
     {
         if(url.StartsWith("//",StringComparison.Ordinal))url="https:"+url;
         var proxied=ZonaPoster.ViaSite(url);
+        if(EnglishMedia.PosterUrl(url) is {} poster)proxied="api/backdrop-image?size=w500&file="+Uri.EscapeDataString("/"+new Uri(poster).Segments.Last());
         if(proxied==null)return await sourceClient.Read(SourceClient.WebUri(url),max,ct);
         using var direct=CancellationTokenSource.CreateLinkedTokenSource(ct);direct.CancelAfter(TimeSpan.FromSeconds(8));
         try{return await sourceClient.Read(SourceClient.WebUri(url),max,direct.Token);}
         catch(Exception) when(!ct.IsCancellationRequested){}
         return await onlineIndex.ReadSite(proxied,max,ct);
     }
-    static string? CoverUrl(object? item)=>item switch{SourceEntry source=>source.ImageUrl,MediaItem media=>media.ImageUrl,DownloadItem download=>download.ImageUrl,_=>null};
+    static string? CoverUrl(object? item)=>item switch{SourceEntry source=>source.ImageUrl,MediaItem media=>media.DisplayImageUrl,DownloadItem download=>download.ImageUrl,_=>null};
     static string CoverPath(string url)=>Path.Combine(Preferences.DataDir,"covers",Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(url)))+".img");
     void QueuePoster(Image image,CoverRequest state,object? item,string url,BitmapImage bitmap)
     {
@@ -243,7 +244,7 @@ public partial class MainWindow
             var created=new CoverRequest();
             created.Changed=(sender,args)=>
             {
-                if((args.PropertyName is null or "" or nameof(DownloadItem.ImageUrl))&&key.IsLoaded&&ReferenceEquals(key.DataContext,sender))SourceCover(key,new RoutedEventArgs());
+                if((args.PropertyName is null or "" or nameof(DownloadItem.ImageUrl) or nameof(MediaItem.DisplayImageUrl))&&key.IsLoaded&&ReferenceEquals(key.DataContext,sender))SourceCover(key,new RoutedEventArgs());
             };
             key.Unloaded+=(_,_)=>
             {
@@ -252,7 +253,7 @@ public partial class MainWindow
             };
             return created;
         });
-        var subject=image.DataContext as DownloadItem;
+        var subject=image.DataContext as INotifyPropertyChanged;
         if(!ReferenceEquals(state.Subject,subject))
         {
             if(state.Subject!=null)PropertyChangedEventManager.RemoveHandler(state.Subject,state.Changed!,string.Empty);

@@ -8,6 +8,14 @@ using System.Windows.Media;
 namespace Kachalka;
 public record MediaItem(int Id, string Title, string Section, string Genre, int Year, string Kinopoisk, string Imdb, string Color) : INotifyPropertyChanged
 {
+    EnglishMedia? english;
+    [JsonIgnore] public EnglishMedia? English {get=>english;init=>english=value;}
+    [JsonIgnore] public string DisplayTitle=>AppLanguage.Current=="en"?(english?.Title??(SearchLanguage.LatinTitle(OriginalTitle??"")?OriginalTitle!:Title)):Title;
+    [JsonIgnore] public string? DisplayImageUrl=>AppLanguage.Current=="en"&&Cinema?english?.Poster:ImageUrl;
+    [JsonIgnore] public string? DisplayDescription=>AppLanguage.Current=="en"&&Cinema?english?.Description:Description;
+    [JsonIgnore] public CinemaPerson[] DisplayPeople=>AppLanguage.Current=="en"&&Cinema?english?.People??[]:People;
+    [JsonIgnore] public string DisplayCountry=>AppLanguage.Current=="en"&&Cinema?string.Join(", ",english?.Countries??[]):Country;
+    public void SetEnglish(EnglishMedia? value){if(Equals(english,value))return;english=value;PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(null));PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(DisplayImageUrl)));}
     public string? PageUrl {get;init;}
     public string? OnlineId {get;init;}
     public string? ImageUrl {get;init;}
@@ -49,10 +57,10 @@ public record MediaItem(int Id, string Title, string Section, string Genre, int 
     // A game from a catalog list only knows "Windows" as its genre, which says nothing under every card: its year and genre show once the store details are known.
     // A game that is not out yet shows when it will be instead.
     [JsonIgnore] public string CardMeta=>Store is {Soon:true,Released.Length:>0}?Store.SoonLabel:string.Join(" · ",new[]{Year>0?Year.ToString():"",Section=="Игры"&&AllGenres=="Windows"?"":AllGenres.Split(", ")[0]}.Where(x=>x.Length>0));
-    [JsonIgnore] public string AllGenres=>InlineMetadata(liveGenre??Genre);
+    [JsonIgnore] public string AllGenres=>InlineMetadata(AppLanguage.Current=="en"&&Cinema&&english!=null?string.Join(", ",english.Genres):liveGenre??Genre);
     [JsonIgnore] public string CardRatingSource => KpAvailable?"Кинопоиск":ImdbAvailable?"IMDb":"Оценка пока недоступна";
     static string InlineMetadata(string? value)=>string.Join(", ",(value??"").Split(',').Select(part=>Regex.Replace(part,@"\s+"," ").Trim()).Where(part=>part.Length>0));
-    [JsonIgnore] public string CardGenre {get{var value=InlineMetadata(liveGenre??Genre);return value.Length==0?Section=="Сериалы"?"Сериал":Section=="Игры"?"Игра для Windows":"Фильм":value;}}
+    [JsonIgnore] public string CardGenre {get{var value=InlineMetadata(AppLanguage.Current=="en"&&Cinema&&english!=null?string.Join(", ",english.Genres):liveGenre??Genre);return value.Length==0?Section=="Сериалы"?"Сериал":Section=="Игры"?"Игра для Windows":"Фильм":value;}}
     string bestQuality="";
     [JsonIgnore] public string BestQuality=>bestQuality;
     [JsonIgnore] public bool HasQuality=>bestQuality.Length>0;

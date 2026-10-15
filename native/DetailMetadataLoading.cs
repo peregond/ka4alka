@@ -16,7 +16,7 @@ public partial class MainWindow
 
     bool DetailMetadataLoading(int id)=>detailMetadataViews.TryGetValue(id,out var view)&&view.Loading;
     bool DetailMetadataNeedsRetry(int id)=>detailMetadataViews.TryGetValue(id,out var view)?!view.Loading&&view.Failed:current?.Id==id&&!ImdbSuggestions.IsImdbOnly(current)&&(!MediaMetadata.HasDescription(current)||current.People.Length==0);
-    string DetailDescriptionText(MediaItem item)=>MediaMetadata.HasDescription(item)?item.Description!:ImdbSuggestions.IsImdbOnly(item)&&!DetailMetadataLoading(item.Id)?"Этого названия нет в русском каталоге, поэтому описания пока нет. Раздачи ищутся по оригинальному названию.":DetailMetadataLoading(item.Id)?"Загружаем описание…":"Описание пока недоступно.";
+    string DetailDescriptionText(MediaItem item)=>!string.IsNullOrWhiteSpace(item.DisplayDescription)?item.DisplayDescription!:ImdbSuggestions.IsImdbOnly(item)&&!DetailMetadataLoading(item.Id)?"Этого названия нет в русском каталоге, поэтому описания пока нет. Раздачи ищутся по оригинальному названию.":DetailMetadataLoading(item.Id)?"Загружаем описание…":"Описание пока недоступно.";
 
     void CancelDetailMetadata(bool restart=false)
     {
@@ -42,7 +42,7 @@ public partial class MainWindow
         void Publish(MediaItem fresh)
         {
             if(!IsCurrent())return;
-            item.SetScores(fresh.Kinopoisk,fresh.Imdb,fresh.Genre);
+            item.SetEnglish(fresh.English);item.SetScores(fresh.Kinopoisk,fresh.Imdb,fresh.Genre);
             liveItems=liveItems.Select(x=>x.Id==fresh.Id?fresh:x).ToArray();
             if(current?.Id==item.Id){current=MediaMetadata.Merge(current,fresh);ApplyKnownQuality(current);}
             if(personOrigin?.Id==fresh.Id)personOrigin=MediaMetadata.Merge(personOrigin,fresh);
@@ -56,7 +56,7 @@ public partial class MainWindow
             {
                 data=await Metadata(item,true,view.Request.Token,Publish,force);
                 if(!IsCurrent())return data;
-                view.Failed=!ImdbSuggestions.IsImdbOnly(data)&&(!MediaMetadata.HasDescription(data)||data.People.Length==0);
+                view.Failed=prefs.UiLanguage=="en"?data.English==null:!ImdbSuggestions.IsImdbOnly(data)&&(!MediaMetadata.HasDescription(data)||data.People.Length==0);
                 view.Loading=false;Publish(data);
                 if(prefs.LiveFavorites.Any(x=>x.Id==data.Id)){prefs.LiveFavorites=prefs.LiveFavorites.Select(x=>x.Id==data.Id?MediaMetadata.Merge(x,data):x).ToList();prefs.Save();}
                 try{await catalogIndex.AddAsync([data],view.Request.Token);}catch(IOException){}catch(UnauthorizedAccessException){}

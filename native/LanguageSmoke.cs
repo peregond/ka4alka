@@ -39,10 +39,12 @@ public partial class MainWindow
             Check(VisualElements<TextBlock>(Body).Any(text=>text.Text=="New series"),"Series shelves use the same English presentation.");
             Shot("series-english");
             var languageMovie=new MediaItem(-990021,"Language fixture","Фильмы","",2021,"—","8.0","#526B69"){PageUrl="https://example.invalid/language-fixture",Description="Fixture"};
+            languageMovie.SetEnglish(new EnglishMedia("en","English movie title","English synopsis shown on the movie page",null,null,["Adventure"],["United States"],["English Actor"],["English Director"]));
             SourceEntry LanguageRelease(string id,string audio,int seeds)=>new(id,"Language fixture (2021) 1080p "+audio,"Fixture","https://example.invalid/"+id,"magnet:?xt=urn:btih:"+new string('a',40),null,Seeds:seeds);
             var englishRelease=LanguageRelease("english-fixture","ENG",50);var russianRelease=LanguageRelease("russian-fixture","RUS",900);
             liveReleases[languageMovie.Id]=[russianRelease,englishRelease];requestedDetails.Add(languageMovie.Id);releaseViews[languageMovie.Id]=new(){ReceivedUtc=DateTime.UtcNow};
             current=languageMovie;section="Фильмы";Render();await Settle();
+            Check(FindVisual<TextBlock>(Body,text=>text.Name=="DetailTitle")?.Text=="English movie title"&&FindVisual<TextBlock>(Body,text=>text.Name=="DetailSynopsis")?.Text=="English synopsis shown on the movie page","Movie detail displays English metadata alongside the English interface.");
             Check(FindVisual<Button>(Body,button=>button.Name=="DetailDownload")?.Tag is SourceEntry chosen&&chosen.Id==englishRelease.Id,"English interface recommends English audio even when Russian alternatives have more seeders.");
             Check(VisualElements<Button>(Body).Where(button=>button.Name!="DetailDownload").Select(button=>button.Tag).OfType<SourceEntry>().First().Id==englishRelease.Id,"Default release list matches the English recommendation.");
             var releaseSort=FindVisual<ComboBox>(Body,box=>System.Windows.Automation.AutomationProperties.GetName(box)==AppLanguage.T("Сортировка раздач"))??throw new Exception("Release sorting is missing.");

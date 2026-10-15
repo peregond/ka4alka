@@ -116,7 +116,7 @@
         <Button x:Name="PosterHide" Style="{StaticResource PosterActionButton}" Click="CatalogPosterHide" ToolTip="{local:Tr Text='Скрыть из ленты'}" AutomationProperties.Name="{local:Tr Text='Скрыть из ленты'}"><Path Data="{StaticResource IconEyeOff}" Width="18" Height="18" Stretch="Uniform" Stroke="{StaticResource BannerText}" StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/></Button>
        </StackPanel>
       </Grid></Border>
-      <TextBlock x:Name="CardTitleText" Text="{Binding Title}" Margin="2,10,2,0" Height="36" FontSize="14" LineHeight="18" FontWeight="SemiBold" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding Title}"/>
+      <TextBlock x:Name="CardTitleText" Text="{Binding DisplayTitle}" Margin="2,10,2,0" Height="36" FontSize="14" LineHeight="18" FontWeight="SemiBold" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding DisplayTitle}"/>
       <TextBlock x:Name="CardGenreText" Text="{Binding CardMeta, Converter={x:Static local:UiText.Instance}, ConverterParameter=@meta}" Height="16" Margin="2,2,2,0" FontSize="12" Foreground="{DynamicResource Subtle}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding CardMeta, Converter={x:Static local:UiText.Instance}, ConverterParameter=@meta}"/>
      </StackPanel>
     </Button>

@@ -29,7 +29,7 @@ public partial class MainWindow
     WrapPanel? gameMetaRow;
     Panel? gameActions;
     FrameworkElement? gameSynopsisSkeleton,gameReleaseAnchor;
-    TextBlock? gameReleaseCount;
+    TextBlock? gameReleaseCount,gameTraits;
     string gameActionState="";
     int gameSteamId;
     // The screenshot gallery under the banner: one large picture, the strip of thumbnails and the request that fills them.
@@ -72,6 +72,7 @@ public partial class MainWindow
         gameCaption=new StackPanel{Name="GameCaption",Orientation=Orientation.Horizontal,Margin=new(0,0,0,12)};info.Children.Add(gameCaption);
         gameTitle=new TextBlock{Name="GameTitle",FontSize=48,FontWeight=FontWeights.ExtraBold,LineHeight=50,LineStackingStrategy=LineStackingStrategy.BlockLineHeight,TextWrapping=TextWrapping.Wrap,Foreground=(Brush)FindResource("BannerText"),Margin=new(0,0,0,12)};info.Children.Add(gameTitle);
         gameMetaRow=new WrapPanel{Name="GameMetaRow",Margin=new(0,0,0,10)};info.Children.Add(gameMetaRow);
+        gameTraits=new TextBlock{Name="GameTraits",FontSize=14,Foreground=(Brush)FindResource("BannerMuted"),TextWrapping=TextWrapping.Wrap,Margin=new(0,0,0,12)};info.Children.Add(gameTraits);
         RenderGameHeading(item,detail);
 
         var description=new StackPanel{Name="GameDescription",Margin=new(0,0,0,16)};info.Children.Add(description);
@@ -179,7 +180,7 @@ public partial class MainWindow
             gameMetaRow.Children.Add(rating);
         }
         var traits=string.Join(" · ",new[]{item.Genre!="Windows"?item.AllGenres:"",detail?.Developers??""}.Where(x=>!string.IsNullOrWhiteSpace(x)));
-        if(traits.Length>0)gameMetaRow.Children.Add(new TextBlock{Name="GameTraits",Text=AppLanguage.T(traits),FontSize=14,Foreground=(Brush)FindResource("BannerMuted"),TextWrapping=TextWrapping.Wrap,VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,12,4)});
+        if(gameTraits!=null){gameTraits.Text=AppLanguage.T(traits);gameTraits.Visibility=traits.Length>0?Visibility.Visible:Visibility.Collapsed;}
         gameMetaRow.Children.Add(GameBadge("Windows"));
         if(detail!=null&&RussianText(detail.Russian) is {Short.Length:>0} russian)gameMetaRow.Children.Add(GameBadge(russian.Short,detail.Russian==GameRussian.Absent?null:ToneGood,russian.Long,"GameRussian"));
         if(detail is {Age:>=12})gameMetaRow.Children.Add(GameBadge(detail.Age+"+",null,"Возрастное ограничение в Steam"));
@@ -198,7 +199,7 @@ public partial class MainWindow
         var owned=GameDownloads(item);
         if(owned.Any(x=>x.Completed))return "done:"+owned.First(x=>x.Completed).Id;
         if(owned.FirstOrDefault(x=>!x.Completed) is {} active)return "active:"+active.Id;
-        var pick=GameReleaseRecommendation.Pick(gameReleases);
+        var pick=GameReleaseRecommendation.Pick(gameReleases,prefs.UiLanguage);
         return pick!=null?"pick:"+pick.Entry.Id+"|"+gameReleases.Length:gameReleasesLoading?"loading":gameReleases.Length>0?"choose":"none";
     }
     void RefreshGameActions()
@@ -211,7 +212,7 @@ public partial class MainWindow
         if(gameActions==null)return;
         gameActions.Children.Clear();gameActionState=GameActionState(item);
         var owned=GameDownloads(item);var done=owned.FirstOrDefault(x=>x.Completed);var active=owned.FirstOrDefault(x=>!x.Completed);
-        var recommended=owned.Length==0?GameReleaseRecommendation.Pick(gameReleases)?.Entry:null;
+        var recommended=owned.Length==0?GameReleaseRecommendation.Pick(gameReleases,prefs.UiLanguage)?.Entry:null;
         Button Action(string text,string icon,bool primary,Action click)
         {
             var button=new Button{Style=(Style)FindResource(primary?"PrimaryButton":typeof(Button)),Height=52,MinHeight=52,Padding=new(22,0,22,0),FontSize=15,Margin=new(0,0,10,8)};
@@ -360,7 +361,7 @@ public partial class MainWindow
         {
             try
             {
-                var detail=gameDetails.GetValueOrDefault(game.Id)??await (gameDetailProvider?.Invoke(game,token)??new GameCatalog(sourceClient).Detail(game,token));
+                var detail=gameDetails.GetValueOrDefault(game.Id)??await (gameDetailProvider?.Invoke(game,token)??new GameCatalog(sourceClient,prefs.UiLanguage).Detail(game,token));
                 if(!Active())return;AddGameDetails(detail);current=detail.Item;
                 if(gameCover!=null)gameCover.DataContext=detail.Item;
                 RenderGameHeading(detail.Item,detail);
@@ -527,7 +528,7 @@ public partial class MainWindow
     void RenderGamePicker(StackPanel host,MediaItem game,SourceEntry[] releases)
     {
         if(!gamePickerStates.TryGetValue(game.Id,out var state)){if(gamePickerStates.Count>=40)gamePickerStates.Remove(gamePickerStates.Keys.First());state=gamePickerStates[game.Id]=new();}
-        var recommended=GameReleaseRecommendation.Pick(releases);
+        var recommended=GameReleaseRecommendation.Pick(releases,prefs.UiLanguage);
         var sorts=new[]{"Больше отдающих","Меньше размер","Больше размер","По названию"};
         var sources=releases.Select(x=>x.Source).Distinct().OrderBy(x=>x).ToArray();
         if(state.Source!="Все"&&!sources.Contains(state.Source))state.Source="Все";
@@ -646,7 +647,7 @@ public partial class MainWindow
                 "Меньше размер"=>filtered.OrderBy(x=>x.Size??long.MaxValue),
                 "Больше размер"=>filtered.OrderByDescending(x=>x.Size??-1),
                 "По названию"=>filtered.OrderBy(x=>x.Title,StringComparer.CurrentCultureIgnoreCase),
-                _=>filtered.OrderByDescending(SeedRank)
+                _=>prefs.UiLanguage=="en"?SearchLanguage.AudioOrder(filtered,prefs.UiLanguage):filtered.OrderByDescending(SeedRank)
             };
             if(state.Reverse)filtered=filtered.Reverse();
             var visible=filtered.ToArray();var displayed=visible.Take(state.VisibleCount).ToArray();

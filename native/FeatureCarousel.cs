@@ -119,11 +119,12 @@ public partial class MainWindow
         DetachFeatureWatch(view);view.Bound=item;
         view.Poster.DataContext=item;if(view.LiteCover.Tag is Image lite)lite.DataContext=item;
         view.Eyebrow.Text=AppLanguage.T(index==0?"В центре внимания":item.Section=="Игры"?"Стоит поиграть":"Стоит посмотреть");
-        view.Title.Text=item.Title;view.Title.ToolTip=item.Title;
+        view.Title.Text=item.DisplayTitle;view.Title.ToolTip=item.DisplayTitle;
         view.About.Tag=item;view.Frame.Tag=item;
-        AutomationProperties.SetName(view.About,AppLanguage.T("Подробнее: "+item.Title));
+        AutomationProperties.SetName(view.About,AppLanguage.T("Подробнее: "+item.DisplayTitle));
         RebuildFeatureMeta(view,item);UpdateFeaturePeople(view,item);UpdateFeatureFavorite(view);UpdateFeatureDots(view);
-        view.Watch=(_,e)=>{if(e.PropertyName is null or nameof(MediaItem.PosterQuality)or nameof(MediaItem.CardRating)or nameof(MediaItem.CardGenre)){RebuildFeatureMeta(view,item);}};
+        view.Watch=(_,e)=>{if(e.PropertyName is null){view.Title.Text=item.DisplayTitle;view.Title.ToolTip=item.DisplayTitle;UpdateFeaturePeople(view,item);UpdateFeatureSummary(view,item);}
+            if(e.PropertyName is null or nameof(MediaItem.PosterQuality)or nameof(MediaItem.CardRating)or nameof(MediaItem.CardGenre)){RebuildFeatureMeta(view,item);}};
         item.PropertyChanged+=view.Watch;
         StartFeatureSummary(view,item);
     }
@@ -179,8 +180,8 @@ public partial class MainWindow
             view.People.Text=AppLanguage.T(studio.Length>0?"Разработчик "+studio:"");view.People.Visibility=studio.Length>0&&!featureCompactText?Visibility.Visible:Visibility.Collapsed;return;
         }
         // Only credits that the item already carries; no extra requests are made for the banner.
-        var director=item.People.Where(x=>x.Role=="Режиссёры").Select(x=>x.Name).Take(1).ToArray();
-        var cast=item.People.Where(x=>x.Role=="Актёры").Select(x=>x.Name).Take(2).ToArray();
+        var director=item.DisplayPeople.Where(x=>x.Role=="Режиссёры").Select(x=>x.Name).Take(1).ToArray();
+        var cast=item.DisplayPeople.Where(x=>x.Role=="Актёры").Select(x=>x.Name).Take(2).ToArray();
         var parts=new List<string>();
         if(director.Length>0)parts.Add("Режиссёр "+director[0]);
         if(cast.Length>0)parts.Add("В ролях "+string.Join(", ",cast));

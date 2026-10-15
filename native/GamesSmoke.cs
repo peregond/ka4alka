@@ -200,6 +200,18 @@ public partial class MainWindow
         await Settle();Shot("game-detail-dark");
         if(gameGallery is {Visibility:Visibility.Visible} gallery&&gameScroll!=null){gallery.BringIntoView();await Settle();gameScroll.ScrollToVerticalOffset(Math.Max(0,gallery.TransformToAncestor((FrameworkElement)gameScroll.Content).Transform(new Point()).Y-20));await Settle();Shot("game-detail-gallery");}
         gameScroll!.ScrollToVerticalOffset(gameScroll.ScrollableHeight);await Settle();Shot("game-detail-releases");gameScroll.ScrollToVerticalOffset(0);await Settle();
+        var normalDetail=gameDetails[game.Id];
+        var verbose=normalDetail with{Item=normalDetail.Item with{Genre="Приключения, Инди, Казуальные игры, Гонки, Симуляторы, Спортивные игры, Исследование открытого мира"},Developers="Funselektor Labs Inc., Strelka Games, A Studio With A Long Name"};
+        AddGameDetails(verbose);RenderGameHeading(verbose.Item,verbose);
+        foreach(var width in new[]{700d,1000d,1280d,1760d})
+        {
+            await Size(width,900);UpdateGameDetailLayout();await Settle();
+            var traitsTop=gameTraits!.TransformToAncestor(gameInfoPanel!).Transform(new Point()).Y;
+            var synopsisTop=gameDescription!.TransformToAncestor(gameInfoPanel!).Transform(new Point()).Y;
+            Check(gameTraits.ActualWidth<=gameInfoPanel.ActualWidth+1&&synopsisTop>=traitsTop+gameTraits.ActualHeight-1,"long game traits stay bounded above synopsis at width "+width);
+            Shot("game-detail-long-text-"+width);
+        }
+        AddGameDetails(normalDetail);RenderGameHeading(normalDetail.Item,normalDetail);
         await Size(700,900);Shot("game-detail-narrow");
         // A wide window lays the releases out as a table with sortable columns instead of cards.
         await Size(1760,900);gameScroll!.ScrollToVerticalOffset(0);await Settle();Shot("game-detail-wide");

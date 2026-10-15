@@ -25,8 +25,8 @@ public partial class MainWindow
     string KnownFeatureSummary(MediaItem item)
     {
         if(item.Section=="Игры"&&gameDetails.TryGetValue(item.Id,out var game)&&FeatureSummary.Shorten(game.Item.Description) is {Length:>0} gameSummary)return gameSummary;
-        if(cardMetadata.TryGetValue(item.Id,out var cached)&&cached.IsCompletedSuccessfully&&FeatureSummary.Shorten(cached.Result.Description) is {Length:>0} summary)return summary;
-        return FeatureSummary.Shorten(item.Description);
+        if(cardMetadata.TryGetValue(item.Id,out var cached)&&cached.IsCompletedSuccessfully&&FeatureSummary.Shorten(cached.Result.DisplayDescription) is {Length:>0} summary)return summary;
+        return FeatureSummary.Shorten(item.DisplayDescription);
     }
     void SetFeatureSummaryText(FeatureCarouselView view,string text)
     {
@@ -59,7 +59,8 @@ public partial class MainWindow
             var fresh=await pending.WaitAsync(request.Token);
             if(Active()&&fresh.Id==item.Id)
             {
-                var text=FeatureSummary.Shorten(fresh.Description);
+                item.SetEnglish(fresh.English);
+                var text=FeatureSummary.Shorten(fresh.DisplayDescription);
                 if(text.Length>0)SetFeatureSummaryText(view,text);
             }
         }

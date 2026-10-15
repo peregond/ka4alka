@@ -39,6 +39,11 @@ public partial class MainWindow
     {
         var previous=prefs.UiLanguage;prefs.UiLanguage=AppLanguage.Normalize(language);
         try{prefs.Save();}catch(Exception error){prefs.UiLanguage=previous;Status.Text=AppLanguage.T("Не удалось сохранить язык: "+error.Message);Render();return;}
+        CancelDetailMetadata(true);cardMetadata.Clear();priorityMetadata.Clear();
+        foreach(var lookup in ratingLookups.Values)lookup.Request.Cancel();ratingLookups.Clear();
+        CancelGameWork();gameHomeRequest?.Cancel();gameBannerRequest?.Cancel();gameDetailRequest?.Cancel();
+        gameCatalogRequest?.Cancel();gameCatalogRequest=null;gameLoading=false;gameHomeRequest=null;gameBannerRequest=null;
+        gameDetails.Clear();gameItems=[];gameShelfItems.Clear();gameShelfLoading.Clear();gameShelfFailed.Clear();gameShelfLoadedUtc=default;gameDetailId=null;gameKey="";
         AppLanguage.Set(prefs.UiLanguage);Status.Text="";
         foreach(var item in downloads.Items)item.Refresh();
         layoutInitialized=false;ApplyCompactLayout();Render();UpdateLoadingStateAfterLanguageChange();

@@ -69,8 +69,8 @@ public partial class MainWindow
         if(item.Year>0){caption.Children.Add(CaptionText("  ·  "));caption.Children.Add(CaptionText(item.Year.ToString(),"DetailYear"));}
         detailInfo.Children.Add(caption);
 
-        var hasOriginal=!string.IsNullOrWhiteSpace(item.OriginalTitle)&&!item.OriginalTitle.Equals(item.Title,StringComparison.OrdinalIgnoreCase);
-        detailTitle=new TextBlock{Name="DetailTitle",Text=item.Title,FontSize=56,FontWeight=FontWeights.ExtraBold,LineHeight=58,LineStackingStrategy=LineStackingStrategy.BlockLineHeight,TextWrapping=TextWrapping.Wrap,Foreground=(Brush)FindResource("BannerText"),Margin=new(0,0,0,hasOriginal?4:12),ToolTip=item.Title};
+        var hasOriginal=!string.IsNullOrWhiteSpace(item.OriginalTitle)&&!item.OriginalTitle.Equals(item.DisplayTitle,StringComparison.OrdinalIgnoreCase);
+        detailTitle=new TextBlock{Name="DetailTitle",Text=item.DisplayTitle,FontSize=56,FontWeight=FontWeights.ExtraBold,LineHeight=58,LineStackingStrategy=LineStackingStrategy.BlockLineHeight,TextWrapping=TextWrapping.Wrap,Foreground=(Brush)FindResource("BannerText"),Margin=new(0,0,0,hasOriginal?4:12),ToolTip=item.DisplayTitle};
         detailInfo.Children.Add(detailTitle);
         if(hasOriginal)
         {
@@ -90,13 +90,13 @@ public partial class MainWindow
         }
         Rating("Кинопоиск",item.Kinopoisk);Rating("IMDb",item.Imdb);
         // Every genre is listed here; a poster's caption shows only the first.
-        var traits=string.Join(" · ",new[]{item.AllGenres,item.Country}.Where(x=>!string.IsNullOrWhiteSpace(x)));
+        var traits=string.Join(" · ",new[]{item.AllGenres,item.DisplayCountry}.Where(x=>!string.IsNullOrWhiteSpace(x)));
         if(traits.Length>0)detailMetaRow.Children.Add(new TextBlock{Name="DetailTraits",Text=AppLanguage.T(traits),FontSize=14,Foreground=(Brush)FindResource("BannerMuted"),TextWrapping=TextWrapping.Wrap,VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,12,4)});
         detailPoorQualitySlot=new StackPanel();detailInfo.Children.Add(detailPoorQualitySlot);
         UpdateDetailQuality(item);
         // credits, only those already known
-        var directors=item.People.Where(x=>x.Role=="Режиссёры").Take(2).ToArray();
-        var cast=item.People.Where(x=>x.Role=="Актёры").Take(5).ToArray();
+        var directors=item.DisplayPeople.Where(x=>x.Role=="Режиссёры").Take(2).ToArray();
+        var cast=item.DisplayPeople.Where(x=>x.Role=="Актёры").Take(5).ToArray();
         if(directors.Length+cast.Length>0)
         {
             var credits=new Grid{Name="DetailCredits",Margin=new(0,0,0,12)};credits.ColumnDefinitions.Add(new(){Width=GridLength.Auto});credits.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});
@@ -121,13 +121,13 @@ public partial class MainWindow
         detailSynopsis=new TextBlock{Name="DetailSynopsis",Text=DetailDescriptionText(item),FontSize=15,LineHeight=23,LineStackingStrategy=LineStackingStrategy.BlockLineHeight,Foreground=(Brush)FindResource("BannerMuted"),TextWrapping=TextWrapping.Wrap,TextTrimming=TextTrimming.CharacterEllipsis,MaxHeight=descriptionExpanded?double.PositiveInfinity:69};
         detailDescription.Children.Add(detailSynopsis);
         // While the description is on its way its place breathes instead of saying "loading".
-        if(!MediaMetadata.HasDescription(item)&&DetailMetadataLoading(item.Id)){detailSynopsis.Visibility=Visibility.Collapsed;detailDescription.Children.Add(SynopsisSkeleton());}
+        if(string.IsNullOrWhiteSpace(item.DisplayDescription)&&DetailMetadataLoading(item.Id)){detailSynopsis.Visibility=Visibility.Collapsed;detailDescription.Children.Add(SynopsisSkeleton());}
         descriptionToggle=Button(descriptionExpanded?"Свернуть описание":"Читать дальше",()=>
         {
             if(descriptionItemId!=item.Id||detailSynopsis==null)return;
             descriptionExpanded=!descriptionExpanded;detailSynopsis.MaxHeight=descriptionExpanded?double.PositiveInfinity:69;UpdateDescriptionToggle();
         });descriptionToggle.Name="DescriptionToggle";descriptionToggle.Style=(Style)FindResource("QuietButton");descriptionToggle.Foreground=(Brush)FindResource("BannerText");descriptionToggle.HorizontalAlignment=HorizontalAlignment.Left;descriptionToggle.Padding=new(0,5,0,5);descriptionToggle.Margin=new(0);descriptionToggle.MinHeight=28;descriptionToggle.Visibility=Visibility.Collapsed;detailDescription.Children.Add(descriptionToggle);
-        if(DetailMetadataNeedsRetry(item.Id)&&!MediaMetadata.HasDescription(item)){var retry=ActionButton("Повторить загрузку карточки","IconRefresh",()=>RetryDetailMetadata(item));retry.Name="DetailMetadataRetry";retry.HorizontalAlignment=HorizontalAlignment.Left;retry.Margin=new(0,8,0,0);detailDescription.Children.Add(retry);}
+        if(DetailMetadataNeedsRetry(item.Id)&&string.IsNullOrWhiteSpace(item.DisplayDescription)){var retry=ActionButton("Повторить загрузку карточки","IconRefresh",()=>RetryDetailMetadata(item));retry.Name="DetailMetadataRetry";retry.HorizontalAlignment=HorizontalAlignment.Left;retry.Margin=new(0,8,0,0);detailDescription.Children.Add(retry);}
         detailSynopsis.SizeChanged+=(sender,_)=>{if(ReferenceEquals(sender,detailSynopsis))UpdateDescriptionToggle();};
         // actions follow the state of the title
         detailActions=new WrapPanel{Name="DetailActions",Margin=new(0,0,0,-8)};detailInfo.Children.Add(detailActions);

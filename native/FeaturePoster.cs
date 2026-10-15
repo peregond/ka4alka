@@ -21,13 +21,14 @@ public partial class MainWindow
     async Task<string?> FeaturePosterUrl(string id,CancellationToken ct,SourceClient? client=null)
     {
         ct.ThrowIfCancellationRequested();
-        if(featurePosters.TryGetValue(id,out var cached)&&cached.Expires>DateTime.UtcNow)return cached.Url;
-        if(!featurePosterLookups.TryGetValue(id,out var lookup)||lookup.Request.IsCancellationRequested)
+        var language=AppLanguage.Current;var cacheKey=language+"|"+id;
+        if(featurePosters.TryGetValue(cacheKey,out var cached)&&cached.Expires>DateTime.UtcNow)return cached.Url;
+        if(!featurePosterLookups.TryGetValue(cacheKey,out var lookup)||lookup.Request.IsCancellationRequested)
         {
-            lookup=new();featurePosterLookups[id]=lookup;var token=lookup.Request.Token;
+            lookup=new();featurePosterLookups[cacheKey]=lookup;var token=lookup.Request.Token;
             async Task<string?> Find()
             {
-                var path=Path.Combine(Preferences.DataDir,"covers","backdrop-"+Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(id)))+".json");
+                var path=Path.Combine(Preferences.DataDir,"covers","backdrop-"+Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(cacheKey)))+".json");
                 byte[]? saved=null;
                 try
                 {
@@ -52,7 +53,7 @@ public partial class MainWindow
                 }
                 try
                 {
-                    var request="api/backdrop?id="+Uri.EscapeDataString(id);
+                    var request="api/backdrop?id="+Uri.EscapeDataString(id)+"&language="+language;
                     var bytes=client!=null?await client.Read(new Uri(OnlineIndexClient.PublishedSite,request),32768,token):await onlineIndex.ReadSite(request,32768,token);
                     var value=await Task.Run(()=>FeatureBackdrop.FromResponse(bytes,id),token);
                     lookup.Expires=DateTime.UtcNow.Add(value!=null?TimeSpan.FromDays(7):TimeSpan.FromHours(1));
@@ -73,14 +74,14 @@ public partial class MainWindow
         try
         {
             var url=await lookup.Task.WaitAsync(ct);ct.ThrowIfCancellationRequested();
-            if(featurePosters.Count>=16&&!featurePosters.ContainsKey(id))featurePosters.Remove(featurePosters.Keys.First());
-            featurePosters[id]=(url,lookup.Expires);return url;
+            if(featurePosters.Count>=16&&!featurePosters.ContainsKey(cacheKey))featurePosters.Remove(featurePosters.Keys.First());
+            featurePosters[cacheKey]=(url,lookup.Expires);return url;
         }
         finally
         {
             if(--lookup.Subscribers==0)
             {
-                if(featurePosterLookups.TryGetValue(id,out var current)&&ReferenceEquals(current,lookup))featurePosterLookups.Remove(id);
+                if(featurePosterLookups.TryGetValue(cacheKey,out var current)&&ReferenceEquals(current,lookup))featurePosterLookups.Remove(cacheKey);
                 if(!lookup.Task.IsCompleted)lookup.Request.Cancel();lookup.Request.Dispose();
             }
         }

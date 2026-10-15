@@ -140,7 +140,7 @@ public partial class MainWindow
         try
         {
             var browse=new GameBrowse("",spec.Sort,spec.Genre,1);
-            var result=await (gameCatalogProvider?.Invoke(browse,token)??new GameCatalog(sourceClient).Browse(browse,token));
+            var result=await (gameCatalogProvider?.Invoke(browse,token)??new GameCatalog(sourceClient,prefs.UiLanguage).Browse(browse,token));
             if(token.IsCancellationRequested)return;
             if(gameShelfItems.Count==0)gameShelfLoadedUtc=DateTime.UtcNow;
             gameShelfItems[spec.Key]=result.Items;
@@ -210,7 +210,7 @@ public partial class MainWindow
             if(gameDetails.ContainsKey(slide.Id))continue;
             try
             {
-                var detail=await (gameDetailProvider?.Invoke(slide,token)??new GameCatalog(sourceClient).Detail(slide,token));
+                var detail=await (gameDetailProvider?.Invoke(slide,token)??new GameCatalog(sourceClient,prefs.UiLanguage).Detail(slide,token));
                 if(token.IsCancellationRequested||closed)return;
                 AddGameDetails(detail);
                 if(carousel is {Bound: {} bound} view&&bound.Id==slide.Id){RebuildFeatureMeta(view,bound);UpdateFeaturePeople(view,bound);UpdateFeatureSummary(view,bound);}
@@ -262,7 +262,7 @@ public partial class MainWindow
     {
         gameCatalogRequest?.Cancel();var request=gameCatalogRequest=new CancellationTokenSource();var token=request.Token;
         var browse=GameRequest;gameLoading=true;gameError="";gameHasNext=false;gameItems=[];await Task.Yield();
-        try{var result=await (gameCatalogProvider?.Invoke(browse,token)??new GameCatalog(sourceClient).Browse(browse,token));if(gameKey==key&&!token.IsCancellationRequested){gameItems=result.Items;gameHasNext=result.HasNext;}}
+        try{var result=await (gameCatalogProvider?.Invoke(browse,token)??new GameCatalog(sourceClient,prefs.UiLanguage).Browse(browse,token));if(gameKey==key&&!token.IsCancellationRequested){gameItems=result.Items;gameHasNext=result.HasNext;}}
         catch(OperationCanceledException)when(token.IsCancellationRequested){}
         catch(Exception error){if(gameKey==key&&!token.IsCancellationRequested){gameError="Каталог временно недоступен. Нажми «Обновить».";ErrorLog.Write(error);}}
         finally{if(ReferenceEquals(gameCatalogRequest,request)){gameCatalogRequest=null;gameLoading=false;if(!closed&&section=="Игры"&&current==null&&gameKey==key)Render();}request.Dispose();}

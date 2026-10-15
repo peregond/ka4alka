@@ -11,15 +11,16 @@ public sealed record GameDetails(MediaItem Item,string Requirements,string Devel
     public GameShot[] Gallery=>Shots??[];
     public string[] Traits=>Features??[];
 }
-public sealed class GameCatalog(SourceClient client)
+public sealed class GameCatalog(SourceClient client,string language="ru")
 {
     public const int PageSize=40;
     // Steam tag 113 is "Free to Play": browsing never lists those games. A title search still finds any game by name.
     public const int FreeToPlayTag=113;
-    public static Uri Query(GameBrowse browse)
+    public static Uri Query(GameBrowse browse,string language="ru")
     {
+        var steamLanguage=AppLanguage.Normalize(language)=="en"?"english":"russian";
         var text=browse.Query.Trim();
-        if(text.Length>0)return new("https://store.steampowered.com/api/storesearch/?term="+Uri.EscapeDataString(text)+"&l=russian");
+        if(text.Length>0)return new("https://store.steampowered.com/api/storesearch/?term="+Uri.EscapeDataString(text)+"&l="+steamLanguage);
         var tag=GameGenres.ByKey(browse.Genre)?.Tag;
         var sort=browse.Sort switch
         {
@@ -28,7 +29,7 @@ public sealed class GameCatalog(SourceClient client)
             GameBrowse.Soon=>"&filter=popularwishlist",
             _=>"&sort_by=_ASC&filter=topsellers"
         };
-        return new("https://store.steampowered.com/search/results/?query&l=russian&infinite=1&category1=998&os=win&untags="+FreeToPlayTag+(tag!=null?"&tags="+tag:"")+"&count="+PageSize+"&start="+((Math.Clamp(browse.Page,1,500)-1)*PageSize)+sort);
+        return new("https://store.steampowered.com/search/results/?query&l="+steamLanguage+"&infinite=1&category1=998&os=win&untags="+FreeToPlayTag+(tag!=null?"&tags="+tag:"")+"&count="+PageSize+"&start="+((Math.Clamp(browse.Page,1,500)-1)*PageSize)+sort);
     }
     public static bool TryId(string? page,out int id)
     {
@@ -59,6 +60,7 @@ public sealed class GameCatalog(SourceClient client)
             var parts=HtmlEntity.DeEntitize(review.GetAttributeValue("data-tooltip-html","")).Split("<br>",StringSplitOptions.RemoveEmptyEntries|StringSplitOptions.TrimEntries);
             label=parts.Length>0&&!parts[0].Contains('%')?parts[0]:"";
             var match=Regex.Match(string.Join(" ",parts),@"(\d{1,3})%\s+из\s+([\d,. \s]+?)\s+обзор");
+            if(!match.Success)match=Regex.Match(string.Join(" ",parts),@"(\d{1,3})%\s+of\s+(?:the\s+)?([\d,. \s]+?)\s+user reviews",RegexOptions.IgnoreCase);
             if(match.Success){reviewPercent=Math.Clamp(int.Parse(match.Groups[1].Value),0,100);reviewCount=GameNumbers.Digits(match.Groups[2].Value);}
         }
         var tags=Regex.Matches(row.GetAttributeValue("data-ds-tagids",""),@"\d+").Select(x=>int.TryParse(x.Value,out var tag)?tag:0).Where(x=>x>0).ToArray();
@@ -120,7 +122,7 @@ public sealed class GameCatalog(SourceClient client)
     }
     public Task<GameCatalogPage> Browse(GameBrowse browse,CancellationToken ct)=>Task.Run(async()=>
     {
-        var uri=Query(browse);var file=Path.Combine(Preferences.DataDir,"games",Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(uri.AbsoluteUri)))+".json");
+        var uri=Query(browse,language);var file=Path.Combine(Preferences.DataDir,"games",Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(uri.AbsoluteUri)))+".json");
         if(File.Exists(file)&&DateTime.UtcNow-File.GetLastWriteTimeUtc(file)<TimeSpan.FromMinutes(15))return ParsePage(await CacheFiles.ReadAllBytesAsync(file,ct));
         try{var bytes=await client.Read(uri,3*1024*1024,ct);var result=ParsePage(bytes);Directory.CreateDirectory(Path.GetDirectoryName(file)!);await CacheFiles.WriteAllBytesAsync(file,bytes,ct);return result;}
         catch(Exception)when(!ct.IsCancellationRequested&&File.Exists(file)){return ParsePage(await CacheFiles.ReadAllBytesAsync(file,ct));}
@@ -136,7 +138,7 @@ public sealed class GameCatalog(SourceClient client)
     static GameRussian Russian(string? languages)
     {
         if(string.IsNullOrWhiteSpace(languages))return GameRussian.Unknown;
-        var match=Regex.Match(languages,@"русск\p{L}*(<strong>\*</strong>)?",RegexOptions.IgnoreCase);
+        var match=Regex.Match(languages,@"(?:русск\p{L}*|Russian)(<strong>\*</strong>)?",RegexOptions.IgnoreCase);
         return !match.Success?GameRussian.Absent:match.Groups[1].Success?GameRussian.Voiced:GameRussian.Interface;
     }
     public static GameDetails ParseDetail(byte[] bytes,MediaItem item)
@@ -200,12 +202,12 @@ public sealed class GameCatalog(SourceClient client)
     {
         if(!TryId(item.PageUrl,out var id))throw new InvalidDataException("Неизвестная игра.");
         var reviews=Review(id,ct);
-        var file=Path.Combine(Preferences.DataDir,"games","detail-"+id+".json");
+        var file=Path.Combine(Preferences.DataDir,"games","detail-"+AppLanguage.Normalize(language)+"-"+id+".json");
         GameDetails detail;
         if(File.Exists(file)&&DateTime.UtcNow-File.GetLastWriteTimeUtc(file)<TimeSpan.FromDays(7))detail=ParseDetail(await CacheFiles.ReadAllBytesAsync(file,ct),item);
         else
         {
-            try{var bytes=await client.Read(new Uri("https://store.steampowered.com/api/appdetails/?appids="+id+"&l=russian"),3*1024*1024,ct);detail=ParseDetail(bytes,item);Directory.CreateDirectory(Path.GetDirectoryName(file)!);await CacheFiles.WriteAllBytesAsync(file,bytes,ct);}
+            try{var bytes=await client.Read(new Uri("https://store.steampowered.com/api/appdetails/?appids="+id+"&l="+(AppLanguage.Normalize(language)=="en"?"english":"russian")),3*1024*1024,ct);detail=ParseDetail(bytes,item);Directory.CreateDirectory(Path.GetDirectoryName(file)!);await CacheFiles.WriteAllBytesAsync(file,bytes,ct);}
             catch(Exception)when(!ct.IsCancellationRequested&&File.Exists(file)){detail=ParseDetail(await CacheFiles.ReadAllBytesAsync(file,ct),item);}
         }
         var review=await reviews;

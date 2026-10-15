@@ -42,6 +42,7 @@ public partial class MainWindow
     readonly OnlineIndexClient onlineIndex;
     Task<MediaItem> Metadata(MediaItem item,bool priority=false,CancellationToken ct=default,Action<MediaItem>? updated=null,bool force=false)
     {
+        if(prefs.UiLanguage=="en"&&item.Cinema)return EnglishMetadata(item,priority,ct,updated,force);
         // A title found only on IMDb has no catalog page to read. An opened card asks the site for its text and cast, TheTVDB for series and TMDB for films (shelf cards do not); TVmaze backs up series.
         if(ImdbSuggestions.IsImdbOnly(item))return priority?ImdbMetadata(item,ct,updated,force):Task.FromResult(item);
         item=DownloadMetadata.EnrichMedia(item,new[]{sharedCatalog.Find(item)}.OfType<MediaItem>().Concat(BundledCatalog.Search(item.Section,item.Title)));
@@ -123,7 +124,7 @@ public partial class MainWindow
             lookup.Task=Metadata(item,ct:lookup.Request.Token);
         }
         lookup.Subscribers++;
-        try{var data=await lookup.Task.WaitAsync(ct);if(!closed&&!ct.IsCancellationRequested){item.SetScores(data.Kinopoisk,data.Imdb,data.Genre);if(prefs.HiddenGenres.Count>0&&!PersonallyVisible(item))ScheduleCatalogEvidenceRefresh();}}
+        try{var data=await lookup.Task.WaitAsync(ct);if(!closed&&!ct.IsCancellationRequested){item.SetEnglish(data.English);item.SetScores(data.Kinopoisk,data.Imdb,data.Genre);if(prefs.HiddenGenres.Count>0&&!PersonallyVisible(item))ScheduleCatalogEvidenceRefresh();}}
         catch{ /* A missing rating stays unavailable. */ }
         finally
         {
