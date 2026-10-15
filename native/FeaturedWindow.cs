@@ -76,7 +76,7 @@ public partial class MainWindow
         var token=request.Token;
         try
         {
-            var groups=featuredProvider!=null?await featuredProvider(token):await Load();
+            var groups=featuredProvider!=null?await featuredProvider(token).WaitAsync(token):await Load();
             if(token.IsCancellationRequested||closed||section!=FeaturedSection||current!=null)return;
             featuredGroups=groups;
             RefreshFeaturedRows();

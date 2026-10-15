@@ -11,7 +11,7 @@ public partial class MainWindow
 {
     public async Task FeaturedSmokeTest(string output)
     {
-        Directory.CreateDirectory(output);liveRequest?.Cancel();catalogRefreshTimer.Stop();refresh.Stop();searchDelay.Stop();metadataLifetime.Cancel();
+        Directory.CreateDirectory(output);liveRequest?.Cancel();catalogRefreshTimer.Stop();refresh.Stop();searchDelay.Stop();
         var checks=new List<string>();
         void Check(bool pass,string message){if(!pass)throw new Exception(message);checks.Add(message);}
         async Task Settle(){await Task.Delay(100);UpdateLayout();await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ContextIdle);}
@@ -23,7 +23,17 @@ public partial class MainWindow
         foreach(var item in items)cardMetadata[item.Id]=Task.FromResult(item);
         var gameDefinition=FeaturedCatalog.Collections.Single(row=>row.IsGames);
         var game=GameCatalog.Item(620,"Portal 2");gameDetailProvider=(item,ct)=>Task.FromResult(new GameDetails(item,"","Valve","Valve"));gameSourcesProvider=_=>[];
-        featuredGroups=[new(definition,items),new(gameDefinition,[game])];
+        FeaturedGroup[] fixtureGroups=[new(definition,items),new(gameDefinition,[game])];
+        var delayed=new TaskCompletionSource<FeaturedGroup[]>(TaskCreationOptions.RunContinuationsAsynchronously);
+        featuredProvider=_=>delayed.Task;featuredGroups=null;
+        ShowFeatured();await Settle();
+        Check(featuredState?.Visibility==Visibility.Visible&&featuredGroups==null,"A delayed snapshot shows the page scaffold without blocking input.");
+        ShowDownloads(DownloadsButton,new RoutedEventArgs());var awayRender=renderCount;delayed.SetResult(fixtureGroups);await Settle();
+        Check(section=="Загрузки"&&renderCount==awayRender&&featuredGroups==null,"A cancelled late result cannot replace another page.");
+        delayed=new(TaskCreationOptions.RunContinuationsAsynchronously);featuredProvider=_=>delayed.Task;ShowFeatured();await Settle();
+        var loadingRender=renderCount;var loadingScroll=FindVisual<ScrollViewer>(Body,_=>true);delayed.SetResult(fixtureGroups);await Settle();
+        Check(renderCount==loadingRender&&ReferenceEquals(loadingScroll,FindVisual<ScrollViewer>(Body,_=>true))&&featuredGroups!=null,"Loaded collections fill the existing scaffold in place.");
+        featuredProvider=null;metadataLifetime.Cancel();
         MaxWidth=1800;MaxHeight=1100;MinWidth=700;MinHeight=550;Width=1280;Height=850;
         ShowFeatured();await Settle();
         Check(Navigation.Children.OfType<Button>().First().Tag?.ToString()==FeaturedSection,"Featured is the first library section.");
