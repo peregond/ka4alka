@@ -9,7 +9,7 @@ public partial class MainWindow
     string featuredCollectionId="";
     string? featuredReturn;
     FeaturedGroup[]? featuredGroups;
-    CancellationTokenSource? featuredRequest;
+    CancellationTokenSource? featuredHubRequest;
     readonly Dictionary<string,DiscoveryShelfView> featuredShelves=[];
     TextBlock? featuredState;
     StackPanel? featuredPanel;
@@ -30,7 +30,7 @@ public partial class MainWindow
     }
     void CancelFeaturedWork()
     {
-        featuredRequest?.Cancel();featuredRequest?.Dispose();featuredRequest=null;
+        featuredHubRequest?.Cancel();featuredHubRequest?.Dispose();featuredHubRequest=null;
         featuredShelves.Clear();featuredState=null;featuredPanel=null;
         if(current==null&&section is not (FeaturedSection or "Настройки"))featuredReturn=null;
     }
@@ -71,8 +71,8 @@ public partial class MainWindow
     async void ReloadFeatured()
     {
         if(closed||section!=FeaturedSection||current!=null)return;
-        featuredRequest?.Cancel();featuredRequest?.Dispose();
-        var request=featuredRequest=CancellationTokenSource.CreateLinkedTokenSource(metadataLifetime.Token);
+        featuredHubRequest?.Cancel();featuredHubRequest?.Dispose();
+        var request=featuredHubRequest=CancellationTokenSource.CreateLinkedTokenSource(metadataLifetime.Token);
         var token=request.Token;
         try
         {
