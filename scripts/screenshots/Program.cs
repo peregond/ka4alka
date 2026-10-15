@@ -176,6 +176,7 @@ internal static class Program
     {
         await Until(()=>app.MainWindow is MainWindow window&&window.IsLoaded,TimeSpan.FromSeconds(25),"Actual public application startup did not create its main window.");
         var window=(MainWindow)app.MainWindow;
+        if(AppLanguage.Current!=CaptureLanguage)throw new InvalidOperationException("Released app did not apply the requested interface language.");
         window.WindowState=WindowState.Normal;window.MaxWidth=1920;window.MaxHeight=1200;window.Width=1440;window.Height=900;window.Left=0;window.Top=0;
         await Settle(window);
         await Until(()=>Field(window,"liveLoading") is false&&Field(window,"liveItems") is IEnumerable rows&&rows.Cast<object>().Any(),TimeSpan.FromSeconds(80),"Actual default source catalogue did not load.");
