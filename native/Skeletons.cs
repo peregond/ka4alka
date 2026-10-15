@@ -21,6 +21,19 @@ public partial class MainWindow
             {AutoReverse=true,RepeatBehavior=System.Windows.Media.Animation.RepeatBehavior.Forever,EasingFunction=new System.Windows.Media.Animation.SineEase{EasingMode=System.Windows.Media.Animation.EasingMode.EaseInOut}});
         return placeholder;
     }
+    // One wave for the posters whose covers are loading; rebuilt after a theme change so it picks up the new colours.
+    ShimmerWave? posterWave;
+    // A catalog poster whose cover is still on its way wears the shimmer instead of its colour, so a shelf that fills
+    // up card by card shows which films are still loading. The shimmer goes as soon as the cover arrives, fails or the
+    // card leaves the visible area; posters without a cover address keep their colour.
+    void SyncPosterShimmer(Image image,CoverRequest state)
+    {
+        if(image.Parent is not Panel panel)return;
+        Border? overlay=null;foreach(var child in panel.Children)if(child is Border {Name:"PosterShimmer"} found){overlay=found;break;}
+        if(overlay==null)return;
+        if(image.DataContext is MediaItem media&&image.Source==null&&state.Request!=null&&!closing&&!closed)(posterWave??=new(Motion)).Show(overlay,Math.Abs(media.Id)%6);
+        else if(posterWave!=null)posterWave.Hide(overlay);else overlay.Visibility=Visibility.Collapsed;
+    }
     // Real content that replaces a placeholder fades in over a quarter of a second instead of snapping in.
     // One short opacity animation on the container, not on each card; skipped with motion off.
     static void Reveal(UIElement content)

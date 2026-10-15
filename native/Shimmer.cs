@@ -51,6 +51,22 @@ sealed class ShimmerWave(bool animated)
         if(running)lane.Start();
         return lane;
     }
+    // For single cards: a poster whose cover is still on its way shows the shimmer until the cover arrives. The wave
+    // runs only while at least one such poster is shown, and a poster that leaves the page drops out by itself.
+    readonly HashSet<Border> shown=[];
+    public void Show(Border overlay,int lane)
+    {
+        if(!animated)return;
+        Paint(overlay,lane);overlay.Visibility=Visibility.Visible;
+        if(shown.Add(overlay))overlay.Unloaded+=Gone;
+        Set(true);
+    }
+    public void Hide(Border overlay)
+    {
+        if(overlay.Visibility!=Visibility.Collapsed)overlay.Visibility=Visibility.Collapsed;
+        if(shown.Remove(overlay)){overlay.Unloaded-=Gone;if(shown.Count==0)Set(false);}
+    }
+    void Gone(object sender,RoutedEventArgs args){if(sender is Border overlay)Hide(overlay);}
     // Runs the wave while the placeholder is shown and stops it when it is hidden, replaced or the page is left.
     public T Run<T>(T host) where T:FrameworkElement
     {
