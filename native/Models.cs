@@ -82,7 +82,24 @@ public record MediaItem(int Id, string Title, string Section, string Genre, int 
     [JsonIgnore] public string Subtitle => Cinema ? string.Join(" · ",new[]{Section=="Сериалы"?"Сериал":Section=="Игры"?"Игра для Windows":"Фильм",Year>0?Year.ToString():null,InlineMetadata(Genre)}.Where(x=>!string.IsNullOrWhiteSpace(x))) : "Демонстрационный каталог";
     [JsonIgnore] public Brush Cover { get { var b = new LinearGradientBrush((Color)ColorConverter.ConvertFromString(Color), (Color)ColorConverter.ConvertFromString("#20262E"), 75); b.Freeze(); return b; } }
 }
-public record CatalogRow(MediaItem[] Items,int Columns);
+public record CatalogRow
+{
+    public MediaItem[] Items {get;private set;}
+    public int Columns {get;}
+    public System.Collections.ObjectModel.ObservableCollection<MediaItem> Cells {get;}
+    public CatalogRow(MediaItem[] items,int columns){Items=items;Columns=columns;Cells=new(items);}
+    public bool Update(MediaItem[] items)
+    {
+        var changed=false;
+        for(var index=0;index<items.Length;index++)
+        {
+            if(index>=Cells.Count){Cells.Add(items[index]);changed=true;}
+            else if(!ReferenceEquals(Cells[index],items[index])){Cells[index]=items[index];changed=true;}
+        }
+        while(Cells.Count>items.Length){Cells.RemoveAt(Cells.Count-1);changed=true;}
+        Items=items;return changed;
+    }
+}
 public record Release(int Id,string Quality,string Type,string Voice,string Subs,string Format,string Codec,string Hdr,double Size,int Seeds,string Source);
 public static class Catalog
 {

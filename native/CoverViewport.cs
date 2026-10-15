@@ -22,7 +22,7 @@ internal sealed class CoverViewport(Window owner):IDisposable
     }
     readonly Dictionary<Image,Entry> entries=[];
     readonly Dictionary<ScrollViewer,int> scrollers=[];
-    DispatcherOperation? scheduled;
+    readonly DispatcherTimer scheduled=new(DispatcherPriority.Background,owner.Dispatcher){Interval=TimeSpan.FromMilliseconds(33)};
     bool listening,disposed;
     internal int SweepCount {get;private set;}
     internal int TrackedCount=>entries.Count;
@@ -50,7 +50,8 @@ internal sealed class CoverViewport(Window owner):IDisposable
     }
     internal void Schedule()
     {
-        if(!disposed&&scheduled==null)scheduled=owner.Dispatcher.BeginInvoke(DispatcherPriority.Background,new Action(Sweep));
+        if(disposed||scheduled.IsEnabled)return;
+        scheduled.Tick-=SweepTick;scheduled.Tick+=SweepTick;scheduled.Start();
     }
     internal Position Measure(Image image)=>entries.TryGetValue(image,out var entry)?Measure(entry):default;
     static FrameworkElement? Anchor(Image image)
@@ -98,9 +99,10 @@ internal sealed class CoverViewport(Window owner):IDisposable
         }
         catch(InvalidOperationException){return default;}
     }
+    void SweepTick(object? sender,EventArgs args)=>Sweep();
     void Sweep()
     {
-        scheduled=null;if(disposed)return;SweepCount++;
+        scheduled.Stop();if(disposed)return;SweepCount++;
         // Let currently visible posters take both slots before prefetched rows.
         var positions=entries.Values.Select(entry=>(Entry:entry,Position:Measure(entry))).ToArray();
         foreach(var entry in positions.Where(x=>!x.Position.Near))entry.Entry.Changed(entry.Position);
@@ -130,7 +132,7 @@ internal sealed class CoverViewport(Window owner):IDisposable
     void Closed(object? sender,EventArgs args)=>Dispose();
     public void Dispose()
     {
-        if(disposed)return;disposed=true;scheduled?.Abort();scheduled=null;
+        if(disposed)return;disposed=true;scheduled.Stop();scheduled.Tick-=SweepTick;
         foreach(var entry in entries.Values.ToArray()){Detach(entry);entry.Changed(default);}entries.Clear();
         if(listening){owner.SizeChanged-=Resized;owner.StateChanged-=StateChanged;owner.IsVisibleChanged-=VisibilityChanged;owner.LayoutUpdated-=LayoutChanged;owner.Closed-=Closed;listening=false;}
     }

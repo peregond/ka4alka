@@ -225,11 +225,44 @@ public partial class MainWindow
         if(decodeThread==uiThread||disk.Downloaded||disk.Image==0)throw new Exception("A synchronous disk-cache hit decoded on the native UI thread.");
 
         await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.Background);var before=coverViewport!.SweepCount;
-        for(var tick=0;tick<256;tick++)coverViewport.Schedule();await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.Background);
+        for(var tick=0;tick<256;tick++)coverViewport.Schedule();await Until(()=>coverViewport.SweepCount>before,"Coalesced viewport sweep did not run.");
         if(coverViewport.SweepCount-before!=1)throw new Exception("Repeated viewport notifications were not coalesced into one background sweep.");
-        Body.Children.Clear();await Task.Delay(30);
+        // Warm-cache bursts yield to native input and stay within a small per-frame budget.
+        var applied=0;using(var batch=new UiWorkQueue<int>(Dispatcher,2))
+        {
+            for(var index=0;index<32;index++){var key=index;batch.Set(key,()=>applied++);batch.Set(key,()=>applied++);}
+            if(applied!=0||batch.Pending!=32)throw new Exception("Poster burst was synchronous or retained duplicate keys.");
+            await Dispatcher.InvokeAsync(()=>{if(applied!=0)throw new Exception("Poster work ran before queued native input.");},DispatcherPriority.Input);
+            await Until(()=>applied==32,"Bounded poster burst did not finish.");
+            if(batch.MaxBatch>2||batch.Batches<16)throw new Exception("Poster burst exceeded the per-frame budget.");
+            batch.Set(33,()=>throw new Exception("Disposed poster queue still ran."));batch.Dispose();
+        }
+        // The real three catalog templates reserve artwork/title/meta space before any image arrives.
+        foreach(var category in new[]{"Фильмы","Сериалы","Игры"})
+        {
+            Body.Children.Clear();StopCoverViewport();
+            var firstId=category=="Фильмы"?40:category=="Сериалы"?50:60;
+            var cards=Enumerable.Range(firstId,8).Select(id=>Card(id,url+id+".png") with{Section=category}).ToArray();
+            foreach(var id in Enumerable.Range(firstId,8))fixture.Hold(id);
+            var data=new CatalogRow(cards,8);
+            var row=new ContentControl{Content=data,ContentTemplate=(DataTemplate)FindResource(category=="Игры"?"GameRow":"MediaRow"),Width=900,VerticalAlignment=VerticalAlignment.Top};
+            Body.Children.Add(row);
+            await Until(()=>VisualElements<Border>(row).Count(x=>x.Name==(category=="Игры"?"GameCardArt":"CardPoster")&&x.ActualHeight>0)==8,"Catalog placeholder slots were not laid out.");
+            var posters=VisualElements<Image>(row).ToArray();
+            if(posters.Any(x=>x.Source!=null))throw new Exception("Controlled poster arrived before release.");
+            var bounds=posters.Select(x=>VisualTreeHelper.GetParent(x) as FrameworkElement).Select(x=>x!.TransformToAncestor(row).TransformBounds(new Rect(new Point(),x.RenderSize))).ToArray();
+            var originalButtons=VisualElements<Button>(row).Where(x=>x.Tag is MediaItem).ToArray();
+            foreach(var id in Enumerable.Range(firstId,8))fixture.Release(id);
+            await Until(()=>posters.All(x=>x.Source!=null),"Real catalog slots did not fill with decoded posters.");
+            var after=posters.Select(x=>VisualTreeHelper.GetParent(x) as FrameworkElement).Select(x=>x!.TransformToAncestor(row).TransformBounds(new Rect(new Point(),x.RenderSize))).ToArray();
+            if(!bounds.Zip(after).All(pair=>Math.Abs(pair.First.X-pair.Second.X)<.5&&Math.Abs(pair.First.Y-pair.Second.Y)<.5&&Math.Abs(pair.First.Width-pair.Second.Width)<.5&&Math.Abs(pair.First.Height-pair.Second.Height)<.5))throw new Exception("Poster arrival shifted the catalog grid.");
+            data.Update(cards.Select((card,index)=>index==3?card with{Title="Обновлённое название"}:card).ToArray());UpdateLayout();
+            var buttons=VisualElements<Button>(row).Where(x=>x.Tag is MediaItem).ToArray();
+            if(!Enumerable.Range(0,8).Where(index=>index!=3).All(index=>ReferenceEquals(originalButtons[index],buttons[index])))throw new Exception("Changing one card recreated its neighbouring placeholders.");
+        }
+        Body.Children.Clear();await Task.Delay(50);
         if(coverViewport.TrackedCount!=0)throw new Exception("Unloaded posters retain viewport scroll subscriptions.");
-        await File.WriteAllTextAsync(Path.Combine(output,"checks.json"),JsonSerializer.Serialize(new{VisiblePosters=true,NearestRowPrefetched=true,OffscreenNetworkAvoided=true,ScrollStartsRequests=true,ScrollAwayCancels=true,EmptyPosterContainerAnchored=true,DecodedPosterOwnBounds=true,CollapsedPosterAvoidsNetwork=true,LayoutPositionStartsRequest=true,OwnedWindowPosters=true,OwnedWindowObserverCleanup=true,UnloadingCancels=true,RecycledContextRejectsLateResponse=true,HiddenFeaturePosterAnchored=true,SharedFeatureLookup=true,IndependentFeatureSubscriberCancellation=true,CanceledFeatureLookupCanRetry=true,FrozenBoundedDecode=true,MemoryCacheNoRefetch=true,DiskCacheNoRefetch=true,DiskCacheWorker=true,CoalescedViewportSweep=true,UnloadedObserverCleanup=true}));
+        await File.WriteAllTextAsync(Path.Combine(output,"checks.json"),JsonSerializer.Serialize(new{VisiblePosters=true,NearestRowPrefetched=true,OffscreenNetworkAvoided=true,ScrollStartsRequests=true,ScrollAwayCancels=true,EmptyPosterContainerAnchored=true,DecodedPosterOwnBounds=true,CollapsedPosterAvoidsNetwork=true,LayoutPositionStartsRequest=true,OwnedWindowPosters=true,OwnedWindowObserverCleanup=true,UnloadingCancels=true,RecycledContextRejectsLateResponse=true,HiddenFeaturePosterAnchored=true,SharedFeatureLookup=true,IndependentFeatureSubscriberCancellation=true,CanceledFeatureLookupCanRetry=true,FrozenBoundedDecode=true,MemoryCacheNoRefetch=true,DiskCacheNoRefetch=true,DiskCacheWorker=true,CoalescedViewportSweep=true,BoundedPosterBatches=true,NativeInputBeforePosterBurst=true,StableMovieSeriesGameSlots=true,IncrementalCardContainers=true,UnloadedObserverCleanup=true}));
         StopCoverViewport();Close();
     }
 }

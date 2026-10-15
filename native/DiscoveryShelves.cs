@@ -36,7 +36,11 @@ public partial class MainWindow
         void Render()
         {
             var next=items.Take(columns*Rows).ToArray();
-            if(row.Content is CatalogRow prior&&prior.Columns==columns&&prior.Items.SequenceEqual(next))return;
+            if(row.Content is CatalogRow prior&&prior.Columns==columns)
+            {
+                if(prior.Update(next))Changed?.Invoke(next);
+                return;
+            }
             row.Content=new CatalogRow(next,columns);Changed?.Invoke(next);
         }
     }

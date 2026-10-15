@@ -27,7 +27,8 @@ public partial class MainWindow
             {
                 if(index>=rows.Count){rows.Add(next[index]);continue;}
                 var previous=rows[index];var replacement=next[index];
-                if(previous.Columns!=replacement.Columns||previous.Items.Length!=replacement.Items.Length||!previous.Items.Zip(replacement.Items).All(pair=>SameFilm(pair.First,pair.Second)))rows[index]=replacement;
+                if(previous.Columns!=replacement.Columns)rows[index]=replacement;
+                else if(previous.Items.Length!=replacement.Items.Length||!previous.Items.Zip(replacement.Items).All(pair=>SameFilm(pair.First,pair.Second)))previous.Update(replacement.Items);
             }
             while(rows.Count>next.Length)rows.RemoveAt(rows.Count-1);
         }

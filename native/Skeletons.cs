@@ -55,10 +55,11 @@ public partial class MainWindow
                 var cell=new StackPanel{Margin=new(0,0,16,18)};
                 var poster=new Border{CornerRadius=new(12)};poster.SetResourceReference(Border.BackgroundProperty,"Raised");
                 if(games)poster.SizeChanged+=GamePosterSized;else poster.SizeChanged+=PosterResized;cell.Children.Add(poster);
-                cell.Children.Add(SkeletonBar(12,new(2,12,28,0)));cell.Children.Add(SkeletonBar(10,new(2,10,64,0),.7));grid.Children.Add(cell);
+                var title=new StackPanel{Height=36,Margin=new(2,10,2,0)};title.Children.Add(SkeletonBar(12,new(0,0,28,6)));title.Children.Add(SkeletonBar(12,new(0,0,52,0),.7));cell.Children.Add(title);
+                var meta=new Grid{Height=16,Margin=new(2,2,2,0)};meta.Children.Add(SkeletonBar(10,new(0,0,64,0),.7));cell.Children.Add(meta);grid.Children.Add(cell);
             }
         }
-        Fill();Breathe(grid);
+        Fill(); // Keep catalog placeholders static: no per-shelf animation during initial layout.
         // Only a real resize regroups the cards: a scroll bar appearing or disappearing (a few pixels) must not,
         // or the new height would toggle the scroll bar again and the layout would never settle.
         var measured=0d;

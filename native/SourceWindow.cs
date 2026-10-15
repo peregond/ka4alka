@@ -20,6 +20,7 @@ public partial class MainWindow
     readonly ConditionalWeakTable<Image,CoverRequest> coverRequests=new();
     readonly Dictionary<Window,CoverViewport> coverViewports=[];
     CoverViewport? coverViewport;
+    UiWorkQueue<Image>? posterPresentation;
     sealed class CoverRequest
     {
         public DownloadItem? Subject;
@@ -34,6 +35,8 @@ public partial class MainWindow
         public DateTime RetryAfterUtc;
         public DateTime NextCacheTouchUtc;
         public Exception? LastFailure;
+        public int PresentationVersion;
+        public bool PresentationPending;
     }
     IReadOnlyList<SourceEntry> sourceResults=[];
     string sourceQuery="",sourceCategory="Фильмы";
@@ -134,13 +137,13 @@ public partial class MainWindow
         {
             CancelCover(state);state.Context=item;state.Url=null;state.RetryAfterUtc=default;return;
         }
-        if(state.Request!=null||image.Source!=null||DateTime.UtcNow<state.RetryAfterUtc)return;
+        if(state.Request!=null||state.PresentationPending||image.Source!=null||DateTime.UtcNow<state.RetryAfterUtc)return;
         var decodeWidth=item is MediaItem or DownloadItem?PosterDecodeWidth:100;
         var memoryKey=url+"|"+decodeWidth;
         var slots=prefs.LiteMode?liteCoverSlots:coverSlots;
         if(coverCache.TryGetValue(memoryKey,out var cached))
         {
-            image.Source=cached;
+            QueuePoster(image,state,item,url,cached);
             if(item is MediaItem or DownloadItem&&DateTime.UtcNow>=state.NextCacheTouchUtc)
             {
                 state.NextCacheTouchUtc=DateTime.UtcNow.AddMinutes(10);var path=CoverPath(url);
@@ -166,7 +169,7 @@ public partial class MainWindow
             },token);
             token.ThrowIfCancellationRequested();
             coverCache.Put(memoryKey,bitmap);
-            if(!closing&&!closed&&image.IsLoaded&&ReferenceEquals(image.DataContext,item)&&CoverUrl(image.DataContext)==url&&ReferenceEquals(state.Request,request)&&CoverViewportFor(image)?.Measure(image).Near==true){image.Source=bitmap;FadeInCover(image);}
+            if(!closing&&!closed&&image.IsLoaded&&ReferenceEquals(image.DataContext,item)&&CoverUrl(image.DataContext)==url&&ReferenceEquals(state.Request,request))QueuePoster(image,state,item,url,bitmap);
 
         }
         catch(Exception error)
@@ -198,7 +201,19 @@ public partial class MainWindow
     }
     static string? CoverUrl(object? item)=>item switch{SourceEntry source=>source.ImageUrl,MediaItem media=>media.ImageUrl,DownloadItem download=>download.ImageUrl,_=>null};
     static string CoverPath(string url)=>Path.Combine(Preferences.DataDir,"covers",Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(url)))+".img");
-    static void CancelCover(CoverRequest state){var request=state.Request;state.Request=null;request?.Cancel();}
+    void QueuePoster(Image image,CoverRequest state,object? item,string url,BitmapImage bitmap)
+    {
+        state.PresentationPending=true;var version=++state.PresentationVersion;
+        posterPresentation??=new(Dispatcher,prefs.LiteMode?1:2);
+        posterPresentation.Set(image,()=>
+        {
+            if(version!=state.PresentationVersion)return;
+            state.PresentationPending=false;
+            if(!closing&&!closed&&image.IsLoaded&&ReferenceEquals(image.DataContext,item)&&CoverUrl(image.DataContext)==url&&CoverViewportFor(image)?.Measure(image).Near==true)
+                image.Source=bitmap;
+        });
+    }
+    static void CancelCover(CoverRequest state){state.PresentationVersion++;state.PresentationPending=false;var request=state.Request;state.Request=null;request?.Cancel();}
     static void CancelFeatureCover(CoverRequest state){var request=state.FeatureRequest;state.FeatureRequest=null;if(request!=null){state.FeatureAttempted=false;request.Cancel();}}
     CoverViewport? CoverViewportFor(Image image,bool create=false)
     {
@@ -217,6 +232,7 @@ public partial class MainWindow
     }
     void StopCoverViewport()
     {
+        posterPresentation?.Dispose();posterPresentation=null;
         foreach(var pair in coverViewports.ToArray()){pair.Key.Closed-=CoverHostClosed;pair.Value.Dispose();}
         coverViewports.Clear();coverViewport=null;
     }
