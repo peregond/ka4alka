@@ -51,7 +51,7 @@ public record MediaItem(int Id, string Title, string Section, string Genre, int 
         percent=complete||percent<0?-1:Math.Clamp(percent,0,100);
         if(complete==downloaded&&Math.Abs(percent-downloadPercent)<.5)return;
         downloaded=complete;downloadPercent=percent;
-        PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(DownloadPercent)));PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(HasDownloadProgress)));PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(IsDownloaded)));
+        Raise(new PropertyChangedEventArgs(nameof(DownloadPercent)));Raise(new PropertyChangedEventArgs(nameof(HasDownloadProgress)));Raise(new PropertyChangedEventArgs(nameof(IsDownloaded)));
     }
     // Under a poster's title: the year and the first genre. The film page lists every genre.
     // A game from a catalog list only knows "Windows" as its genre, which says nothing under every card: its year and genre show once the store details are known.
@@ -68,10 +68,23 @@ public record MediaItem(int Id, string Title, string Section, string Genre, int 
     [JsonIgnore] public string PosterQuality=>posterQuality;
     [JsonIgnore] public bool HasPosterQuality=>posterQuality.Length>0;
     [JsonIgnore] public string Scores => liveScores ?? (Cinema ? $"КП {Kinopoisk}   IMDb {Imdb}" : Section);
-    public event PropertyChangedEventHandler? PropertyChanged;
+    // Record clones must not copy a previous card's WPF/view subscriptions. Otherwise each
+    // metadata merge can carry old listeners into a new model and multiply invalidations.
+    sealed class BindingListeners
+    {
+        public event PropertyChangedEventHandler? Changed;
+        public void Raise(MediaItem sender,PropertyChangedEventArgs args)=>Changed?.Invoke(sender,args);
+    }
+    static readonly ConditionalWeakTable<MediaItem,BindingListeners> bindingListeners=new();
+    public event PropertyChangedEventHandler? PropertyChanged
+    {
+        add{if(value!=null)bindingListeners.GetValue(this,_=>new()).Changed+=value;}
+        remove{if(bindingListeners.TryGetValue(this,out var listeners))listeners.Changed-=value;}
+    }
+    void Raise(PropertyChangedEventArgs args){if(bindingListeners.TryGetValue(this,out var listeners))listeners.Raise(this,args);}
     bool savedForUi;
     [JsonIgnore] public bool SavedForUi=>savedForUi;
-    public void SetSavedForUi(bool saved){if(savedForUi==saved)return;savedForUi=saved;PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(SavedForUi)));}
+    public void SetSavedForUi(bool saved){if(savedForUi==saved)return;savedForUi=saved;Raise(new PropertyChangedEventArgs(nameof(SavedForUi)));}
     [JsonIgnore] public bool OnlyPoorQuality {get;private set;}
     HashSet<int> releaseResolutions=[];
     SourceEntry[]? qualityRows;
@@ -91,11 +104,11 @@ public record MediaItem(int Id, string Title, string Section, string Genre, int 
         var height=available.Where(x=>!ReleaseQuality.Poor(x,720)).Select(x=>ReleaseQuality.Height(x)??0).DefaultIfEmpty(0).Max();
         var quality=height>=2160?"4K":height>=1080?"Full HD":height>=720?"HD Ready":"";
         var label=quality.Length>0?quality:available.Length>0&&available.All(ReleaseQuality.IsScreen)?"Экранка":value?"SD":"";
-        if(label!=posterQuality){posterQuality=label;PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(PosterQuality)));PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(HasPosterQuality)));}
-        if(value!=OnlyPoorQuality){OnlyPoorQuality=value;PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(OnlyPoorQuality)));}
-        if(quality!=bestQuality){bestQuality=quality;PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(BestQuality)));PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(HasQuality)));}
+        if(label!=posterQuality){posterQuality=label;Raise(new PropertyChangedEventArgs(nameof(PosterQuality)));Raise(new PropertyChangedEventArgs(nameof(HasPosterQuality)));}
+        if(value!=OnlyPoorQuality){OnlyPoorQuality=value;Raise(new PropertyChangedEventArgs(nameof(OnlyPoorQuality)));}
+        if(quality!=bestQuality){bestQuality=quality;Raise(new PropertyChangedEventArgs(nameof(BestQuality)));Raise(new PropertyChangedEventArgs(nameof(HasQuality)));}
     }
-    void Notify(params string[] names){foreach(var name in names)PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(name));}
+    void Notify(params string[] names){foreach(var name in names)Raise(new PropertyChangedEventArgs(name));}
     public void SetScores(string kp,string imdb,string? genre=null)
     {
         var kpChanged=kp!=(liveKp??Kinopoisk);var imdbChanged=imdb!=(liveImdb??Imdb);

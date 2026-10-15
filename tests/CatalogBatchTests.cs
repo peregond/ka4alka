@@ -47,6 +47,10 @@ static class CatalogBatchTests
         Check(notifications.Count==0,"identical ratings and normalized genres do not invalidate card bindings");
         show.SetScores("8.4","8.1","драма");
         Check(notifications.Contains(nameof(MediaItem.CardRating))&&notifications.Contains(nameof(MediaItem.CardMeta))&&!notifications.Any(name=>string.IsNullOrEmpty(name)||name is nameof(MediaItem.Cover) or nameof(MediaItem.DisplayImageUrl)),"late ratings only notify changed text and badge fields, never poster bindings");
+        var originalNotifications=0;show.PropertyChanged+=(_,_)=>originalNotifications++;
+        var metadataCopy=show with{Description="Новое описание"};metadataCopy.SetScores("8.7","8.5","комедия");
+        Check(originalNotifications==0,"metadata record copies cannot retain a previous card's binding subscriptions");
+        show.SetScores("8.8","8.1");Check(originalNotifications>0,"original card bindings remain subscribed after metadata is copied");
         foreach(var rate in new[]{60,120})
         {
             var position=0d;var velocity=0d;var monotonic=true;
