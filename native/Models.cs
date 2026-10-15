@@ -74,11 +74,17 @@ public record MediaItem(int Id, string Title, string Section, string Genre, int 
     public void SetSavedForUi(bool saved){if(savedForUi==saved)return;savedForUi=saved;PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(SavedForUi)));}
     [JsonIgnore] public bool OnlyPoorQuality {get;private set;}
     HashSet<int> releaseResolutions=[];
+    SourceEntry[]? qualityRows;
+    int qualityMinimum;
     [JsonIgnore] public IReadOnlySet<int> ReleaseResolutions=>releaseResolutions;
     public bool HasReleaseResolution(int height)=>releaseResolutions.Contains(ReleaseQuality.CatalogHeight(height));
     public void SetReleaseQuality(IEnumerable<SourceEntry> entries,int minimum=720)
     {
-        var rows=entries.ToArray();
+        var rows=entries as SourceEntry[]??entries.ToArray();
+        // A card can belong to several shelves. Repaint badges only for new evidence,
+        // rather than parsing all torrent titles again for every filter/layout pass.
+        if(qualityRows!=null&&qualityMinimum==minimum&&rows.SequenceEqual(qualityRows))return;
+        qualityRows=rows.ToArray();qualityMinimum=minimum;
         var value=ReleaseQuality.OnlyPoor(rows,minimum);
         var available=rows.Where(ReleaseQuality.Downloadable).ToArray();
         releaseResolutions=available.Where(x=>!ReleaseQuality.IsScreen(x)).Select(x=>ReleaseQuality.CatalogHeight(ReleaseQuality.Height(x)??0)).Where(x=>x!=0).ToHashSet();
