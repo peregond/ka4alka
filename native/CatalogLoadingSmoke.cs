@@ -3,6 +3,7 @@ using System.IO;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -60,15 +61,20 @@ public partial class MainWindow
                 try{while(!recording.IsCancellationRequested){await Task.Delay(25,recording.Token);var sent=Stopwatch.GetTimestamp();await Dispatcher.InvokeAsync(()=>postedInputDelays.Add(Stopwatch.GetElapsedTime(sent).TotalMilliseconds),DispatcherPriority.Input,recording.Token);}}
                 catch(OperationCanceledException){}
             });
-            var frames=new List<double>();long lastFrame=0;
-            EventHandler rendered=(_,_)=>{var now=Stopwatch.GetTimestamp();if(lastFrame!=0)frames.Add(Stopwatch.GetElapsedTime(lastFrame,now).TotalMilliseconds);lastFrame=now;};
-            CompositionTarget.Rendering+=rendered;
+            // Observe real render operations without subscribing to CompositionTarget.Rendering:
+            // that event itself forces continuous frames and can starve input on software-rendered CI.
+            var frames=new List<double>();var rendering=new Dictionary<DispatcherOperation,long>();
+            DispatcherHookEventHandler renderStarted=(_,args)=>{if(args.Operation.Priority==DispatcherPriority.Render)rendering[args.Operation]=Stopwatch.GetTimestamp();};
+            DispatcherHookEventHandler renderCompleted=(_,args)=>{if(rendering.Remove(args.Operation,out var start))frames.Add(Stopwatch.GetElapsedTime(start).TotalMilliseconds);};
+            Dispatcher.Hooks.OperationStarted+=renderStarted;Dispatcher.Hooks.OperationCompleted+=renderCompleted;
+            var previousSmooth=WheelScroll.SmoothOverride;WheelScroll.SmoothOverride=true;
             try
             {
                 foreach(var chunk in cards.Skip(8).Chunk(3))
                 {
                     foreach(var card in chunk)qualitySnapshots[card.Id]=Evidence(card);
                     ScheduleCatalogEvidenceRefresh();
+                    scroll!.RaiseEvent(new MouseWheelEventArgs(Mouse.PrimaryDevice,Environment.TickCount,-15){RoutedEvent=UIElement.PreviewMouseWheelEvent,Source=scroll});
                     await Until(()=>catalogDisplay.Any(item=>item.Id==chunk[^1].Id),"Delayed evidence did not reach existing catalog.");
                     Check(ReferenceEquals(scroll,navigationScroll)&&ReferenceEquals(list,catalogList)&&renderCount==baseline,"background evidence retains page, scroll viewer and row controls: "+category+" lite="+lite+" count="+catalogDisplay.Count);
                     Check(images.All(pair=>pair.Image.IsLoaded&&ReferenceEquals(pair.Image.Source,pair.Source)),"ready posters remain drawn while neighbouring cards arrive: "+category+" lite="+lite);
@@ -76,10 +82,10 @@ public partial class MainWindow
                     await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.Background);
                 }
             }
-            finally{CompositionTarget.Rendering-=rendered;inputTimer.Stop();catalogRefreshMeasured=null;recording.Cancel();await input;}
+            finally{Dispatcher.Hooks.OperationStarted-=renderStarted;Dispatcher.Hooks.OperationCompleted-=renderCompleted;WheelScroll.SmoothOverride=previousSmooth;inputTimer.Stop();catalogRefreshMeasured=null;recording.Cancel();await input;}
             inputDelays.Sort();postedInputDelays.Sort();refreshTimes.Sort();frames.Sort();
             var p95=inputDelays.Count==0?0:inputDelays[(int)((inputDelays.Count-1)*.95)];
-            samples.Add(new{Section=category,Lite=lite,BackgroundPageRebuilds=renderCount-baseline,RetainedPosters=images.Length,InputSamples=inputDelays.Count,InputP95Ms=p95,InputMaxMs=inputDelays.DefaultIfEmpty().Max(),WorkerInputP95Ms=postedInputDelays.Count==0?0:postedInputDelays[(int)((postedInputDelays.Count-1)*.95)],RefreshP95Ms=refreshTimes.Count==0?0:refreshTimes[(int)((refreshTimes.Count-1)*.95)],RefreshMaxMs=refreshTimes.DefaultIfEmpty().Max(),FrameMaxMs=frames.DefaultIfEmpty().Max(),FrameP95Ms=frames.Count==0?0:frames[(int)((frames.Count-1)*.95)]});
+            samples.Add(new{Section=category,Lite=lite,BackgroundPageRebuilds=renderCount-baseline,RetainedPosters=images.Length,InputSamples=inputDelays.Count,InputP95Ms=p95,InputMaxMs=inputDelays.DefaultIfEmpty().Max(),WorkerInputP95Ms=postedInputDelays.Count==0?0:postedInputDelays[(int)((postedInputDelays.Count-1)*.95)],RefreshP95Ms=refreshTimes.Count==0?0:refreshTimes[(int)((refreshTimes.Count-1)*.95)],RefreshMaxMs=refreshTimes.DefaultIfEmpty().Max(),RenderBatchMaxMs=frames.DefaultIfEmpty().Max(),RenderBatchP95Ms=frames.Count==0?0:frames[(int)((frames.Count-1)*.95)]});
             await File.WriteAllTextAsync(Path.Combine(output,"measurements.json"),JsonSerializer.Serialize(samples,new JsonSerializerOptions{WriteIndented=true}));
             Check(inputDelays.Count>10&&p95<200&&inputDelays.Max()<1000,"native input continues during slow catalog loading: "+category+" lite="+lite+" samples="+inputDelays.Count+" p95="+p95.ToString("F2"));
         }
