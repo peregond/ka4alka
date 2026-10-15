@@ -32,7 +32,7 @@ public partial class MainWindow
         }
         ApplyKnownQuality(item);
         if(descriptionItemId!=item.Id){descriptionItemId=item.Id;descriptionExpanded=false;}
-        SetBack(returnPerson?.Person.Name??SavedBackLabel()??DownloadBackLabel()??section,CinemaBack);
+        SetBack(returnPerson?.Person.Name??FeaturedBackLabel()??SavedBackLabel()??DownloadBackLabel()??section,CinemaBack);
         // The scroll viewer extends 6 px past the gutter so focus rings are not clipped.
         var panel=new StackPanel{Margin=new(6,6,6,0)};
         detailScroll=new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=panel,Margin=new(-6,-6,-6,0),VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};

@@ -44,7 +44,7 @@ public partial class MainWindow:Window
         try{downloads=new(null,prefs.MaxDownloadKbps,prefs.MaxUploadKbps);}catch(Exception e){downloads=newEmpty(prefs.MaxDownloadKbps,prefs.MaxUploadKbps);Status.Text=AppLanguage.T("Не удалось прочитать очередь: "+e.Message);}
         InitializeDownloadReliability();
         InitializeLanDevices();
-        foreach(var name in new[]{"Фильмы","Сериалы","Игры"}) { var n=name;var b=ActionButton(n,NavIcon(n),()=>{if(n=="Игры")ShowGames();else ShowCatalogSection(n);},"NavButton");b.Tag=n;b.ToolTip=AppLanguage.T(n);b.HorizontalContentAlignment=HorizontalAlignment.Left;b.Margin=new(0,0,0,5);Navigation.Children.Add(b); }
+        foreach(var name in new[]{"Актуальное","Фильмы","Сериалы","Игры"}) { var n=name;var b=ActionButton(n,NavIcon(n),()=>{if(n=="Актуальное")ShowFeatured();else if(n=="Игры")ShowGames();else ShowCatalogSection(n);},"NavButton");b.Tag=n;b.ToolTip=AppLanguage.T(n);b.HorizontalContentAlignment=HorizontalAlignment.Left;b.Margin=new(0,0,0,5);Navigation.Children.Add(b); }
         refresh.Tick+=(_,_)=>RefreshDownloadsReliably();
         ContentRendered+=async(_,_)=>{if(!prefs.AutoResumeDownloads||downloads.PendingResumeCount==0)return;Status.Text=AppLanguage.T("Продолжаем загрузки…");var resumed=await downloads.ResumePendingAsync();Status.Text=AppLanguage.T(resumed>0?$"Продолжено загрузок: {resumed}":"Не удалось продолжить загрузки. Проверь очередь.");if(!closed){SyncTimer();if(section=="Загрузки")Render();}};
         StateChanged+=(_,_)=>SyncTimer();searchDelay.Tick+=(_,_)=>{searchDelay.Stop();if(section is "Фильмы" or "Сериалы"){current=null;Render();}};
@@ -72,6 +72,7 @@ public partial class MainWindow:Window
                 // A manual request received during this check joins its result.
                 forceSharedCatalogRefresh=false;
                 if(!changed||closed)return;
+                if(section=="Актуальное"&&current==null)ReloadFeatured();
                 catalogPages.Clear();cardMetadata.Clear();catalogLastPage=null;ResetDiscoveryData();
                 if(current==null&&activePerson==null&&(section is "Фильмы" or "Сериалы")&&!SearchActive&&!favoritesOnly&&(CatalogSelection.IsDefault||CatalogSelection.Collection.StartsWith("seasonal:",StringComparison.Ordinal)))
                 {liveKey="";Render();}
@@ -116,7 +117,7 @@ public partial class MainWindow:Window
     void Render()
     {
         if(!ready)return;renderCount++;if(!MotionAllowed)lastRenderCaller=Environment.StackTrace;BeginCatalogNavigationRender();savedScroll=null;personRequest?.Cancel();personRequest?.Dispose();personRequest=null;
-        CancelStaleDetailWork();CancelGameWork();
+        CancelStaleDetailWork();CancelGameWork();CancelFeaturedWork();
         SyncDiscoveryContext();
         if(activePerson!=null&&(section!=personSection||current?.Id!=personOrigin?.Id))activePerson=null;
         if(current==null&&activePerson==null&&section is not ("Настройки" or "Загрузки"))downloadReturnItem=null;
@@ -125,7 +126,7 @@ public partial class MainWindow:Window
         if(activePerson!=null||current!=null||section is not ("Фильмы" or "Сериалы"))CancelCatalogQualityCheck();
         if(activePerson!=null||current!=null||section is not ("Фильмы" or "Сериалы")||!SearchActive)CancelPeopleSearch(!SearchActive);
         try{catalogList=null;catalogRows=null;catalogEmptyHost=null;catalogEmptyKey="";detailHero=null;detailMetaRow=null;detailRatings=null;detailInfo=null;detailPoster=null;detailSynopsis=null;detailTitle=null;detailDescription=null;descriptionToggle=null;inlineCatalogFilters=null;inlineCatalogFilterScroll=null;catalogToolbar=null;catalogRefreshButton=null;catalogFilterBack=null;catalogFilterForward=null;catalogFiltersCompact=null;catalogFilterCaptions.Clear();catalogRailPreview=null;discoveryHero=null;gameShelfViews.Clear();gameFilterRow=null;gameGenreScroll=null;gameGenreBack=null;gameGenreForward=null;if(carousel!=null)DetachFeatureWatch(carousel);carousel=null;discoveryShelf=null;ReturnFiltersPanel();FilterControls.Children.Clear();PageHeader.Children.Clear();ClearBack();AddTorrentButton.Visibility=section=="Загрузки"?Visibility.Collapsed:Visibility.Visible;Body.Children.Clear();Body.RowDefinitions.Clear();SyncTimer();UpdateFilterRail();
-        SearchBar.Visibility=current!=null||section is "Фильмы" or "Сериалы" or "Игры" or "Сохранённое" or "Загрузки"?Visibility.Visible:Visibility.Collapsed;
+        SearchBar.Visibility=current!=null||section is "Фильмы" or "Сериалы" or "Игры" or "Сохранённое" or "Загрузки" or "Актуальное"?Visibility.Visible:Visibility.Collapsed;
         SearchPlaceholder.Text=AppLanguage.T(compactSearch?"Поиск":section=="Игры"?"Найти игру для Windows":"Найти фильм, сериал или человека");
         ContextLabel.Visibility=SearchBar.Visibility==Visibility.Visible||section is "Загрузки" or "Настройки"?Visibility.Collapsed:Visibility.Visible;ContextLabel.Text=section;
         downloadView=null;downloadList=null;
@@ -136,6 +137,7 @@ public partial class MainWindow:Window
         if(current?.Section=="Игры"){RenderGameDetail(current);return;}
         if(current?.IsLive==true){RenderLiveDetail(current);return;}
         if(current!=null){Detail(current);return;}
+        if(section=="Актуальное"){RenderFeatured();return;}
         if(section=="Сохранённое"){RenderSaved();return;}
         if(!demoCatalog&&section is "Фильмы" or "Сериалы"){RenderLiveCatalog();return;}
         if(section=="Игры"){RenderGames();return;}
@@ -153,13 +155,14 @@ public partial class MainWindow:Window
     }
     void RenderNavSelection()
     {
-        foreach(Button b in Navigation.Children)StyleNav(b,!SearchActive&&savedReturn==null&&b.Tag?.ToString()==section);
+        foreach(Button b in Navigation.Children)StyleNav(b,!SearchActive&&savedReturn==null&&b.Tag?.ToString()==(featuredReturn!=null&&current!=null?"Актуальное":section));
         StyleNav(DownloadsButton,section=="Загрузки");
         StyleNav(SavedButton,section=="Сохранённое"||savedReturn!=null&&section!="Настройки");
         StyleNav(SettingsButton,section=="Настройки");
     }
     void OpenCard(object sender,RoutedEventArgs e)
     {
+        if(section=="Актуальное"&&current==null)featuredReturn=featuredCollectionId;
         if(section=="Сохранённое"&&current==null&&activePerson==null)savedReturn=new(savedCategory,savedPage,savedScroll?.VerticalOffset??0);
         if(activePerson is {} person){returnPerson=(person,personOrigin);activePerson=null;}
         current=(MediaItem)((Button)sender).Tag;section=current.Section;Render();
@@ -167,7 +170,7 @@ public partial class MainWindow:Window
     void Detail(MediaItem item)
     {
         var panel=new StackPanel();Body.Children.Add(new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=panel,VerticalScrollBarVisibility=ScrollBarVisibility.Auto});
-        SetBack(SavedBackLabel()??DownloadBackLabel()??section,CinemaBack);
+        SetBack(FeaturedBackLabel()??SavedBackLabel()??DownloadBackLabel()??section,CinemaBack);
         var intro=new Grid{Margin=new(0,8,0,20)};intro.ColumnDefinitions.Add(new(){Width=new GridLength(180)});intro.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});
         var cover=new Border{Background=item.Cover,CornerRadius=new(18),Height=225,Margin=new(0,0,20,0)};intro.Children.Add(cover);
         var info=new StackPanel();Grid.SetColumn(info,1);intro.Children.Add(info);info.Children.Add(TextRaw(item.Title,28));info.Children.Add(Text(item.Subtitle,12,true));

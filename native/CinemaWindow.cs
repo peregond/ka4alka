@@ -103,6 +103,7 @@ public partial class MainWindow
     void CinemaBack()
     {
         if(returnPerson is {} previous){returnPerson=null;OpenPerson(previous.Person,previous.Origin);return;}
+        if(ReturnToFeatured())return;
         if(ReturnToSaved())return;
         if(section=="Загрузки"||DownloadBackLabel()!=null)
         {

@@ -66,6 +66,7 @@ public partial class MainWindow
         if(activePerson is {} person)
             return "person|"+PeopleSearchIdentity(person)+"|origin:"+personOrigin?.Id;
         if(current is {} item)return "detail|"+item.Section+"|"+item.Id;
+        if(section=="Актуальное")return "featured|"+featuredCollectionId;
         if(section=="Сохранённое")return "saved|"+savedCategory+"|"+savedPage;
         if(section is "Фильмы" or "Сериалы")
             return "catalog|"+section+"|"+CurrentCatalogKey+"|page:"+livePage+"|category:"+searchCategory+

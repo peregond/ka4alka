@@ -252,6 +252,7 @@ jobs:
             test-output/person-performance/*
             test-output/poster-actions/*
             test-output/feature-summary/*
+            test-output/featured/*
             test-output/startup-performance/*
             test-output/cover-viewport/*
             test-output/catalog-navigation/*

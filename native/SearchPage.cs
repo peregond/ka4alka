@@ -12,7 +12,7 @@ public partial class MainWindow
     {
         if(OpenShareLink(Search.Text))return;
         if(section=="Игры"||current?.Section=="Игры"){section="Игры";SubmitGameSearch();return;}
-        ResetCatalogNavigationPosition();
+        featuredReturn=null;ResetCatalogNavigationPosition();
         searchDelay.Stop();
         if(section is not ("Фильмы" or "Сериалы"))section=current?.Section is "Фильмы" or "Сериалы"?current.Section:lastCatalogSection;
         CancelPeopleSearch(true);personSearchReturn=null;activePerson=null;returnPerson=null;

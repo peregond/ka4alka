@@ -40,7 +40,7 @@ public partial class MainWindow
 
     void RenderGameDetail(MediaItem game)
     {
-        SetBack(SavedBackLabel()??DownloadBackLabel()??"Игры",GameBack);
+        SetBack(FeaturedBackLabel()??SavedBackLabel()??DownloadBackLabel()??"Игры",GameBack);
         if(!GameCatalog.TryId(game.PageUrl,out var steamId)){PageHeader.Children.Add(Text("Не удалось открыть карточку игры: неизвестный адрес Steam.",14,true));return;}
         gameSteamId=steamId;gameDetails.TryGetValue(game.Id,out var detail);var item=detail?.Item??game;
         if(descriptionItemId!=game.Id){descriptionItemId=game.Id;descriptionExpanded=false;}

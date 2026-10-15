@@ -271,5 +271,5 @@ public partial class MainWindow
         catch(Exception error){if(gameKey==key&&!token.IsCancellationRequested){gameError="Каталог временно недоступен. Нажми «Обновить».";ErrorLog.Write(error);}}
         finally{if(ReferenceEquals(gameCatalogRequest,request)){gameCatalogRequest=null;gameLoading=false;if(!closed&&section=="Игры"&&current==null&&gameKey==key)Render();}request.Dispose();}
     }
-    void GameBack(){if(ReturnToSaved())return;if(DownloadBackLabel()!=null){CinemaBack();return;}current=null;section="Игры";Search.Text=gameQuery;Render();}
+    void GameBack(){if(ReturnToFeatured())return;if(ReturnToSaved())return;if(DownloadBackLabel()!=null){CinemaBack();return;}current=null;section="Игры";Search.Text=gameQuery;Render();}
 }

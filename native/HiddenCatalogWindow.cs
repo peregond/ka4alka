@@ -12,7 +12,8 @@ public partial class MainWindow
         try
         {
             change();prefs.Save();
-            if(immediate)Render();
+            if(immediate&&section=="Актуальное"&&current==null)RefreshFeaturedRows();
+            else if(immediate)Render();
             else if(section=="Игры")Dispatcher.BeginInvoke(new Action(()=>{if(section=="Игры"&&current==null)Render();}));
             else ScheduleCatalogEvidenceRefresh();
             Status.Text=AppLanguage.T("Каталог настроен. Вернуть скрытое можно в настройках.");

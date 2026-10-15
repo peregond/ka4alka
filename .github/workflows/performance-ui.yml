@@ -39,7 +39,7 @@ jobs:
       - name: Verify actual WPF viewport loading and responsive person profiles
         shell: pwsh
         run: |
-          foreach ($mode in @('search-downloads','feature-summary','release-freshness','cover-viewport','catalog-loading','wheel-input','poster-actions','person-performance','startup-performance','home-availability','games','catalog-navigation','interface-polish','language','queue-virtualization')) {
+          foreach ($mode in @('featured','search-downloads','feature-summary','release-freshness','cover-viewport','catalog-loading','wheel-input','poster-actions','person-performance','startup-performance','home-availability','games','catalog-navigation','interface-polish','language','queue-virtualization')) {
             $env:KACHALKA_DATA=Join-Path $PWD "test-output/performance/$mode/profile"
             $folder=Join-Path $env:KACHALKA_DATA 'downloads'
             New-Item -ItemType Directory -Force $folder | Out-Null

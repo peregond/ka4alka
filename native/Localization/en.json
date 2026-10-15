@@ -1523,5 +1523,12 @@
   "Удалить из сохранённого": "Remove from saved",
   "Скрыть из ленты": "Hide from feed",
   "Добавлено в сохранённое.": "Added to saved.",
-  "Удалено из сохранённого.": "Removed from saved."
+  "Удалено из сохранённого.": "Removed from saved.",
+  "Актуальное": "Featured",
+  "Подборки для тебя": "Handpicked collections",
+  "Выбираем истории, в которые стоит погрузиться.": "Stories and worlds worth exploring.",
+  "Все подборки": "All collections",
+  "В этой подборке пока нет доступных карточек.": "There are no available titles in this collection yet.",
+  "Не удалось загрузить подборки. Попробуй ещё раз.": "Could not load collections. Please try again.",
+  "Загружаем подборки…": "Loading collections…"
 }

@@ -71,6 +71,7 @@ public partial class App : Application
                 catch(Exception error){System.IO.Directory.CreateDirectory(e.Args[1]);System.IO.File.WriteAllText(System.IO.Path.Combine(e.Args[1],"error.txt"),error.ToString());window.Close();}
             };
         }
+        RegisterSmoke("--featured-smoke-test",window.FeaturedSmokeTest);
         RegisterSmoke("--games-smoke-test",window.GamesSmokeTest);
         RegisterSmoke("--search-downloads-smoke-test",window.SearchDownloadsSmokeTest);
         RegisterSmoke("--home-availability-smoke-test",window.HomeAvailabilitySmokeTest);

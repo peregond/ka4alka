@@ -54,7 +54,7 @@ public partial class MainWindow
         LocationChanged+=(_,_)=>QueueMonitorFit();
         StateChanged+=(_,_)=>QueueMonitorFit();
         SizeChanged+=(_,_)=>ApplyCompactLayout();
-        Body.SizeChanged+=(_,_)=>{UpdateCatalogColumns();UpdateDetailLayout();UpdateGameDetailLayout();UpdateFilterRail();UpdateDiscoveryLayout();};
+        Body.SizeChanged+=(_,_)=>{UpdateCatalogColumns();UpdateDetailLayout();UpdateGameDetailLayout();UpdateFilterRail();UpdateDiscoveryLayout();ResizeFeaturedShelves();};
     }
     IntPtr WindowMessage(IntPtr hwnd,int message,IntPtr wParam,IntPtr lParam,ref bool handled)
     {
@@ -230,7 +230,7 @@ public partial class MainWindow
         UpdateCatalogColumns(true);
     }
     // Games, and the saved games tab, lay out wide capsules instead of portrait posters.
-    bool GameGrid=>section=="Игры"||section=="Сохранённое"&&savedCategory=="Игры";
+    bool GameGrid=>section=="Игры"||section=="Сохранённое"&&savedCategory=="Игры"||section=="Актуальное"&&FeaturedGameGrid;
     void UpdateCatalogColumns(bool force=false)
     {
         // The games home has shelves but no list, so it still follows the window width.

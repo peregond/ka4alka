@@ -1,0 +1,91 @@
+[
+  {
+    "id": "other-worlds",
+    "title": "Другие миры",
+    "titleEn": "Other worlds",
+    "description": "Будущее, космос и реальности за пределами привычного.",
+    "descriptionEn": "The future, space and realities beyond the familiar.",
+    "mediaIds": [
+      "series:fallout-2024",
+      "series:ukrytie-2023",
+      "series:razdelenie-2022",
+      "series:dyuna-prorochestvo",
+      "movies:chuzhoi-romul",
+      "movies:planeta-obezyan-novoe-tsarstvo"
+    ]
+  },
+  {
+    "id": "one-more-episode",
+    "title": "Ещё одну серию",
+    "titleEn": "One more episode",
+    "description": "Истории, к которым хочется вернуться вечером.",
+    "descriptionEn": "Stories to come back to in the evening.",
+    "mediaIds": [
+      "series:dzhentlmeny-2024",
+      "series:gangsterlend",
+      "series:dzhek-richer-2022",
+      "series:luchshe-zvonite-solu",
+      "series:chernobyl-2019"
+    ]
+  },
+  {
+    "id": "animation-night",
+    "title": "Вечер анимации",
+    "titleEn": "Animation night",
+    "description": "Яркие миры и большие приключения.",
+    "descriptionEn": "Colourful worlds and big adventures.",
+    "mediaIds": [
+      "movies:dikii-robot",
+      "movies:golovolomka-2",
+      "movies:moana-2",
+      "movies:transformery-nachalo-2024"
+    ]
+  },
+  {
+    "id": "secrets",
+    "title": "Тайны и расследования",
+    "titleEn": "Secrets and investigations",
+    "description": "Секреты, неожиданные повороты и непростые решения.",
+    "descriptionEn": "Secrets, unexpected twists and difficult choices.",
+    "mediaIds": [
+      "movies:dostat-nozhi-voskreshenie-pokoinika",
+      "movies:lovushka-2024",
+      "series:razdelenie-2022",
+      "series:dzhentlmeny-2024",
+      "series:gangsterlend"
+    ]
+  },
+  {
+    "id": "game-worlds",
+    "title": "Миры, в которых хочется остаться",
+    "titleEn": "Worlds worth exploring",
+    "description": "Приключения и открытия на Windows.",
+    "descriptionEn": "Adventures and discoveries on Windows.",
+    "games": [
+      {
+        "id": 292030,
+        "title": "The Witcher 3: Wild Hunt"
+      },
+      {
+        "id": 1245620,
+        "title": "ELDEN RING"
+      },
+      {
+        "id": 1091500,
+        "title": "Cyberpunk 2077"
+      },
+      {
+        "id": 1086940,
+        "title": "Baldur’s Gate 3"
+      },
+      {
+        "id": 620,
+        "title": "Portal 2"
+      },
+      {
+        "id": 413150,
+        "title": "Stardew Valley"
+      }
+    ]
+  }
+]
