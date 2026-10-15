@@ -91,7 +91,7 @@ public partial class MainWindow
         Rating("Кинопоиск",item.Kinopoisk);Rating("IMDb",item.Imdb);
         // Every genre is listed here; a poster's caption shows only the first.
         var traits=string.Join(" · ",new[]{item.AllGenres,item.DisplayCountry}.Where(x=>!string.IsNullOrWhiteSpace(x)));
-        if(traits.Length>0)detailMetaRow.Children.Add(new TextBlock{Name="DetailTraits",Text=AppLanguage.T(traits),FontSize=14,Foreground=(Brush)FindResource("BannerMuted"),TextWrapping=TextWrapping.Wrap,VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,12,4)});
+        if(traits.Length>0)detailInfo.Children.Add(new TextBlock{Name="DetailTraits",Text=AppLanguage.T(traits),FontSize=14,Foreground=(Brush)FindResource("BannerMuted"),TextWrapping=TextWrapping.Wrap,VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,12,4)});
         detailPoorQualitySlot=new StackPanel();detailInfo.Children.Add(detailPoorQualitySlot);
         UpdateDetailQuality(item);
         // credits, only those already known

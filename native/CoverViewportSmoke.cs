@@ -120,7 +120,7 @@ public partial class MainWindow
             {
                 AppLanguage.Set(originalLanguage=="en"?"ru":"en");
                 var other=await FeaturePosterUrl(shared,CancellationToken.None,client);
-                if(other==null||other==await FeaturePosterUrl(shared,CancellationToken.None,client)&&handler.Counts[shared]!=2)throw new Exception("Localized backdrops did not share their own cache.");
+                if(other==null||other!=await FeaturePosterUrl(shared,CancellationToken.None,client)||handler.Counts[shared]!=2)throw new Exception("Localized backdrops did not share their own cache.");
                 AppLanguage.Set(originalLanguage);
                 if(await FeaturePosterUrl(shared,CancellationToken.None,client)==other||handler.Counts[shared]!=2)throw new Exception("Backdrop cache crossed interface languages.");
             }
