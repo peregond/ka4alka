@@ -124,23 +124,31 @@ internal static class Program
         return position?.GetType().GetProperty("Visible",Members)?.GetValue(position) is true;
     }
     static Image[] VisiblePosters(MainWindow window)=>Visuals<Image>(window)
-        .Where(image=>image.IsLoaded&&image.DataContext is MediaItem&&PosterVisible(window,image)).ToArray();
+        .Where(image=>image.IsLoaded&&image.DataContext is MediaItem&&image.Tag?.ToString() is not ("FeaturePoster" or "FeaturePlaceholderPoster")&&PosterVisible(window,image)).ToArray();
     static bool Loaded(Image image)=>image.Source is BitmapSource bitmap&&bitmap.PixelWidth>8&&bitmap.PixelHeight>8;
 
+    static bool CatalogSettled(MainWindow window)
+    {
+        if(Field(window,"current")!=null||Field(window,"section") is not ("Фильмы" or "Сериалы"))return true;
+        return window.GetType().GetProperty("CatalogQualityChecking",Members)?.GetValue(window) is not true
+            &&Field(window,"liveLoading") is false&&Field(window,"featuredRequest")==null&&Field(window,"discoveryRegionRequest")==null;
+    }
     static async Task WaitPosters(MainWindow window,string stage,int minimum=4)
     {
-        var until=DateTime.UtcNow.AddSeconds(75);string last="";var stable=DateTime.UtcNow;
+        var until=DateTime.UtcNow.AddSeconds(110);string last="";var stable=DateTime.UtcNow;
         while(DateTime.UtcNow<until&&DateTime.UtcNow<Deadline)
         {
             await Settle(window);
             var posters=VisiblePosters(window);
-            var signature=string.Join("|",posters.Select(image=>((MediaItem)image.DataContext).PageUrl+":"+Loaded(image)));
+            var signature=CatalogSettled(window)+":"+string.Join("|",posters.Select(image=>((MediaItem)image.DataContext).PageUrl+":"+Loaded(image)));
             if(signature!=last){last=signature;stable=DateTime.UtcNow;}
-            if(posters.Count(Loaded)>=minimum&&posters.All(Loaded)&&DateTime.UtcNow-stable>TimeSpan.FromSeconds(2))return;
+            // A real source may return fewer cards than a complete row. Require
+            // every actual visible poster, plus settled source/quality work.
+            if(CatalogSettled(window)&&posters.Length>0&&posters.Count(Loaded)>=Math.Min(minimum,posters.Length)&&posters.All(Loaded)&&DateTime.UtcNow-stable>TimeSpan.FromSeconds(4))return;
             await Task.Delay(200);
         }
         var current=VisiblePosters(window);var loaded=current.Count(Loaded);
-        if(loaded<minimum||current.Any(image=>!Loaded(image)))throw new InvalidOperationException(stage+": real application loaded only "+loaded+" visible source posters; pending="+current.Count(image=>!Loaded(image))+"; catalogue error: "+Field(window,"liveError"));
+        if(!CatalogSettled(window)||current.Length==0||loaded<Math.Min(minimum,current.Length)||current.Any(image=>!Loaded(image)))throw new InvalidOperationException(stage+": real application loaded only "+loaded+" visible source posters; pending="+current.Count(image=>!Loaded(image))+"; catalogue error: "+Field(window,"liveError"));
         Console.WriteLine(stage+": actual source posters loaded="+loaded+", unavailable or still pending="+current.Count(image=>!Loaded(image)));
     }
     static async Task WaitFeature(MainWindow window)
@@ -156,7 +164,9 @@ internal static class Program
     }
     static void Save(MainWindow window,string filename)
     {
-        window.UpdateLayout();var content=window.Content as FrameworkElement??throw new InvalidOperationException("Actual application client area is missing.");
+        window.UpdateLayout();
+        if(VisiblePosters(window).Any(image=>!Loaded(image)))throw new InvalidOperationException("Refusing to capture pending visible posters: "+filename);
+        var content=window.Content as FrameworkElement??throw new InvalidOperationException("Actual application client area is missing.");
         var dpi=VisualTreeHelper.GetDpi(content);var width=(int)Math.Ceiling(content.ActualWidth*dpi.DpiScaleX);var height=(int)Math.Ceiling(content.ActualHeight*dpi.DpiScaleY);
         var bitmap=new RenderTargetBitmap(width,height,dpi.PixelsPerInchX,dpi.PixelsPerInchY,PixelFormats.Pbgra32);
         // Window.Background is normally painted by the containing Window.
@@ -180,7 +190,7 @@ internal static class Program
         window.WindowState=WindowState.Normal;window.MaxWidth=1920;window.MaxHeight=1200;window.Width=1440;window.Height=900;window.Left=0;window.Top=0;
         await Settle(window);
         await Until(()=>Field(window,"liveLoading") is false&&Field(window,"liveItems") is IEnumerable rows&&rows.Cast<object>().Any(),TimeSpan.FromSeconds(80),"Actual default source catalogue did not load.");
-        await Task.Delay(2000);await WaitPosters(window,"Film catalogue");await Task.Delay(8000);await WaitPosters(window,"Final film catalogue");await WaitFeature(window);Save(window,"catalog-dark.png");
+        await Task.Delay(2000);await WaitPosters(window,"Film catalogue");await Task.Delay(8000);await WaitPosters(window,"Final film catalogue");await WaitFeature(window);await WaitPosters(window,"Settled film catalogue");Save(window,"catalog-dark.png");
         Call(window,"ToggleTheme",window,new RoutedEventArgs());await Settle(window);await WaitPosters(window,"Light film catalogue");Save(window,"catalog-light.png");
         Call(window,"ToggleTheme",window,new RoutedEventArgs());await Settle(window);
         var movieButton=Visuals<Button>(window).FirstOrDefault(button=>button.Tag is MediaItem movie&&movie.Section=="Фильмы"&&movie.IsLive&&
@@ -198,11 +208,11 @@ internal static class Program
         else skipped.Add("No genuine loaded film card was available for detail navigation.");
         Call(window,"ShowCatalogSection","Сериалы");await Settle(window);
         await Until(()=>Field(window,"liveLoading") is false&&Field(window,"liveItems") is IEnumerable rows&&rows.Cast<object>().Any(),TimeSpan.FromSeconds(70),"Actual series source catalogue did not load.");
-        await Task.Delay(2000);await WaitPosters(window,"Series catalogue");await WaitFeature(window);Save(window,"series-dark.png");
+        await Task.Delay(2000);await WaitPosters(window,"Series catalogue");await WaitFeature(window);await WaitPosters(window,"Settled series catalogue");Save(window,"series-dark.png");
         Call(window,"ShowGames");await Settle(window);
         // 0.42.0 opened a plain list; later releases open a home page whose shelves hold the games.
         await Until(()=>Field(window,"gameLoading") is false&&!(Field(window,"gameShelfLoading") is IEnumerable loadingShelves&&loadingShelves.Cast<object>().Any())&&(Field(window,"gameItems") is IEnumerable games&&games.Cast<object>().Any()||Field(window,"gameShelfItems") is IDictionary shelves&&shelves.Count>0),TimeSpan.FromSeconds(60),"Actual Steam game catalogue did not load.");
-        await WaitPosters(window,"Steam game catalogue");await Task.Delay(8000);await WaitFeature(window);Save(window,"games-dark.png");
+        await WaitPosters(window,"Steam game catalogue");await Task.Delay(8000);await WaitFeature(window);await WaitPosters(window,"Settled game catalogue");Save(window,"games-dark.png");
         Call(window,"ToggleTheme",window,new RoutedEventArgs());await Settle(window);await WaitPosters(window,"Light game catalogue");Save(window,"games-light.png");
         Call(window,"ToggleTheme",window,new RoutedEventArgs());await Settle(window);
         var gameButtons=Visuals<Button>(window).Where(button=>button.Tag is MediaItem game&&game.Section=="Игры"&&Visuals<Image>(button).Any(Loaded)).ToArray();
