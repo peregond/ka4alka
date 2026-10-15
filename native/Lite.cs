@@ -9,6 +9,7 @@ public partial class MainWindow
     void ApplyLiteMode()
     {
         lightweightMotion=prefs.LiteMode;PerformanceBudget.LiteMode=prefs.LiteMode;
+        if(posterPresentation!=null)posterPresentation.Limit=prefs.LiteMode?1:2;
         coverCache.Resize(prefs.LiteMode?Math.Min(PerformanceBudget.ImageMemoryBytes,12L*1024*1024):PerformanceBudget.ImageMemoryBytes);
         portraitCache.Resize(prefs.LiteMode||PerformanceBudget.Constrained?4L*1024*1024:8L*1024*1024);
         RenderOptions.SetBitmapScalingMode(this,prefs.LiteMode?BitmapScalingMode.LowQuality:BitmapScalingMode.Unspecified);
