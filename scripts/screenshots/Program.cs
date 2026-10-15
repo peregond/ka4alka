@@ -18,6 +18,7 @@ internal static class Program
 {
     const BindingFlags Members=BindingFlags.Instance|BindingFlags.Public|BindingFlags.NonPublic;
     static string releaseDirectory="",outputDirectory="";
+    static readonly string CaptureLanguage=Environment.GetEnvironmentVariable("KACHALKA_SCREENSHOT_LANGUAGE")??"ru";
     static readonly List<object> captures=[];
     static readonly List<string> skipped=[];
     static readonly DateTime Deadline=DateTime.UtcNow.AddSeconds(510);
@@ -44,15 +45,16 @@ internal static class Program
     static int StartReleasedApplication()
     {
         var version=typeof(Kachalka.App).Assembly.GetName().Version?.ToString(3);
-        var expected=Environment.GetEnvironmentVariable("KACHALKA_SCREENSHOT_VERSION")??"0.42.0";
+        var expected=Environment.GetEnvironmentVariable("KACHALKA_SCREENSHOT_VERSION")??"0.43.4";
         if(version!=expected)throw new InvalidOperationException("Screenshot driver requires the public "+expected+" assembly, got "+version);
+        if(CaptureLanguage is not ("ru" or "en"))throw new InvalidOperationException("Screenshot language must be ru or en.");
         var state=Path.Combine(outputDirectory,"isolated-state-"+Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(state);
         var downloads=Path.Combine(Path.GetPathRoot(state)!,"Ka4alka");Directory.CreateDirectory(downloads);
         Environment.SetEnvironmentVariable("KACHALKA_DATA",state);
         File.WriteAllText(Path.Combine(state,"settings.json"),JsonSerializer.Serialize(new
         {
-            Folder=downloads,FolderConfigured=true,Light=false,CheckForUpdates=false,AutoUpdate=false,
+            Folder=downloads,FolderConfigured=true,Light=false,UiLanguage=CaptureLanguage,CheckForUpdates=false,AutoUpdate=false,
             AutoResumeDownloads=false,NotifyDownloads=false,LanEnabled=false,QualityFilterConfigured=true,HidePoorQuality=true
         }));
         Directory.SetCurrentDirectory(releaseDirectory);
@@ -141,6 +143,17 @@ internal static class Program
         if(loaded<minimum||current.Any(image=>!Loaded(image)))throw new InvalidOperationException(stage+": real application loaded only "+loaded+" visible source posters; pending="+current.Count(image=>!Loaded(image))+"; catalogue error: "+Field(window,"liveError"));
         Console.WriteLine(stage+": actual source posters loaded="+loaded+", unavailable or still pending="+current.Count(image=>!Loaded(image)));
     }
+    static async Task WaitFeature(MainWindow window)
+    {
+        var until=DateTime.UtcNow.AddSeconds(18);
+        while(DateTime.UtcNow<until&&DateTime.UtcNow<Deadline)
+        {
+            var view=Field(window,"carousel");
+            if(view==null||Field(view,"SummaryRequest")==null)break;
+            await Task.Delay(200);
+        }
+        await Settle(window);
+    }
     static void Save(MainWindow window,string filename)
     {
         window.UpdateLayout();var content=window.Content as FrameworkElement??throw new InvalidOperationException("Actual application client area is missing.");
@@ -154,7 +167,7 @@ internal static class Program
         bitmap.Render(background);bitmap.Render(content);
         var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(bitmap));using(var file=File.Create(Path.Combine(outputDirectory,filename)))png.Save(file);
         var posters=VisiblePosters(window);
-        captures.Add(new{File=filename,Width=width,Height=height,LoadedVisiblePosters=posters.Count(Loaded),PendingVisiblePosters=posters.Count(image=>!Loaded(image)),
+        captures.Add(new{File=filename,Language=CaptureLanguage,Width=width,Height=height,LoadedVisiblePosters=posters.Count(Loaded),PendingVisiblePosters=posters.Count(image=>!Loaded(image)),
             Titles=posters.Where(Loaded).Select(image=>((MediaItem)image.DataContext).Title).Distinct().ToArray()});
         Console.WriteLine("Captured "+filename+" from actual public "+typeof(Kachalka.App).Assembly.GetName().Version!.ToString(3)+" client area.");
     }
@@ -166,7 +179,7 @@ internal static class Program
         window.WindowState=WindowState.Normal;window.MaxWidth=1920;window.MaxHeight=1200;window.Width=1440;window.Height=900;window.Left=0;window.Top=0;
         await Settle(window);
         await Until(()=>Field(window,"liveLoading") is false&&Field(window,"liveItems") is IEnumerable rows&&rows.Cast<object>().Any(),TimeSpan.FromSeconds(80),"Actual default source catalogue did not load.");
-        await Task.Delay(2000);await WaitPosters(window,"Film catalogue");await Task.Delay(8000);await WaitPosters(window,"Final film catalogue");await Settle(window);Save(window,"catalog-dark.png");
+        await Task.Delay(2000);await WaitPosters(window,"Film catalogue");await Task.Delay(8000);await WaitPosters(window,"Final film catalogue");await WaitFeature(window);Save(window,"catalog-dark.png");
         Call(window,"ToggleTheme",window,new RoutedEventArgs());await Settle(window);await WaitPosters(window,"Light film catalogue");Save(window,"catalog-light.png");
         Call(window,"ToggleTheme",window,new RoutedEventArgs());await Settle(window);
         var movieButton=Visuals<Button>(window).FirstOrDefault(button=>button.Tag is MediaItem movie&&movie.Section=="Фильмы"&&movie.IsLive&&
@@ -184,18 +197,18 @@ internal static class Program
         else skipped.Add("No genuine loaded film card was available for detail navigation.");
         Call(window,"ShowCatalogSection","Сериалы");await Settle(window);
         await Until(()=>Field(window,"liveLoading") is false&&Field(window,"liveItems") is IEnumerable rows&&rows.Cast<object>().Any(),TimeSpan.FromSeconds(70),"Actual series source catalogue did not load.");
-        await Task.Delay(2000);await WaitPosters(window,"Series catalogue");Save(window,"series-dark.png");
+        await Task.Delay(2000);await WaitPosters(window,"Series catalogue");await WaitFeature(window);Save(window,"series-dark.png");
         Call(window,"ShowGames");await Settle(window);
         // 0.42.0 opened a plain list; later releases open a home page whose shelves hold the games.
         await Until(()=>Field(window,"gameLoading") is false&&!(Field(window,"gameShelfLoading") is IEnumerable loadingShelves&&loadingShelves.Cast<object>().Any())&&(Field(window,"gameItems") is IEnumerable games&&games.Cast<object>().Any()||Field(window,"gameShelfItems") is IDictionary shelves&&shelves.Count>0),TimeSpan.FromSeconds(60),"Actual Steam game catalogue did not load.");
-        await WaitPosters(window,"Steam game catalogue");Save(window,"games-dark.png");
+        await WaitPosters(window,"Steam game catalogue");await Task.Delay(8000);await WaitFeature(window);Save(window,"games-dark.png");
         Call(window,"ToggleTheme",window,new RoutedEventArgs());await Settle(window);await WaitPosters(window,"Light game catalogue");Save(window,"games-light.png");
         Call(window,"ToggleTheme",window,new RoutedEventArgs());await Settle(window);
         var gameButtons=Visuals<Button>(window).Where(button=>button.Tag is MediaItem game&&game.Section=="Игры"&&Visuals<Image>(button).Any(Loaded)).ToArray();
         var gameButton=gameButtons.FirstOrDefault(button=>button.Tag is MediaItem game&&game.PageUrl=="https://store.steampowered.com/app/730/")
             ??gameButtons.FirstOrDefault()??throw new InvalidOperationException("No real loaded Steam card was available to open.");
         gameButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await Settle(window);
-        await Until(()=>Field(window,"gameDescription") is TextBlock description&&description.Text.Length>0&&!description.Text.StartsWith("Загружаем")&&!description.Text.Contains("временно недоступно"),TimeSpan.FromSeconds(45),"Real Steam game description did not load.");
+        await Until(()=>Field(window,"gameDescription") is TextBlock description&&description.Text.Length>0&&!description.Text.StartsWith("Загружаем")&&!description.Text.Contains("временно недоступно")&&!description.Text.StartsWith("Loading")&&!description.Text.Contains("temporarily unavailable"),TimeSpan.FromSeconds(45),"Real Steam game description did not load.");
         await Until(()=>Field(window,"gameReleasesLoading") is false,TimeSpan.FromSeconds(30),"Real game source search did not complete.");
         await WaitPosters(window,"Steam game detail",1);Save(window,"game-detail-dark.png");
         Call(window,"ShowDownloads",window,new RoutedEventArgs());await Settle(window);Save(window,"downloads-dark.png");
@@ -205,7 +218,7 @@ internal static class Program
         File.WriteAllText(Path.Combine(outputDirectory,"capture-info.json"),JsonSerializer.Serialize(new
         {
             Version=typeof(Kachalka.App).Assembly.GetName().Version!.ToString(3),ReleaseDllSha256=Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(releasedDll))),
-            ActualApplicationStartup=true,ModifiedApplicationBinary=false,SyntheticMedia=false,Utc=DateTimeOffset.UtcNow,Captures=captures,Skipped=skipped
+            Language=CaptureLanguage,ActualApplicationStartup=true,ModifiedApplicationBinary=false,SyntheticMedia=false,Utc=DateTimeOffset.UtcNow,Captures=captures,Skipped=skipped
         },new JsonSerializerOptions{WriteIndented=true}));
     }
 }
