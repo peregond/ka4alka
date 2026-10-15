@@ -42,17 +42,17 @@ public partial class MainWindow
                 var point=card.PointToScreen(new Point(card.ActualWidth/2,30));Check(SetCursorPos((int)point.X,(int)point.Y),"native pointer reaches poster");Mouse.Synchronize();await Settle();
                 Check(card.IsMouseOver&&actions.Opacity==1&&actions.IsHitTestVisible,category+": native hover exposes both actions");
                 var renders=renderCount;
-                save.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await Settle();
+                save.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Settle();
                 Check(current==null&&renderCount==renders&&item.SavedForUi&&IsSaved(item)&&Preferences.Load().Favorites.Contains(id),category+": heart persists Saved without opening or rebuilding the page");
                 var heart=FindVisual<System.Windows.Shapes.Path>(save,_=>true)!;
                 Check(heart.Fill is SolidColorBrush fill&&fill.Color.A==255,category+": saved heart is filled");
                 var bitmap=new RenderTargetBitmap((int)ActualWidth,(int)ActualHeight,96,96,PixelFormats.Pbgra32);bitmap.Render(this);var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(bitmap));using(var file=File.Create(Path.Combine(output,(category=="Фильмы"?"movies":category=="Сериалы"?"series":"games")+(isLight?"-light":"-dark")+".png")))encoder.Save(file);
-                save.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Check(!item.SavedForUi&&!IsSaved(item),category+": second click removes Saved");
-                hide.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await Settle();
+                save.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));Check(!item.SavedForUi&&!IsSaved(item),category+": second click removes Saved");
+                hide.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Settle();
                 Check(current==null&&!PersonallyVisible(item)&&HiddenCatalog.TitleHidden(item,Preferences.Load().HiddenTitles),category+": eye hides title without opening it and persists ignored state");
                 Check(VisualElements<TextBlock>(Body).Any(x=>x.Text=="Игнорируемое"),"Settings expose the ignored section");
                 var ignored=VisualElements<DockPanel>(Body).First(x=>VisualElements<TextBlock>(x).Any(text=>text.Text.StartsWith(item.Title+" ·",StringComparison.Ordinal)));
-                VisualElements<Button>(ignored).Single().RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await Settle();
+                VisualElements<Button>(ignored).Single().RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Settle();
                 Check(PersonallyVisible(item)&&!HiddenCatalog.TitleHidden(item,Preferences.Load().HiddenTitles),category+": restoring in Settings makes the title visible again");
             }
             File.WriteAllText(Path.Combine(output,"checks.json"),JsonSerializer.Serialize(new{Checks=checks,MoviesSeriesGames=true,LightAndDark=true,NativeHover=true,KeyboardActions=true,NoAccidentalNavigation=true,PersistentSaved=true,PersistentIgnored=true,RestoreInSettings=true},new JsonSerializerOptions{WriteIndented=true}));
