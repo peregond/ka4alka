@@ -52,7 +52,8 @@ public partial class MainWindow
             await Task.Delay(180,request.Token);
             // A banner subscribes to the common metadata cache. Leaving it must not cancel
             // the same lookup used by a catalog card or an opened detail page.
-            var pending=featureSummaryProvider?.Invoke(item,request.Token)??Metadata(item,false,metadataLifetime.Token);
+            var pending=featureSummaryProvider?.Invoke(item,request.Token)
+                ??(cardMetadata.TryGetValue(item.Id,out var cached)&&!cached.IsCanceled&&!cached.IsFaulted?cached:Metadata(item,false,metadataLifetime.Token));
             var fresh=await pending.WaitAsync(request.Token);
             if(Active()&&fresh.Id==item.Id)
             {

@@ -69,7 +69,7 @@ public partial class MainWindow
 
             foreach(var category in new[]{"Фильмы","Сериалы","Игры"})foreach(var width in new[]{1200d,700d,360d})
             {
-                Width=width;prefs.Light=width==700;ApplyTheme();
+                Width=width;prefs.Light=width==700;prefs.LiteMode=width==360;ApplyLiteMode();ApplyTheme();
                 var view=Mount(Item(-966010,category,description));await Settle();ArrangeFeatureCarousel(Body.ActualWidth);await Settle();
                 var slot=FindVisual<Grid>(view.Frame,x=>x.Name=="FeatureSummarySlot")!;
                 Check(Math.Abs(slot.ActualHeight-60)<.5&&view.Summary.Text==description&&view.Summary.TextWrapping==TextWrapping.Wrap&&view.Summary.TextTrimming==TextTrimming.CharacterEllipsis,category+": three synopsis lines stay bounded at "+width);
