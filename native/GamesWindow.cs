@@ -213,7 +213,7 @@ public partial class MainWindow
                 var detail=await (gameDetailProvider?.Invoke(slide,token)??new GameCatalog(sourceClient).Detail(slide,token));
                 if(token.IsCancellationRequested||closed)return;
                 AddGameDetails(detail);
-                if(carousel is {Bound: {} bound} view&&bound.Id==slide.Id){RebuildFeatureMeta(view,bound);UpdateFeaturePeople(view,bound);}
+                if(carousel is {Bound: {} bound} view&&bound.Id==slide.Id){RebuildFeatureMeta(view,bound);UpdateFeaturePeople(view,bound);UpdateFeatureSummary(view,bound);}
             }
             catch(OperationCanceledException)when(token.IsCancellationRequested){return;}
             catch(Exception error){ErrorLog.Write(error);}
