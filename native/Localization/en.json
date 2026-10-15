@@ -1517,5 +1517,11 @@
   "Английская озвучка при больше всего отдающих": "English audio · most seeders",
   "Английская озвучка при много отдающих": "English audio · many seeders",
   "Английская озвучка при умеренный размер": "English audio · moderate size",
-  "Английская озвучка при проверенный источник": "English audio · verified source"
+  "Английская озвучка при проверенный источник": "English audio · verified source",
+  "Игнорируемое": "Ignored titles and genres",
+  "Добавить в сохранённое": "Save",
+  "Удалить из сохранённого": "Remove from saved",
+  "Скрыть из ленты": "Hide from feed",
+  "Добавлено в сохранённое.": "Added to saved.",
+  "Удалено из сохранённого.": "Removed from saved."
 }

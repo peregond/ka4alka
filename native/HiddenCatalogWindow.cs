@@ -6,18 +6,25 @@ public partial class MainWindow
 {
     IEnumerable<CatalogChoice> PersonalGenreChoices=>CatalogChoices.Genres.Concat(catalogGenres).DistinctBy(choice=>choice.Key);
     bool PersonallyVisible(MediaItem item)=>!HiddenCatalog.Hidden(item,prefs,PersonalGenreChoices);
+    void SaveCatalogPersonalChoice(Action change,bool immediate=false)
+    {
+        var titles=prefs.HiddenTitles.ToList();var genres=new HashSet<string>(prefs.HiddenGenres);
+        try
+        {
+            change();prefs.Save();
+            if(immediate)Render();
+            else if(section=="Игры")Dispatcher.BeginInvoke(new Action(()=>{if(section=="Игры"&&current==null)Render();}));
+            else ScheduleCatalogEvidenceRefresh();
+            Status.Text=AppLanguage.T("Каталог настроен. Вернуть скрытое можно в настройках.");
+        }
+        catch(Exception error){prefs.HiddenTitles=titles;prefs.HiddenGenres=genres;Status.Text=AppLanguage.T("Не удалось сохранить выбор: "+error.Message);}
+    }
     ContextMenu CatalogPersonalMenu(MediaItem item)
     {
         var menu=new ContextMenu();menu.SetResourceReference(Control.BackgroundProperty,"Panel");menu.SetResourceReference(Control.ForegroundProperty,"Text");
-        void Save(Action change)
-        {
-            var titles=prefs.HiddenTitles.ToList();var genres=new HashSet<string>(prefs.HiddenGenres);
-            try{change();prefs.Save();if(section=="Игры")Dispatcher.BeginInvoke(new Action(()=>{if(section=="Игры"&&current==null)Render();}));else ScheduleCatalogEvidenceRefresh();Status.Text=AppLanguage.T("Каталог настроен. Вернуть скрытое можно в настройках.");}
-            catch(Exception error){prefs.HiddenTitles=titles;prefs.HiddenGenres=genres;Status.Text=AppLanguage.T("Не удалось сохранить выбор: "+error.Message);}
-        }
         var hidden=HiddenCatalog.TitleHidden(item,prefs.HiddenTitles);
         var title=new MenuItem{Header=AppLanguage.T(hidden?"Вернуть в каталог":item.Section=="Сериалы"?"Скрыть сериал из каталога":item.Section=="Игры"?"Скрыть игру из каталога":"Скрыть фильм из каталога")};
-        title.Click+=(_,_)=>Save(()=>
+        title.Click+=(_,_)=>SaveCatalogPersonalChoice(()=>
         {
             if(hidden)prefs.HiddenTitles.RemoveAll(row=>row.Section==item.Section&&(row.CatalogId==item.Id||row.Identity==HiddenCatalog.Title(item).Identity));
             else{if(prefs.HiddenTitles.Count>=1000)throw new InvalidOperationException("В списке уже 1000 названий. Верни несколько из них в настройках.");prefs.HiddenTitles.Add(HiddenCatalog.Title(item));}
@@ -29,7 +36,7 @@ public partial class MainWindow
             foreach(var choice in genreChoices)
             {
                 var option=new MenuItem{Header=AppLanguage.T(choice.Label),IsCheckable=true,IsChecked=prefs.HiddenGenres.Contains(choice.Key)};
-                option.Click+=(_,_)=>Save(()=>{if(option.IsChecked)prefs.HiddenGenres.Add(choice.Key);else prefs.HiddenGenres.Remove(choice.Key);});group.Items.Add(option);
+                option.Click+=(_,_)=>SaveCatalogPersonalChoice(()=>{if(option.IsChecked)prefs.HiddenGenres.Add(choice.Key);else prefs.HiddenGenres.Remove(choice.Key);});group.Items.Add(option);
             }
             menu.Items.Add(group);
         }

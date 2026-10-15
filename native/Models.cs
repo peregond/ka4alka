@@ -61,6 +61,9 @@ public record MediaItem(int Id, string Title, string Section, string Genre, int 
     [JsonIgnore] public bool HasPosterQuality=>posterQuality.Length>0;
     [JsonIgnore] public string Scores => liveScores ?? (Cinema ? $"КП {Kinopoisk}   IMDb {Imdb}" : Section);
     public event PropertyChangedEventHandler? PropertyChanged;
+    bool savedForUi;
+    [JsonIgnore] public bool SavedForUi=>savedForUi;
+    public void SetSavedForUi(bool saved){if(savedForUi==saved)return;savedForUi=saved;PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(SavedForUi)));}
     [JsonIgnore] public bool OnlyPoorQuality {get;private set;}
     HashSet<int> releaseResolutions=[];
     [JsonIgnore] public IReadOnlySet<int> ReleaseResolutions=>releaseResolutions;

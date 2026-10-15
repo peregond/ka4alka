@@ -54,7 +54,7 @@ public partial class MainWindow
                 Render();UpdateLayout();Check(catalogDisplay.Any(item=>item.Id==good.Id)&&good.HasReleaseResolution(1080),category+": newer remembered releases replace an older empty quality view after returning from details");
             }
             section="Настройки";current=null;Render();UpdateLayout();
-            Check(VisualElements<TextBlock>(Body).Any(text=>text.Text=="Скрытые названия и жанры"),"native Settings expose the reversible hidden-content controls");
+            Check(VisualElements<TextBlock>(Body).Any(text=>text.Text=="Игнорируемое"),"native Settings expose the reversible hidden-content controls");
             await File.WriteAllTextAsync(Path.Combine(output,"checks.json"),JsonSerializer.Serialize(new{Checks=checks,NativeHomeAvailability=true,MovieAndSeries=true,PersonalChoices=true,BoundedQueue=true}));
         }
         finally
