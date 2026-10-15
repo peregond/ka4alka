@@ -39,6 +39,10 @@ public partial class MainWindow
             liveItems=cards;liveLoading=false;liveError="";catalogPages[category+"||1"]=new(cards.Take(8).ToArray(),false,CatalogChoices.Genres,CatalogChoices.Countries);
             SetDiscoveryRegionalItems(category,home,[],cards);liveKey=CurrentCatalogKey;Render();UpdateLayout();
             await Until(()=>VisualElements<Image>(Body).Any(image=>image.Source!=null),"Initial cached posters did not arrive.");
+            // The viewport test separately exercises cold image arrivals. Here isolate the delayed
+            // evidence/rating path from first-use font, image-codec and WPF resource initialization.
+            await Until(()=>!VisualElements<Image>(Body).Any(image=>image.Tag==null&&image.DataContext is MediaItem&&CoverViewportFor(image)?.Measure(image).Near==true&&image.Source==null),"Initial near-viewport posters did not settle.");
+            await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ContextIdle);await Task.Delay(150);
             var scroll=navigationScroll;var list=catalogList;var baseline=renderCount;
             var retained=VisualElements<Image>(discoveryShelves[DiscoveryShelfKind.Popular].Row).ToArray();
             await Until(()=>retained.Any(image=>image.Source!=null),"Visible popular posters did not arrive.");
@@ -69,8 +73,9 @@ public partial class MainWindow
             finally{CompositionTarget.Rendering-=rendered;recording.Cancel();await input;}
             inputDelays.Sort();frames.Sort();
             var p95=inputDelays.Count==0?0:inputDelays[(int)((inputDelays.Count-1)*.95)];
-            Check(inputDelays.Count>10&&p95<200,"native input continues during slow catalog loading: "+category+" lite="+lite);
             samples.Add(new{Section=category,Lite=lite,BackgroundPageRebuilds=renderCount-baseline,RetainedPosters=images.Length,InputSamples=inputDelays.Count,InputP95Ms=p95,InputMaxMs=inputDelays.DefaultIfEmpty().Max(),FrameP95Ms=frames.Count==0?0:frames[(int)((frames.Count-1)*.95)]});
+            await File.WriteAllTextAsync(Path.Combine(output,"measurements.json"),JsonSerializer.Serialize(samples,new JsonSerializerOptions{WriteIndented=true}));
+            Check(inputDelays.Count>10&&p95<200,"native input continues during slow catalog loading: "+category+" lite="+lite+" samples="+inputDelays.Count+" p95="+p95.ToString("F2"));
         }
         await File.WriteAllTextAsync(Path.Combine(output,"checks.json"),JsonSerializer.Serialize(new{Checks=checks,Samples=samples},new JsonSerializerOptions{WriteIndented=true}));Close();
     }
