@@ -233,7 +233,8 @@ public partial class MainWindow
         // lists keep the row pinned under the search so selected-filter chips never move the list below them.
         AddDiscovery(content,cards,DiscoveryCatalog?TakeFiltersPanel():null);
         content.Children.Add(list);
-        if(cards.Length==0&&liveLoading&&!CatalogQualityChecking)content.Children.Add(PosterSkeleton(2,"CatalogSkeleton"));
+        if(cards.Length>0&&catalogSkeletonShown){catalogSkeletonShown=false;Reveal(list);}
+        if(cards.Length==0&&liveLoading&&!CatalogQualityChecking){content.Children.Add(PosterSkeleton(2,"CatalogSkeleton"));catalogSkeletonShown=true;}
         else if(cards.Length==0)
         {
             var empty=new StackPanel{HorizontalAlignment=HorizontalAlignment.Center,MaxWidth=370,Margin=new(24)};
