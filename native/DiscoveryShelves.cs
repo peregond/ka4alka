@@ -20,7 +20,9 @@ public partial class MainWindow
         public int Rows {get;init;}=1;
         public void Set(MediaItem[] source,bool loading)
         {
+            var appearing=items.Length==0;
             items=source.DistinctBy(item=>item.Id).Take(40).ToArray();
+            appearing&=items.Length>0;
             state.Text=loading?"Загружаем подборку…":"Подборка пока недоступна.";
             // While a shelf is still loading it shows grey poster shapes instead of a sentence.
             skeleton.Visibility=items.Length==0&&loading?Visibility.Visible:Visibility.Collapsed;
@@ -28,6 +30,8 @@ public partial class MainWindow
             row.Visibility=items.Length>0?Visibility.Visible:Visibility.Collapsed;
             all.IsEnabled=items.Length>0;
             Render();
+            // A shelf that just filled up replaces its placeholders with a fade, not a jump.
+            if(appearing)Reveal(row);
         }
         public void Resize(int count)
         {
