@@ -18,7 +18,7 @@ public partial class MainWindow
         public required Border Frame;
         public required Image Poster;
         public required TextBlock Eyebrow,Title,People,Summary;
-        public required FrameworkElement SummaryPlaceholder;
+        public required Grid SummarySlot;
         public CancellationTokenSource? SummaryRequest;
         public required WrapPanel Meta;
         public required StackPanel Dots;
@@ -66,10 +66,8 @@ public partial class MainWindow
         var eyebrow=new TextBlock{FontSize=13,FontWeight=FontWeights.SemiBold,Foreground=(Brush)FindResource("BannerText"),VerticalAlignment=VerticalAlignment.Center};eyebrowRow.Children.Add(eyebrow);content.Children.Add(eyebrowRow);
         var title=new TextBlock{Name="FeatureTitle",FontSize=44,FontWeight=FontWeights.ExtraBold,LineHeight=46,LineStackingStrategy=LineStackingStrategy.BlockLineHeight,Foreground=(Brush)FindResource("BannerText"),TextWrapping=TextWrapping.Wrap,TextTrimming=TextTrimming.CharacterEllipsis,MaxHeight=108,Margin=new(0,0,0,14)};content.Children.Add(title);
         var meta=new WrapPanel{Margin=new(0,0,0,10)};content.Children.Add(meta);
-        var summarySlot=new Grid{Name="FeatureSummarySlot",Height=60,Margin=new(0,0,0,14)};content.Children.Add(summarySlot);
+        var summarySlot=new Grid{Name="FeatureSummarySlot",Height=60,Margin=new(0,0,0,14),Visibility=Visibility.Collapsed};content.Children.Add(summarySlot);
         var summary=new TextBlock{Name="FeatureSummary",FontSize=15,LineHeight=20,LineStackingStrategy=LineStackingStrategy.BlockLineHeight,TextWrapping=TextWrapping.Wrap,TextTrimming=TextTrimming.CharacterEllipsis,Foreground=(Brush)FindResource("BannerText"),Opacity=.9};summarySlot.Children.Add(summary);
-        var summaryPlaceholder=new StackPanel{Visibility=Visibility.Collapsed,IsHitTestVisible=false};
-        foreach(var right in new[]{24d,80d}){var line=SkeletonBar(10,new(0,5,right,6),.3);line.SetResourceReference(Border.BackgroundProperty,"BannerChip");summaryPlaceholder.Children.Add(line);}summarySlot.Children.Add(summaryPlaceholder);
         var people=new TextBlock{FontSize=14,Foreground=(Brush)FindResource("BannerMuted"),TextTrimming=TextTrimming.CharacterEllipsis,Margin=new(0,0,0,18)};content.Children.Add(people);
         var actions=new WrapPanel{Orientation=Orientation.Horizontal,Margin=new(0,4,0,0)};content.Children.Add(actions);
         Button Action(string text,string icon,bool primary)
@@ -93,7 +91,7 @@ public partial class MainWindow
         var previous=Arrow("IconChevronLeft",games?"Предыдущая игра":"Предыдущий фильм");var next=Arrow("IconChevron",games?"Следующая игра":"Следующий фильм");controls.Children.Add(previous);controls.Children.Add(next);
         if(slides.Length<2){dots.Visibility=Visibility.Collapsed;previous.Visibility=Visibility.Collapsed;next.Visibility=Visibility.Collapsed;}
 
-        var view=new FeatureCarouselView{Slides=slides,Frame=frame,Poster=image,Eyebrow=eyebrow,Title=title,People=people,Summary=summary,SummaryPlaceholder=summaryPlaceholder,Meta=meta,Dots=dots,About=aboutAction,Favorite=favorite,Previous=previous,Next=next,LiteCover=liteCover,PosterHost=posterHost};
+        var view=new FeatureCarouselView{Slides=slides,Frame=frame,Poster=image,Eyebrow=eyebrow,Title=title,People=people,Summary=summary,SummarySlot=summarySlot,Meta=meta,Dots=dots,About=aboutAction,Favorite=favorite,Previous=previous,Next=next,LiteCover=liteCover,PosterHost=posterHost};
         frame.ContextMenu=new ContextMenu();frame.ContextMenuOpening+=(_,_)=>{if(view.Bound!=null)frame.ContextMenu=CatalogPersonalMenu(view.Bound);};
         carousel=view;
         previous.Click+=(_,_)=>ShowFeatureSlide(view,(view.Index+view.Slides.Length-1)%view.Slides.Length);

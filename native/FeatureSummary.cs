@@ -28,11 +28,14 @@ public partial class MainWindow
         if(cardMetadata.TryGetValue(item.Id,out var cached)&&cached.IsCompletedSuccessfully&&FeatureSummary.Shorten(cached.Result.Description) is {Length:>0} summary)return summary;
         return FeatureSummary.Shorten(item.Description);
     }
-    void UpdateFeatureSummary(FeatureCarouselView view,MediaItem item,bool loading=false)
+    void SetFeatureSummaryText(FeatureCarouselView view,string text)
     {
-        view.Summary.Text=KnownFeatureSummary(item);
-        view.SummaryPlaceholder.Visibility=loading&&view.Summary.Text.Length==0?Visibility.Visible:Visibility.Collapsed;
+        var visible=text.Length>0?Visibility.Visible:Visibility.Collapsed;
+        var position=view.Frame.IsLoaded&&ReferenceEquals(carousel,view)&&view.SummarySlot.Visibility!=visible?CaptureCatalogReflow():null;
+        view.Summary.Text=text;view.SummarySlot.Visibility=visible;
+        RestoreCatalogReflow(position);
     }
+    void UpdateFeatureSummary(FeatureCarouselView view,MediaItem item)=>SetFeatureSummaryText(view,KnownFeatureSummary(item));
     void StartFeatureSummary(FeatureCarouselView view,MediaItem item)
     {
         UpdateFeatureSummary(view,item);
@@ -40,7 +43,6 @@ public partial class MainWindow
         if(view.Summary.Text.Length>0||item.Section=="Игры"||(!item.IsLive&&featureSummaryProvider==null)||metadataLifetime.IsCancellationRequested||!view.Frame.IsLoaded||view.SummaryRequest!=null)return;
         var request=view.SummaryRequest=CancellationTokenSource.CreateLinkedTokenSource(metadataLifetime.Token);
         request.CancelAfter(TimeSpan.FromSeconds(15));
-        UpdateFeatureSummary(view,item,true);
         _=LoadFeatureSummary(view,item,request);
     }
     async Task LoadFeatureSummary(FeatureCarouselView view,MediaItem item,CancellationTokenSource request)
@@ -58,7 +60,7 @@ public partial class MainWindow
             if(Active()&&fresh.Id==item.Id)
             {
                 var text=FeatureSummary.Shorten(fresh.Description);
-                if(text.Length>0)view.Summary.Text=text;
+                if(text.Length>0)SetFeatureSummaryText(view,text);
             }
         }
         catch(OperationCanceledException){}
@@ -67,7 +69,7 @@ public partial class MainWindow
         {
             if(ReferenceEquals(view.SummaryRequest,request))
             {
-                view.SummaryRequest=null;view.SummaryPlaceholder.Visibility=Visibility.Collapsed;
+                view.SummaryRequest=null;
             }
             request.Dispose();
         }
