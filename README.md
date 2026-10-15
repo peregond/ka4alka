@@ -6,7 +6,9 @@
 
 **[Скачать последнюю опубликованную версию](https://github.com/peregond/ka4alka/releases/latest)** · [Скриншоты](distribution/README.md) · [Новости](https://t.me/ka4alkacc) · [Чат поддержки](https://t.me/+6sT2ocaKvLxlNmRi)
 
-[![Игры для Windows в Качалке](distribution/assets/0.42/games-dark.png)](distribution/README.md)
+[![Игры для Windows в Качалке](distribution/assets/0.43.4/ru/games-dark.png)](distribution/README.md)
+
+[Скриншоты на русском и английском — версия 0.43.4](distribution/README.md)
 
 ## Фильмы и сериалы
 

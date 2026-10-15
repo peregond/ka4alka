@@ -6,60 +6,32 @@
 
 [Все выпуски](https://github.com/peregond/ka4alka/releases) · [Описание возможностей](../README.md) · [Новости](https://t.me/ka4alkacc) · [Поддержка](https://t.me/+6sT2ocaKvLxlNmRi)
 
-## Скриншоты опубликованной 0.42.0
+## Скриншоты опубликованной 0.43.4
 
-Снимки настоящего WPF-интерфейса опубликованной версии в Windows. Каталог и карточка игры используют живые данные Steam. Версия и SHA-256 пакета зафиксированы в [метаданных захвата](assets/0.42/capture-0.42.0.json).
+Настоящий WPF-интерфейс Windows из проверенного опубликованного пакета. Русский и английский наборы сняты отдельно с соответствующей настройкой языка; приложение и содержимое карточек не подменялись. Версия, SHA-256 пакета и DLL и сведения о загрузке постеров сохранены в [метаданных захвата](assets/0.43.4/capture-0.43.4.json).
+
+| Раздел | Русский | English |
+| --- | --- | --- |
+| Фильмы | [Тёмная тема](assets/0.43.4/ru/catalog-dark.png) · [Светлая](assets/0.43.4/ru/catalog-light.png) | [Dark](assets/0.43.4/en/catalog-dark.png) · [Light](assets/0.43.4/en/catalog-light.png) |
+| Сериалы | [Открыть](assets/0.43.4/ru/series-dark.png) | [TV shows](assets/0.43.4/en/series-dark.png) |
+| Игры | [Тёмная тема](assets/0.43.4/ru/games-dark.png) · [Светлая](assets/0.43.4/ru/games-light.png) | [Dark](assets/0.43.4/en/games-dark.png) · [Light](assets/0.43.4/en/games-light.png) |
+| Карточка фильма | [Открыть](assets/0.43.4/ru/detail-dark.png) | [Movie details](assets/0.43.4/en/detail-dark.png) |
+| Загрузки | [Открыть](assets/0.43.4/ru/downloads-dark.png) | [Downloads](assets/0.43.4/en/downloads-dark.png) |
+| Настройки | [Открыть](assets/0.43.4/ru/settings-dark.png) | [Settings](assets/0.43.4/en/settings-dark.png) |
 
 ### Игры для Windows
 
-Популярные игры и новинки Steam, поиск и переход к описанию и раздачам.
+[![Игры — русский интерфейс](assets/0.43.4/ru/games-dark.png)](assets/0.43.4/ru/games-dark.png)
 
-[![Каталог игр — тёмная тема](assets/0.42/games-dark.png)](assets/0.42/games-dark.png)
+[![Games — English interface](assets/0.43.4/en/games-dark.png)](assets/0.43.4/en/games-dark.png)
 
-### Карточка игры
+### Фильмы и описания в баннерах
 
-Описание, разработчики, минимальные системные требования и результат поиска раздач. Steam и SteamDB открываются отдельными кнопками.
+[![Каталог фильмов](assets/0.43.4/ru/catalog-dark.png)](assets/0.43.4/ru/catalog-dark.png)
 
-[![Карточка игры](assets/0.42/game-detail-dark.png)](assets/0.42/game-detail-dark.png)
+### Материалы для лендинга
 
-### Фильмы
-
-[![Каталог фильмов](assets/0.42/catalog-dark.png)](assets/0.42/catalog-dark.png)
-
-### Сериалы
-
-[![Каталог сериалов](assets/0.42/series-dark.png)](assets/0.42/series-dark.png)
-
-<details>
-<summary>Светлая тема, карточка фильма, загрузки и настройки</summary>
-
-### Игры — светлая тема
-
-[![Игровой каталог — светлая тема](assets/0.42/games-light.png)](assets/0.42/games-light.png)
-
-### Фильмы — светлая тема
-
-[![Каталог фильмов — светлая тема](assets/0.42/catalog-light.png)](assets/0.42/catalog-light.png)
-
-### Карточка фильма
-
-[![Карточка фильма](assets/0.42/detail-dark.png)](assets/0.42/detail-dark.png)
-
-### Загрузки
-
-Очередь в изолированном профиле без добавленных заданий.
-
-[![Раздел загрузок](assets/0.42/downloads-dark.png)](assets/0.42/downloads-dark.png)
-
-### Настройки
-
-[![Настройки приложения](assets/0.42/settings-dark.png)](assets/0.42/settings-dark.png)
-
-</details>
-
-## Материалы для лендинга
-
-Используйте PNG из `assets/0.42/` и [готовый текст описания](LANDING-COPY.md). Каталог игр и карточка игры подходят для представления нового раздела; остальные снимки показывают актуальное оформление приложения. [Порядок получения скриншотов](../scripts/screenshots/README.md).
+Оригиналы PNG находятся в `assets/0.43.4/ru/` и `assets/0.43.4/en/`. Лендинги в `landing/` и `web-index/` используют WebP без изменения содержимого: русский сайт показывает русский интерфейс, английский и испанский — английский. Галерея включает фильмы, сериалы, игры, карточку фильма, загрузки и светлую тему. [Текст описания](LANDING-COPY.md) · [Получение скриншотов](../scripts/screenshots/README.md).
 
 ## Установка
 

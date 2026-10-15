@@ -1,0 +1,268 @@
+{
+  "Version": "0.43.4",
+  "Languages": [
+    "ru",
+    "en"
+  ],
+  "ReleaseArchiveSha256": "8f2ed9e77a3d2444c8d6f9593c8ffe44e9f3d1319110848a5013b8e49488abf5",
+  "ReleaseDllSha256": "ce735a834d178d641df8e303df9e8146e2df9e1199b6ede0c648d587003cbf89",
+  "CaptureMethod": "Windows desktop client pixels",
+  "CaptureRunId": 38726565413,
+  "CaptureURL": "https://github.com/peregond/ka4alka/actions/runs/38726565413",
+  "Captures": [
+    {
+      "File": "ru/catalog-dark.png",
+      "Language": "ru",
+      "Width": 1424,
+      "Height": 892,
+      "LoadedVisiblePosters": 7,
+      "PendingVisiblePosters": 0,
+      "Titles": [
+        "Курьер",
+        "Последний богатырь. Колобок",
+        "Холоп 3",
+        "Унабомбер",
+        "Обитель зла",
+        "Сердце зверя",
+        "На деревню дедушке 2"
+      ],
+      "CaptureRunId": 38726565413
+    },
+    {
+      "File": "ru/catalog-light.png",
+      "Language": "ru",
+      "Width": 1424,
+      "Height": 892,
+      "LoadedVisiblePosters": 7,
+      "PendingVisiblePosters": 0,
+      "Titles": [
+        "Курьер",
+        "Последний богатырь. Колобок",
+        "Холоп 3",
+        "Унабомбер",
+        "Обитель зла",
+        "Сердце зверя",
+        "На деревню дедушке 2"
+      ],
+      "CaptureRunId": 38726565413
+    },
+    {
+      "File": "ru/detail-dark.png",
+      "Language": "ru",
+      "Width": 1424,
+      "Height": 892,
+      "LoadedVisiblePosters": 1,
+      "PendingVisiblePosters": 0,
+      "Titles": [
+        "Курьер"
+      ],
+      "CaptureRunId": 38726565413
+    },
+    {
+      "File": "ru/series-dark.png",
+      "Language": "ru",
+      "Width": 1424,
+      "Height": 892,
+      "LoadedVisiblePosters": 7,
+      "PendingVisiblePosters": 0,
+      "Titles": [
+        "Гангстерленд",
+        "Джентльмены",
+        "Сверхъестественное",
+        "Укрытие",
+        "Ходячие мертвецы",
+        "Первый отдел",
+        "Джек Ричер"
+      ],
+      "CaptureRunId": 38726565413
+    },
+    {
+      "File": "ru/games-dark.png",
+      "Language": "ru",
+      "Width": 1424,
+      "Height": 892,
+      "LoadedVisiblePosters": 10,
+      "PendingVisiblePosters": 0,
+      "Titles": [
+        "over the hill",
+        "Castlevania: Belmont's Curse",
+        "Planet Zoo 2",
+        "Call of Duty®: Modern Warfare® 4",
+        "Hood Warfare 2",
+        "STAR WARS: Galactic Racer™",
+        "ARC Raiders",
+        "DayZ",
+        "Risk of Rain 2",
+        "WARDOGS"
+      ],
+      "CaptureRunId": 38726565413
+    },
+    {
+      "File": "ru/games-light.png",
+      "Language": "ru",
+      "Width": 1424,
+      "Height": 892,
+      "LoadedVisiblePosters": 10,
+      "PendingVisiblePosters": 0,
+      "Titles": [
+        "over the hill",
+        "Castlevania: Belmont's Curse",
+        "Planet Zoo 2",
+        "Call of Duty®: Modern Warfare® 4",
+        "Hood Warfare 2",
+        "STAR WARS: Galactic Racer™",
+        "ARC Raiders",
+        "DayZ",
+        "Risk of Rain 2",
+        "WARDOGS"
+      ],
+      "CaptureRunId": 38726565413
+    },
+    {
+      "File": "ru/downloads-dark.png",
+      "Language": "ru",
+      "Width": 1424,
+      "Height": 892,
+      "LoadedVisiblePosters": 0,
+      "PendingVisiblePosters": 0,
+      "Titles": [],
+      "CaptureRunId": 38726565413
+    },
+    {
+      "File": "ru/settings-dark.png",
+      "Language": "ru",
+      "Width": 1424,
+      "Height": 892,
+      "LoadedVisiblePosters": 0,
+      "PendingVisiblePosters": 0,
+      "Titles": [],
+      "CaptureRunId": 38726565413
+    },
+    {
+      "File": "en/catalog-dark.png",
+      "Language": "en",
+      "Width": 1424,
+      "Height": 892,
+      "LoadedVisiblePosters": 7,
+      "PendingVisiblePosters": 0,
+      "Titles": [
+        "Человек-паук: Новый день",
+        "Курьер",
+        "Последний богатырь. Колобок",
+        "Одиссея",
+        "Мстители: Финал",
+        "Астрал 6: Они уже здесь",
+        "Холоп 3"
+      ],
+      "CaptureRunId": 38726565413
+    },
+    {
+      "File": "en/catalog-light.png",
+      "Language": "en",
+      "Width": 1424,
+      "Height": 892,
+      "LoadedVisiblePosters": 7,
+      "PendingVisiblePosters": 0,
+      "Titles": [
+        "Человек-паук: Новый день",
+        "Курьер",
+        "Последний богатырь. Колобок",
+        "Одиссея",
+        "Мстители: Финал",
+        "Астрал 6: Они уже здесь",
+        "Холоп 3"
+      ],
+      "CaptureRunId": 38726565413
+    },
+    {
+      "File": "en/detail-dark.png",
+      "Language": "en",
+      "Width": 1424,
+      "Height": 892,
+      "LoadedVisiblePosters": 1,
+      "PendingVisiblePosters": 0,
+      "Titles": [
+        "Человек-паук: Новый день"
+      ],
+      "CaptureRunId": 38726565413
+    },
+    {
+      "File": "en/series-dark.png",
+      "Language": "en",
+      "Width": 1424,
+      "Height": 892,
+      "LoadedVisiblePosters": 5,
+      "PendingVisiblePosters": 0,
+      "Titles": [
+        "Гангстерленд",
+        "Джентльмены",
+        "Первый отдел",
+        "Тёмная материя",
+        "Фоллаут"
+      ],
+      "CaptureRunId": 38726565413
+    },
+    {
+      "File": "en/games-dark.png",
+      "Language": "en",
+      "Width": 1424,
+      "Height": 892,
+      "LoadedVisiblePosters": 10,
+      "PendingVisiblePosters": 0,
+      "Titles": [
+        "over the hill",
+        "Castlevania: Belmont's Curse",
+        "Planet Zoo 2",
+        "Call of Duty®: Modern Warfare® 4",
+        "Hood Warfare 2",
+        "STAR WARS: Galactic Racer™",
+        "ARC Raiders",
+        "DayZ",
+        "Risk of Rain 2",
+        "WARDOGS"
+      ],
+      "CaptureRunId": 38726565413
+    },
+    {
+      "File": "en/games-light.png",
+      "Language": "en",
+      "Width": 1424,
+      "Height": 892,
+      "LoadedVisiblePosters": 10,
+      "PendingVisiblePosters": 0,
+      "Titles": [
+        "over the hill",
+        "Castlevania: Belmont's Curse",
+        "Planet Zoo 2",
+        "Call of Duty®: Modern Warfare® 4",
+        "Hood Warfare 2",
+        "STAR WARS: Galactic Racer™",
+        "ARC Raiders",
+        "DayZ",
+        "Risk of Rain 2",
+        "WARDOGS"
+      ],
+      "CaptureRunId": 38726565413
+    },
+    {
+      "File": "en/downloads-dark.png",
+      "Language": "en",
+      "Width": 1424,
+      "Height": 892,
+      "LoadedVisiblePosters": 0,
+      "PendingVisiblePosters": 0,
+      "Titles": [],
+      "CaptureRunId": 38726565413
+    },
+    {
+      "File": "en/settings-dark.png",
+      "Language": "en",
+      "Width": 1424,
+      "Height": 892,
+      "LoadedVisiblePosters": 0,
+      "PendingVisiblePosters": 0,
+      "Titles": [],
+      "CaptureRunId": 38726565413
+    }
+  ]
+}

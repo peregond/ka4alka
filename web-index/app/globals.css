@@ -83,3 +83,6 @@
   }
 }
 
+
+/* More screenshot sections stay usable between desktop and mobile widths. */
+.preview-toolbar{flex-wrap:wrap}.preview-tabs{flex-wrap:wrap}
