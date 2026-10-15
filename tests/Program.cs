@@ -50,7 +50,7 @@ if(args.Contains("--probe-public"))
 if(args.Contains("--verify-cinema-source")){await CinemaSourceTests.Run();return;}
 if(args.Contains("--diagnose-cinema-source")){await CinemaSourceTests.Diagnostics();return;}
 if(args.Contains("--probe-portraits")){await PortraitSourceProbe.Run(root);return;}
-if(args.Contains("--performance-only")){FeatureSummaryTests.Run();await PerformanceResourcesTests.Run();await CoverCachePerformanceTests.Run(root);await UnifiedSearchTests.Run();await ReleaseSearchTests.Run();return;}
+if(args.Contains("--performance-only")){ReleaseQualityTests.Run();await CatalogBatchTests.Run();FeatureSummaryTests.Run();await PerformanceResourcesTests.Run();await CoverCachePerformanceTests.Run(root);await UnifiedSearchTests.Run();await ReleaseSearchTests.Run();return;}
 if(args.Contains("--home-availability-only")){HiddenCatalogTests.Run();await UXReliabilityTests.Run(root);return;}
 if(args.Contains("--missing-files-only")){await MissingDownloadFilesTests.Run(root);return;}
 if(args.Contains("--language-only")){LanguageResourceTests.Run();SearchLanguageTests.Run();await UnifiedSearchTests.Run();return;}
