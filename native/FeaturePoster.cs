@@ -102,7 +102,7 @@ public partial class MainWindow
         {
             var id=OnlineIndexClient.IdFor(item);
             if(id==null)return;
-            url=await FeaturePosterUrl(id,ct);
+            url=AppLanguage.Current=="en"?(await Metadata(item,ct:metadataLifetime.Token).WaitAsync(ct)).English?.Backdrop:await FeaturePosterUrl(id,ct);
             if(url!=null){var proxy="api/backdrop-image?file="+Uri.EscapeDataString(new Uri(url).Segments.Last().Insert(0,"/"));fetch=c=>onlineIndex.ReadSite(proxy,2*1024*1024,c);}
             else fetch=_=>Task.FromException<byte[]>(new InvalidOperationException());
         }

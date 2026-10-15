@@ -15,16 +15,16 @@ public partial class MainWindow
     Border RenderCinemaConnections(StackPanel panel,MediaItem item,Panel? participantsHost=null)
     {
         var people=new StackPanel();Action limitCrew=()=>{};
-        if(item.People.Length==0)
+        if(item.DisplayPeople.Length==0)
         {
             if(DetailMetadataLoading(item.Id))people.Children.Add(PeopleSkeleton());else people.Children.Add(Text("Участники пока недоступны у источника.",12,true));
             if(DetailMetadataNeedsRetry(item.Id)){var retry=ActionButton("Загрузить участников","IconRefresh",()=>RetryDetailMetadata(item));retry.HorizontalAlignment=HorizontalAlignment.Left;people.Children.Add(retry);}
         }
-        if(item.People.Length>0)
+        if(item.DisplayPeople.Length>0)
         {
             var row=new UniformGrid{Name="CinemaPeopleGrid",Columns=3,Margin=new(0,0,-12,0)};people.Children.Add(row);
             row.SizeChanged+=(_,_)=>{var columns=Math.Clamp((int)Math.Floor(ScrollStableWidth(row)/124),1,8);if(row.Columns!=columns){row.Columns=columns;limitCrew();}};
-            foreach(var person in item.People)
+            foreach(var person in item.DisplayPeople)
             {
                 var button=Button(person.Name,()=>OpenPerson(person,item));button.Name="CinemaPersonTile";button.Tag=person;button.Style=(Style)FindResource("PersonTileButton");
                 var tile=new StackPanel();var portrait=PersonPortrait(person,96,120,item);portrait.Name="CinemaPersonPortrait";portrait.BorderThickness=new(0);portrait.HorizontalAlignment=HorizontalAlignment.Center;tile.Children.Add(portrait);var name=TextRaw(person.Name,12);name.TextAlignment=TextAlignment.Center;name.MinHeight=28;name.MaxHeight=32;name.TextTrimming=TextTrimming.CharacterEllipsis;name.Margin=new(0);tile.Children.Add(name);

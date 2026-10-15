@@ -38,7 +38,7 @@ static class SearchLanguageTests
         Check(ReleaseRecommendation.Pick(rows,preferredLanguage:"ru")?.Entry==russian,"the primary download recommendation retains Russian priority in Russian mode");
         Check(ReleaseRecommendation.Pick([russian],preferredLanguage:"en")?.Entry==russian,"a Russian fallback remains downloadable when no English release exists");
         Check(ReleaseRecommendation.Pick([dead],preferredLanguage:"en")==null,"language preference cannot bypass minimum seeder safeguards");
-        var gameEn=Row("game-en","Portal 2 [ENG]",seeds:300);var gameRu=Row("game-ru","Portal 2 [RUS]","RuTor",500);
+        var gameEn=Row("game-en","Portal 2 [ENG]",seeds:50);var gameRu=Row("game-ru","Portal 2 [RUS]","RuTor",500);
         Check(GameReleaseRecommendation.Pick([gameRu,gameEn],"en")?.Entry==gameEn&&GameReleaseRecommendation.Pick([gameRu,gameEn],"ru")?.Entry==gameRu,"game recommendation follows interface language without losing seeder safeguards");
         Check(ReleaseRecommendation.Pick(rows,preferredLanguage:"en")!.Reason.Contains("английская озвучка",StringComparison.OrdinalIgnoreCase),"recommendations describe evidenced English audio only");
     }

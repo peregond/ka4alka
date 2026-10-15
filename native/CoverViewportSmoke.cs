@@ -24,9 +24,10 @@ public partial class MainWindow
         public void Release(string id){if(held.TryRemove(id,out var pending))pending.TrySetResult();}
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken ct)
         {
-            var id=Uri.UnescapeDataString(request.RequestUri!.Query.Split("id=")[1]);Counts.AddOrUpdate(id,1,(_,count)=>count+1);Tokens[id]=ct;
+            var query=request.RequestUri!.Query.TrimStart('?').Split('&').Select(part=>part.Split('=',2)).ToDictionary(part=>part[0],part=>part.Length>1?Uri.UnescapeDataString(part[1]):"");
+            var id=query["id"];var language=query.GetValueOrDefault("language","ru");Counts.AddOrUpdate(id,1,(_,count)=>count+1);Tokens[id]=ct;
             if(held.TryGetValue(id,out var pending))await pending.Task.WaitAsync(ct);
-            return new(HttpStatusCode.OK){Content=new StringContent(JsonSerializer.Serialize(new{id,backdrop=new{url="https://image.tmdb.org/t/p/w1280/fixture.jpg",source="TMDB",tmdbId=1}}))};
+            return new(HttpStatusCode.OK){Content=new StringContent(JsonSerializer.Serialize(new{id,backdrop=new{url="https://image.tmdb.org/t/p/w1280/fixture_"+language+".jpg",source="TMDB",tmdbId=1}}))};
         }
     }
     sealed class CoverViewportFixture(byte[] bytes):IAsyncDisposable
@@ -114,11 +115,21 @@ public partial class MainWindow
             if(secondLookup.IsCompleted||handler.Tokens[shared].IsCancellationRequested)throw new Exception("One canceled banner canceled another banner's shared lookup.");
             handler.Release(shared);if(await secondLookup==null)throw new Exception("The remaining feature subscriber did not receive its poster URL.");
             if(await FeaturePosterUrl(shared,CancellationToken.None,client)==null||handler.Counts[shared]!=1)throw new Exception("A completed feature lookup was not cached.");
+            var originalLanguage=AppLanguage.Current;
+            try
+            {
+                AppLanguage.Set(originalLanguage=="en"?"ru":"en");
+                var other=await FeaturePosterUrl(shared,CancellationToken.None,client);
+                if(other==null||other==await FeaturePosterUrl(shared,CancellationToken.None,client)&&handler.Counts[shared]!=2)throw new Exception("Localized backdrops did not share their own cache.");
+                AppLanguage.Set(originalLanguage);
+                if(await FeaturePosterUrl(shared,CancellationToken.None,client)==other||handler.Counts[shared]!=2)throw new Exception("Backdrop cache crossed interface languages.");
+            }
+            finally{AppLanguage.Set(originalLanguage);}
             handler.Hold(canceled);using var canceledSubscriber=new CancellationTokenSource();var abandoned=FeaturePosterUrl(canceled,canceledSubscriber.Token,client);
             await Until(()=>handler.Counts.GetValueOrDefault(canceled)>0,"Cancelable feature lookup did not start.");canceledSubscriber.Cancel();
             try{await abandoned;throw new Exception("An abandoned lookup completed despite cancellation.");}catch(OperationCanceledException){}
             await Until(()=>handler.Tokens[canceled].IsCancellationRequested,"The last feature subscriber did not cancel its underlying request.");
-            if(featurePosters.ContainsKey(canceled))throw new Exception("An offscreen canceled lookup poisoned the completed feature cache.");
+            if(featurePosters.ContainsKey(AppLanguage.Current+"|"+canceled))throw new Exception("An offscreen canceled lookup poisoned the completed feature cache.");
             var returned=FeaturePosterUrl(canceled,CancellationToken.None,client);handler.Release(canceled);
             if(await returned==null||handler.Counts[canceled]!=2)throw new Exception("Returning to a canceled feature did not start a fresh successful lookup.");
         }

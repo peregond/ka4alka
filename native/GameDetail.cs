@@ -16,7 +16,7 @@ public partial class MainWindow
 {
     sealed class GamePickerState
     {
-        public string Sort {get;set;}="Больше отдающих";
+        public string Sort {get;set;}=AppLanguage.Current=="en"?"По языку интерфейса":"Больше отдающих";
         public string Source {get;set;}="Все";
         public int VisibleCount {get;set;}=40;
         public bool Reverse {get;set;}
@@ -529,7 +529,7 @@ public partial class MainWindow
     {
         if(!gamePickerStates.TryGetValue(game.Id,out var state)){if(gamePickerStates.Count>=40)gamePickerStates.Remove(gamePickerStates.Keys.First());state=gamePickerStates[game.Id]=new();}
         var recommended=GameReleaseRecommendation.Pick(releases,prefs.UiLanguage);
-        var sorts=new[]{"Больше отдающих","Меньше размер","Больше размер","По названию"};
+        var sorts=(prefs.UiLanguage=="en"?new[]{"По языку интерфейса"}:Array.Empty<string>()).Concat(new[]{"Больше отдающих","Меньше размер","Больше размер","По названию"}).ToArray();
         var sources=releases.Select(x=>x.Source).Distinct().OrderBy(x=>x).ToArray();
         if(state.Source!="Все"&&!sources.Contains(state.Source))state.Source="Все";
         bool compact=Body.ActualWidth<1000;
@@ -550,7 +550,7 @@ public partial class MainWindow
         // Declared before the handlers that call Show(), which reads them.
         Button? sourceChip=null;ToggleContextMenu? sourceMenu=null;Button reset=null!;
         var sortChip=Chip("Сортировка раздач: выбрать");var sortMenu=Menu(sortChip);
-        foreach(var name in sorts){var entry=new MenuItem{Header=name,IsCheckable=true,Tag=name};entry.Click+=(_,_)=>{sortMenu.IsOpen=false;state.Sort=name;state.Reverse=false;state.VisibleCount=40;Show();};sortMenu.Items.Add(entry);}
+        foreach(var name in sorts){var entry=new MenuItem{Header=AppLanguage.T(name),IsCheckable=true,Tag=name};entry.Click+=(_,_)=>{sortMenu.IsOpen=false;state.Sort=name;state.Reverse=false;state.VisibleCount=40;Show();};sortMenu.Items.Add(entry);}
         AttachMenuToggle(sortChip,sortMenu);
         if(sources.Length>1)
         {
@@ -647,7 +647,8 @@ public partial class MainWindow
                 "Меньше размер"=>filtered.OrderBy(x=>x.Size??long.MaxValue),
                 "Больше размер"=>filtered.OrderByDescending(x=>x.Size??-1),
                 "По названию"=>filtered.OrderBy(x=>x.Title,StringComparer.CurrentCultureIgnoreCase),
-                _=>prefs.UiLanguage=="en"?SearchLanguage.AudioOrder(filtered,prefs.UiLanguage):filtered.OrderByDescending(SeedRank)
+                "По языку интерфейса"=>SearchLanguage.AudioOrder(filtered,prefs.UiLanguage),
+                _=>filtered.OrderByDescending(SeedRank)
             };
             if(state.Reverse)filtered=filtered.Reverse();
             var visible=filtered.ToArray();var displayed=visible.Take(state.VisibleCount).ToArray();
