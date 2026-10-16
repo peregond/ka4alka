@@ -48,7 +48,12 @@ jobs:
             $app=Start-Process (Join-Path $PWD 'native/bin/Release/net10.0-windows/Kachalka.exe') -ArgumentList @("--$mode-smoke-test",('"'+$output+'"')) -PassThru
             $deadline=if($mode -eq 'search-downloads'){60000}else{120000}
             if(-not $app.WaitForExit($deadline)){$app.Kill($true);throw "$mode timed out"}
-            if(Test-Path (Join-Path $output 'error.txt')){throw (Get-Content (Join-Path $output 'error.txt') -Raw)}
+            if(Test-Path (Join-Path $output 'error.txt')){
+              $errorText=Get-Content (Join-Path $output 'error.txt') -Raw
+              $message=(($errorText -split "`r?`n") | Select-Object -First 6) -join ' | '
+              Write-Output ('::error title='+$mode+'::'+$message.Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A'))
+              throw $errorText
+            }
             if($app.ExitCode -ne 0 -or -not(Test-Path (Join-Path $output 'checks.json'))){throw "$mode checks missing"}
             Get-Content (Join-Path $output 'checks.json')
           }
