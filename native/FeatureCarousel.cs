@@ -18,6 +18,7 @@ public partial class MainWindow
         public required Border Frame;
         public required Image Poster;
         public required TextBlock Eyebrow,Title,People,Summary;
+        public Func<MediaItem,int,string>? EyebrowText;
         public required Grid SummarySlot;
         public CancellationTokenSource? SummaryRequest;
         public required WrapPanel Meta;
@@ -30,7 +31,8 @@ public partial class MainWindow
     FeatureCarouselView? carousel;
     bool scrollToReleasesAfterOpen;
 
-    FrameworkElement BuildFeatureCarousel(MediaItem[] slides)
+    // eyebrowText: the line above the title, given the slide and its position; without it the usual "in the spotlight" wording is used.
+    FrameworkElement BuildFeatureCarousel(MediaItem[] slides,Func<MediaItem,int,string>? eyebrowText=null)
     {
         slides=slides.Take(5).ToArray();
         var frame=new Border{Name="FeatureFrame",CornerRadius=new(22),MinHeight=232};
@@ -93,7 +95,7 @@ public partial class MainWindow
 
         var view=new FeatureCarouselView{Slides=slides,Frame=frame,Poster=image,Eyebrow=eyebrow,Title=title,People=people,Summary=summary,SummarySlot=summarySlot,Meta=meta,Dots=dots,About=aboutAction,Favorite=favorite,Previous=previous,Next=next,LiteCover=liteCover,PosterHost=posterHost};
         frame.ContextMenu=new ContextMenu();frame.ContextMenuOpening+=(_,_)=>{if(view.Bound!=null)frame.ContextMenu=CatalogPersonalMenu(view.Bound);};
-        carousel=view;
+        view.EyebrowText=eyebrowText;carousel=view;
         previous.Click+=(_,_)=>ShowFeatureSlide(view,(view.Index+view.Slides.Length-1)%view.Slides.Length);
         next.Click+=(_,_)=>ShowFeatureSlide(view,(view.Index+1)%view.Slides.Length);
         aboutAction.Click+=OpenCard;
@@ -118,7 +120,7 @@ public partial class MainWindow
         var item=view.Slides[index];
         DetachFeatureWatch(view);view.Bound=item;
         view.Poster.DataContext=item;if(view.LiteCover.Tag is Image lite)lite.DataContext=item;
-        view.Eyebrow.Text=AppLanguage.T(index==0?"В центре внимания":item.Section=="Игры"?"Стоит поиграть":"Стоит посмотреть");
+        view.Eyebrow.Text=view.EyebrowText?.Invoke(item,index)??AppLanguage.T(index==0?"В центре внимания":item.Section=="Игры"?"Стоит поиграть":"Стоит посмотреть");
         view.Title.Text=item.DisplayTitle;view.Title.ToolTip=item.DisplayTitle;
         view.About.Tag=item;view.Frame.Tag=item;
         AutomationProperties.SetName(view.About,AppLanguage.T("Подробнее: "+item.DisplayTitle));

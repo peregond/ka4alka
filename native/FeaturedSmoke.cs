@@ -60,7 +60,10 @@ public partial class MainWindow
             foreach(var width in new[]{760d,1280d})
             {
                 Width=width;await Settle();ResizeFeaturedShelves();
-                Check(featuredShelves.Values.All(shelf=>shelf.Row.Content is CatalogRow row&&row.Columns>=1),"Responsive shelves: "+language+" "+width);
+                Check(featuredShelves.Values.All(shelf=>shelf.Custom!=null||shelf.Row.Content is CatalogRow row&&row.Columns>=1),"Responsive shelves: "+language+" "+width);
+                Check(carousel!=null&&FindVisual<Grid>(Body,grid=>grid.Name=="FeaturedHero")?.Children.Count>0,"The banner of top stories is shown: "+language+" "+width);
+                Check(FindVisual<StackPanel>(Body,panel=>panel.Name=="FeaturedDigest")?.Children.OfType<UniformGrid>().Any(row=>row.Children.Count>=1)==true,"The digest of stories is shown: "+language+" "+width);
+                Check(FindVisual<StackPanel>(Body,panel=>panel.Name.EndsWith("Block",StringComparison.Ordinal)&&panel.Name.StartsWith("Featured",StringComparison.Ordinal))?.Children.Count>0,"The lead story and its list are drawn: "+language+" "+width);
                 var bitmap=new RenderTargetBitmap((int)ActualWidth,(int)ActualHeight,96,96,PixelFormats.Pbgra32);bitmap.Render(this);var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(bitmap));using var file=File.Create(Path.Combine(output,"featured-"+language+"-"+width+".png"));png.Save(file);
             }
         }

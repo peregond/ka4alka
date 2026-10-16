@@ -3,11 +3,14 @@ namespace Kachalka;
 
 // Explicit editorial membership: no ranking guesswork or per-title requests.
 public sealed record FeaturedGame(int Id,string Title);
-public sealed record FeaturedCollection(string Id,string Title,string TitleEn,string Description,string DescriptionEn,string[]? MediaIds=null,FeaturedGame[]? Games=null)
+// Layout: "shelf" is the ordinary row of posters, "lead" one large story with a short list beside it, "ranking" numbered posters.
+public sealed record FeaturedCollection(string Id,string Title,string TitleEn,string Description,string DescriptionEn,string[]? MediaIds=null,FeaturedGame[]? Games=null,string Layout="shelf")
 {
     public string Label=>AppLanguage.Current=="en"?TitleEn:Title;
     public string Summary=>AppLanguage.Current=="en"?DescriptionEn:Description;
     public bool IsGames=>Games is {Length:>0};
+    // The small caps rubric above the heading.
+    public string Kicker=>AppLanguage.T(Id.StartsWith("seasonal-",StringComparison.Ordinal)?"Сезон":Id==FeaturedCatalog.FreshId?"Новое":Id==FeaturedCatalog.TopRatedId?"Рейтинг":IsGames?"Игры":"Подборка");
 }
 public sealed record FeaturedGroup(FeaturedCollection Collection,MediaItem[] Items);
 public static class FeaturedCatalog
@@ -31,6 +34,21 @@ public static class FeaturedCatalog
             var items=Members(collection.MediaIds);if(items.Length==0)continue;
             seasonalGroups.Add(new(new("seasonal-"+collection.Id,collection.Title,AppLanguage.T(collection.Title),"","",collection.MediaIds),items));
         }
+        // Rubrics drawn from the catalog itself, so the page has fresh material without any editorial work.
+        if(Fresh(catalog) is {Length:>0} fresh)groups.Insert(Math.Min(1,groups.Count),new(new(FreshId,"Свежее в каталоге","Fresh in the catalog","Недавние релизы с раздачами","Recent releases"),fresh));
+        if(TopRated(catalog) is {Length:>0} top)groups.Insert(Math.Min(3,groups.Count),new(new(TopRatedId,"Лучшее по оценкам","Top rated","Фильмы и сериалы с самыми высокими оценками зрителей","Titles with the highest audience ratings",Layout:"ranking"),top));
         return seasonalGroups.Concat(groups).ToArray();
     }
+    public const string FreshId="fresh",TopRatedId="top-rated";
+    static double Score(MediaItem item)
+    {
+        var kp=CatalogPaging.Rating(item);
+        var imdb=double.TryParse(item.Imdb.Replace(',','.'),System.Globalization.NumberStyles.Float,System.Globalization.CultureInfo.InvariantCulture,out var value)&&value is >=0 and <=10?value:-1;
+        return kp>=0&&imdb>=0?(kp+imdb)/2:-1;
+    }
+    static bool Presentable(MediaItem item)=>item.Cinema&&item.OnlineId!=null&&!string.IsNullOrWhiteSpace(item.ImageUrl)&&!string.IsNullOrWhiteSpace(item.Description);
+    // The newest releases first; among equal years the better rated one comes first.
+    static MediaItem[] Fresh(IEnumerable<MediaItem> catalog)=>catalog.Where(Presentable).OrderByDescending(item=>item.Year).ThenByDescending(Score).ThenBy(item=>item.Id).Take(40).ToArray();
+    // Both sources must agree: a single enthusiastic rating of an obscure title does not make a ranking.
+    static MediaItem[] TopRated(IEnumerable<MediaItem> catalog)=>catalog.Where(Presentable).Where(item=>Score(item)>=7.8&&item.Year>=1960).OrderByDescending(Score).ThenByDescending(item=>item.Year).ThenBy(item=>item.Id).Take(40).ToArray();
 }

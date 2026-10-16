@@ -32,7 +32,7 @@ public partial class MainWindow
     void CancelFeaturedWork()
     {
         featuredHubRequest?.Cancel();featuredHubRequest?.Dispose();featuredHubRequest=null;
-        featuredShelves.Clear();featuredState=null;featuredPanel=null;featuredRetry=null;
+        featuredShelves.Clear();featuredState=null;featuredPanel=null;featuredRetry=null;featuredHero=null;featuredDigest=null;
         if(current==null&&section is not (FeaturedSection or "Настройки"))featuredReturn=null;
     }
     void OpenFeaturedCollection(string id)
@@ -44,7 +44,8 @@ public partial class MainWindow
         var group=featuredGroups?.FirstOrDefault(group=>group.Collection.Id==featuredCollectionId);
         var definition=group?.Collection??FeaturedCatalog.Collections.FirstOrDefault(row=>row.Id==featuredCollectionId);
         var title=Text(definition?.Label??FeaturedSection,compactHeight?22:28);title.FontWeight=FontWeights.SemiBold;title.Name="FeaturedHeading";PageHeader.Children.Add(title);
-        PageHeader.Children.Add(Text(definition?.Summary??"Выбираем истории, в которые стоит погрузиться.",13,true));
+        // The front page shows today's date under the title, like a newspaper; a collection shows its own description.
+        PageHeader.Children.Add(definition!=null?Text(definition.Summary,13,true):TextRaw(FeaturedDateLine()+" · "+AppLanguage.T("Что смотреть и во что играть"),13,true));
         if(featuredCollectionId.Length>0)
         {
             SetBack("Все подборки",()=>OpenFeaturedCollection(""));ShowCatalog([]);
@@ -53,6 +54,11 @@ public partial class MainWindow
         else
         {
             var panel=featuredPanel=new StackPanel{Name="FeaturedCollections"};
+            // The banner and the digest of top stories come first; both fill in when the collections have loaded.
+            featuredHeroKey=featuredDigestKey=null;featuredHeroIds.Clear();featuredUsed.Clear();
+            featuredHero=new Grid{Name="FeaturedHero"};featuredDigest=new StackPanel{Name="FeaturedDigest"};
+            panel.Children.Add(featuredHero);panel.Children.Add(featuredDigest);
+            if(featuredGroups==null)featuredHero.Children.Add(BannerSkeleton());
             Body.Children.Add(new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=panel,VerticalScrollBarVisibility=ScrollBarVisibility.Auto});
             var definitions=featuredGroups?.Select(row=>row.Collection).ToArray()??FeaturedCatalog.Collections.ToArray();
             foreach(var collection in definitions)AddFeaturedShelf(panel,collection);
@@ -64,8 +70,14 @@ public partial class MainWindow
     }
     void AddFeaturedShelf(StackPanel panel,FeaturedCollection collection)
     {
-        var view=AddShelf(panel,"Featured"+collection.Id.Replace("-",""),collection.Label,()=>OpenFeaturedCollection(collection.Id),collection.IsGames?"GameRow":"MediaRow",1);
+        var view=AddShelf(panel,"Featured"+collection.Id.Replace("-",""),collection.Label,()=>OpenFeaturedCollection(collection.Id),collection.IsGames?"GameRow":"MediaRow",1,collection.Kicker);
         featuredShelves[collection.Id]=view;
+        // A rubric with its own shape draws itself into a block under the heading instead of the poster row.
+        if(!collection.IsGames&&collection.Layout is "lead" or "ranking"&&view.Row.Parent is StackPanel section)
+        {
+            var host=new StackPanel{Name="Featured"+collection.Id.Replace("-","")+"Block"};section.Children.Add(host);view.Host=host;
+            view.Custom=collection.Layout=="lead"?(items,columns)=>FillFeaturedLead(host,items,columns):(items,columns)=>FillFeaturedRanking(host,items,columns);
+        }
         if(collection.Summary.Length>0&&view.Row.Parent is StackPanel shelf)
         {var description=TextRaw(collection.Summary,13,true);description.Margin=new(0,0,0,12);shelf.Children.Insert(1,description);}
         view.Set([],true);
@@ -96,6 +108,7 @@ public partial class MainWindow
             if(closed||token.IsCancellationRequested)return;
             ErrorLog.Write(error);
             if(featuredGroups==null)foreach(var shelf in featuredShelves.Values)shelf.Set([],false);
+            featuredHero?.Children.Clear();
             if(featuredRetry!=null)featuredRetry.Visibility=Visibility.Visible;
             if(featuredState!=null){featuredState.Text=AppLanguage.T("Не удалось загрузить подборки. Попробуй ещё раз.");featuredState.Visibility=Visibility.Visible;}
         }
@@ -106,6 +119,7 @@ public partial class MainWindow
         if(section!=FeaturedSection||current!=null||featuredGroups==null)return;
         if(featuredCollectionId.Length==0)
         {
+            BuildFeaturedHero(featuredGroups);BuildFeaturedDigest(featuredGroups);
             var active=featuredGroups.Select(group=>group.Collection.Id).ToHashSet(StringComparer.Ordinal);
             foreach(var id in featuredShelves.Keys.Where(id=>!active.Contains(id)).ToArray())
             {
@@ -118,8 +132,9 @@ public partial class MainWindow
                 if(!featuredShelves.ContainsKey(group.Collection.Id)&&featuredPanel!=null)AddFeaturedShelf(featuredPanel,group.Collection);
                 if(featuredShelves.TryGetValue(group.Collection.Id,out var shelf))
                 {
-                    if(featuredPanel!=null&&shelf.Row.Parent is UIElement row&&featuredPanel.Children.IndexOf(row)!=index)
-                    {featuredPanel.Children.Remove(row);featuredPanel.Children.Insert(index,row);}
+                    // The banner and the digest hold the first two places of the page.
+                    if(featuredPanel!=null&&shelf.Row.Parent is UIElement row&&featuredPanel.Children.IndexOf(row)!=index+2)
+                    {featuredPanel.Children.Remove(row);featuredPanel.Children.Insert(Math.Min(index+2,featuredPanel.Children.Count),row);}
                     shelf.Set(FeaturedVisible(group),false);
                 }
             }
@@ -144,6 +159,8 @@ public partial class MainWindow
     {
         if(section!=FeaturedSection||current!=null||featuredCollectionId.Length>0)return;
         var width=Body.ActualWidth>0?Body.ActualWidth:Math.Max(320,Width-280);
+        featuredWidth=width;if(carousel!=null)ArrangeFeatureCarousel(width);
+        if(featuredGroups!=null)BuildFeaturedDigest(featuredGroups);
         foreach(var pair in featuredShelves)
         {
             var games=FeaturedCatalog.Collections.FirstOrDefault(row=>row.Id==pair.Key)?.IsGames==true;
