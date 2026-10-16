@@ -12,6 +12,8 @@ public partial class MainWindow
     public async Task FeaturedSmokeTest(string output)
     {
         Directory.CreateDirectory(output);liveRequest?.Cancel();catalogRefreshTimer.Stop();refresh.Stop();searchDelay.Stop();
+        var originalLanguage=prefs.UiLanguage;var originalPoor=prefs.HidePoorQuality;var originalQuality=prefs.CatalogQualityHeight;
+        var originalHiddenTitles=prefs.HiddenTitles;var originalHiddenGenres=prefs.HiddenGenres;
         var checks=new List<string>();
         void Check(bool pass,string message){if(!pass)throw new Exception(message);checks.Add(message);}
         async Task Settle(){await Task.Delay(100);UpdateLayout();await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ContextIdle);}
@@ -62,6 +64,8 @@ public partial class MainWindow
                 var bitmap=new RenderTargetBitmap((int)ActualWidth,(int)ActualHeight,96,96,PixelFormats.Pbgra32);bitmap.Render(this);var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(bitmap));using var file=File.Create(Path.Combine(output,"featured-"+language+"-"+width+".png"));png.Save(file);
             }
         }
+        prefs.UiLanguage=originalLanguage;AppLanguage.Set(originalLanguage);prefs.HidePoorQuality=originalPoor;prefs.CatalogQualityHeight=originalQuality;
+        prefs.HiddenTitles=originalHiddenTitles;prefs.HiddenGenres=originalHiddenGenres;
         File.WriteAllText(Path.Combine(output,"checks.json"),JsonSerializer.Serialize(checks));Close();
     }
 }
