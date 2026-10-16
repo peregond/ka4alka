@@ -25,7 +25,10 @@ public partial class MainWindow
         foreach(var item in items)cardMetadata[item.Id]=Task.FromResult(item);
         var gameDefinition=FeaturedCatalog.Collections.Single(row=>row.IsGames);
         var game=GameCatalog.Item(620,"Portal 2");gameDetailProvider=(item,ct)=>Task.FromResult(new GameDetails(item,"","Valve","Valve"));gameSourcesProvider=_=>[];
-        FeaturedGroup[] fixtureGroups=[new(definition,items),new(gameDefinition,[game])];
+        // The lead story with its list, a numbered ranking and an ordinary shelf, as the front page has them.
+        var shelfDefinition=FeaturedCatalog.Collections.Where(row=>!row.IsGames&&row.Id!=definition.Id).First();
+        var rankingDefinition=new FeaturedCollection(FeaturedCatalog.TopRatedId,"Лучшее по оценкам","Top rated","Фильмы и сериалы с самыми высокими оценками зрителей","Titles with the highest audience ratings",Layout:"ranking");
+        FeaturedGroup[] fixtureGroups=[new(definition,items),new(rankingDefinition,items.Skip(5).Take(8).ToArray()),new(shelfDefinition,items.Skip(8).Take(10).ToArray()),new(gameDefinition,[game])];
         var delayed=new TaskCompletionSource<FeaturedGroup[]>(TaskCreationOptions.RunContinuationsAsynchronously);
         featuredProvider=_=>delayed.Task;featuredGroups=null;
         ShowFeatured();await Settle();
@@ -39,7 +42,8 @@ public partial class MainWindow
         MaxWidth=1800;MaxHeight=1100;MinWidth=700;MinHeight=550;Width=1280;Height=850;
         ShowFeatured();await Settle();
         Check(Navigation.Children.OfType<Button>().First().Tag?.ToString()==FeaturedSection,"Featured is the first library section.");
-        Check(SearchBar.Visibility==Visibility.Visible&&featuredShelves.Count==2,"Search and editorial shelves are available.");
+        Check(SearchBar.Visibility==Visibility.Visible&&featuredShelves.Count==4,"Search and editorial shelves are available.");
+        Check(featuredShelves[rankingDefinition.Id].Custom!=null&&FindVisual<StackPanel>(Body,panel=>panel.Name=="FeaturedtopratedBlock")?.Children.OfType<UniformGrid>().FirstOrDefault()?.Children.Count>=2,"The ranking shows numbered posters.");
         var scroll=FindVisual<ScrollViewer>(Body,_=>true);var baseline=renderCount;
         RefreshFeaturedRows();await Settle();
         Check(renderCount==baseline&&ReferenceEquals(scroll,FindVisual<ScrollViewer>(Body,_=>true)),"Shelf updates preserve the page and scroll viewer.");
@@ -64,7 +68,17 @@ public partial class MainWindow
                 Check(carousel!=null&&FindVisual<Grid>(Body,grid=>grid.Name=="FeaturedHero")?.Children.Count>0,"The banner of top stories is shown: "+language+" "+width);
                 Check(FindVisual<StackPanel>(Body,panel=>panel.Name=="FeaturedDigest")?.Children.OfType<UniformGrid>().Any(row=>row.Children.Count>=1)==true,"The digest of stories is shown: "+language+" "+width);
                 Check(FindVisual<StackPanel>(Body,panel=>panel.Name.EndsWith("Block",StringComparison.Ordinal)&&panel.Name.StartsWith("Featured",StringComparison.Ordinal))?.Children.Count>0,"The lead story and its list are drawn: "+language+" "+width);
-                var bitmap=new RenderTargetBitmap((int)ActualWidth,(int)ActualHeight,96,96,PixelFormats.Pbgra32);bitmap.Render(this);var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(bitmap));using var file=File.Create(Path.Combine(output,"featured-"+language+"-"+width+".png"));png.Save(file);
+                void Capture(string suffix)
+                {
+                    var bitmap=new RenderTargetBitmap((int)ActualWidth,(int)ActualHeight,96,96,PixelFormats.Pbgra32);bitmap.Render(this);var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(bitmap));using var file=File.Create(Path.Combine(output,"featured-"+language+"-"+width+suffix+".png"));png.Save(file);
+                }
+                Capture("");
+                // The same page scrolled down, so the lower rubrics can be inspected too.
+                if(width>1000&&FindVisual<ScrollViewer>(Body,_=>true) is {} page)
+                {
+                    foreach(var offset in new[]{650d,1300d,1950d}){page.ScrollToVerticalOffset(offset);await Settle();Capture("-y"+(int)offset);}
+                    page.ScrollToVerticalOffset(0);await Settle();
+                }
             }
         }
         prefs.UiLanguage=originalLanguage;AppLanguage.Set(originalLanguage);prefs.HidePoorQuality=originalPoor;prefs.CatalogQualityHeight=originalQuality;
