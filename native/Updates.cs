@@ -153,7 +153,7 @@ public partial class MainWindow
         panel.Children.Add(head);
         Toggle("Проверять обновления при запуске", prefs.CheckForUpdates, v => prefs.CheckForUpdates = v);
         Toggle("Автоматически скачивать и устанавливать при выходе", prefs.AutoUpdate, v => prefs.AutoUpdate = v);
-        panel.Children.Add(Hint("Обновление применяется после сохранения очереди. Неизменившиеся компоненты повторно не скачиваются. Настройки и загруженные файлы остаются на месте."));
+        panel.Children.Add(Hint("Перед установкой сохраняем очередь. Скачиваются только изменившиеся части; настройки и файлы не затрагиваются."));
         var actions = new WrapPanel(); panel.Children.Add(actions);
         var notes=new TextBlock {Margin=new(10,0,0,0),VerticalAlignment=VerticalAlignment.Center};
         var link=new System.Windows.Documents.Hyperlink(new System.Windows.Documents.Run("Что нового"));link.SetResourceReference(System.Windows.Documents.TextElement.ForegroundProperty,"Accent");

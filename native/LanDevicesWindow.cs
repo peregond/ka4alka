@@ -20,7 +20,7 @@ public partial class MainWindow
     {
         var enable=new CheckBox{Name="SettingsLanEnabled",Style=(Style)FindResource("SettingsSwitch"),Content=SwitchTitle("Загрузки на другом компьютере"),IsChecked=prefs.LanEnabled,Margin=new(0,0,0,8)};
         AutomationProperties.SetName(enable,AppLanguage.T("Разрешить загрузки на связанных устройствах в локальной сети"));panel.Children.Add(enable);
-        var description=Hint("Включи на обоих компьютерах и свяжи их один раз. Файл скачает выбранный компьютер в свою папку Ka4alka; этот компьютер только передаст задачу.");panel.Children.Add(description);
+        var description=Hint("Включи на обоих компьютерах и свяжи их один раз. Файл скачает выбранный компьютер в свою папку Ka4alka, этот только передаст задачу.");panel.Children.Add(description);
         var nameLabel=Hint("Имя устройства");nameLabel.Margin=new(0,8,0,6);panel.Children.Add(nameLabel);
         var name=new TextBox{Name="SettingsLanDeviceName",Text=LanDeviceDisplayName,MaxLength=64,Margin=new(0,0,0,8),MinWidth=0,MaxWidth=400,HorizontalAlignment=HorizontalAlignment.Left};
         name.SetBinding(FrameworkElement.WidthProperty,new System.Windows.Data.Binding(nameof(FrameworkElement.ActualWidth)){Source=panel});

@@ -55,32 +55,36 @@ public partial class MainWindow
         SetBack("Вернуться",ReturnFromSettings);
         var header=new Grid{Margin=new(0,0,0,compactHeight?4:6)};
         var title=Text("Настройки",compactHeight?23:28);title.FontFamily=(FontFamily)FindResource("DisplayFont");title.FontWeight=FontWeights.Bold;title.Margin=new(0);title.VerticalAlignment=VerticalAlignment.Center;header.Children.Add(title);PageHeader.Children.Add(header);
-        var subtitle=Text("Изменения сохраняются автоматически.",13,true);subtitle.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");subtitle.Margin=new(0,0,0,20);subtitle.Visibility=compactHeight?Visibility.Collapsed:Visibility.Visible;PageHeader.Children.Add(subtitle);
-        // Two columns on wide windows: section navigation on the left, cards on the right (up to 820 wide).
-        var content=new StackPanel{MaxWidth=820,HorizontalAlignment=HorizontalAlignment.Left,Margin=new(0,0,6,12)};
-        var settingsScroll=new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=content,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};
-        var settingsLayout=new Grid{Name="SettingsLayout"};settingsLayout.ColumnDefinitions.Add(new(){Width=new GridLength(0)});settingsLayout.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});
-        var sectionNav=new StackPanel{Name="SettingsSections",Margin=new(0,0,24,0),Visibility=Visibility.Collapsed};settingsLayout.Children.Add(sectionNav);
-        Grid.SetColumn(settingsScroll,1);settingsLayout.Children.Add(settingsScroll);Body.Children.Add(settingsLayout);
+        var subtitle=Text("Всё сохраняется сразу.",13,true);subtitle.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");subtitle.Margin=new(0,0,0,12);subtitle.Visibility=compactHeight?Visibility.Collapsed:Visibility.Visible;PageHeader.Children.Add(subtitle);
+        // Cards sit in one column, or in two on wide windows so more of them fit on the screen. "content" is the first
+        // column and holds every card until the page is wide enough for the second one; the chips under the title jump
+        // between the cards.
+        var content=new StackPanel{Name="SettingsColumnA"};
+        var columnB=new StackPanel{Name="SettingsColumnB",Margin=new(14,0,0,0)};
+        var columns=new Grid{Name="SettingsColumns"};columns.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});columns.ColumnDefinitions.Add(new(){Width=new GridLength(0)});
+        columns.Children.Add(content);Grid.SetColumn(columnB,1);columns.Children.Add(columnB);
+        var page=new StackPanel{MaxWidth=760,HorizontalAlignment=HorizontalAlignment.Left,Margin=new(0,0,6,12)};page.Children.Add(columns);
+        var settingsScroll=new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=page,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};
+        var settingsLayout=new Grid{Name="SettingsLayout"};settingsLayout.Children.Add(settingsScroll);Body.Children.Add(settingsLayout);
         var sectionFrames=new Dictionary<string,Border>();var sectionIcons=new Dictionary<string,string>();
         StackPanel Card(string heading,string description,string icon)
         {
             var panel=new StackPanel();
-            var frame=new Border{Child=panel,CornerRadius=new(20),Padding=new(24),BorderThickness=new(1),Margin=new(0,0,0,20),Tag=heading};
+            var frame=new Border{Child=panel,CornerRadius=new(16),Padding=new(18),BorderThickness=new(1),Margin=new(0,0,0,14),Tag=heading};
             frame.SetResourceReference(Border.BackgroundProperty,"Panel");frame.SetResourceReference(Border.BorderBrushProperty,"EdgeSoft");content.Children.Add(frame);sectionFrames[heading]=frame;sectionIcons[heading]=icon;
             // Each section carries its own icon on a soft tile, the same one as in the section list.
-            var headings=new DockPanel{Margin=new(0,0,0,18),LastChildFill=true};
-            var tile=new Border{Width=36,Height=36,CornerRadius=new(10),Margin=new(0,0,14,0),VerticalAlignment=VerticalAlignment.Top};tile.SetResourceReference(Border.BackgroundProperty,"AccentSoft");
+            var headings=new DockPanel{Margin=new(0,0,0,14),LastChildFill=true};
+            var tile=new Border{Width=32,Height=32,CornerRadius=new(9),Margin=new(0,0,12,0),VerticalAlignment=VerticalAlignment.Top};tile.SetResourceReference(Border.BackgroundProperty,"AccentSoft");
             var glyph=new System.Windows.Shapes.Path{Data=(Geometry)FindResource(icon),Width=18,Height=18,Stretch=Stretch.Uniform,StrokeThickness=1.8,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,StrokeLineJoin=PenLineJoin.Round,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};
             glyph.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty,"Accent");tile.Child=glyph;DockPanel.SetDock(tile,Dock.Left);headings.Children.Add(tile);
             var texts=new StackPanel{VerticalAlignment=VerticalAlignment.Center};headings.Children.Add(texts);
-            var h=Text(heading,18);h.FontWeight=FontWeights.Bold;h.Margin=new(0,0,0,4);texts.Children.Add(h);
+            var h=Text(heading,17);h.FontWeight=FontWeights.Bold;h.Margin=new(0,0,0,3);texts.Children.Add(h);
             if(description.Length>0)texts.Children.Add(Hint(description));
             panel.Children.Add(headings);return panel;
         }
         void Divider(StackPanel panel)
         {
-            var line=new Border{Height=1,Margin=new(0,18,0,18)};line.SetResourceReference(Border.BackgroundProperty,"EdgeSoft");panel.Children.Add(line);
+            var line=new Border{Height=1,Margin=new(0,12,0,12)};line.SetResourceReference(Border.BackgroundProperty,"EdgeSoft");panel.Children.Add(line);
         }
         TextBlock Notice(StackPanel panel)
         {
@@ -90,7 +94,7 @@ public partial class MainWindow
         {
             notice.Text=AppLanguage.T(message);notice.SetResourceReference(TextBlock.ForegroundProperty,error?"Danger":"Accent");notice.Visibility=Visibility.Visible;Status.Text=AppLanguage.T(message);
         }
-        var appearance=Card("Внешний вид","Тема оформления и режим для слабых компьютеров.","IconTheme");
+        var appearance=Card("Внешний вид","Язык, тема и режим для слабых компьютеров.","IconTheme");
         var languageLabel=Text("Язык интерфейса",13);languageLabel.FontWeight=FontWeights.SemiBold;appearance.Children.Add(languageLabel);
         var language=new ComboBox{Name="SettingsLanguage",ItemsSource=new[]{"Русский","English"},SelectedIndex=prefs.UiLanguage=="en"?1:0,MaxWidth=320,MinWidth=0,HorizontalAlignment=HorizontalAlignment.Left,Margin=new(0,0,0,12)};
         AutomationProperties.SetName(language,AppLanguage.T("Язык интерфейса"));appearance.Children.Add(language);
@@ -139,7 +143,7 @@ public partial class MainWindow
         // Lite mode drops decorative backdrops; posters, catalog and every function stay.
         var liteTitle=new WrapPanel();liteTitle.Children.Add(SwitchTitle("Лёгкий режим"));
         var litePill=PillRadius.Apply(new Border{Padding=new(9,2,9,2),Margin=new(10,2,0,2),VerticalAlignment=VerticalAlignment.Center,Child=new TextBlock{Text=AppLanguage.T("Для слабых ноутбуков"),FontSize=11,FontWeight=FontWeights.SemiBold}});litePill.SetResourceReference(Border.BackgroundProperty,"Raised");((TextBlock)litePill.Child).SetResourceReference(TextBlock.ForegroundProperty,"Muted");liteTitle.Children.Add(litePill);
-        var liteContent=new StackPanel();liteContent.Children.Add(liteTitle);var liteHint=Hint("Без фоновых обложек и лишних эффектов. Автоматически включается на слабых компьютерах; здесь можно изменить выбор. Постеры и каталог остаются на месте.");liteHint.Margin=new(0,4,0,0);liteContent.Children.Add(liteHint);
+        var liteContent=new StackPanel();liteContent.Children.Add(liteTitle);var liteHint=Hint("Без фоновых обложек и анимаций. На слабых компьютерах включается сам; здесь можно переключить.");liteHint.Margin=new(0,4,0,0);liteContent.Children.Add(liteHint);
         var lite=new CheckBox{Name="SettingsLiteMode",Style=(Style)FindResource("SettingsSwitch"),Content=liteContent,IsChecked=prefs.LiteMode,VerticalContentAlignment=VerticalAlignment.Center};
         AutomationProperties.SetName(lite,AppLanguage.T("Лёгкий режим"));appearance.Children.Add(lite);
         var liteNotice=Notice(appearance);
@@ -149,15 +153,15 @@ public partial class MainWindow
             try{prefs.Save();ApplyLiteMode();Feedback(liteNotice,"Настройка сохранена.");}
             catch(Exception error){prefs.LiteMode=previous;prefs.LiteModeConfigured=configured;lite.IsChecked=previous;ApplyLiteMode();Feedback(liteNotice,"Не удалось сохранить настройки: "+error.Message,true);}
         };
-        var personal=Card("Игнорируемое","Выбери, что не показывать в каталоге и подборках. Поиск, сохранённое и загрузки остаются доступны.","IconMovies");
+        var personal=Card("Игнорируемое","Скрой названия и жанры в каталоге и подборках. В поиске, «Сохранённом» и загрузках они остаются.","IconMovies");
         RenderHiddenCatalogSettings(personal);
-        var catalogue=Card("Каталог","Выбери страну для отечественных подборок фильмов и сериалов.","IconMovies");
+        var catalogue=Card("Каталог","Страна для подборок «Отечественное» и источники данных.","IconMovies");
         var countryLabel=Hint("Отечественное кино");countryLabel.Margin=new(0,0,0,7);catalogue.Children.Add(countryLabel);
         var homeCountries=CatalogChoices.Countries.OrderBy(choice=>choice.Label).ToArray();
         var homeCountry=new ComboBox{Name="SettingsHomeCountry",ItemsSource=homeCountries,SelectedItem=homeCountries.First(choice=>choice.Key==CatalogRegions.HomeCountry(prefs.HomeCountry)),MaxWidth=320,HorizontalAlignment=HorizontalAlignment.Left,MinWidth=0,Margin=new(0,4,0,10)};
         homeCountry.SetBinding(FrameworkElement.WidthProperty,new System.Windows.Data.Binding(nameof(FrameworkElement.ActualWidth)){Source=catalogue});
         AutomationProperties.SetName(homeCountry,AppLanguage.T("Страна отечественных подборок"));catalogue.Children.Add(homeCountry);
-        var countryHint=Hint("Учитываем страну производства. Фильмы совместного производства с выбранной страной тоже входят в отечественные подборки.");countryHint.Margin=new(0,8,0,0);catalogue.Children.Add(countryHint);
+        var countryHint=Hint("Учитываем страну производства, в том числе совместного.");countryHint.Margin=new(0,8,0,0);catalogue.Children.Add(countryHint);
         var countryNotice=Notice(catalogue);
         var tmdbLogo=new Image{Name="TmdbLogo",Source=new System.Windows.Media.Imaging.BitmapImage(new Uri("pack://application:,,,/Assets/tmdb-logo.png")),Width=128,Height=17,Stretch=Stretch.Uniform,HorizontalAlignment=HorizontalAlignment.Left,Margin=new(0,18,0,8)};
         AutomationProperties.SetName(tmdbLogo,AppLanguage.T("The Movie Database — источник широких фонов"));catalogue.Children.Add(tmdbLogo);
@@ -174,7 +178,7 @@ public partial class MainWindow
             try{prefs.Save();ResetDiscoveryData();catalogPages.Clear();liveKey="";Feedback(countryNotice,"Страна подборок сохранена.");}
             catch(Exception error){prefs.HomeCountry=previous;Feedback(countryNotice,"Не удалось сохранить страну: "+error.Message,true);}
         };
-        var files=Card("Загрузки","Куда сохранять фильмы и сериалы.","IconDownload");
+        var files=Card("Загрузки","Папка, возобновление и свободное место.","IconDownload");
         var folderLabel=Text("Папка загрузок",13);folderLabel.FontWeight=FontWeights.SemiBold;folderLabel.SetResourceReference(TextBlock.ForegroundProperty,"TextSoft");folderLabel.Margin=new(0,0,0,8);files.Children.Add(folderLabel);
         var folderRow=new Grid{Margin=new(0,0,0,10)};folderRow.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});folderRow.ColumnDefinitions.Add(new(){Width=GridLength.Auto});folderRow.ColumnDefinitions.Add(new(){Width=GridLength.Auto});files.Children.Add(folderRow);
         var folder=new TextBlock{Name="SettingsFolder",Text=prefs.Folder,FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=14,TextTrimming=TextTrimming.CharacterEllipsis,VerticalAlignment=VerticalAlignment.Center,ToolTip=prefs.Folder};folder.SetResourceReference(TextBlock.ForegroundProperty,"Text");
@@ -190,7 +194,7 @@ public partial class MainWindow
             foreach(var child in folderRow.Children.OfType<Button>()){Grid.SetRow(child,narrowRow?1:0);}
             if(folderRow.Children.OfType<Button>().ToArray() is [var change,var open]){Grid.SetColumn(change,narrowRow?0:1);Grid.SetColumn(open,narrowRow?1:2);}
         };
-        files.Children.Add(Hint("Качалка создаёт в выбранном месте папку Ka4alka — все загрузки попадают туда. Уже добавленные загрузки сохраняют прежнюю папку."));
+        files.Children.Add(Hint("Внутри выбранной папки Качалка создаёт Ka4alka. Уже добавленные загрузки остаются на прежнем месте."));
         var folderNotice=Notice(files);
         var changeFolder=Button("Изменить",()=>
         {
@@ -209,7 +213,7 @@ public partial class MainWindow
         var resumeLabel=SwitchTitle("Продолжать активные загрузки при запуске");
         var resume=new CheckBox{Name="SettingsAutoResume",Style=(Style)FindResource("SettingsSwitch"),Content=resumeLabel,IsChecked=prefs.AutoResumeDownloads,VerticalContentAlignment=VerticalAlignment.Center,Margin=new(0,0,0,8)};
         resume.SetResourceReference(Control.ForegroundProperty,"Text");AutomationProperties.SetName(resume,AppLanguage.T("Продолжать активные загрузки при запуске"));
-        files.Children.Add(resume);files.Children.Add(Hint("Загрузки, поставленные на паузу вручную, останутся на паузе."));
+        files.Children.Add(resume);files.Children.Add(Hint("Загрузки на ручной паузе остаются на паузе."));
         var resumeNotice=Notice(files);
         void SaveResume()
         {
@@ -221,7 +225,7 @@ public partial class MainWindow
         Divider(files);
         var recovery=new CheckBox{Name="SettingsAutoRecover",Style=(Style)FindResource("SettingsSwitch"),Content=SwitchTitle("Восстанавливать подключения после обрыва сети"),IsChecked=prefs.AutoRecoverDownloads,Margin=new(0,0,0,8)};
         AutomationProperties.SetName(recovery,AppLanguage.T("Восстанавливать загрузки после обрыва сети"));files.Children.Add(recovery);
-        files.Children.Add(Hint("Активные загрузки продолжатся при возвращении сети и после сна. Задачи на ручной паузе останутся на паузе."));
+        files.Children.Add(Hint("Продолжим активные загрузки, когда вернётся сеть или компьютер проснётся."));
         var recoveryNotice=Notice(files);
         recovery.Click+=(_,_)=>
         {
@@ -231,11 +235,11 @@ public partial class MainWindow
         };
         Divider(files);
         files.Children.Add(Text("Свободное место",13));
-        files.Children.Add(Hint("Перед началом и во время скачивания проверяем место для оставшихся файлов и других активных загрузок на том же диске. Оставляем запас 256 МБ. Если места не хватает, загрузка встанет на паузу: освободи место и нажми «Продолжить»."));
-        var notifications=Card("Уведомления","Windows сообщит о завершении загрузки, ошибке или нехватке места.","IconBell");
+        files.Children.Add(Hint("Перед загрузкой и во время неё проверяем место на диске и оставляем запас 256 МБ. Если места мало, загрузка встанет на паузу: освободи место и нажми «Продолжить»."));
+        var notifications=Card("Уведомления","Сообщим, когда загрузка завершится, остановится с ошибкой или упрётся в нехватку места.","IconBell");
         var notify=new CheckBox{Name="SettingsNotifyDownloads",Style=(Style)FindResource("SettingsSwitch"),Content=SwitchTitle("Уведомления о загрузках"),IsChecked=prefs.NotifyDownloads,Margin=new(0,0,0,8)};
         AutomationProperties.SetName(notify,AppLanguage.T("Уведомления Windows о загрузках"));notifications.Children.Add(notify);
-        notifications.Children.Add(Hint("Повторяющиеся ошибки не создают поток уведомлений. Нажатие на уведомление откроет очередь. Windows может скрывать уведомления в режиме «Не беспокоить»."));
+        notifications.Children.Add(Hint("Одинаковые ошибки не повторяются. Нажатие откроет очередь загрузок. В режиме «Не беспокоить» Windows уведомления скрывает."));
         var notificationNotice=Notice(notifications);
         notify.Click+=(_,_)=>
         {
@@ -245,7 +249,7 @@ public partial class MainWindow
         };
         var testNotification=ActionButton("Проверить уведомление","IconInfo",()=>Feedback(notificationNotice,ShowTestDownloadNotification()?"Уведомление передано Windows. Если оно скрыто, проверь настройки уведомлений и режим «Не беспокоить».":prefs.NotifyDownloads?"Windows не приняла уведомление. Попробуй ещё раз.":"Включи уведомления о загрузках для проверки.",!prefs.NotifyDownloads));
         AutomationProperties.SetName(testNotification,AppLanguage.T("Проверить уведомление Windows"));notifications.Children.Add(testNotification);
-        var system=Card("Запуск и Windows","Автозапуск и подключения участников раздачи.","IconPower");
+        var system=Card("Запуск и Windows","Автозапуск и доступ в сеть для приёма раздач.","IconPower");
         var startupNotice=Notice(system);
         var startup=new CheckBox{Name="SettingsStartup",Content=SwitchTitle("Открывать Качалку при входе в Windows"),IsChecked=WindowsIntegration.StartupEnabled,Style=(Style)FindResource("SettingsSwitch"),Margin=new(0,0,0,12)};
         AutomationProperties.SetName(startup,AppLanguage.T("Запускать Качалку вместе с Windows"));system.Children.Add(startup);
@@ -256,7 +260,7 @@ public partial class MainWindow
         };
         Divider(system);
         system.Children.Add(Text("Брандмауэр",13));
-        system.Children.Add(Hint("Разреши входящие TCP и UDP для Качалки в частных сетях. Windows попросит права администратора. Это может помочь поиску участников раздачи; в общедоступных сетях исключение не применяется."));
+        system.Children.Add(Hint("Разрешает входящие TCP и UDP в частных сетях: так проще находить участников раздачи. Нужны права администратора."));
         var firewallNotice=Notice(system);
         var firewall=AsyncButton("Разрешить в брандмауэре",async()=>
         {
@@ -264,9 +268,9 @@ public partial class MainWindow
             catch(Exception error){ErrorLog.Write(error);Feedback(firewallNotice,error.Message,true);}
         });
         AutomationProperties.SetName(firewall,AppLanguage.T("Разрешить Качалку в брандмауэре"));firewall.HorizontalAlignment=HorizontalAlignment.Left;system.Children.Add(firewall);
-        RenderLanSettings(Card("Устройства в сети","Отправляй загрузки на другой компьютер с Качалкой.","IconLaptop"));
-        RenderUpdateSettings(Card("Обновления","Приложение всегда под рукой в актуальной версии.","IconRefresh"));
-        var cache=Card("Кэш","Постеры, фотографии и данные каталога: до 1 ГБ. Раз в неделю удаляем данные, не использованные за последние семь дней. При заполнении — самые давно не открывавшиеся.","IconStorage");
+        RenderLanSettings(Card("Устройства в сети","Отправляй загрузки на другой компьютер в домашней сети.","IconLaptop"));
+        RenderUpdateSettings(Card("Обновления","Автоматическая проверка и установка новых версий.","IconRefresh"));
+        var cache=Card("Кэш","Постеры, фото и данные каталога занимают до 1 ГБ. Лишнее удаляется само.","IconStorage");
         var cacheSize=Text("Подсчитываем размер…",13);cacheSize.Name="SettingsCacheSize";cache.Children.Add(cacheSize);
         var cacheNotice=Notice(cache);
         var clearCache=AsyncButton("Очистить кэш",async()=>
@@ -276,9 +280,9 @@ public partial class MainWindow
             Feedback(cacheNotice,"Освобождено "+CacheSize(result.FreedBytes)+(result.Failed>0?". Некоторые файлы заняты — очистка повторится автоматически.":"."));
         });
         clearCache.Name="ClearCacheButton";AutomationProperties.SetName(clearCache,AppLanguage.T("Очистить кэш"));clearCache.HorizontalAlignment=HorizontalAlignment.Left;cache.Children.Add(clearCache);
-        cache.Children.Add(Hint("Скачанные файлы, очередь загрузок, избранное и настройки сохраняются."));
+        cache.Children.Add(Hint("Скачанные файлы, очередь, «Сохранённое» и настройки не затрагиваются."));
         _=ShowCacheSizeAsync(cacheSize);
-        var diagnostics=Card("Помощь и диагностика","Отчёт поможет разобраться с ошибкой. Пути к личным папкам и ключи доступа скрываются.","IconHelp");
+        var diagnostics=Card("Помощь и диагностика","Отчёт для поддержки. Личные пути и ключи доступа скрываются.","IconHelp");
         var diagnosticActions=new WrapPanel();diagnostics.Children.Add(diagnosticActions);
         var diagnosticNotice=Notice(diagnostics);
         var copyingReport=false;
@@ -290,8 +294,8 @@ public partial class MainWindow
             catch(Exception error){Feedback(diagnosticNotice,"Не удалось скопировать логи: "+error.Message,true);}
             finally{copyingReport=false;}
         }));
-        diagnostics.Children.Add(Text("Скопируй логи и приложи их к сообщению в чате поддержки.",11,true));
-        var community=Card("Новости и поддержка","Новости Качалки и помощь сообщества в Telegram.","IconBell");
+        diagnostics.Children.Add(Text("Скопируй отчёт и приложи его к сообщению в чате поддержки.",11,true));
+        var community=Card("Новости и поддержка","Новости Качалки и чат поддержки в Telegram.","IconBell");
         var communityActions=new WrapPanel();community.Children.Add(communityActions);
         var communityNotice=Notice(community);
         void OpenTelegram(string url)
@@ -304,11 +308,15 @@ public partial class MainWindow
         var help=ActionButton("Сообщить об ошибке","IconHelp",()=>OpenTelegram("https://t.me/+6sT2ocaKvLxlNmRi"));
         help.ToolTip=AppLanguage.T("Открыть чат поддержки в Telegram");AutomationProperties.SetName(help,AppLanguage.T("Сообщить об ошибке"));communityActions.Children.Add(help);
 
-        // Sections run from what people change often to what they set once or open when something goes wrong;
-        // on wide windows the list on the left groups them the same way and jumps between the cards.
-        var groups=new (string Caption,string[] Sections)[]{("Основное",["Загрузки","Внешний вид","Каталог","Уведомления"]),("Система",["Устройства в сети","Запуск и Windows","Обновления"]),("Обслуживание",["Новости и поддержка","Кэш","Помощь и диагностика"])};
+        // Sections run from what people change often to what they set once or open when something goes wrong.
+        // A row of chips under the title jumps between the cards and follows the scroll position.
+        var groups=new (string Caption,string[] Sections)[]{("Основное",["Загрузки","Внешний вид","Каталог","Игнорируемое","Уведомления"]),("Система",["Устройства в сети","Запуск и Windows","Обновления"]),("Обслуживание",["Новости и поддержка","Кэш","Помощь и диагностика"])};
         var wanted=groups.SelectMany(group=>group.Sections).ToArray();
         foreach(var name in wanted.Reverse())if(sectionFrames.TryGetValue(name,out var frame)){content.Children.Remove(frame);content.Children.Insert(0,frame);}
+        var chipRow=new StackPanel{Orientation=Orientation.Horizontal};
+        var chipScroll=new ScrollViewer{Name="SettingsSections",Content=chipRow,VerticalScrollBarVisibility=ScrollBarVisibility.Disabled,HorizontalScrollBarVisibility=ScrollBarVisibility.Hidden,Margin=new(0,0,0,12),Focusable=false};
+        PageHeader.Children.Add(chipScroll);
+        var chips=new List<(Border Frame,Button Chip)>();
         Button? activeSection=null;
         void MarkSection(Button button)
         {
@@ -319,25 +327,50 @@ public partial class MainWindow
         foreach(var name in sections)
         {
             if(!sectionFrames.TryGetValue(name,out var frame))continue;
-            if(name==sections[0])
-            {
-                var label=Text(AppLanguage.T(caption).ToUpperInvariant(),11);label.FontWeight=FontWeights.SemiBold;label.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");
-                label.Margin=new(14,sectionNav.Children.Count==0?4:18,0,6);sectionNav.Children.Add(label);
-            }
-            var jump=new Button{Style=(Style)FindResource("QuietButton"),Content=IconLabel(name,sectionIcons[name],17),HorizontalContentAlignment=HorizontalAlignment.Left,MinHeight=40,Height=40,Padding=new(14,0,14,0),Margin=new(0,0,0,2),FontSize=14};
+            if(name==sections[0]&&chips.Count>0){var gap=new Border{Width=1,Height=18,Margin=new(6,0,10,0)};gap.SetResourceReference(Border.BackgroundProperty,"EdgeSoft");chipRow.Children.Add(gap);}
+            var jump=new Button{Style=(Style)FindResource("QuietButton"),Content=IconLabel(name,sectionIcons[name],15),HorizontalContentAlignment=HorizontalAlignment.Left,MinHeight=34,Height=34,Padding=new(12,0,14,0),Margin=new(0,0,4,0),FontSize=13};
             jump.Click+=(_,_)=>
             {
                 MarkSection(jump);settingsScroll.UpdateLayout();
-                settingsScroll.ScrollToVerticalOffset(Math.Max(0,frame.TransformToAncestor(content).Transform(new Point()).Y));
+                settingsScroll.ScrollToVerticalOffset(Math.Max(0,frame.TransformToAncestor(page).Transform(new Point()).Y));
             };
-            AutomationProperties.SetName(jump,AppLanguage.T("Раздел: "+name));sectionNav.Children.Add(jump);if(activeSection==null)MarkSection(jump);
+            AutomationProperties.SetName(jump,AppLanguage.T("Раздел: "+name));chipRow.Children.Add(jump);chips.Add((frame,jump));if(activeSection==null)MarkSection(jump);
         }
-        settingsLayout.SizeChanged+=(_,_)=>
+        // The chip of the card under the reading line is highlighted while scrolling; at the very end it is the last one.
+        void SyncSection()
         {
-            var wide=settingsLayout.ActualWidth>=1000;
-            sectionNav.Visibility=wide?Visibility.Visible:Visibility.Collapsed;settingsLayout.ColumnDefinitions[0].Width=wide?new GridLength(240):new GridLength(0);
-        };
-        var about=new WrapPanel{Margin=new(4,4,0,12)};content.Children.Add(about);
+            if(chips.Count==0)return;
+            try
+            {
+                var line=settingsScroll.VerticalOffset+90;var current=chips[0];
+                foreach(var row in chips)if(row.Frame.TransformToAncestor(page).Transform(new Point()).Y<=line)current=row;
+                if(settingsScroll.ScrollableHeight>0&&settingsScroll.VerticalOffset>=settingsScroll.ScrollableHeight-2)current=chips[^1];
+                if(ReferenceEquals(activeSection,current.Chip))return;
+                MarkSection(current.Chip);current.Chip.BringIntoView();
+            }
+            catch(InvalidOperationException){}
+        }
+        settingsScroll.ScrollChanged+=(_,e)=>{if(e.VerticalChange!=0)SyncSection();};
+        // Two columns from about 940 px of room (the page is then up to 1120 wide, otherwise 760); the cards go to the shorter column in turn, so both end about even.
+        var twoColumns=false;
+        void Arrange()
+        {
+            var room=settingsScroll.ViewportWidth;
+            var wide=twoColumns?room>=900:room>=940;
+            if(wide==twoColumns)return;twoColumns=wide;page.MaxWidth=wide?1120:760;
+            var ordered=chips.Select(row=>row.Frame).Concat(sectionFrames.Values.Except(chips.Select(row=>row.Frame))).ToList();
+            content.Children.Clear();columnB.Children.Clear();
+            if(!wide){columns.ColumnDefinitions[1].Width=new GridLength(0);foreach(var card in ordered)content.Children.Add(card);return;}
+            columns.ColumnDefinitions[1].Width=new GridLength(1,GridUnitType.Star);
+            var width=Math.Max(300,(Math.Min(page.MaxWidth,room)-6-14)/2);double heightA=0,heightB=0;
+            foreach(var card in ordered)
+            {
+                card.Measure(new Size(width,double.PositiveInfinity));var height=card.DesiredSize.Height;
+                if(heightA<=heightB){content.Children.Add(card);heightA+=height;}else{columnB.Children.Add(card);heightB+=height;}
+            }
+        }
+        settingsScroll.SizeChanged+=(_,_)=>{Arrange();SyncSection();};
+        var about=new WrapPanel{Margin=new(4,4,0,12)};page.Children.Add(about);
         var appName=Text("Качалка",13);appName.FontWeight=FontWeights.SemiBold;appName.Margin=new(0,0,10,4);about.Children.Add(appName);
         var version=new TextBlock{Text=AppLanguage.T("Версия "+(typeof(MainWindow).Assembly.GetName().Version?.ToString(3)??"")),FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=12,Margin=new(0,1,0,4)};version.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");about.Children.Add(version);
     }

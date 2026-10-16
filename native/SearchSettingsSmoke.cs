@@ -79,6 +79,16 @@ public partial class MainWindow
             var actualFolder=Path.Combine(folder,"Ka4alka");
             Check(Directory.Exists(actualFolder)&&FindVisual<TextBlock>(Body,t=>t.Name=="SettingsFolder")?.Text==actualFolder&&Preferences.Load().Folder==actualFolder,"Settings did not create and show saved Ka4alka download folder.");
             Width=Math.Min(1220,MaxWidth-24);Height=Math.Min(900,MaxHeight-24);await Settle();Shot("settings-light");
+            Width=Math.Min(1500,MaxWidth-24);Height=Math.Min(900,MaxHeight-24);await Settle();
+            Check(FindVisual<StackPanel>(Body,panel=>panel.Name=="SettingsColumnB")?.Children.Count>0,"A wide settings page puts cards in two columns.");Shot("settings-wide");
+            var chipRow=FindVisual<ScrollViewer>(PageHeader,panel=>panel.Name=="SettingsSections")?.Content as StackPanel;
+            var settingsPage=FindVisual<ScrollViewer>(Body,_=>true)??throw new Exception("Settings scroll viewer missing.");
+            var sectionChips=chipRow?.Children.OfType<Button>().ToArray()??[];
+            Check(sectionChips.Length>=11,"Settings has a chip for every card.");
+            settingsPage.ScrollToHome();await Settle();Check(sectionChips[0].FontWeight==FontWeights.SemiBold,"The first chip is marked at the top of the page.");
+            settingsPage.ScrollToEnd();await Settle();Check(sectionChips[^1].FontWeight==FontWeights.SemiBold&&sectionChips[0].FontWeight!=FontWeights.SemiBold,"The chip of the last card is marked at the end of the page.");
+            settingsPage.ScrollToHome();await Settle();
+            Width=Math.Min(1220,MaxWidth-24);Height=Math.Min(900,MaxHeight-24);await Settle();
             var dark=FindVisual<Button>(Body,b=>AutomationProperties.GetName(b)=="Тёмная тема")??throw new Exception("Dark theme action missing.");
             dark.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await Settle();Shot("settings-dark");
             Width=510;Height=820;await Settle();Shot("settings-small");
