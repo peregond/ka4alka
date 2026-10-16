@@ -11,7 +11,7 @@ on:
       - '.github/workflows/catalog-*.yml'
       - '.github/workflows/release.yml'
   push:
-    branches: [main]
+    branches: [main, claude/quirky-hopper-1vlmj6]
     paths:
       - 'native/**'
       - 'tests/**'

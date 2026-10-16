@@ -13,6 +13,10 @@
     <Compile Include="../native/PerformanceResources.cs" Link="PerformanceResources.cs" />
     <Compile Include="../tests/PerformanceResourcesTests.cs" Link="PerformanceResourcesTests.cs" />
     <Compile Include="../native/UnifiedSearch.cs" Link="UnifiedSearch.cs" />
+    <Compile Include="../native/AppLanguage.cs" Link="AppLanguage.cs" />
+    <Compile Include="../native/SearchLanguage.cs" Link="SearchLanguage.cs" />
+    <Compile Include="../native/RussianAudio.cs" Link="RussianAudio.cs" />
+    <Compile Include="../native/ReleaseAudio.cs" Link="ReleaseAudio.cs" />
     <Compile Include="../native/MediaIdentity.cs" Link="MediaIdentity.cs" />
     <Compile Include="../tests/SharedCatalogTests.cs" Link="SharedCatalogTests.cs" />
     <Compile Include="../tests/UnifiedSearchTests.cs" Link="UnifiedSearchTests.cs" />
@@ -21,6 +25,7 @@
     <EmbeddedResource Include="../web-index/app/data/seed.json" LogicalName="Kachalka.catalog-seed.json" />
     <EmbeddedResource Include="../web-index/app/data/starter.json" LogicalName="Kachalka.catalog-starter.json" />
     <EmbeddedResource Include="../web-index/app/data/title-aliases.json" LogicalName="Kachalka.title-aliases.json" />
+    <EmbeddedResource Include="../native/Localization/en.json" LogicalName="Kachalka.Localization.en.json" />
     <EmbeddedResource Include="../scripts/catalog-collections.json" LogicalName="Kachalka.catalog-collections.json" />
   </ItemGroup>
 </Project>

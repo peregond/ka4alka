@@ -5,6 +5,16 @@ using System.Text;
 using System.Text.Json;
 using Kachalka;
 
+var savedLanguage=AppLanguage.Current;
+try
+{
+    AppLanguage.Set("en");
+    var localized=new MediaItem(-1,"Дюна","Фильмы","",2021,"—","—","#526B69"){OriginalTitle="Dune",English=new("Dune")};
+    if(MediaIdentity.Queries(localized).First()!="Dune"||SearchLanguage.TitleRank(localized,"en")!=1)throw new Exception("English title identity/ranking fixture is inconsistent.");
+    if(SearchLanguage.EnglishAudioRank(new("Dune ENGLISH 1080p","Fixture",10))!=3)throw new Exception("Real audio ranking is not wired into the text harness.");
+    Console.WriteLine("PASS: real localized identity, title ranking and English audio helpers compile in the Linux catalog harness");
+}
+finally{AppLanguage.Set(savedLanguage);}
 await BundledCatalogTests.Run();
 await TransportTests.Run();
 SeasonalCatalogTests.Run();

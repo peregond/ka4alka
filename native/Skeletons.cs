@@ -22,7 +22,7 @@ public partial class MainWindow
         if(image.Parent is not Panel panel)return;
         Border? overlay=null;foreach(var child in panel.Children)if(child is Border {Name:"PosterShimmer"} found){overlay=found;break;}
         if(overlay==null)return;
-        if(image.DataContext is MediaItem media&&image.Source==null&&(state.Request!=null||state.PresentationPending)&&!closing&&!closed)(posterWave??=new(Motion)).Show(overlay,Math.Abs(media.Id)%6);
+        if(image.DataContext is MediaItem media&&image.Source==null&&CoverViewportFor(image)?.Measure(image).Visible==true&&(state.Request!=null||state.PresentationPending)&&!closing&&!closed)(posterWave??=new(Motion)).Show(overlay,Math.Abs(media.Id)%6);
         else if(posterWave!=null)posterWave.Hide(overlay);else overlay.Visibility=Visibility.Collapsed;
     }
     // Real content that replaces a placeholder fades in over a quarter of a second instead of snapping in.

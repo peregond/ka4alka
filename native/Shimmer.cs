@@ -33,6 +33,9 @@ sealed class ShimmerWave(bool animated)
     }
     readonly Dictionary<(string Resource,int Index),Lane> lanes=[];
     bool running;
+    internal bool IsRunning=>running;
+    internal int LaneCount=>lanes.Count;
+    public void Stop(){foreach(var overlay in shown.ToArray())Hide(overlay);Set(false);}
 
     // Colours the shape with the lane's brush, or with the plain theme colour when nothing animates.
     public void Paint(Border target,int lane,string resource="Raised")
