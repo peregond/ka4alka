@@ -10,7 +10,7 @@ public sealed record FeaturedCollection(string Id,string Title,string TitleEn,st
     public string Summary=>AppLanguage.Current=="en"?DescriptionEn:Description;
     public bool IsGames=>Games is {Length:>0};
     // The small caps rubric above the heading.
-    public string Kicker=>AppLanguage.T(Id.StartsWith("seasonal-",StringComparison.Ordinal)?"Сезон":Id==FeaturedCatalog.FreshId?"Новое":Id==FeaturedCatalog.TopRatedId?"Рейтинг":IsGames?"Игры":"Подборка");
+    public string Kicker=>AppLanguage.T(Id.StartsWith("seasonal-",StringComparison.Ordinal)?"Сезон":Id.StartsWith("genre-",StringComparison.Ordinal)?"Жанр":Id==FeaturedCatalog.FreshId?"Новое":Id==FeaturedCatalog.TopRatedId?"Рейтинг":IsGames?"Игры":"Подборка");
 }
 public sealed record FeaturedGroup(FeaturedCollection Collection,MediaItem[] Items);
 public static class FeaturedCatalog
@@ -37,8 +37,31 @@ public static class FeaturedCatalog
         // Rubrics drawn from the catalog itself, so the page has fresh material without any editorial work.
         if(Fresh(catalog) is {Length:>0} fresh)groups.Insert(Math.Min(1,groups.Count),new(new(FreshId,"Свежее в каталоге","Fresh in the catalog","Недавние релизы с раздачами","Recent releases"),fresh));
         if(TopRated(catalog) is {Length:>0} top)groups.Insert(Math.Min(3,groups.Count),new(new(TopRatedId,"Лучшее по оценкам","Top rated","Фильмы и сериалы с самыми высокими оценками зрителей","Titles with the highest audience ratings",Layout:"ranking"),top));
+        // One shelf per big genre, from the best rated titles of the catalog.
+        // A title stands on the shelf of the first genre that takes it, so the shelves do not repeat each other.
+        var taken=new HashSet<int>();
+        foreach(var (key,title,titleEn) in Genres)
+            if(ByGenre(catalog,key,taken) is {Length:>=GenreMinimum} best)
+            {
+                foreach(var item in best)taken.Add(item.Id);
+                groups.Add(new(new("genre-"+key,title,titleEn,"Лучшее по оценкам зрителей","Best rated by viewers"),best));
+            }
         return seasonalGroups.Concat(groups).ToArray();
     }
+    const int GenreMinimum=6;
+    static readonly (string Key,string Title,string TitleEn)[] Genres=
+    [
+        ("fantastika","Фантастика","Sci-Fi"),("triller","Триллеры","Thrillers"),("komediia","Комедии","Comedies"),("uzhasy","Ужасы","Horror"),
+        ("detektiv","Детективы","Mysteries"),("boevik","Боевики","Action"),("multfilm","Мультфильмы","Animation"),("kriminal","Криминал","Crime")
+    ];
+    // Any available rating counts here, the Kinopoisk one first; a genre shelf does not need both sources like the ranking.
+    static double AnyRating(MediaItem item)
+    {
+        var kp=CatalogPaging.Rating(item);if(kp>=0)return kp;
+        return double.TryParse(item.Imdb.Replace(',','.'),System.Globalization.NumberStyles.Float,System.Globalization.CultureInfo.InvariantCulture,out var value)&&value is >=0 and <=10?value:-1;
+    }
+    static MediaItem[] ByGenre(IEnumerable<MediaItem> catalog,string key,ISet<int> taken)=>catalog.Where(Presentable).Where(item=>item.GenreKeys.Contains(key)&&AnyRating(item)>=6.5&&!taken.Contains(item.Id))
+        .OrderByDescending(AnyRating).ThenByDescending(item=>item.Year).ThenBy(item=>item.Id).Take(40).ToArray();
     public const string FreshId="fresh",TopRatedId="top-rated";
     static double Score(MediaItem item)
     {

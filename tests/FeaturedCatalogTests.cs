@@ -31,6 +31,14 @@ public static class FeaturedCatalogTests
         var top=derived.Single(row=>row.Collection.Id==FeaturedCatalog.TopRatedId);
         Check(top.Items.Select(item=>item.Id).SequenceEqual(new[]{22,23})&&top.Collection.Layout=="ranking","The ranking needs both ratings, keeps only well rated titles and is laid out as a ranking.");
         Check(FeaturedCatalog.Resolve([a,b]).All(row=>row.Collection.Id is not (FeaturedCatalog.FreshId or FeaturedCatalog.TopRatedId)),"Rubrics without presentable titles are not shown.");
+        // Genre shelves: best rated first, a title only on the first shelf that takes it, and no shelf for a genre with too few titles.
+        MediaItem Genre(int id,string rating,params string[] keys)=>new(id,"Genre "+id,"Фильмы","",2024,rating,rating,"#123456"){OnlineId="movies:genre-"+id,ImageUrl="https://example.test/p.jpg",Description="Описание",GenreKeys=keys};
+        var genreCatalog=Enumerable.Range(0,8).Select(index=>Genre(100+index,(8.0-index*.1).ToString("0.0",System.Globalization.CultureInfo.InvariantCulture),"fantastika","triller"))
+            .Concat(Enumerable.Range(0,7).Select(index=>Genre(200+index,"7.0","triller"))).Append(Genre(300,"5.0","komediia")).ToArray();
+        var genreGroups=FeaturedCatalog.Resolve(genreCatalog).Where(row=>row.Collection.Id.StartsWith("genre-",StringComparison.Ordinal)).ToArray();
+        Check(genreGroups.Select(row=>row.Collection.Id).SequenceEqual(new[]{"genre-fantastika","genre-triller"}),"Only genres with enough well rated titles get a shelf, in the fixed genre order.");
+        Check(genreGroups[0].Items.Select(item=>item.Id).SequenceEqual(Enumerable.Range(0,8).Select(index=>100+index)),"A genre shelf lists its titles best rated first.");
+        Check(genreGroups[1].Items.Select(item=>item.Id).SequenceEqual(Enumerable.Range(0,7).Select(index=>200+index))&&genreGroups[0].Collection.Kicker.Length>0,"A title is on one genre shelf only.");
         Check(first.Layout is "lead" or "shelf" or "ranking"&&definitions.All(row=>row.Layout is "shelf" or "lead" or "ranking"),"Layouts are known.");
         var lang=AppLanguage.Current;
         try{AppLanguage.Set("en");Check(first.Label==first.TitleEn&&first.Summary==first.DescriptionEn,"English headings and descriptions use authored translations.");}
