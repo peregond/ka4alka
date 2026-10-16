@@ -83,7 +83,7 @@ public partial class MainWindow
     void BuildFeaturedDigest(FeaturedGroup[] groups)
     {
         if(featuredDigest==null)return;
-        var picks=groups.Where(group=>!group.Collection.IsGames).Select(group=>(Group:group,Item:FeaturedVisible(group).FirstOrDefault(item=>!featuredHeroIds.Contains(item.Id)&&!string.IsNullOrWhiteSpace(item.DisplayDescription)))).Where(row=>row.Item!=null).DistinctBy(row=>row.Item!.Id).Take(3).ToArray();
+        var picks=groups.Where(group=>!group.Collection.IsGames).Select(group=>(Group:group,Item:FeaturedVisible(group).Where(item=>!featuredHeroIds.Contains(item.Id)).OrderBy(item=>string.IsNullOrWhiteSpace(item.DisplayDescription)?1:0).FirstOrDefault())).Where(row=>row.Item!=null).DistinctBy(row=>row.Item!.Id).Take(3).ToArray();
         // Titles already told above (banner, digest) go last in the lead story's list below.
         featuredUsed.Clear();featuredUsed.UnionWith(featuredHeroIds);foreach(var row in picks)featuredUsed.Add(row.Item!.Id);
         var key=FeaturedKey(picks.Select(row=>row.Item!))+"|"+(featuredWidth<760?1:featuredWidth<1100?2:3);
@@ -100,7 +100,7 @@ public partial class MainWindow
             var text=new StackPanel{Margin=new(14,0,0,0)};
             var kicker=TextRaw(group.Collection.Label.ToUpperInvariant(),10);kicker.FontWeight=FontWeights.Bold;kicker.Margin=new(0,2,0,4);kicker.TextTrimming=TextTrimming.CharacterEllipsis;kicker.TextWrapping=TextWrapping.NoWrap;kicker.SetResourceReference(TextBlock.ForegroundProperty,"Accent");text.Children.Add(kicker);
             var title=TextRaw(item.DisplayTitle,16);title.FontWeight=FontWeights.SemiBold;title.Margin=new(0,0,0,6);title.MaxHeight=42;title.TextTrimming=TextTrimming.CharacterEllipsis;text.Children.Add(title);
-            var summary=TextRaw(item.DisplayDescription??"",12.5,true);summary.LineHeight=18;summary.LineStackingStrategy=LineStackingStrategy.BlockLineHeight;summary.MaxHeight=54;summary.TextTrimming=TextTrimming.CharacterEllipsis;summary.Margin=new(0,0,0,8);text.Children.Add(summary);
+            var summary=TextRaw(item.DisplayDescription??"",12.5,true);summary.LineHeight=18;summary.LineStackingStrategy=LineStackingStrategy.BlockLineHeight;summary.MaxHeight=54;summary.TextTrimming=TextTrimming.CharacterEllipsis;summary.Margin=new(0,0,0,8);if(summary.Text.Length>0)text.Children.Add(summary);
             text.Children.Add(RatingMeta(item));
             var body=new Grid();body.ColumnDefinitions.Add(new(){Width=GridLength.Auto});body.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});
             body.Children.Add(StoryPoster(item,92,10));Grid.SetColumn(text,1);body.Children.Add(text);
