@@ -35,6 +35,8 @@ public record MediaItem(int Id, string Title, string Section, string Genre, int 
     [JsonIgnore] public bool IsLive => PageUrl!=null;
     [JsonIgnore] public bool Cinema => Section is "Фильмы" or "Сериалы";
     string? liveScores,liveKp,liveImdb,liveGenre;
+    [JsonIgnore] public string KpValue => liveKp??Kinopoisk;
+    [JsonIgnore] public string ImdbValue => liveImdb??Imdb;
     [JsonIgnore] public string KpDisplay => "КП  "+(liveKp??Kinopoisk);
     [JsonIgnore] public string ImdbDisplay => "IMDb  "+(liveImdb??Imdb);
     [JsonIgnore] public bool KpAvailable => !string.IsNullOrWhiteSpace(liveKp??Kinopoisk)&&(liveKp??Kinopoisk)!="—";

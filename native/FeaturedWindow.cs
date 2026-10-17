@@ -55,11 +55,12 @@ public partial class MainWindow
         if(featuredGroups!=null&&featuredLanguage!=AppLanguage.Current)featuredGroups=null;
         var group=featuredGroups?.FirstOrDefault(group=>group.Collection.Id==featuredCollectionId);
         var definition=group?.Collection??FeaturedCatalog.Collections.FirstOrDefault(row=>row.Id==featuredCollectionId);
-        var title=Text(definition?.Label??FeaturedSection,compactHeight?22:28);title.FontWeight=FontWeights.SemiBold;title.Name="FeaturedHeading";PageHeader.Children.Add(title);
+        var title=Text(definition?.Label??FeaturedSection,compactHeight?22:28);title.FontWeight=FontWeights.SemiBold;title.Name="FeaturedHeading";
         // The front page shows today's date under the title, like a newspaper; a collection shows its own description.
-        PageHeader.Children.Add(definition!=null?Text(definition.Summary,13,true):TextRaw(FeaturedDateLine()+" · "+AppLanguage.T("Что смотреть и во что играть"),13,true));
+        var subtitle=definition!=null?Text(definition.Summary,13,true):TextRaw(FeaturedDateLine()+" · "+AppLanguage.T("Что смотреть и во что играть"),13,true);
         if(featuredCollectionId.Length>0)
         {
+            PageHeader.Children.Add(title);PageHeader.Children.Add(subtitle);
             SetBack("Все подборки",()=>OpenFeaturedCollection(""));
             if(featuredCollectionId.StartsWith("award-",StringComparison.Ordinal))BuildAwardPage();else ShowCatalog([]);
             featuredState=Text("Загружаем подборки…",14,true);PageHeader.Children.Add(featuredState);
@@ -72,7 +73,10 @@ public partial class MainWindow
             featuredHero=new Grid{Name="FeaturedHero"};featuredDigest=new StackPanel{Name="FeaturedDigest"};
             panel.Children.Add(featuredHero);panel.Children.Add(featuredDigest);
             if(featuredGroups==null)featuredHero.Children.Add(BannerSkeleton());
-            Body.Children.Add(new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=panel,VerticalScrollBarVisibility=ScrollBarVisibility.Auto});
+            // The title and the date scroll away with the page instead of staying above the stories; the small margin leaves room for the hover ring of a story.
+            subtitle.Margin=new(0,2,0,16);
+            var page=new StackPanel{Margin=new(6,0,6,0)};page.Children.Add(title);page.Children.Add(subtitle);page.Children.Add(panel);
+            Body.Children.Add(new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=page,VerticalScrollBarVisibility=ScrollBarVisibility.Auto});
             var definitions=featuredGroups?.Select(row=>row.Collection).ToArray()??FeaturedCatalog.Collections.ToArray();
             foreach(var collection in definitions)AddFeaturedShelf(panel,collection);
             featuredState=Text("Загружаем подборки…",13,true);panel.Children.Add(featuredState);

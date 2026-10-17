@@ -83,9 +83,8 @@ public partial class MainWindow
         {
             if(string.IsNullOrWhiteSpace(value)||value=="—")return;
             var row=new StackPanel{Orientation=Orientation.Horizontal,Margin=new(0,0,14,0),ToolTip=name+" · "+value};
-            var star=new TextBlock{Text="★",FontSize=14,Margin=new(0,0,5,0),VerticalAlignment=VerticalAlignment.Center};star.SetResourceReference(TextBlock.ForegroundProperty,"RatingInk");row.Children.Add(star);
+            row.Children.Add(RatingMark(name,14));
             row.Children.Add(new TextBlock{Text=AppLanguage.T(value),FontSize=14,FontWeight=FontWeights.Bold,Foreground=(Brush)FindResource("BannerText"),VerticalAlignment=VerticalAlignment.Center});
-            row.Children.Add(new TextBlock{Text=" "+name,FontSize=12,Foreground=(Brush)FindResource("BannerMuted"),VerticalAlignment=VerticalAlignment.Center});
             detailRatings.Children.Add(row);
         }
         Rating("Кинопоиск",item.Kinopoisk);Rating("IMDb",item.Imdb);
@@ -271,6 +270,7 @@ public partial class MainWindow
         void Paint(){var now=IsSaved(item);favorite.Content=IconLabel("",now?"IconHeartFilled":"IconHeart",20);favorite.ToolTip=AppLanguage.T(now?"Сохранено":"Сохранить");AutomationProperties.SetName(favorite,AppLanguage.T(now?"Сохранено":"Сохранить"));}
         Paint();favorite.Click+=(_,_)=>{ToggleSaved(item);Paint();UpdateSavedCount();};
         detailActions.Children.Add(favorite);
+        detailActions.Children.Add(HideTitleButton(item,"DetailHide"));
         if(ShareLink.Create(item)!=null)
         {
             var share=new Button{Name="DetailShare",Style=(Style)FindResource("IconButton"),Width=52,Height=52,Margin=new(0,0,10,8),ToolTip=AppLanguage.T("Скопировать ссылку на "+(item.Section=="Сериалы"?"сериал":"фильм"))};

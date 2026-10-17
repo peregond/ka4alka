@@ -251,6 +251,7 @@ public partial class MainWindow
         void Paint(){var now=IsSaved(item);favorite.Content=IconLabel("",now?"IconHeartFilled":"IconHeart",20);favorite.ToolTip=AppLanguage.T(now?"Сохранено":"Сохранить");AutomationProperties.SetName(favorite,AppLanguage.T(now?"Сохранено":"Сохранить"));}
         Paint();favorite.Click+=(_,_)=>{ToggleSaved(current?.Id==item.Id?current:item);Paint();UpdateSavedCount();};
         gameActions.Children.Add(favorite);
+        gameActions.Children.Add(HideTitleButton(item,"GameHide"));
     }
     void ScrollToGameReleases()
     {

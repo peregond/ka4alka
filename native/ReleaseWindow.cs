@@ -138,15 +138,27 @@ public partial class MainWindow
         var filters=new Dictionary<string,ComboBox>();
         void Filter(string label,IEnumerable<string> values,Panel target,bool captioned)
         {
-            var field=new StackPanel{Width=captioned?156:120};
-            if(captioned){var caption=new TextBlock{Text=AppLanguage.T(label),FontSize=11,FontWeight=FontWeights.SemiBold,Margin=new(0,0,0,4)};caption.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");field.Children.Add(caption);}
             var options=new[]{"Все"}.Concat(values.Where(x=>!string.IsNullOrWhiteSpace(x))).Distinct().ToArray();
             var selected=state.Filters.GetValueOrDefault(label,"Все");
             if(!options.Contains(selected))selected="Все";
             var box=new ComboBox{ItemsSource=options,SelectedItem=selected,MinWidth=0,MinHeight=40,Margin=new(0,0,10,10)};
             AutomationProperties.SetName(box,AppLanguage.T("Раздачи: "+label));
-            field.Children.Add(box);target.Children.Add(field);filters[label]=box;
+            filters[label]=box;
             state.Filters[label]=selected;
+            if(!captioned){target.Children.Add(box);return;}
+            // The visible filters are all the same button with a menu; the combo box stays in the tree (collapsed) and holds the value.
+            hidden.Children.Add(box);
+            var chip=new Button{Style=(Style)FindResource("ControlButton")};AutomationProperties.SetName(chip,AppLanguage.T("Фильтр раздач: "+label));
+            var menu=new ToggleContextMenu{PlacementTarget=chip,Placement=System.Windows.Controls.Primitives.PlacementMode.Bottom,MaxHeight=380};
+            foreach(var option in options){var entry=new MenuItem{Header=AppLanguage.T(option),IsCheckable=true,Tag=option};entry.Click+=(_,_)=>{menu.IsOpen=false;box.SelectedItem=option;};menu.Items.Add(entry);}
+            void ShowChoice()
+            {
+                var value=box.SelectedItem?.ToString()??"Все";
+                chip.Content=ChipContent(value=="Все"?label:label+" · "+value,true);StyleChip(chip,value!="Все");
+                foreach(MenuItem entry in menu.Items)entry.IsChecked=Equals(entry.Tag,value);
+            }
+            box.SelectionChanged+=(_,_)=>ShowChoice();ShowChoice();
+            AttachMenuToggle(chip,menu);target.Children.Add(chip);
         }
         var isSeries=current?.Section=="Сериалы";
         if(isSeries){Filter("Сезон",releases.Select(x=>x.Series).OrderBy(x=>x.Season??int.MaxValue).Select(x=>x.SeasonLabel),hidden,false);Filter("Серия",releases.Select(x=>x.Series).OrderBy(x=>x.Episode??int.MaxValue).Select(x=>x.EpisodeLabel),hidden,false);}
@@ -164,7 +176,7 @@ public partial class MainWindow
         AutomationProperties.SetName(sort,AppLanguage.T("Сортировка раздач"));hidden.Children.Add(sort);
 
         // ---- quality segments ----
-        var segmentFrame=new Border{CornerRadius=new(12),BorderThickness=new(1),Padding=new(4),Margin=new(0,0,10,10),VerticalAlignment=VerticalAlignment.Center};segmentFrame.SetResourceReference(Border.BackgroundProperty,"Panel");segmentFrame.SetResourceReference(Border.BorderBrushProperty,"EdgeSoft");
+        var segmentFrame=new Border{CornerRadius=new(12),BorderThickness=new(1),Padding=new(3),Height=40,Margin=new(0,0,8,8),VerticalAlignment=VerticalAlignment.Center};segmentFrame.SetResourceReference(Border.BackgroundProperty,"Panel");segmentFrame.SetResourceReference(Border.BorderBrushProperty,"EdgeSoft");
         AutomationProperties.SetName(segmentFrame,AppLanguage.T("Качество раздач"));
         var segmentRow=new StackPanel{Orientation=Orientation.Horizontal};segmentFrame.Child=segmentRow;top.Children.Add(segmentFrame);
         var segments=new Dictionary<string,RadioButton>();var syncing=false;
@@ -172,7 +184,7 @@ public partial class MainWindow
         {
             var content=new StackPanel{Orientation=Orientation.Horizontal};content.Children.Add(new TextBlock{Text=AppLanguage.T(label),VerticalAlignment=VerticalAlignment.Center});
             content.Children.Add(new TextBlock{Text=AppLanguage.T(count.ToString()),FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=11,Opacity=.7,Margin=new(6,1,0,0),VerticalAlignment=VerticalAlignment.Center});
-            var radio=new RadioButton{Style=(Style)FindResource("SegmentButton"),GroupName="ReleaseQuality"+filmId,Content=content,Tag=value,ToolTip=AppLanguage.T("Показать раздачи: "+label)};AutomationProperties.SetName(radio,AppLanguage.T("Качество: "+label));
+            var radio=new RadioButton{Style=(Style)FindResource("SegmentButton"),MinHeight=32,GroupName="ReleaseQuality"+filmId,Content=content,Tag=value,ToolTip=AppLanguage.T("Показать раздачи: "+label)};AutomationProperties.SetName(radio,AppLanguage.T("Качество: "+label));
             radio.Checked+=(_,_)=>{if(syncing)return;filters["Качество"].SelectedItem=value;};
             segments[value]=radio;segmentRow.Children.Add(radio);
         }
@@ -211,21 +223,23 @@ public partial class MainWindow
         }
 
         // ---- Russian-audio switch ----
-        var voice=new Button{Style=(Style)FindResource("PillButton"),Margin=new(0,0,10,10),Padding=new(14,0,16,0),ToolTip=AppLanguage.T("Показывать только раздачи с профессиональной русской озвучкой")};
+        var voice=new Button{Style=(Style)FindResource("ControlButton"),Padding=new(12,0,14,0),ToolTip=AppLanguage.T("Показывать только раздачи с профессиональной русской озвучкой")};
         var voiceTrack=new Border{Width=34,Height=20,CornerRadius=new(10),Margin=new(0,0,10,0),VerticalAlignment=VerticalAlignment.Center};var voiceKnob=new Border{Width=14,Height=14,CornerRadius=new(7),Margin=new(3),HorizontalAlignment=HorizontalAlignment.Left};voiceTrack.Child=voiceKnob;
         var voiceRow=new StackPanel{Orientation=Orientation.Horizontal};voiceRow.Children.Add(voiceTrack);voiceRow.Children.Add(new TextBlock{Text=AppLanguage.T("Только русская озвучка"),VerticalAlignment=VerticalAlignment.Center});voice.Content=voiceRow;
         AutomationProperties.SetName(voice,AppLanguage.T("Только русская озвучка"));top.Children.Add(voice);
 
         // ---- sort chip ----
-        var sortChip=new Button{Style=(Style)FindResource("PillButton"),Margin=new(0,0,10,10)};AutomationProperties.SetName(sortChip,AppLanguage.T("Сортировка раздач: выбрать"));top.Children.Add(sortChip);
+        var sortChip=new Button{Style=(Style)FindResource("ControlButton")};AutomationProperties.SetName(sortChip,AppLanguage.T("Сортировка раздач: выбрать"));top.Children.Add(sortChip);
         var sortMenu=new ToggleContextMenu{PlacementTarget=sortChip,Placement=System.Windows.Controls.Primitives.PlacementMode.Bottom,MaxHeight=380};
         foreach(var name in sorts){var entry=new MenuItem{Header=AppLanguage.T(name),IsCheckable=true,Tag=name};entry.Click+=(_,_)=>{sortMenu.IsOpen=false;sort.SelectedItem=name;};sortMenu.Items.Add(entry);}
         AttachMenuToggle(sortChip,sortMenu);
 
-        var toggle=new Button{Style=(Style)FindResource("PillButton"),Margin=new(0,0,10,10)};
-        var reset=new Button{Content=AppLanguage.T("Сбросить"),Style=(Style)FindResource("QuietButton"),Padding=new(12,0,12,0),Margin=new(0,0,10,10)};
+        var toggle=new Button{Style=(Style)FindResource("ControlButton")};
+        var reset=new Button{Content=AppLanguage.T("Сбросить"),Style=(Style)FindResource("QuietButton"),Height=40,FontSize=13,Padding=new(12,0,12,0),Margin=new(0,0,8,8)};
         AutomationProperties.SetName(reset,AppLanguage.T("Сбросить фильтры и сортировку раздач"));
         top.Children.Add(toggle);top.Children.Add(reset);
+        // Quality is the filter most often used: it comes first, the rest follow in one even row.
+        top.Children.Remove(segmentFrame);top.Children.Insert(0,segmentFrame);
         var results=new StackPanel{Margin=new(0,8,0,0)};panel.Children.Add(results);
         var recommended=ReleaseRecommendation.Pick(releases,QualityMinimum,prefs.UiLanguage);
         bool compact=Body.ActualWidth<1000,changingFilters=false;

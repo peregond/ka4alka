@@ -85,9 +85,9 @@ public partial class MainWindow
     {
         if(!releaseViews.ContainsKey(item.Id))releaseViews[item.Id]=new();
         releaseSourceItemId=item.Id;renderedSourceChecks=null;
-        var show=Button("Источники",()=>{});show.Style=(Style)FindResource("QuietButton");show.Padding=new(8,6,8,6);show.MinHeight=30;show.Margin=new(0,0,4,0);show.BorderThickness=new(0);show.VerticalAlignment=VerticalAlignment.Center;
+        var show=Button("Источники",()=>{});show.Style=(Style)FindResource("QuietButton");show.Padding=new(12,0,12,0);show.Height=40;show.MinHeight=40;show.FontSize=13;show.Margin=new(0,0,4,0);show.BorderThickness=new(0);show.VerticalAlignment=VerticalAlignment.Center;
         show.ToolTip=AppLanguage.T("Состояние трекеров и онлайн-индекса");AutomationProperties.SetName(show,AppLanguage.T("Показать состояние источников"));toolbar.Children.Add(show);releaseSourceToggle=show;
-        var retry=ActionButton("Обновить","IconRefresh",()=>RetryReleases(item));retry.MinHeight=30;retry.Padding=new(8,6,8,6);retry.Margin=new(0,0,6,0);retry.BorderThickness=new(0);retry.VerticalAlignment=VerticalAlignment.Center;
+        var retry=ActionButton("Обновить","IconRefresh",()=>RetryReleases(item));retry.Height=40;retry.MinHeight=40;retry.FontSize=13;retry.Padding=new(12,0,12,0);retry.Margin=new(0,0,6,0);retry.BorderThickness=new(0);retry.VerticalAlignment=VerticalAlignment.Center;
         retry.ToolTip=AppLanguage.T("Повторить поиск раздач во всех источниках");AutomationProperties.SetName(retry,AppLanguage.T("Обновить варианты загрузки"));toolbar.Children.Add(retry);releaseSourceRetry=retry;
         var summary=Text("",11,true);summary.Name="SourceSummary";summary.Margin=new(4,6,4,6);summary.MaxWidth=260;summary.TextTrimming=TextTrimming.CharacterEllipsis;summary.TextWrapping=TextWrapping.NoWrap;summary.VerticalAlignment=VerticalAlignment.Center;
         toolbar.Children.Add(summary);releaseSourceSummary=summary;
