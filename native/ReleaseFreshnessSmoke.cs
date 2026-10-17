@@ -68,7 +68,9 @@ public partial class MainWindow
                 Check(sourcePanel.Visibility==Visibility.Collapsed,name+": repeated click did not collapse the source details.");
                 var studio=FindVisual<ComboBox>(Body,x=>AutomationProperties.GetName(x)=="Раздачи: Студия озвучки")!;
                 var audioType=FindVisual<ComboBox>(Body,x=>AutomationProperties.GetName(x)=="Раздачи: Тип озвучки")!;
-                Check(studio.IsVisible&&audioType.IsVisible,name+": audio filters are not visible in the primary row.");
+                // The audio filters are buttons with a menu in the primary row; the combo boxes behind them hold the value.
+                var studioChip=FindVisual<Button>(Body,x=>AutomationProperties.GetName(x)=="Фильтр раздач: Студия озвучки");var typeChip=FindVisual<Button>(Body,x=>AutomationProperties.GetName(x)=="Фильтр раздач: Тип озвучки");
+                Check(studioChip is {IsVisible:true}&&typeChip is {IsVisible:true}&&studioChip.ActualHeight==typeChip.ActualHeight&&studioChip.ActualHeight==40,name+": audio filters are not visible in the primary row at one height.");
                 studio.SelectedItem="LostFilm";await Settle();
                 Check(VisualElements<Button>(Body).Any(x=>x.Tag is SourceEntry e&&e.Id==direct.Id)
                     &&!VisualElements<Button>(Body).Any(x=>x.Tag is SourceEntry e&&e.Id==indexed.Id),name+": studio filter did not select the advertised track.");
