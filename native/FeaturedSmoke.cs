@@ -44,6 +44,9 @@ public partial class MainWindow
         Check(Navigation.Children.OfType<Button>().First().Tag?.ToString()==FeaturedSection,"Featured is the first library section.");
         Check(Navigation.Children.OfType<Button>().First().Content is Grid navGrid&&navGrid.Children.OfType<System.Windows.Shapes.Path>().FirstOrDefault()?.Fill!=null,"The icon of the open section is solid.");
         Check(Navigation.Children.OfType<Button>().Skip(1).All(button=>button.Content is Grid other&&other.Children.OfType<System.Windows.Shapes.Path>().FirstOrDefault()?.Fill==null),"The icons of the other sections stay outlined.");
+        Check(FindVisual<ScrollViewer>(Body,_=>true) is {} pageScroll&&FindVisual<TextBlock>(pageScroll,text=>text.Name=="FeaturedHeading")!=null,"The page title and date scroll away with the stories.");
+        Check(featuredHero!=null&&VisualElements<TextBlock>(featuredHero).Any(text=>text.Text=="КП")&&VisualElements<TextBlock>(featuredHero).Any(text=>text.Text=="IMDb")&&!VisualElements<TextBlock>(featuredHero).Any(text=>text.Text is "Фильм" or "Сериал"),"The banner shows both ratings with the mark of their site and no kind word.");
+        Check(FindVisual<StackPanel>(Body,panel=>panel.Name=="FeaturedotherworldsBlock") is {} leadBlock&&VisualElements<TextBlock>(leadBlock).Any(text=>text.Text=="1")&&VisualElements<TextBlock>(leadBlock).Any(text=>text.Text=="2"),"The lead story is numbered one like the list beside it.");
         Check(SearchBar.Visibility==Visibility.Visible&&featuredShelves.Count==4,"Search and editorial shelves are available.");
         Check(featuredShelves[rankingDefinition.Id].Custom!=null&&FindVisual<StackPanel>(Body,panel=>panel.Name=="FeaturedtopratedBlock")?.Children.OfType<UniformGrid>().FirstOrDefault()?.Children.Count>=2,"The ranking shows numbered posters.");
         // Films, series and games each have a tab in the ranking; a tab shows its own list.
@@ -67,6 +70,20 @@ public partial class MainWindow
         ShowFeatured();OpenFeaturedCollection(gameDefinition.Id);await Settle();Check(GameGrid,"A curated game collection uses wide game cards.");
         card=VisualElements<Button>(Body).First(button=>button.Tag is MediaItem);Click(card);await Settle();GameBack();await Settle();
         Check(section==FeaturedSection&&featuredCollectionId==gameDefinition.Id,"Back from a game also returns to the curated collection.");
+        // An award page lists every year: the winner first, the nominees after it, each with its own tag.
+        var awardDefinition=new FeaturedCollection("award-oscar-best-picture","Оскар","Academy Awards","Лучший фильм","Best Picture");
+        AwardEntry Entry(int year,string imdb,string title)=>new(year,imdb,title,title,title,year-1,null);
+        Awards.Seed([new("oscar-best-picture","Оскар","Academy Awards","Лучший фильм","Best Picture",[Entry(2025,"tt0000101","Победитель 2025"),Entry(2024,"tt0000102","Победитель 2024")])],
+            new(){["oscar-best-picture"]=[Entry(2025,"tt0000103","Номинант А"),Entry(2025,"tt0000104","Номинант Б"),Entry(2024,"tt0000105","Номинант В")]});
+        featuredGroups=[..fixtureGroups,new(awardDefinition,[])];
+        ShowFeatured();OpenFeaturedCollection(awardDefinition.Id);await Settle();
+        Check(VisualElements<TextBlock>(Body).Count(text=>text.Text is "2025" or "2024")==2,"The award page has a heading for each year.");
+        Check(VisualElements<Button>(Body).Count(button=>button.Tag is MediaItem)==5,"Each year lists its winner and its nominees.");
+        Check(VisualElements<TextBlock>(Body).Count(text=>text.Text=="Победитель")==2&&VisualElements<TextBlock>(Body).Count(text=>text.Text=="Номинант")==3,"Winners and nominees carry their own tag.");
+        Point Where(TextBlock text)=>text.TransformToAncestor(Body).Transform(new Point());
+        var firstWinner=Where(VisualElements<TextBlock>(Body).First(text=>text.Text=="Победитель"));var firstNominee=Where(VisualElements<TextBlock>(Body).First(text=>text.Text=="Номинант"));
+        Check(firstWinner.Y<firstNominee.Y||firstWinner.Y==firstNominee.Y&&firstWinner.X<firstNominee.X,"The winner of the newest year comes before its nominees.");
+        featuredGroups=fixtureGroups;ShowFeatured();await Settle();
         foreach(var language in new[]{"ru","en"})
         {
             prefs.UiLanguage=language;AppLanguage.Set(language);ShowFeatured();await Settle();
@@ -75,7 +92,7 @@ public partial class MainWindow
             for(var wait=0;wait<200&&featuredGroups==null;wait++)await Task.Delay(50);await Settle();
             Check(featuredGroups!=null&&featuredLanguage==language,"Shelves are resolved again after the interface language changes: "+language);
             featuredProvider=null;
-            Check(FindVisual<TextBlock>(PageHeader,text=>text.Name=="FeaturedHeading")?.Text==AppLanguage.T(FeaturedSection),"Featured title translates: "+language);
+            Check((FindVisual<TextBlock>(Body,text=>text.Name=="FeaturedHeading")??FindVisual<TextBlock>(PageHeader,text=>text.Name=="FeaturedHeading"))?.Text==AppLanguage.T(FeaturedSection),"Featured title translates: "+language);
             foreach(var width in new[]{760d,1280d})
             {
                 Width=width;await Settle();ResizeFeaturedShelves();

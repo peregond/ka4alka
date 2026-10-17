@@ -35,6 +35,8 @@ public record MediaItem(int Id, string Title, string Section, string Genre, int 
     [JsonIgnore] public bool IsLive => PageUrl!=null;
     [JsonIgnore] public bool Cinema => Section is "Фильмы" or "Сериалы";
     string? liveScores,liveKp,liveImdb,liveGenre;
+    [JsonIgnore] public string KpValue => liveKp??Kinopoisk;
+    [JsonIgnore] public string ImdbValue => liveImdb??Imdb;
     [JsonIgnore] public string KpDisplay => "КП  "+(liveKp??Kinopoisk);
     [JsonIgnore] public string ImdbDisplay => "IMDb  "+(liveImdb??Imdb);
     [JsonIgnore] public bool KpAvailable => !string.IsNullOrWhiteSpace(liveKp??Kinopoisk)&&(liveKp??Kinopoisk)!="—";
@@ -237,6 +239,8 @@ public class DownloadItem : INotifyPropertyChanged
     public string? ReleaseId {get;set;}
     public string? ReleasePageUrl {get;set;}
     public string? ReleaseUrl {get;set;}
+    // A series release the tracker may have replaced with a newer torrent: it gets a one-click update on its row.
+    [JsonIgnore] public bool CanUpdateRelease=>MediaSection=="Сериалы"&&!FilesMissing&&!string.IsNullOrWhiteSpace(ReleaseSource)&&(!string.IsNullOrWhiteSpace(ReleaseUrl)||!string.IsNullOrWhiteSpace(ReleasePageUrl));
     [JsonIgnore] public string DisplayName=>string.IsNullOrWhiteSpace(MediaTitle)?Name:MediaTitle;
     [JsonIgnore] public string YearLabel=>MediaYear is >=1880 and <=2100?MediaYear.ToString(System.Globalization.CultureInfo.InvariantCulture):"";
     [JsonIgnore] public bool HasYear=>YearLabel.Length>0;

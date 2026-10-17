@@ -200,6 +200,45 @@ public sealed partial class DownloadService
             }
         }finally{gate.Release();}
     }
+    public enum TorrentUpdate {Unchanged,Updated}
+    // A tracker keeps one topic and swaps its torrent as a running series gains episodes. The queued task takes the new
+    // torrent in place: the files already on disk are found again by the hash check and only the new part is fetched.
+    public async Task<TorrentUpdate> ReplaceTorrentAsync(DownloadItem item,string source)
+    {
+        if(item.Busy)throw new InvalidOperationException("С этой загрузкой сейчас что-то происходит. Попробуй чуть позже.");
+        item.Busy=true;item.Refresh();await gate.WaitAsync();
+        try
+        {
+            if(!Items.Contains(item))throw new InvalidOperationException("Эта загрузка уже убрана из очереди.");
+            string identity,name;
+            if(source.StartsWith("magnet:",StringComparison.OrdinalIgnoreCase)){var magnet=MagnetLink.Parse(source);identity=HashKey(magnet.InfoHashes);name=string.IsNullOrWhiteSpace(magnet.Name)?item.Name:magnet.Name;}
+            else
+            {
+                if(!File.Exists(source)||new FileInfo(source).Length>10*1024*1024)throw new InvalidOperationException("Выбери .torrent-файл размером до 10 МБ.");
+                var torrent=await Torrent.LoadAsync(source);identity=HashKey(torrent.InfoHashes);name=torrent.Name;
+                var cache=Path.Combine(Preferences.DataDir,"torrents");Directory.CreateDirectory(cache);
+                var cached=Path.Combine(cache,Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(await File.ReadAllBytesAsync(source)))+".torrent");
+                if(!File.Exists(cached))File.Copy(source,cached);source=cached;
+            }
+            if(string.Equals(identity,ExistingHash(item),StringComparison.OrdinalIgnoreCase))return TorrentUpdate.Unchanged;
+            if(Items.Any(x=>x!=item&&string.Equals(ExistingHash(x),identity,StringComparison.OrdinalIgnoreCase)))throw new InvalidOperationException("Обновлённая раздача уже стоит в очереди отдельной задачей.");
+            var resume=!item.Paused;
+            pendingResume.Remove(item.Id);CancelMetadataWatch(item.Id);
+            if(managers.TryGetValue(item.Id,out var old)){await StopManager(old);await Engine.RemoveAsync(old);managers.Remove(item.Id);meters.Remove(item.Id);}
+            item.Source=source;item.InfoHash=identity;item.Name=name;item.Files=[];item.Paused=true;
+            item.HasCompletedDownload=false;item.FilesMissing=false;item.MissingFilesMessage="";item.Progress=0;item.Hint="";completionNotified.Remove(item.Id);
+            Save();
+            if(resume)
+            {
+                var fresh=await Manager(item);SnapshotFiles(item,fresh);
+                if(await EnsureSpaceAsync(item,fresh,lifetime.Token)){await fresh.StartAsync();item.Paused=false;item.LowSpacePaused=false;item.SpacePauseMessage="";item.SpaceCheckFailed=false;item.LastStartedUtc=DateTime.UtcNow;}
+            }
+            Update();Save();await ReleaseIdleEngine();
+            DiagnosticLog.Write("download-torrent-updated",new{item.Id,item.ReleaseSource,item.InfoHash});
+            return TorrentUpdate.Updated;
+        }
+        finally{item.Busy=false;item.Refresh();gate.Release();}
+    }
     public Task Toggle(DownloadItem item)=>SetPausedAsync(item,!item.Paused);
     async Task SetPausedAsync(DownloadItem item,bool paused,bool redownload=false)
     {

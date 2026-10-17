@@ -18,6 +18,12 @@ public static class FeaturedCatalogTests
         Check(groups.Single(row=>row.Collection.Id==first.Id).Items.Select(item=>item.Id).SequenceEqual(new[]{11,12}),"Editorial order survives shuffled/duplicate catalog data; missing IDs are skipped.");
         var games=groups.Single(row=>row.Collection.IsGames).Items;
         Check(games.Length>0&&games.All(item=>item.Section=="Игры"&&GameCatalog.TryId(item.PageUrl,out _)),"Game cards must open real Steam IDs through the normal game detail view.");
+        // A shelf that mixes kinds is an ordinary poster shelf: films and series first in their order, the games spread between them with tall art.
+        var tonight=definitions.Single(row=>row.IsMixed);
+        var tonightCatalog=tonight.MediaIds!.Select((online,index)=>Film(200+index,online)).ToArray();
+        var tonightItems=FeaturedCatalog.Resolve(tonightCatalog).Single(row=>row.Collection.Id==tonight.Id).Items;
+        Check(tonightItems[0].Id==200&&tonightItems.Count(item=>item.Section=="Игры")==tonight.Games!.Length&&tonightItems.Any(item=>item.Section!="Игры")&&tonightItems.Where(item=>item.Section=="Игры").All(item=>item.ImageUrl!.EndsWith("library_600x900.jpg",StringComparison.Ordinal)),"A mixed shelf interleaves films, series and games and shows games on tall art.");
+        Check(tonightItems.TakeWhile(item=>item.Section!="Игры").Count()<tonightCatalog.Length,"The games of a mixed shelf stand between the films, not all at the end.");
         var seasonal=new SeasonalCollection("test","Seasonal",[ids[1],"movies:missing"]);
         var seasonalGroups=FeaturedCatalog.Resolve([a,b],[seasonal]);
         Check(seasonalGroups[0].Collection.Id=="seasonal-test"&&seasonalGroups[0].Items.Single().Id==12,"Shared editorial collections join the hub using exact IDs.");

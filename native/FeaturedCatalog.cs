@@ -8,7 +8,9 @@ public sealed record FeaturedCollection(string Id,string Title,string TitleEn,st
 {
     public string Label=>AppLanguage.Current=="en"?TitleEn:Title;
     public string Summary=>AppLanguage.Current=="en"?DescriptionEn:Description;
-    public bool IsGames=>Games is {Length:>0};
+    // A shelf of games only has wide capsules; one that mixes films, series and games is an ordinary poster shelf.
+    public bool IsGames=>Games is {Length:>0}&&MediaIds is not {Length:>0};
+    public bool IsMixed=>Games is {Length:>0}&&MediaIds is {Length:>0};
     // The small caps rubric above the heading.
     public string Kicker=>AppLanguage.T(Id.StartsWith("seasonal-",StringComparison.Ordinal)?"Сезон":Id.StartsWith("genre-",StringComparison.Ordinal)?"Жанр":Id.StartsWith("award-",StringComparison.Ordinal)?"Награды":Id==FeaturedCatalog.FreshId?"Новое":Id==FeaturedCatalog.TopRatedId?"Рейтинг":IsGames?"Игры":"Подборка");
 }
@@ -27,7 +29,7 @@ public static class FeaturedCatalog
         MediaItem[] Members(IEnumerable<string> ids)=>ids.Distinct(StringComparer.Ordinal).Where(lookup.ContainsKey).Select(id=>lookup[id]).Take(40).ToArray();
         var groups=Collections.Select(collection=>new FeaturedGroup(collection,collection.IsGames
             ?collection.Games!.Take(40).Select(game=>GameCatalog.Item(game.Id,game.Title,"https://cdn.akamai.steamstatic.com/steam/apps/"+game.Id+"/header.jpg")).ToArray()
-            :Members(collection.MediaIds??[]))).ToList();
+            :collection.IsMixed?Interleave(Members(collection.MediaIds??[]),collection.Games!.Select(game=>GameCatalog.Item(game.Id,game.Title,GamePortrait(game.Id))).ToArray()):Members(collection.MediaIds??[]))).ToList();
         var seasonalGroups=new List<FeaturedGroup>();
         foreach(var collection in (seasonal??[]).Take(10))
         {
@@ -52,6 +54,17 @@ public static class FeaturedCatalog
                 groups.Add(new(new("genre-"+key,title,titleEn,"Лучшее по оценкам зрителей","Best rated by viewers"),best));
             }
         return seasonalGroups.Concat(groups).ToArray();
+    }
+    // Films and series in their order with the games spread between them, so every kind shows up early in the row.
+    static MediaItem[] Interleave(MediaItem[] media,MediaItem[] games)
+    {
+        var result=new List<MediaItem>();var every=games.Length==0?int.MaxValue:Math.Max(1,media.Length/games.Length);var next=0;
+        for(var index=0;index<media.Length;index++)
+        {
+            result.Add(media[index]);
+            if(next<games.Length&&(index+1)%every==0)result.Add(games[next++]);
+        }
+        result.AddRange(games.Skip(next));return result.Take(40).ToArray();
     }
     const int GenreMinimum=6;
     static readonly (string Key,string Title,string TitleEn)[] Genres=

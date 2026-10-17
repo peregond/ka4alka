@@ -16,7 +16,8 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # The nominees need a poster lookup per film, one by one.
+    timeout-minutes: 30
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
@@ -26,7 +27,7 @@ jobs:
           python-version: '3.12'
       - name: Check the collector offline
         run: python scripts/test-collect-awards.py
-      - name: Collect the winners of every year from Wikidata
+      - name: Collect the winners and nominees of every year from Wikidata
         run: |
           set +e
           python scripts/collect_awards.py --output awards.json 2> collect-error.txt
@@ -34,6 +35,19 @@ jobs:
           if [ $status -ne 0 ]; then
             echo "::error title=Collect awards::$(tr '\n' ' ' < collect-error.txt)"
             exit $status
+          fi
+          if grep -q '^warning:' collect-error.txt; then
+            echo "::warning title=Nominees::$(grep '^warning:' collect-error.txt | tr '\n' ' ')"
+          fi
+          if [ -f awards-nominees.json ]; then
+            python - <<'PY'
+          import json
+          feed = json.load(open('awards-nominees.json', encoding='utf-8'))
+          for award in feed['awards']:
+              entries = award['entries']
+              years = sorted({e['year'] for e in entries})
+              print(f"::notice title=nominees {award['id']} ({len(entries)})::years {years[0]}-{years[-1]}, {len(years)} years covered; posters {sum(1 for e in entries if e.get('poster'))}")
+          PY
           fi
           # A compact copy in the run's annotations, so the collected lists can be reviewed before they are published.
           python - <<'PY'
@@ -55,6 +69,18 @@ jobs:
           mkdir verify
           gh release download catalog-data --pattern awards.json --dir verify
           cmp awards.json verify/awards.json
+          # The nominees are optional: the collector skips them when Wikidata does not answer, and the app then shows winners alone.
+          if [ -f awards-nominees.json ]; then
+            gh release upload catalog-data awards-nominees.json --clobber
+            gh release download catalog-data --pattern awards-nominees.json --dir verify
+            cmp awards-nominees.json verify/awards-nominees.json
+            python - <<'PY'
+          import json, os
+          feed = json.load(open('awards-nominees.json', encoding='utf-8'))
+          lines = ', '.join(f"{a['id']}: {len(a['entries'])}" for a in feed['awards'])
+          open(os.environ['GITHUB_STEP_SUMMARY'], 'a').write(f"Published awards-nominees.json ({lines}).\n")
+          PY
+          fi
           python - <<'PY'
           import json
           feed = json.load(open('awards.json', encoding='utf-8'))

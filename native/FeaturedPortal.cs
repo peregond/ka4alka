@@ -48,12 +48,13 @@ public partial class MainWindow
         var line=new StackPanel{Orientation=Orientation.Horizontal};
         if(item.HasCardRating)
         {
-            var star=new TextBlock{Text="★",FontSize=size,Margin=new(0,0,4,0)};star.SetResourceReference(TextBlock.ForegroundProperty,"RatingInk");line.Children.Add(star);
-            var rating=new TextBlock{Text=item.CardRating,FontSize=size,FontWeight=FontWeights.Bold,Margin=new(0,0,6,0)};rating.SetResourceReference(TextBlock.ForegroundProperty,"RatingInk");line.Children.Add(rating);
+            var rating=RatingRow(item.CardRatingSource,item.CardRating,size);rating.Margin=new(0,0,8,0);line.Children.Add(rating);
         }
         // The kind of title first, so films, series and games sitting side by side can be told apart.
         var kind=AppLanguage.T(item.Section switch{"Сериалы"=>"Сериал","Игры"=>"Игра",_=>"Фильм"});
-        var rest=string.Join(" · ",new[]{kind,item.Year>0?item.Year.ToString():"",item.CardGenre}.Where(part=>part.Length>0));
+        // One genre: the line sits in a narrow column and a longer list is cut off.
+        var genre=item.AllGenres.Split(", ",StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()??"";if(item.Section=="Игры"&&genre=="Windows")genre="";
+        var rest=string.Join(" · ",new[]{kind,item.Year>0?item.Year.ToString():"",genre}.Where(part=>part.Length>0));
         var tail=new TextBlock{Text=rest,FontSize=size,TextTrimming=TextTrimming.CharacterEllipsis};tail.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");line.Children.Add(tail);
         return line;
     }
@@ -130,14 +131,17 @@ public partial class MainWindow
         var grid=new Grid{Margin=new(0,4,0,0)};
         grid.ColumnDefinitions.Add(new(){Width=new GridLength(1.15,GridUnitType.Star)});
         if(wide){grid.ColumnDefinitions.Add(new(){Width=new GridLength(26)});grid.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});}
-        var story=new Grid();story.ColumnDefinitions.Add(new(){Width=GridLength.Auto});story.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});
-        story.Children.Add(StoryPoster(lead,columns>=5?190:150,14));
+        // The story is number one of the list beside it, so it wears the same kind of numeral as the rows below.
+        var story=new Grid();story.ColumnDefinitions.Add(new(){Width=new GridLength(34)});story.ColumnDefinitions.Add(new(){Width=GridLength.Auto});story.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});
+        var first=new TextBlock{Text="1",FontFamily=(FontFamily)FindResource("DisplayFont"),FontSize=20,FontWeight=FontWeights.ExtraBold,VerticalAlignment=VerticalAlignment.Top,Margin=new(0,6,0,0)};first.SetResourceReference(TextBlock.ForegroundProperty,"EdgeFocus");story.Children.Add(first);
+        var leadPoster=StoryPoster(lead,columns>=5?190:150,14);Grid.SetColumn(leadPoster,1);story.Children.Add(leadPoster);
         var text=new StackPanel{Margin=new(20,2,0,0)};
         text.Children.Add(RatingMeta(lead,13));
         var title=TextRaw(lead.DisplayTitle,26);title.FontWeight=FontWeights.ExtraBold;title.LineHeight=30;title.LineStackingStrategy=LineStackingStrategy.BlockLineHeight;title.Margin=new(0,8,0,10);title.MaxHeight=90;title.TextTrimming=TextTrimming.CharacterEllipsis;text.Children.Add(title);
         var summary=TextRaw(lead.DisplayDescription??"",14);summary.LineHeight=21;summary.LineStackingStrategy=LineStackingStrategy.BlockLineHeight;summary.MaxHeight=columns>=5?126:84;summary.TextTrimming=TextTrimming.CharacterEllipsis;summary.Margin=new(0,0,0,0);summary.SetResourceReference(TextBlock.ForegroundProperty,"TextSoft");text.Children.Add(summary);
-        Grid.SetColumn(text,1);story.Children.Add(text);
-        grid.Children.Add(StoryButton(lead,story,lead.DisplayTitle));
+        Grid.SetColumn(text,2);story.Children.Add(text);
+        // Padding keeps the hover and focus ring clear of the poster instead of cutting into its edge.
+        var leadButton=StoryButton(lead,story,lead.DisplayTitle);leadButton.Padding=new(8);grid.Children.Add(leadButton);
         if(rest.Length>0)
         {
             var list=new StackPanel{Margin=wide?new(0):new(0,18,0,0)};

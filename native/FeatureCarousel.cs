@@ -156,15 +156,11 @@ public partial class MainWindow
             else if(store is {HasPrice:true})view.Meta.Children.Add(GamePriceBadge(store.Price,store.Discount,store.OriginalPrice));
             return;
         }
-        if(item.HasCardRating)
-        {
-            var rating=new StackPanel{Orientation=Orientation.Horizontal,Margin=new(0,0,12,4)};
-            var star=new TextBlock{Text="★",FontSize=14,Margin=new(0,0,5,0),VerticalAlignment=VerticalAlignment.Center};star.SetResourceReference(TextBlock.ForegroundProperty,"RatingInk");rating.Children.Add(star);
-            rating.Children.Add(new TextBlock{Text=item.CardRating,FontSize=14,FontWeight=FontWeights.Bold,Foreground=(Brush)FindResource("BannerText"),VerticalAlignment=VerticalAlignment.Center});view.Meta.Children.Add(rating);
-        }
+        // Each rating carries the mark of its site; the genre stands where the word «Фильм» used to be.
+        foreach(var (source,value) in MediaRatings(item)){var rating=RatingRow(source,value,14,(Brush)FindResource("BannerText"));rating.Margin=new(0,0,12,4);view.Meta.Children.Add(rating);}
         if(item.Year>0)view.Meta.Children.Add(Label(item.Year.ToString()));
-        view.Meta.Children.Add(Label(item.Section=="Сериалы"?"Сериал":"Фильм"));
-        if(item.CardGenre.Length>0&&item.Genre.Length>0)view.Meta.Children.Add(Label(item.CardGenre));
+        var genres=string.Join(", ",item.AllGenres.Split(", ",StringSplitOptions.RemoveEmptyEntries).Take(2));
+        if(genres.Length>0)view.Meta.Children.Add(Label(genres));
         var qualities=item.ReleaseResolutions.OrderByDescending(x=>x).Select(x=>x>=2160?"4K":x+"p").Take(3).ToList();
         if(qualities.Count==0&&item.PosterQuality.Length>0)qualities.Add(item.PosterQuality);
         foreach(var quality in qualities)

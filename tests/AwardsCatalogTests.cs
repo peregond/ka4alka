@@ -21,6 +21,22 @@ public static class AwardsCatalogTests
     {
         void Check(bool pass,string message){if(!pass)throw new Exception(message);}
         void Rejects(string json,string message){try{AwardsCatalog.Parse(Encoding.UTF8.GetBytes(json));}catch(InvalidDataException){return;}throw new Exception(message);}
+        // Nominees live in their own file and are read just as strictly.
+        const string NomineesSample="""
+        {"schemaVersion":1,"generatedAtUtc":"2026-10-17T05:00:00Z","awards":[{"id":"oscar-best-picture","entries":[
+          {"year":2024,"imdbId":"tt1","title":"X","titleEn":"X","originalTitle":"X","filmYear":2023},
+          {"year":2025,"imdbId":"tt16311594","title":"Эмилия Перес","titleEn":"Emilia Perez","originalTitle":"Emilia Pérez","filmYear":2024,"poster":"https://upload.example/e.jpg"},
+          {"year":2025,"imdbId":"tt16311594","title":"Эмилия Перес","titleEn":"Emilia Perez","originalTitle":"Emilia Pérez","filmYear":2024},
+          {"year":2025,"imdbId":"tt11271038","title":"Анора","titleEn":"Anora","originalTitle":"Anora","filmYear":2024}
+        ]}]}
+        """;
+        var nomineeSample=NomineesSample.Replace("\"tt1\"","\"tt15398776\"");
+        var nominated=AwardsCatalog.ParseNominees(Encoding.UTF8.GetBytes(nomineeSample))["oscar-best-picture"];
+        Check(nominated.Length==3&&nominated[0].Year==2025&&nominated.Select(entry=>entry.ImdbId+entry.Year).Distinct().Count()==3,"Nominees are read newest year first and a film is listed once a year.");
+        void RejectsNominees(string json,string message){try{AwardsCatalog.ParseNominees(Encoding.UTF8.GetBytes(json));}catch(InvalidDataException){return;}throw new Exception(message);}
+        RejectsNominees(nomineeSample.Replace("\"schemaVersion\":1","\"schemaVersion\":2"),"An unknown nominees version is rejected.");
+        RejectsNominees(nomineeSample.Replace("tt16311594","bad-id"),"A bad IMDb id rejects the whole nominees file.");
+        Check(new AwardsCatalog(new SourceClient(new Fake(_=>new HttpResponseMessage(HttpStatusCode.NotFound)))).NomineesOf("oscar-best-picture").Count==0,"Without the nominees file a page shows winners alone.");
         var parsed=AwardsCatalog.Parse(Encoding.UTF8.GetBytes(Sample));
         var oscar=parsed.Single();var entries=oscar.Entries;
         Check(entries.Select(entry=>entry.ImdbId).SequenceEqual(new[]{"tt11271038","tt15398776"}),"Winners are listed newest year first and a repeated IMDb id is read once.");

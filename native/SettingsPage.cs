@@ -90,7 +90,7 @@ public partial class MainWindow
         {
             notice.Text=AppLanguage.T(message);notice.SetResourceReference(TextBlock.ForegroundProperty,error?"Danger":"Accent");notice.Visibility=Visibility.Visible;Status.Text=AppLanguage.T(message);
         }
-        var appearance=Card("Внешний вид","Язык, тема и режим для слабых компьютеров.","IconTheme");
+        var appearance=Card("Внешний вид","Язык, тема и режим для слабых компьютеров.",prefs.Light?"IconSun":"IconMoon");
         var languageLabel=Text("Язык интерфейса",13);languageLabel.FontWeight=FontWeights.SemiBold;appearance.Children.Add(languageLabel);
         var language=new ComboBox{Name="SettingsLanguage",ItemsSource=new[]{"Русский","English"},SelectedIndex=prefs.UiLanguage=="en"?1:0,MaxWidth=320,MinWidth=0,HorizontalAlignment=HorizontalAlignment.Left,Margin=new(0,0,0,12)};
         AutomationProperties.SetName(language,AppLanguage.T("Язык интерфейса"));appearance.Children.Add(language);
@@ -149,7 +149,7 @@ public partial class MainWindow
             try{prefs.Save();ApplyLiteMode();Feedback(liteNotice,"Настройка сохранена.");}
             catch(Exception error){prefs.LiteMode=previous;prefs.LiteModeConfigured=configured;lite.IsChecked=previous;ApplyLiteMode();Feedback(liteNotice,"Не удалось сохранить настройки: "+error.Message,true);}
         };
-        var personal=Card("Игнорируемое","Скрой названия и жанры в каталоге и подборках. В поиске, «Сохранённом» и загрузках они остаются.","IconMovies");
+        var personal=Card("Игнорируемое","Скрой названия и жанры в каталоге и подборках. В поиске, «Сохранённом» и загрузках они остаются.","IconEyeOff");
         RenderHiddenCatalogSettings(personal);
         var catalogue=Card("Каталог","Страна для подборок «Отечественное» и источники данных.","IconMovies");
         var countryLabel=Hint("Отечественное кино");countryLabel.Margin=new(0,0,0,7);catalogue.Children.Add(countryLabel);

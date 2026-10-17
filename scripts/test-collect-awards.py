@@ -136,4 +136,20 @@ try:
 except urllib.error.HTTPError as error:
     assert error.code == 503
 
+# Nominees: the winner of a year is not listed again, the P1411 query asks for 'nominated for'.
+assert 'p:P1411' in awards.query('Q102427', 'P1411') and 'p:P166' in awards.query('Q102427')
+winners_document = {'awards': [{'id': 'oscar-best-picture', 'entries': entries}]}
+nominee_rows = [
+    row('tt11271038', '2025-03-02T00:00:00Z', 'Anora', 'Анора', 'Anora', '2024-05-21T00:00:00Z'),  # the winner is also "nominated"
+    row('tt16311594', '2025-03-02T00:00:00Z', 'Emilia Pérez', '', '', '2024-05-18T00:00:00Z'),
+    row('tt11271038', '2024-03-10T00:00:00Z', 'Anora', '', '', '2024-05-21T00:00:00Z'),  # same film, other year: kept
+]
+nominees = awards.nominees_from(response(*nominee_rows), entries)
+assert [(e['imdbId'], e['year']) for e in nominees] == [('tt16311594', 2025), ('tt11271038', 2024)], nominees
+document = awards.build_nominees({'oscar-best-picture': response(*nominee_rows)}, winners_document, posters=lambda imdb: 'https://example.org/' + imdb + '.jpg')
+assert document['schemaVersion'] == 1 and document['awards'][0]['id'] == 'oscar-best-picture'
+assert all(e['poster'].startswith('https://example.org/') for e in document['awards'][0]['entries']), 'nominees get the IMDb posters too'
+assert awards.build_nominees({}, winners_document)['awards'] == [], 'an award without nominees is left out'
+expect_error(lambda: awards.build_nominees({'oscar-best-picture': response(*nominee_rows)}, winners_document, limit=1), 'at most')
+
 print('PASS: Wikidata rows become entries, checks reject wrong lists, the file is written for the app')

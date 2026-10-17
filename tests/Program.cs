@@ -53,7 +53,7 @@ if(args.Contains("--probe-portraits")){await PortraitSourceProbe.Run(root);retur
 if(args.Contains("--featured-only")){FeaturedCatalogTests.Run();return;}
 if(args.Contains("--performance-only")){FeaturedCatalogTests.Run();ReleaseQualityTests.Run();await CatalogBatchTests.Run();FeatureSummaryTests.Run();await PerformanceResourcesTests.Run();await CoverCachePerformanceTests.Run(root);await UnifiedSearchTests.Run();await ReleaseSearchTests.Run();return;}
 if(args.Contains("--home-availability-only")){HiddenCatalogTests.Run();await UXReliabilityTests.Run(root);return;}
-if(args.Contains("--missing-files-only")){await MissingDownloadFilesTests.Run(root);return;}
+if(args.Contains("--missing-files-only")){await MissingDownloadFilesTests.Run(root);await TorrentUpdateTests.Run(root);return;}
 if(args.Contains("--language-only")){LanguageResourceTests.Run();SearchLanguageTests.Run();await UnifiedSearchTests.Run();return;}
 if(args.Contains("--games-only")){await GameCatalogTests.Run(root);return;}
 if(args.Contains("--probe-game-releases")){await GameReleaseProbe.Run(root);return;}
