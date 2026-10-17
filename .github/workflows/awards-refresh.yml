@@ -46,7 +46,7 @@ jobs:
           for award in feed['awards']:
               entries = award['entries']
               line = ' | '.join(f"{e['year']} {e['titleEn'] or e['originalTitle']}/{e['title'] or '-'}" + ('' if e.get('poster') else ' (no poster)') for e in entries)
-              covered = f"russian titles {sum(1 for e in entries if e['title'])}/{len(entries)}, posters {sum(1 for e in entries if e.get('poster'))}/{len(entries)}"
+              covered = f"ru {sum(1 for e in entries if e['title'])} of {len(entries)}; posters {sum(1 for e in entries if e.get('poster'))}"
               print(f"::notice title={award['id']} ({covered})::{line[:30000]}")
           PY
       - name: Publish awards.json next to the shared catalog
