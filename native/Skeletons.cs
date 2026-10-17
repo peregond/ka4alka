@@ -17,6 +17,19 @@ public partial class MainWindow
     // shimmer instead of its colour, so a shelf that fills up card by card shows which films are still loading. The
     // shimmer goes as soon as the cover is shown, fails or the card leaves the visible area; posters without a cover
     // address keep their colour.
+    // The light rests while the wheel scrolls the page and goes on a moment after the last turn.
+    System.Windows.Threading.DispatcherTimer? shimmerRest;
+    void RestShimmerWhileScrolling()
+    {
+        if(posterWave==null)return;
+        posterWave.Pause(true);
+        if(shimmerRest==null)
+        {
+            shimmerRest=new(System.Windows.Threading.DispatcherPriority.Background){Interval=TimeSpan.FromMilliseconds(260)};
+            shimmerRest.Tick+=(_,_)=>{shimmerRest.Stop();posterWave?.Pause(false);};
+        }
+        shimmerRest.Stop();shimmerRest.Start();
+    }
     // After a theme or Lite mode change the wave is rebuilt in the new colours and speed; posters still loading keep shimmering.
     void ResetPosterShimmer()
     {

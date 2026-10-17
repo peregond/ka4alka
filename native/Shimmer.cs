@@ -79,8 +79,13 @@ sealed class ShimmerWave(bool animated,int framesPerSecond=30)
         host.Loaded+=(_,_)=>Sync();host.IsVisibleChanged+=(_,_)=>Sync();host.Unloaded+=(_,_)=>Set(false);
         return host;
     }
-    void Set(bool on)
+    // While the page is being scrolled the light rests, so the render thread works for the scroll alone.
+    bool wanted,paused;
+    public void Pause(bool value){if(paused==value)return;paused=value;Apply();}
+    void Set(bool on){wanted=on;Apply();}
+    void Apply()
     {
+        var on=wanted&&!paused;
         if(running==on)return;running=on;
         foreach(var lane in lanes.Values){if(on)lane.Start();else lane.Stop();}
     }

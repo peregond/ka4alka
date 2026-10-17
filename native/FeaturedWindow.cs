@@ -41,7 +41,7 @@ public partial class MainWindow
     }
     void CancelFeaturedWork()
     {
-        featuredHubRequest?.Cancel();featuredHubRequest?.Dispose();featuredHubRequest=null;
+        featuredHubRequest?.Cancel();featuredHubRequest?.Dispose();featuredHubRequest=null;featuredRefresh++;featuredDeferred.Clear();
         featuredShelves.Clear();featuredState=null;featuredPanel=null;featuredRetry=null;featuredHero=null;featuredDigest=null;
         if(current==null&&section is not (FeaturedSection or "Настройки"))featuredReturn=null;
     }
@@ -126,6 +126,18 @@ public partial class MainWindow
             if(featuredState!=null){featuredState.Text=AppLanguage.T("Не удалось загрузить подборки. Попробуй ещё раз.");featuredState.Visibility=Visibility.Visible;}
         }
     }
+    int featuredRefresh;
+    readonly Queue<Action> featuredDeferred=new();
+    void DrainFeaturedShelves(int version)
+    {
+        if(version!=featuredRefresh||featuredDeferred.Count==0)return;
+        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background,new Action(()=>
+        {
+            if(version!=featuredRefresh||closed)return;
+            if(featuredDeferred.TryDequeue(out var step))step();
+            DrainFeaturedShelves(version);
+        }));
+    }
     MediaItem[] FeaturedVisible(FeaturedGroup group)=>group.Items.Where(item=>PersonallyVisible(item)&&!NoDownloads(item)&&(item.Section=="Игры"||CatalogQualityMatches(item))).ToArray();
     void RefreshFeaturedRows()
     {
@@ -133,6 +145,7 @@ public partial class MainWindow
         if(featuredCollectionId.Length==0)
         {
             BuildFeaturedHero(featuredGroups);BuildFeaturedDigest(featuredGroups);
+            featuredRefresh++;featuredDeferred.Clear();
             var active=featuredGroups.Select(group=>group.Collection.Id).ToHashSet(StringComparer.Ordinal);
             foreach(var id in featuredShelves.Keys.Where(id=>!active.Contains(id)).ToArray())
             {
@@ -148,12 +161,19 @@ public partial class MainWindow
                     // The banner and the digest hold the first two places of the page.
                     if(featuredPanel!=null&&shelf.Row.Parent is UIElement row&&featuredPanel.Children.IndexOf(row)!=index+2)
                     {featuredPanel.Children.Remove(row);featuredPanel.Children.Insert(Math.Min(index+2,featuredPanel.Children.Count),row);}
-                    var visible=FeaturedVisible(group);shelf.Set(visible,false);
-                    // A shelf emptied by the person's own filters is hidden rather than shown as unavailable.
-                    if(shelf.Row.Parent is UIElement whole)whole.Visibility=visible.Length>0?Visibility.Visible:Visibility.Collapsed;
+                    var visible=FeaturedVisible(group);
+                    void Fill()
+                    {
+                        shelf.Set(visible,false);
+                        // A shelf emptied by the person's own filters is hidden rather than shown as unavailable.
+                        if(shelf.Row.Parent is UIElement whole)whole.Visibility=visible.Length>0?Visibility.Visible:Visibility.Collapsed;
+                    }
+                    // The first shelves appear at once; the rest are built one by one while the page is already usable.
+                    if(index<3)Fill();else featuredDeferred.Enqueue(Fill);
                 }
             }
             if(featuredState!=null)featuredState.Visibility=Visibility.Collapsed;
+            DrainFeaturedShelves(featuredRefresh);
         }
         else
         {

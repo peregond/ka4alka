@@ -159,6 +159,30 @@ public partial class MainWindow
         AutomationProperties.SetName(homeCountry,AppLanguage.T("Страна отечественных подборок"));catalogue.Children.Add(homeCountry);
         var countryHint=Hint("Учитываем страну производства, в том числе совместного.");countryHint.Margin=new(0,8,0,0);catalogue.Children.Add(countryHint);
         var countryNotice=Notice(catalogue);
+        // What the catalog holds and when it was last checked, with a way to check right now.
+        var catalogStatus=Hint("");catalogStatus.Name="SettingsCatalogStatus";catalogStatus.Margin=new(0,16,0,0);catalogue.Children.Add(catalogStatus);
+        void ShowCatalogStatus()
+        {
+            var culture=System.Globalization.CultureInfo.GetCultureInfo(AppLanguage.Current=="en"?"en-US":"ru-RU");
+            string Moment(DateTime utc)=>utc==default?AppLanguage.T("ещё не проверялось"):utc.ToLocalTime().ToString("d MMMM, HH:mm",culture);
+            catalogStatus.Text=string.Format(AppLanguage.T("В каталоге {0} названий. Данные от {1}. Проверено: {2}."),sharedCatalog.All.Count,Moment(sharedCatalog.GeneratedUtc),Moment(sharedCatalog.LastCheckedUtc));
+        }
+        ShowCatalogStatus();
+        var catalogNotice=Notice(catalogue);
+        var checkCatalog=ActionButton("Обновить каталог","IconRefresh",async()=>
+        {
+            Feedback(catalogNotice,"Проверяем каталог…");
+            try
+            {
+                var changed=await sharedCatalog.RefreshAsync(force:true);
+                if(closed)return;
+                ShowCatalogStatus();
+                if(changed){catalogPages.Clear();liveKey="";}
+                Feedback(catalogNotice,changed?"Каталог обновлён. Новые названия появятся в разделах.":"Новых названий пока нет.");
+            }
+            catch(Exception error){if(!closed)Feedback(catalogNotice,"Не удалось проверить каталог: "+error.Message,true);}
+        });
+        checkCatalog.Margin=new(0,10,0,0);checkCatalog.HorizontalAlignment=HorizontalAlignment.Left;checkCatalog.Name="SettingsCheckCatalog";catalogue.Children.Add(checkCatalog);
         var tmdbLogo=new Image{Name="TmdbLogo",Source=new System.Windows.Media.Imaging.BitmapImage(new Uri("pack://application:,,,/Assets/tmdb-logo.png")),Width=128,Height=17,Stretch=Stretch.Uniform,HorizontalAlignment=HorizontalAlignment.Left,Margin=new(0,18,0,8)};
         AutomationProperties.SetName(tmdbLogo,AppLanguage.T("The Movie Database — источник широких фонов"));catalogue.Children.Add(tmdbLogo);
         var artworkAttribution=Hint("Широкие фоны — TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.");artworkAttribution.Name="TmdbAttribution";catalogue.Children.Add(artworkAttribution);

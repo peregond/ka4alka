@@ -32,6 +32,7 @@ public sealed class SharedCatalog
     bool Due(DateTime now)=>now>=retryAfterUtc&&(lastCheckedUtc==default||lastCheckedUtc>now||now-lastCheckedUtc>=RefreshInterval);
     public bool RefreshDue {get{lock(state)return Due(clock());}}
     public DateTime LastCheckedUtc {get{lock(state)return lastCheckedUtc;}}
+    public DateTime GeneratedUtc {get{lock(state)return generatedUtc;}}
     public IReadOnlyList<MediaItem> All=>items??BundledCatalog.All;
     public IReadOnlyList<SeasonalCollection> Collections=>collections??BundledCatalog.Collections;
     public IReadOnlyList<SeasonalCollection> ActiveCollections=>Collections.Where(x=>x.Active(clock())).ToArray();

@@ -1561,5 +1561,11 @@
   "Скачанные файлы, очередь, «Сохранённое» и настройки не затрагиваются.": "Downloaded files, the queue, Saved and settings are not affected.",
   "Скопируй отчёт и приложи его к сообщению в чате поддержки.": "Copy the report and attach it to your message in the support chat.",
   "Включи на обоих компьютерах и свяжи их один раз. Файл скачает выбранный компьютер в свою папку Ka4alka, этот только передаст задачу.": "Turn it on on both computers and pair them once. The chosen computer downloads the file into its own Ka4alka folder; this one only passes the task on.",
-  "Перед установкой сохраняем очередь. Скачиваются только изменившиеся части; настройки и файлы не затрагиваются.": "The queue is saved before installing. Only changed parts are downloaded; settings and files are untouched."
+  "Перед установкой сохраняем очередь. Скачиваются только изменившиеся части; настройки и файлы не затрагиваются.": "The queue is saved before installing. Only changed parts are downloaded; settings and files are untouched.",
+  "В каталоге {0} названий. Данные от {1}. Проверено: {2}.": "The catalog has {0} titles. Data from {1}. Checked: {2}.",
+  "ещё не проверялось": "not checked yet",
+  "Проверяем каталог…": "Checking the catalog…",
+  "Каталог обновлён. Новые названия появятся в разделах.": "Catalog updated. New titles will appear in the sections.",
+  "Новых названий пока нет.": "No new titles yet.",
+  "Не удалось проверить каталог: ": "Could not check the catalog: "
 }

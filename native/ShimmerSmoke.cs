@@ -20,6 +20,7 @@ public partial class MainWindow
         Check(wave.IsRunning&&wave.LaneCount==1&&ReferenceEquals(a.Background,b.Background),"One shared gradient lane serves multiple loading cards.");
         wave.Hide(a);Check(wave.IsRunning,"Another loading card keeps the shared animation alive.");
         wave.Hide(b);Check(!wave.IsRunning&&a.Visibility==Visibility.Collapsed&&b.Visibility==Visibility.Collapsed,"Last completed card stops the animation.");
+        wave.Show(a,0);wave.Pause(true);Check(!wave.IsRunning,"The light rests while the page is scrolled.");wave.Pause(false);Check(wave.IsRunning,"The light goes on after scrolling.");wave.Hide(a);
         wave.Show(a,0);wave.Stop();Check(!wave.IsRunning&&a.Visibility==Visibility.Collapsed,"Theme/Lite reset stops and detaches the prior wave.");
         wave.Show(a,0);host.Children.Remove(a);await Settle();Check(!wave.IsRunning,"Unloading the last card stops its wave.");
         var skeleton=new StackPanel();var shape=new Border{Height=30};skeleton.Children.Add(shape);var placeholder=new ShimmerWave(true);placeholder.Paint(shape,0);placeholder.Run(skeleton);host.Children.Add(skeleton);await Settle();

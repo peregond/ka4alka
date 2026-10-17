@@ -25,7 +25,7 @@ public partial class MainWindow:Window
     {
         AppLanguage.Set(prefs.UiLanguage);InitializeComponent();
         prefs.LiteMode=PerformanceBudget.DefaultLiteMode(prefs.LiteModeConfigured,prefs.LiteMode);
-        InitializeStatusToast();InitializeShareLinks();
+        InitializeStatusToast();InitializeShareLinks();PreviewMouseWheel+=(_,_)=>RestShimmerWhileScrolling();
         onlineIndex=new(sourceClient,relays:new IndexRelays(sourceClient));sourceClient.TorrentRelay=onlineIndex.RelayTorrent;sharedCatalog=new(sourceClient);
         catalogRefreshTimer.Tick+=(_,_)=>
         {
