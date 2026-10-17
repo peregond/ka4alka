@@ -44,8 +44,10 @@ jobs:
           import json
           feed = json.load(open('awards.json', encoding='utf-8'))
           for award in feed['awards']:
-              line = ' | '.join(f"{e['year']} {e['titleEn'] or e['originalTitle']} {e['imdbId']}" + ('' if e.get('poster') else ' (no poster)') for e in award['entries'])
-              print(f"::notice title={award['id']} ({len(award['entries'])})::{line[:30000]}")
+              entries = award['entries']
+              line = ' | '.join(f"{e['year']} {e['titleEn'] or e['originalTitle']}/{e['title'] or '-'}" + ('' if e.get('poster') else ' (no poster)') for e in entries)
+              covered = f"russian titles {sum(1 for e in entries if e['title'])}/{len(entries)}, posters {sum(1 for e in entries if e.get('poster'))}/{len(entries)}"
+              print(f"::notice title={award['id']} ({covered})::{line[:30000]}")
           PY
       - name: Publish awards.json next to the shared catalog
         if: ${{ github.event_name == 'schedule' || inputs.publish }}

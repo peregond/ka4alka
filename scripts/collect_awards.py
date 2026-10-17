@@ -11,7 +11,7 @@ Each entry carries the film's IMDb id: the app shows it as an IMDb-only card, lo
 The file is checked before it is written: shape, uniqueness, plausible counts and a few well known anchor winners,
 so a changed or broken Wikidata answer fails the run instead of publishing a wrong list.
 """
-import argparse, datetime, json, re, sys, urllib.parse, urllib.request
+import argparse, datetime, json, re, sys, time, urllib.parse, urllib.request
 
 ENDPOINT = 'https://query.wikidata.org/sparql'
 USER_AGENT = 'Kachalka-awards/1.0 (https://github.com/peregond/ka4alka)'
@@ -61,6 +61,38 @@ def fetch(qid, opener=urllib.request.urlopen):
     request = urllib.request.Request(url, headers={'User-Agent': USER_AGENT, 'Accept': 'application/sparql-results+json'})
     with opener(request, timeout=90) as response:
         return json.load(response)
+
+
+def imdb_poster(imdb, opener=urllib.request.urlopen):
+    """A card-sized poster from IMDb's public title suggestions, the same service the app uses for IMDb-only cards.
+    Wikidata knows a poster for few films. Any failure just means the card keeps its plain colour."""
+    url = f'https://v3.sg.media-imdb.com/suggestion/{imdb[:1]}/{imdb}.json'
+    request = urllib.request.Request(url, headers={'User-Agent': USER_AGENT})
+    try:
+        with opener(request, timeout=15) as response:
+            rows = json.load(response).get('d', [])
+    except (OSError, ValueError):
+        return None
+    for row in rows:
+        image = (row.get('i') or {}).get('imageUrl') if isinstance(row, dict) else None
+        if isinstance(row, dict) and row.get('id') == imdb and isinstance(image, str) and image.startswith('https://'):
+            marker = image.rfind('._V1_')
+            return image[:marker] + '._V1_QL75_UX400_.jpg' if marker > 0 and image.lower().endswith('.jpg') else image
+    return None
+
+
+def add_posters(entries, fetch=imdb_poster, pause=0.15):
+    """Fills the posters Wikidata lacks; a film that won two awards is asked once."""
+    found = {}
+    for entry in entries:
+        if entry.get('poster'):
+            continue
+        imdb = entry['imdbId']
+        if imdb not in found:
+            found[imdb] = fetch(imdb)
+            time.sleep(pause)
+        if found[imdb]:
+            entry['poster'] = found[imdb]
 
 
 def value(row, name):
@@ -134,14 +166,17 @@ def check(award, entries):
             raise ValueError(f"{name}: the {year} winner should be '{word}', found '{names.strip()}'")
 
 
-def build(responses, now=None):
-    """responses: {award id: Wikidata response}. Returns the document the app reads."""
+def build(responses, now=None, posters=None):
+    """responses: {award id: Wikidata response}. Returns the document the app reads.
+    posters: a function imdb id -> poster url, used for the entries Wikidata has no poster for."""
     awards = []
     for award in AWARDS:
         if award['id'] not in responses:
             continue
         entries = entries_from(responses[award['id']], award)
         check(award, entries)
+        if posters is not None:
+            add_posters(entries, posters)
         awards.append({key: award[key] for key in ('id', 'title', 'titleEn', 'description', 'descriptionEn')} | {'entries': entries})
     if not awards:
         raise ValueError('no awards collected')
@@ -152,6 +187,7 @@ def build(responses, now=None):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--output', default='awards.json')
+    parser.add_argument('--no-posters', action='store_true', help='do not ask IMDb for the posters Wikidata lacks')
     parser.add_argument('--from-file', help='a saved Wikidata response instead of the network (needs --award)')
     parser.add_argument('--award', choices=[a['id'] for a in AWARDS])
     args = parser.parse_args(argv)
@@ -164,7 +200,7 @@ def main(argv=None):
     else:
         for award in AWARDS:
             responses[award['id']] = fetch(award['qid'])
-    document = build(responses)
+    document = build(responses, posters=None if args.no_posters else imdb_poster)
     text = json.dumps(document, ensure_ascii=False, indent=1, sort_keys=False) + '\n'
     if len(text.encode('utf-8')) > 400_000:
         raise ValueError('awards.json is too large for the app (limit 512 KB)')

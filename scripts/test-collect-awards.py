@@ -89,4 +89,25 @@ with tempfile.TemporaryDirectory() as folder:
         awards.AWARDS[:] = original
     written = json.load(open(target, encoding='utf-8'))
     assert written['awards'][0]['id'] == 'oscar-best-picture' and len(written['awards'][0]['entries']) == 41
+# Posters Wikidata lacks come from the supplied function, once per film; a failed lookup leaves the entry as it is.
+asked = []
+def fake_poster(imdb):
+    asked.append(imdb)
+    return None if imdb == 'tt15398776' else f'https://img.example/{imdb}.jpg'
+sample = [dict(e) for e in entries] + [dict(entries[0], year=2024)]
+awards.add_posters(sample, fake_poster, pause=0)
+assert asked == ['tt15398776'], 'a poster Wikidata knows is not asked again, a film is asked once: ' + str(asked)
+assert sample[0]['poster'].startswith('https://commons.') and 'poster' not in sample[1]
+
+class Reply:
+    def __init__(self, text): self.text = text.encode()
+    def __enter__(self): return self
+    def __exit__(self, *args): return False
+    def read(self, *args): return self.text
+page = json.dumps({'d': [{'id': 'tt0110912', 'i': {'imageUrl': 'https://m.media-amazon.com/images/M/abc._V1_.jpg'}}]})
+assert awards.imdb_poster('tt0110912', lambda request, timeout: Reply(page)) == 'https://m.media-amazon.com/images/M/abc._V1_QL75_UX400_.jpg'
+assert awards.imdb_poster('tt0000002', lambda request, timeout: Reply(page)) is None, 'another title is not taken'
+def broken(request, timeout): raise OSError('offline')
+assert awards.imdb_poster('tt0110912', broken) is None
+
 print('PASS: Wikidata rows become entries, checks reject wrong lists, the file is written for the app')
