@@ -60,6 +60,9 @@ public partial class MainWindow
         foreach(var language in new[]{"ru","en"})
         {
             prefs.UiLanguage=language;AppLanguage.Set(language);ShowFeatured();await Settle();
+            // A new interface language resolves the shelves again; wait for that load like a person would.
+            for(var wait=0;wait<200&&featuredGroups==null;wait++)await Task.Delay(50);await Settle();
+            Check(featuredGroups!=null&&featuredLanguage==language,"Shelves are resolved again after the interface language changes: "+language);
             Check(FindVisual<TextBlock>(PageHeader,text=>text.Name=="FeaturedHeading")?.Text==AppLanguage.T(FeaturedSection),"Featured title translates: "+language);
             foreach(var width in new[]{760d,1280d})
             {
