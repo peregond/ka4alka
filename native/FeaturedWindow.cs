@@ -41,7 +41,7 @@ public partial class MainWindow
     }
     void CancelFeaturedWork()
     {
-        featuredHubRequest?.Cancel();featuredHubRequest?.Dispose();featuredHubRequest=null;featuredRefresh++;featuredDeferred.Clear();
+        featuredHubRequest?.Cancel();featuredHubRequest?.Dispose();featuredHubRequest=null;featuredRefresh++;featuredDeferred.Clear();CancelAwardPage();
         featuredShelves.Clear();featuredState=null;featuredPanel=null;featuredRetry=null;featuredHero=null;featuredDigest=null;
         if(current==null&&section is not (FeaturedSection or "Настройки"))featuredReturn=null;
     }
@@ -60,7 +60,8 @@ public partial class MainWindow
         PageHeader.Children.Add(definition!=null?Text(definition.Summary,13,true):TextRaw(FeaturedDateLine()+" · "+AppLanguage.T("Что смотреть и во что играть"),13,true));
         if(featuredCollectionId.Length>0)
         {
-            SetBack("Все подборки",()=>OpenFeaturedCollection(""));ShowCatalog([]);
+            SetBack("Все подборки",()=>OpenFeaturedCollection(""));
+            if(featuredCollectionId.StartsWith("award-",StringComparison.Ordinal))BuildAwardPage();else ShowCatalog([]);
             featuredState=Text("Загружаем подборки…",14,true);PageHeader.Children.Add(featuredState);
         }
         else
@@ -175,6 +176,7 @@ public partial class MainWindow
             if(featuredState!=null)featuredState.Visibility=Visibility.Collapsed;
             DrainFeaturedShelves(featuredRefresh);
         }
+        else if(IsAwardPage){FillAwardYears();LoadAwardNominees();}
         else
         {
             var group=featuredGroups.FirstOrDefault(row=>row.Collection.Id==featuredCollectionId);
@@ -192,6 +194,7 @@ public partial class MainWindow
     }
     void ResizeFeaturedShelves()
     {
+        if(IsAwardPage){FillAwardYears();return;}
         if(section!=FeaturedSection||current!=null||featuredCollectionId.Length>0)return;
         var width=Body.ActualWidth>0?Body.ActualWidth:Math.Max(320,Width-280);
         featuredWidth=width;if(carousel!=null)ArrangeFeatureCarousel(width);

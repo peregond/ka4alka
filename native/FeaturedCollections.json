@@ -16,6 +16,29 @@
     "layout": "lead"
   },
   {
+    "id": "tonight",
+    "title": "Кино, сериал и игра на вечер",
+    "titleEn": "A film, a series and a game for tonight",
+    "description": "Одна подборка на все случаи: что посмотреть и во что поиграть.",
+    "descriptionEn": "One shelf for every mood: what to watch and what to play.",
+    "mediaIds": [
+      "movies:dikii-robot",
+      "series:chernobyl-2019",
+      "movies:dostat-nozhi-voskreshenie-pokoinika",
+      "series:fallout-2024"
+    ],
+    "games": [
+      {
+        "id": 1245620,
+        "title": "ELDEN RING"
+      },
+      {
+        "id": 413150,
+        "title": "Stardew Valley"
+      }
+    ]
+  },
+  {
     "id": "one-more-episode",
     "title": "Ещё одну серию",
     "titleEn": "One more episode",

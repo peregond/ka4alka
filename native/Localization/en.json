@@ -1567,5 +1567,6 @@
   "Проверяем каталог…": "Checking the catalog…",
   "Каталог обновлён. Новые названия появятся в разделах.": "Catalog updated. New titles will appear in the sections.",
   "Новых названий пока нет.": "No new titles yet.",
-  "Не удалось проверить каталог: ": "Could not check the catalog: "
+  "Не удалось проверить каталог: ": "Could not check the catalog: ",
+  "Номинант": "Nominee"
 }

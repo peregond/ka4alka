@@ -8,6 +8,8 @@ Each entry carries the film's IMDb id: the app shows it as an IMDb-only card, lo
   python scripts/collect_awards.py --output awards.json
   python scripts/collect_awards.py --from-file wikidata-response.json --award oscar-best-picture --output awards.json
 
+Nominees go to a second file, awards-nominees.json, so that the first stays small for the apps that read only that one.
+
 The file is checked before it is written: shape, uniqueness, plausible counts and a few well known anchor winners,
 so a changed or broken Wikidata answer fails the run instead of publishing a wrong list.
 """
@@ -39,11 +41,12 @@ AWARDS = [
 ]
 
 
-def query(qid):
+def query(qid, relation='P166'):
+    """relation: P166 'award received' (winners) or P1411 'nominated for' (nominees)."""
     return f"""
 SELECT ?film ?imdb ?labelRu ?labelEn ?original ?published ?date ?poster WHERE {{
-  ?film p:P166 ?statement .
-  ?statement ps:P166 wd:{qid} .
+  ?film p:{relation} ?statement .
+  ?statement ps:{relation} wd:{qid} .
   OPTIONAL {{ ?statement pq:P585 ?date . }}
   ?film wdt:P31/wdt:P279* wd:{FILM_KINDS[0]} .
   ?film wdt:P345 ?imdb .
@@ -56,9 +59,9 @@ SELECT ?film ?imdb ?labelRu ?labelEn ?original ?published ?date ?poster WHERE {{
 }}"""
 
 
-def fetch(qid, opener=urllib.request.urlopen, sleep=time.sleep, attempts=5):
+def fetch(qid, opener=urllib.request.urlopen, sleep=time.sleep, attempts=5, relation='P166'):
     """One SPARQL query. Wikidata answers 429 or 503 when it is busy; waiting as long as it asks (or a growing pause) is the polite way."""
-    url = ENDPOINT + '?' + urllib.parse.urlencode({'query': query(qid), 'format': 'json'})
+    url = ENDPOINT + '?' + urllib.parse.urlencode({'query': query(qid, relation), 'format': 'json'})
     request = urllib.request.Request(url, headers={'User-Agent': USER_AGENT, 'Accept': 'application/sparql-results+json'})
     for attempt in range(1, attempts + 1):
         try:
@@ -176,6 +179,34 @@ def check(award, entries):
             raise ValueError(f"{name}: the {year} winner should be '{word}', found '{names.strip()}'")
 
 
+def nominees_from(response, winners):
+    """The nominees of every year, without the film that won that year. Quieter than the winners: no anchors, only plausibility."""
+    won = {(e['imdbId'], e['year']) for e in winners}
+    result = [e for e in entries_from(response, None) if (e['imdbId'], e['year']) not in won]
+    for entry in result:
+        if not 1900 <= entry['year'] <= 2100:
+            raise ValueError(f"nominee {entry['imdbId']}: implausible year {entry['year']}")
+    return result
+
+
+def build_nominees(responses, winners_document, now=None, posters=None, limit=1500):
+    """responses: {award id: Wikidata 'nominated for' response}. Returns the nominees document; an award with none is left out."""
+    awards = []
+    for award in winners_document['awards']:
+        if award['id'] not in responses:
+            continue
+        entries = nominees_from(responses[award['id']], award['entries'])
+        if not entries:
+            continue
+        if len(entries) > limit:
+            raise ValueError(f"{award['id']}: {len(entries)} nominees, expected at most {limit}")
+        if posters is not None:
+            add_posters(entries, posters)
+        awards.append({'id': award['id'], 'entries': entries})
+    generated = (now or datetime.datetime.now(datetime.timezone.utc)).strftime('%Y-%m-%dT%H:%M:%SZ')
+    return {'schemaVersion': 1, 'generatedAtUtc': generated, 'source': 'Wikidata', 'awards': awards}
+
+
 def build(responses, now=None, posters=None):
     """responses: {award id: Wikidata response}. Returns the document the app reads.
     posters: a function imdb id -> poster url, used for the entries Wikidata has no poster for."""
@@ -197,6 +228,7 @@ def build(responses, now=None, posters=None):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--output', default='awards.json')
+    parser.add_argument('--nominees-output', default='awards-nominees.json', help='where the nominees go; empty to skip them')
     parser.add_argument('--no-posters', action='store_true', help='do not ask IMDb for the posters Wikidata lacks')
     parser.add_argument('--from-file', help='a saved Wikidata response instead of the network (needs --award)')
     parser.add_argument('--award', choices=[a['id'] for a in AWARDS])
@@ -213,6 +245,23 @@ def main(argv=None):
                 time.sleep(10)  # one query after another, not side by side
             responses[award['id']] = fetch(award['qid'])
     document = build(responses, posters=None if args.no_posters else imdb_poster)
+    if args.nominees_output and not args.from_file:
+        try:
+            nominee_responses = {}
+            for award in AWARDS:
+                time.sleep(10)
+                nominee_responses[award['id']] = fetch(award['qid'], relation='P1411')
+            nominees = build_nominees(nominee_responses, document, posters=None if args.no_posters else imdb_poster)
+            text = json.dumps(nominees, ensure_ascii=False, indent=1) + '\n'
+            if len(text.encode('utf-8')) > 1_400_000:
+                raise ValueError('awards-nominees.json is too large for the app (limit 1.5 MB)')
+            with open(args.nominees_output, 'w', encoding='utf-8', newline='\n') as handle:
+                handle.write(text)
+            for award in nominees['awards']:
+                print(f"{award['id']}: {len(award['entries'])} nominees")
+        except (ValueError, OSError, urllib.error.URLError) as error:
+            # Winners are the product; missing nominees only mean the year pages show winners alone.
+            print(f'warning: nominees skipped: {error}', file=sys.stderr)
     text = json.dumps(document, ensure_ascii=False, indent=1, sort_keys=False) + '\n'
     if len(text.encode('utf-8')) > 400_000:
         raise ValueError('awards.json is too large for the app (limit 512 KB)')

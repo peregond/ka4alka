@@ -67,6 +67,18 @@ public partial class MainWindow
         ShowFeatured();OpenFeaturedCollection(gameDefinition.Id);await Settle();Check(GameGrid,"A curated game collection uses wide game cards.");
         card=VisualElements<Button>(Body).First(button=>button.Tag is MediaItem);Click(card);await Settle();GameBack();await Settle();
         Check(section==FeaturedSection&&featuredCollectionId==gameDefinition.Id,"Back from a game also returns to the curated collection.");
+        // An award page lists every year: the winner first, the nominees after it, each with its own tag.
+        var awardDefinition=new FeaturedCollection("award-oscar-best-picture","Оскар","Academy Awards","Лучший фильм","Best Picture");
+        AwardEntry Entry(int year,string imdb,string title)=>new(year,imdb,title,title,title,year-1,null);
+        Awards.Seed([new("oscar-best-picture","Оскар","Academy Awards","Лучший фильм","Best Picture",[Entry(2025,"tt0000101","Победитель 2025"),Entry(2024,"tt0000102","Победитель 2024")])],
+            new(){["oscar-best-picture"]=[Entry(2025,"tt0000103","Номинант А"),Entry(2025,"tt0000104","Номинант Б"),Entry(2024,"tt0000105","Номинант В")]});
+        featuredGroups=[..fixtureGroups,new(awardDefinition,[])];
+        ShowFeatured();OpenFeaturedCollection(awardDefinition.Id);await Settle();
+        Check(VisualElements<TextBlock>(Body).Count(text=>text.Text is "2025" or "2024")==2,"The award page has a heading for each year.");
+        Check(VisualElements<Button>(Body).Count(button=>button.Tag is MediaItem)==5,"Each year lists its winner and its nominees.");
+        Check(VisualElements<TextBlock>(Body).Count(text=>text.Text=="Победитель")==2&&VisualElements<TextBlock>(Body).Count(text=>text.Text=="Номинант")==3,"Winners and nominees carry their own tag.");
+        Check(VisualElements<TextBlock>(Body).First(text=>text.Text=="Победитель").TransformToAncestor(Body).Transform(new Point()).Y<VisualElements<TextBlock>(Body).First(text=>text.Text=="Номинант").TransformToAncestor(Body).Transform(new Point()).Y,"The winner of the newest year comes before its nominees.");
+        featuredGroups=fixtureGroups;ShowFeatured();await Settle();
         foreach(var language in new[]{"ru","en"})
         {
             prefs.UiLanguage=language;AppLanguage.Set(language);ShowFeatured();await Settle();

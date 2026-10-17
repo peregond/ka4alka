@@ -42,23 +42,28 @@ public sealed partial class AwardsCatalog(SourceClient client,Func<DateTime>? ut
             var entries=new List<AwardEntry>();var seen=new HashSet<string>(StringComparer.Ordinal);
             foreach(var row in rows.EnumerateArray())
             {
-                if(row.ValueKind!=JsonValueKind.Object)throw new InvalidDataException("Неверная запись награды.");
-                var imdb=Text(row,"imdbId",12);
-                if(!TitleId().IsMatch(imdb))throw new InvalidDataException("Неверный код IMDb.");
-                var year=Number(row,"year");
-                if(year is <1900 or >2100)throw new InvalidDataException("Неверный год награды.");
-                var original=Text(row,"originalTitle",200);var name=Text(row,"title",200);var nameEn=Text(row,"titleEn",200);
-                if((name.Length==0?(nameEn.Length==0?original:nameEn):name).Length==0)throw new InvalidDataException("У записи награды нет названия.");
-                var filmYear=Number(row,"filmYear");if(filmYear is not (0 or (>=1880 and <=2100)))throw new InvalidDataException("Неверный год фильма.");
-                var poster=Text(row,"poster",400);
-                // Only https images; anything else is dropped, the card then keeps its plain colour.
-                if(poster.Length>0&&!(Uri.TryCreate(poster,UriKind.Absolute,out var uri)&&uri.Scheme==Uri.UriSchemeHttps))poster="";
-                if(seen.Add(imdb))entries.Add(new(year,imdb,name,nameEn,original,filmYear,poster.Length>0?poster:null));
+                var entry=ReadEntry(row);
+                if(seen.Add(entry.ImdbId))entries.Add(entry);
             }
             result.Add(new(id,title,Text(award,"titleEn",120).Length>0?Text(award,"titleEn",120):title,Text(award,"description",300),Text(award,"descriptionEn",300),
                 entries.OrderByDescending(entry=>entry.Year).ThenBy(entry=>entry.Title,StringComparer.CurrentCulture).ToArray()));
         }
         return result.ToArray();
+    }
+    static AwardEntry ReadEntry(JsonElement row)
+    {
+        if(row.ValueKind!=JsonValueKind.Object)throw new InvalidDataException("Неверная запись награды.");
+        var imdb=Text(row,"imdbId",12);
+        if(!TitleId().IsMatch(imdb))throw new InvalidDataException("Неверный код IMDb.");
+        var year=Number(row,"year");
+        if(year is <1900 or >2100)throw new InvalidDataException("Неверный год награды.");
+        var original=Text(row,"originalTitle",200);var name=Text(row,"title",200);var nameEn=Text(row,"titleEn",200);
+        if((name.Length==0?(nameEn.Length==0?original:nameEn):name).Length==0)throw new InvalidDataException("У записи награды нет названия.");
+        var filmYear=Number(row,"filmYear");if(filmYear is not (0 or (>=1880 and <=2100)))throw new InvalidDataException("Неверный год фильма.");
+        var poster=Text(row,"poster",400);
+        // Only https images; anything else is dropped, the card then keeps its plain colour.
+        if(poster.Length>0&&!(Uri.TryCreate(poster,UriKind.Absolute,out var uri)&&uri.Scheme==Uri.UriSchemeHttps))poster="";
+        return new(year,imdb,name,nameEn,original,filmYear,poster.Length>0?poster:null);
     }
     static string Text(JsonElement row,string name,int max)=>row.TryGetProperty(name,out var value)&&value.ValueKind==JsonValueKind.String?(value.GetString()??"").Trim() is {} text&&text.Length<=max?text:throw new InvalidDataException("Слишком длинное значение."):"";
     static int Number(JsonElement row,string name)=>row.TryGetProperty(name,out var value)&&value.ValueKind==JsonValueKind.Number&&value.TryGetInt32(out var number)?number:0;
@@ -108,6 +113,82 @@ public sealed partial class AwardsCatalog(SourceClient client,Func<DateTime>? ut
                 var fresh=Parse(bytes);
                 var hash=Convert.ToHexString(SHA256.HashData(bytes));var changed=hash!=contentHash||!SameLists(collections,fresh);collections=fresh;contentHash=hash;
                 try{Directory.CreateDirectory(Path.GetDirectoryName(path)!);await CacheFiles.WriteAllBytesAsync(path,bytes,CancellationToken.None);}catch(IOException){}catch(UnauthorizedAccessException){}
+                return changed;
+            }
+            catch(Exception error)when(error is not OperationCanceledException||!ct.IsCancellationRequested){return false;}
+        }
+        finally{gate.Release();}
+    }
+    // ── Nominees ──
+    // A second, larger file: the nominees of every year. Only the page of one award asks for it, so the first screen
+    // never waits for it, and an app that does not know it keeps working with the winners alone.
+    public static readonly Uri NomineesUri=new("https://github.com/peregond/ka4alka/releases/download/catalog-data/awards-nominees.json");
+    public const int NomineesMaxBytes=1536*1024,NomineesMaxEntries=1500;
+    readonly string nomineesPath=Path.Combine(Preferences.DataDir,"awards-nominees.json");
+    Dictionary<string,AwardEntry[]> nominees=[];
+    bool nomineesRestored;
+    DateTime nomineesNextTryUtc;
+    string? nomineesHash;
+    public IReadOnlyList<AwardEntry> NomineesOf(string awardId)=>nominees.TryGetValue(awardId,out var rows)?rows:[];
+
+    public static Dictionary<string,AwardEntry[]> ParseNominees(byte[] bytes)
+    {
+        if(bytes.Length is 0 or >NomineesMaxBytes)throw new InvalidDataException("Неверный размер списка номинантов.");
+        using var json=JsonDocument.Parse(bytes);var root=json.RootElement;
+        if(root.ValueKind!=JsonValueKind.Object||!root.TryGetProperty("schemaVersion",out var version)||version.ValueKind!=JsonValueKind.Number||version.GetInt32()!=1)throw new InvalidDataException("Неизвестная версия списка номинантов.");
+        if(!root.TryGetProperty("awards",out var awards)||awards.ValueKind!=JsonValueKind.Array||awards.GetArrayLength()>MaxAwards)throw new InvalidDataException("Неверный список номинантов.");
+        var result=new Dictionary<string,AwardEntry[]>(StringComparer.Ordinal);
+        foreach(var award in awards.EnumerateArray())
+        {
+            if(award.ValueKind!=JsonValueKind.Object)throw new InvalidDataException("Неверная награда.");
+            var id=Text(award,"id",60);
+            if(!AwardId().IsMatch(id)||result.ContainsKey(id))throw new InvalidDataException("Неверный код награды.");
+            if(!award.TryGetProperty("entries",out var rows)||rows.ValueKind!=JsonValueKind.Array||rows.GetArrayLength()>NomineesMaxEntries)throw new InvalidDataException("Неверный состав номинантов.");
+            var seen=new HashSet<string>(StringComparer.Ordinal);var entries=new List<AwardEntry>();
+            foreach(var row in rows.EnumerateArray())
+            {
+                var entry=ReadEntry(row);
+                // A film is a nominee once a year.
+                if(seen.Add(entry.ImdbId+"|"+entry.Year))entries.Add(entry);
+            }
+            result[id]=entries.OrderByDescending(entry=>entry.Year).ThenBy(entry=>entry.Title,StringComparer.CurrentCulture).ToArray();
+        }
+        return result;
+    }
+    // For tests and for fixtures: the lists as if they had come from the backend.
+    internal void Seed(AwardCollection[] winners,Dictionary<string,AwardEntry[]>? nomineeLists=null)
+    {
+        collections=winners;restored=true;nextTryUtc=DateTime.MaxValue;nominees=nomineeLists??[];nomineesRestored=true;nomineesNextTryUtc=DateTime.MaxValue;
+    }
+    // Reads the saved copy once, then asks the backend at most daily. True when the nominees changed.
+    public async Task<bool> RefreshNomineesAsync(CancellationToken ct=default,bool force=false)
+    {
+        await gate.WaitAsync(ct);
+        try
+        {
+            if(!nomineesRestored)
+            {
+                nomineesRestored=true;
+                try
+                {
+                    if(File.Exists(nomineesPath)&&new FileInfo(nomineesPath).Length<=NomineesMaxBytes)
+                    {
+                        var saved=await CacheFiles.ReadAllBytesAsync(nomineesPath,CancellationToken.None);
+                        nominees=await Task.Run(()=>ParseNominees(saved),CancellationToken.None);nomineesHash=Convert.ToHexString(SHA256.HashData(saved));
+                    }
+                }
+                catch(Exception error)when(error is IOException or InvalidDataException or JsonException or UnauthorizedAccessException or FormatException){nominees=[];}
+            }
+            var now=clock();
+            if(!force&&(now<nomineesNextTryUtc||nominees.Count>0&&File.Exists(nomineesPath)&&now-File.GetLastWriteTimeUtc(nomineesPath)<RefreshInterval))return false;
+            nomineesNextTryUtc=now+RetryInterval;
+            try
+            {
+                using var timeout=CancellationTokenSource.CreateLinkedTokenSource(ct);timeout.CancelAfter(TimeSpan.FromSeconds(15));
+                var bytes=await client.Read(NomineesUri,NomineesMaxBytes,timeout.Token);
+                var fresh=ParseNominees(bytes);
+                var hash=Convert.ToHexString(SHA256.HashData(bytes));var changed=hash!=nomineesHash;nominees=fresh;nomineesHash=hash;
+                try{Directory.CreateDirectory(Path.GetDirectoryName(nomineesPath)!);await CacheFiles.WriteAllBytesAsync(nomineesPath,bytes,CancellationToken.None);}catch(IOException){}catch(UnauthorizedAccessException){}
                 return changed;
             }
             catch(Exception error)when(error is not OperationCanceledException||!ct.IsCancellationRequested){return false;}
