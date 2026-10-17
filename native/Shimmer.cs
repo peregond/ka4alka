@@ -58,9 +58,9 @@ sealed class ShimmerWave(bool animated,int framesPerSecond=30)
     readonly HashSet<Border> shown=[];
     public void Show(Border overlay,int lane)
     {
-        if(!animated)return;
+        if(!animated||shown.Contains(overlay))return;
         Paint(overlay,lane);overlay.Visibility=Visibility.Visible;
-        if(shown.Add(overlay))overlay.Unloaded+=Gone;
+        shown.Add(overlay);overlay.Unloaded+=Gone;
         Set(true);
     }
     public void Hide(Border overlay)

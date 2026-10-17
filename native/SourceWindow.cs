@@ -33,6 +33,8 @@ public partial class MainWindow
         public object? RatingsContext;
         public CancellationTokenSource? RatingsRequest;
         public DateTime RetryAfterUtc;
+        public Border? Shimmer;
+        public bool ShimmerLooked;
         public DateTime NextCacheTouchUtc;
         public Exception? LastFailure;
         public int PresentationVersion;

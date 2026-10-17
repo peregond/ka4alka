@@ -19,11 +19,17 @@ public partial class MainWindow
     // address keep their colour.
     void SyncPosterShimmer(Image image,CoverRequest state)
     {
-        if(image.Parent is not Panel panel)return;
-        Border? overlay=null;foreach(var child in panel.Children)if(child is Border {Name:"PosterShimmer"} found){overlay=found;break;}
+        // This runs for every poster on every scroll step, so it only looks at flags: a cover request exists only for
+        // posters near the screen, and the overlay is found once per poster.
+        if(!state.ShimmerLooked&&image.Parent is Panel panel)
+        {
+            state.ShimmerLooked=true;
+            foreach(var child in panel.Children)if(child is Border {Name:"PosterShimmer"} found){state.Shimmer=found;break;}
+        }
+        var overlay=state.Shimmer;
         if(overlay==null)return;
-        if(image.DataContext is MediaItem media&&image.Source==null&&CoverViewportFor(image)?.Measure(image).Visible==true&&(state.Request!=null||state.PresentationPending)&&!closing&&!closed)(posterWave??=NewShimmer()).Show(overlay,Math.Abs(media.Id)%6);
-        else if(posterWave!=null)posterWave.Hide(overlay);else overlay.Visibility=Visibility.Collapsed;
+        if(image.DataContext is MediaItem media&&image.Source==null&&(state.Request!=null||state.PresentationPending)&&!closing&&!closed)(posterWave??=NewShimmer()).Show(overlay,Math.Abs(media.Id)%6);
+        else if(posterWave!=null)posterWave.Hide(overlay);else if(overlay.Visibility!=Visibility.Collapsed)overlay.Visibility=Visibility.Collapsed;
     }
     // Real content that replaces a placeholder fades in over a quarter of a second instead of snapping in.
     // One short opacity animation on the container, not on each card; skipped with motion off.
