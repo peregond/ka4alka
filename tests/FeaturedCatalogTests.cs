@@ -43,6 +43,7 @@ public static class FeaturedCatalogTests
         var lang=AppLanguage.Current;
         try{AppLanguage.Set("en");Check(first.Label==first.TitleEn&&first.Summary==first.DescriptionEn,"English headings and descriptions use authored translations.");}
         finally{AppLanguage.Set(lang);}
+        AwardsCatalogTests.Run();
         Console.WriteLine("PASS: curated membership, stable ordering, missing/duplicate IDs, shared collections, Steam identity and English labels");
     }
 }

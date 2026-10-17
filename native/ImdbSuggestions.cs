@@ -54,13 +54,20 @@ public static partial class ImdbSuggestions
             var year=row.TryGetProperty("y",out var y)&&y.ValueKind==JsonValueKind.Number&&y.TryGetInt32(out var value)?value:0;
             string? image=null;
             if(row.TryGetProperty("i",out var picture)&&picture.ValueKind==JsonValueKind.Object)image=Poster(Text(picture,"imageUrl"));
-            var hash=SHA256.HashData(Encoding.UTF8.GetBytes("imdb:"+id));
-            items.Add(new MediaItem(-(BitConverter.ToInt32(hash,0)&int.MaxValue),title.Trim(),section,"",year,"—","—","#526B69")
-            {
-                PageUrl=Host+id+"/",ImdbId=id,OriginalTitle=title.Trim(),ImageUrl=image
-            });
+            items.Add(Card(id,title.Trim(),title.Trim(),section,year,image));
         }
         return items.DistinctBy(x=>x.Id).ToArray();
+    }
+
+    // The minimal card of a title known only by its IMDb id: its details come from the site's /api/title and its
+    // releases are searched by the original name, exactly as for a title found through the suggestions.
+    public static MediaItem Card(string imdbId,string title,string? originalTitle,string section,int year,string? image)
+    {
+        var hash=SHA256.HashData(Encoding.UTF8.GetBytes("imdb:"+imdbId));
+        return new MediaItem(-(BitConverter.ToInt32(hash,0)&int.MaxValue),title,section,"",year,"—","—","#526B69")
+        {
+            PageUrl=Host+imdbId+"/",ImdbId=imdbId,OriginalTitle=originalTitle,ImageUrl=image
+        };
     }
 
     // IMDb serves resized posters from the same address with a size directive; a 400 px wide copy is plenty for a card.

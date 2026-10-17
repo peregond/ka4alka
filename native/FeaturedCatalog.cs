@@ -10,7 +10,7 @@ public sealed record FeaturedCollection(string Id,string Title,string TitleEn,st
     public string Summary=>AppLanguage.Current=="en"?DescriptionEn:Description;
     public bool IsGames=>Games is {Length:>0};
     // The small caps rubric above the heading.
-    public string Kicker=>AppLanguage.T(Id.StartsWith("seasonal-",StringComparison.Ordinal)?"Сезон":Id.StartsWith("genre-",StringComparison.Ordinal)?"Жанр":Id==FeaturedCatalog.FreshId?"Новое":Id==FeaturedCatalog.TopRatedId?"Рейтинг":IsGames?"Игры":"Подборка");
+    public string Kicker=>AppLanguage.T(Id.StartsWith("seasonal-",StringComparison.Ordinal)?"Сезон":Id.StartsWith("genre-",StringComparison.Ordinal)?"Жанр":Id.StartsWith("award-",StringComparison.Ordinal)?"Награды":Id==FeaturedCatalog.FreshId?"Новое":Id==FeaturedCatalog.TopRatedId?"Рейтинг":IsGames?"Игры":"Подборка");
 }
 public sealed record FeaturedGroup(FeaturedCollection Collection,MediaItem[] Items);
 public static class FeaturedCatalog
@@ -21,7 +21,7 @@ public static class FeaturedCatalog
         return JsonSerializer.Deserialize<FeaturedCollection[]>(stream,new JsonSerializerOptions{PropertyNameCaseInsensitive=true})??[];
     });
     public static IReadOnlyList<FeaturedCollection> Collections=>collections.Value;
-    public static FeaturedGroup[] Resolve(IEnumerable<MediaItem> catalog,IEnumerable<SeasonalCollection>? seasonal=null)
+    public static FeaturedGroup[] Resolve(IEnumerable<MediaItem> catalog,IEnumerable<SeasonalCollection>? seasonal=null,IEnumerable<AwardCollection>? awards=null)
     {
         var lookup=catalog.Where(item=>item.OnlineId!=null).GroupBy(item=>item.OnlineId!,StringComparer.Ordinal).ToDictionary(group=>group.Key,group=>group.First(),StringComparer.Ordinal);
         MediaItem[] Members(IEnumerable<string> ids)=>ids.Distinct(StringComparer.Ordinal).Where(lookup.ContainsKey).Select(id=>lookup[id]).Take(40).ToArray();
@@ -38,6 +38,10 @@ public static class FeaturedCatalog
         if(Fresh(catalog) is {Length:>0} fresh)groups.Insert(Math.Min(1,groups.Count),new(new(FreshId,"Свежее в каталоге","Fresh in the catalog","Недавние релизы с раздачами","Recent releases"),fresh));
         if(TopRated(catalog) is {Length:>0} top)groups.Insert(Math.Min(3,groups.Count),new(new(TopRatedId,"Лучшее по оценкам","Top rated","Фильмы и сериалы с самыми высокими оценками зрителей","Titles with the highest audience ratings",Layout:"ranking"),top));
         // One shelf per big genre, from the best rated titles of the catalog.
+        // Award lists from the backend: the winners of every year, newest first. A winner the catalog already has keeps its own card.
+        var byImdb=catalog.Where(item=>item.ImdbId!=null).GroupBy(item=>item.ImdbId!,StringComparer.OrdinalIgnoreCase).ToDictionary(group=>group.Key,group=>group.First(),StringComparer.OrdinalIgnoreCase);
+        foreach(var award in awards??[])
+            groups.Add(new(new("award-"+award.Id,award.Title,award.TitleEn,award.Description,award.DescriptionEn),award.Entries.Select(entry=>AwardsCatalog.Item(entry,byImdb)).DistinctBy(item=>item.Id).ToArray()));
         // A title stands on the shelf of the first genre that takes it, so the shelves do not repeat each other.
         var taken=new HashSet<int>();
         foreach(var (key,title,titleEn) in Genres)

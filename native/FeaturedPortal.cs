@@ -66,7 +66,7 @@ public partial class MainWindow
     void BuildFeaturedHero(FeaturedGroup[] groups)
     {
         if(featuredHero==null)return;
-        var slides=groups.Where(group=>!group.Collection.IsGames).Select(group=>(Group:group,Item:FeaturedVisible(group).FirstOrDefault())).Where(row=>row.Item!=null).DistinctBy(row=>row.Item!.Id).Take(5).ToArray();
+        var slides=groups.Where(group=>!group.Collection.IsGames&&!group.Collection.Id.StartsWith("award-",StringComparison.Ordinal)).Select(group=>(Group:group,Item:FeaturedVisible(group).FirstOrDefault())).Where(row=>row.Item!=null).DistinctBy(row=>row.Item!.Id).Take(5).ToArray();
         var key=FeaturedKey(slides.Select(row=>row.Item!));
         if(key==featuredHeroKey)return;featuredHeroKey=key;
         featuredHero.Children.Clear();featuredHeroIds.Clear();featuredDigestKey=null;
@@ -83,7 +83,7 @@ public partial class MainWindow
     void BuildFeaturedDigest(FeaturedGroup[] groups)
     {
         if(featuredDigest==null)return;
-        var picks=groups.Where(group=>!group.Collection.IsGames).Select(group=>(Group:group,Item:FeaturedVisible(group).Where(item=>!featuredHeroIds.Contains(item.Id)).OrderBy(item=>string.IsNullOrWhiteSpace(item.DisplayDescription)?1:0).FirstOrDefault())).Where(row=>row.Item!=null).DistinctBy(row=>row.Item!.Id).Take(3).ToArray();
+        var picks=groups.Where(group=>!group.Collection.IsGames&&!group.Collection.Id.StartsWith("award-",StringComparison.Ordinal)).Select(group=>(Group:group,Item:FeaturedVisible(group).Where(item=>!featuredHeroIds.Contains(item.Id)).OrderBy(item=>string.IsNullOrWhiteSpace(item.DisplayDescription)?1:0).FirstOrDefault())).Where(row=>row.Item!=null).DistinctBy(row=>row.Item!.Id).Take(3).ToArray();
         // Titles already told above (banner, digest) go last in the lead story's list below.
         featuredUsed.Clear();featuredUsed.UnionWith(featuredHeroIds);foreach(var row in picks)featuredUsed.Add(row.Item!.Id);
         var key=FeaturedKey(picks.Select(row=>row.Item!))+"|"+(featuredWidth<760?1:featuredWidth<1100?2:3);

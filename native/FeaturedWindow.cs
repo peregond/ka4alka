@@ -29,6 +29,15 @@ public partial class MainWindow
         featuredCollectionId=featuredReturn;featuredReturn=null;section=FeaturedSection;current=null;activePerson=null;personOrigin=null;returnPerson=null;
         submittedQuery="";Search.Text="";Render();return true;
     }
+    AwardsCatalog? awardsCatalog;
+    AwardsCatalog Awards=>awardsCatalog??=new(sourceClient);
+    // The backend's award lists are checked once a day; when they changed, the page loads them again.
+    async Task RefreshAwardsAsync()
+    {
+        try{if(await Awards.RefreshAsync(metadataLifetime.Token)&&!closed&&section==FeaturedSection&&current==null)ReloadFeatured();}
+        catch(OperationCanceledException){}
+        catch(Exception error){ErrorLog.Write(error);}
+    }
     void CancelFeaturedWork()
     {
         featuredHubRequest?.Cancel();featuredHubRequest?.Dispose();featuredHubRequest=null;
@@ -98,8 +107,9 @@ public partial class MainWindow
             async Task<FeaturedGroup[]> Load()
             {
                 await BundledCatalog.EnsureLoadedAsync(token);
-                await sharedCatalog.RestoreAsync(token);
-                return await Task.Run(()=>FeaturedCatalog.Resolve(sharedCatalog.All,sharedCatalog.ActiveCollections),token);
+                await sharedCatalog.RestoreAsync(token);await Awards.RestoreAsync(token);
+                _=RefreshAwardsAsync();
+                return await Task.Run(()=>FeaturedCatalog.Resolve(sharedCatalog.All,sharedCatalog.ActiveCollections,Awards.All),token);
             }
         }
         catch(OperationCanceledException) when(token.IsCancellationRequested){}
