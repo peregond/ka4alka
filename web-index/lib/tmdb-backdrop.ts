@@ -1,7 +1,7 @@
 // This module runs on the server. Credentials never enter public JSON or image URLs.
 export type BackdropIdentity = { section: "movies" | "series"; title: string; originalTitle?: string | null; year: number; imdbId?: string | null };
 type Row = { id?: number; title?: string; original_title?: string; name?: string; original_name?: string; release_date?: string; first_air_date?: string; backdrop_path?: string };
-export type Backdrop = { url: string; tmdbId: number; source: "TMDB" };
+export type Backdrop = { url: string; tmdbId?: number; tvdbId?: number; source: "TMDB" | "TVDB" };
 const normalize = (value: string) => value.normalize("NFKC").toLowerCase().replaceAll("ё", "е").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 export function imageUrl(path: unknown): string | null {
   return typeof path === "string" && /^\/[a-zA-Z0-9_-]+\.jpg$/.test(path) ? `https://image.tmdb.org/t/p/w1280${path}` : null;
@@ -41,7 +41,8 @@ export async function fetchBackdrop(item: BackdropIdentity, token: string, reque
     const bytes = new Uint8Array(length); let offset = 0; for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
     return JSON.parse(new TextDecoder().decode(bytes));
   }
-  const type = item.section === "movies" ? "movie" : "tv";
+  if (item.section !== "movies") return null; // Series artwork comes from TheTVDB.
+  const type = "movie";
   let selected: Row | null = null;
   if (/^tt\d{7,10}$/.test(item.imdbId ?? "")) {
     const result = await read(`find/${item.imdbId}?external_source=imdb_id`);
