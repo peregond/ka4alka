@@ -29,7 +29,8 @@ public static class FeaturedCatalogTests
         var fresh=derived.Single(row=>row.Collection.Id==FeaturedCatalog.FreshId);
         Check(fresh.Items.Select(item=>item.Id).SequenceEqual(new[]{23,21,24,22,28}),"Fresh lists the newest year first and the better rated title first within a year; games and titles without poster or text are left out.");
         var top=derived.Single(row=>row.Collection.Id==FeaturedCatalog.TopRatedId);
-        Check(top.Items.Select(item=>item.Id).SequenceEqual(new[]{22,23})&&top.Collection.Layout=="ranking","The ranking needs both ratings, keeps only well rated titles and is laid out as a ranking.");
+        Check(top.Items.Where(item=>item.Section!="Игры").Select(item=>item.Id).SequenceEqual(new[]{22,23})&&top.Collection.Layout=="ranking","The ranking needs both ratings, keeps only well rated titles and is laid out as a ranking.");
+        Check(top.Items.Any(item=>item.Section=="Игры")&&top.Items.TakeWhile(item=>item.Section!="Игры").Count()==2,"The ranking ends with the games list as its own tab.");
         Check(FeaturedCatalog.Resolve([a,b]).All(row=>row.Collection.Id is not (FeaturedCatalog.FreshId or FeaturedCatalog.TopRatedId)),"Rubrics without presentable titles are not shown.");
         // Genre shelves: best rated first, a title only on the first shelf that takes it, and no shelf for a genre with too few titles.
         MediaItem Genre(int id,string rating,params string[] keys)=>new(id,"Genre "+id,"Фильмы","",2024,rating,rating,"#123456"){OnlineId="movies:genre-"+id,ImageUrl="https://example.test/p.jpg",Description="Описание",GenreKeys=keys};

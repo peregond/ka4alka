@@ -93,8 +93,21 @@ public partial class MainWindow
         button.FontWeight=selected?FontWeights.SemiBold:FontWeights.Medium;
         if(button.Content is Grid grid&&grid.Children.OfType<Path>().FirstOrDefault(x=>Equals(x.Tag,"NavIcon")) is {} icon)
         {
-            if(selected){BindingOperations.ClearBinding(icon,Shape.StrokeProperty);icon.SetResourceReference(Shape.StrokeProperty,"Accent");}
-            else{icon.ClearValue(Shape.StrokeProperty);icon.SetBinding(Shape.StrokeProperty,new Binding("Foreground"){RelativeSource=new RelativeSource(RelativeSourceMode.FindAncestor,typeof(Button),1)});}
+            // The section being shown has a solid icon (star, heart, film strip, television, gamepad), not just an accent outline.
+            var solid=button.Tag?.ToString() is "Актуальное" or "Фильмы" or "Сериалы" or "Игры"||ReferenceEquals(button,SavedButton);
+            if(selected)
+            {
+                BindingOperations.ClearBinding(icon,Shape.StrokeProperty);
+                // Film strip and gamepad keep their inner details visible as ink lines on the accent fill.
+                var details=button.Tag?.ToString() is "Фильмы" or "Игры";
+                icon.SetResourceReference(Shape.StrokeProperty,solid&&details?"AccentInk":"Accent");
+                if(solid){icon.SetResourceReference(Shape.FillProperty,"Accent");icon.StrokeThickness=2;}
+            }
+            else
+            {
+                icon.ClearValue(Shape.StrokeProperty);icon.SetBinding(Shape.StrokeProperty,new Binding("Foreground"){RelativeSource=new RelativeSource(RelativeSourceMode.FindAncestor,typeof(Button),1)});
+                icon.ClearValue(Shape.FillProperty);icon.StrokeThickness=1.8;
+            }
         }
     }
     void UpdateSavedCount(){SetNavBadge(SavedButton,prefs.LiveFavorites.Select(x=>x.Id).Distinct().Count().ToString());}

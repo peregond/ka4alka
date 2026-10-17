@@ -28,7 +28,7 @@ public partial class MainWindow
         // The lead story with its list, a numbered ranking and an ordinary shelf, as the front page has them.
         var shelfDefinition=FeaturedCatalog.Collections.Where(row=>!row.IsGames&&row.Id!=definition.Id).First();
         var rankingDefinition=new FeaturedCollection(FeaturedCatalog.TopRatedId,"Лучшее по оценкам","Top rated","Фильмы и сериалы с самыми высокими оценками зрителей","Titles with the highest audience ratings",Layout:"ranking");
-        FeaturedGroup[] fixtureGroups=[new(definition,items),new(rankingDefinition,items.Skip(5).Take(8).ToArray()),new(shelfDefinition,items.Skip(8).Take(10).ToArray()),new(gameDefinition,[game])];
+        FeaturedGroup[] fixtureGroups=[new(definition,items),new(rankingDefinition,items.Skip(5).Take(8).Concat([GameCatalog.Item(620,"Portal 2",FeaturedCatalog.GamePortrait(620)),GameCatalog.Item(413150,"Stardew Valley",FeaturedCatalog.GamePortrait(413150))]).ToArray()),new(shelfDefinition,items.Skip(8).Take(10).ToArray()),new(gameDefinition,[game])];
         var delayed=new TaskCompletionSource<FeaturedGroup[]>(TaskCreationOptions.RunContinuationsAsynchronously);
         featuredProvider=_=>delayed.Task;featuredGroups=null;
         ShowFeatured();await Settle();
@@ -42,8 +42,18 @@ public partial class MainWindow
         MaxWidth=1800;MaxHeight=1100;MinWidth=700;MinHeight=550;Width=1280;Height=850;
         ShowFeatured();await Settle();
         Check(Navigation.Children.OfType<Button>().First().Tag?.ToString()==FeaturedSection,"Featured is the first library section.");
+        Check(Navigation.Children.OfType<Button>().First().Content is Grid navGrid&&navGrid.Children.OfType<System.Windows.Shapes.Path>().FirstOrDefault()?.Fill!=null,"The icon of the open section is solid.");
+        Check(Navigation.Children.OfType<Button>().Skip(1).All(button=>button.Content is Grid other&&other.Children.OfType<System.Windows.Shapes.Path>().FirstOrDefault()?.Fill==null),"The icons of the other sections stay outlined.");
         Check(SearchBar.Visibility==Visibility.Visible&&featuredShelves.Count==4,"Search and editorial shelves are available.");
         Check(featuredShelves[rankingDefinition.Id].Custom!=null&&FindVisual<StackPanel>(Body,panel=>panel.Name=="FeaturedtopratedBlock")?.Children.OfType<UniformGrid>().FirstOrDefault()?.Children.Count>=2,"The ranking shows numbered posters.");
+        // Films, series and games each have a tab in the ranking; a tab shows its own list.
+        var rankingBlock=FindVisual<StackPanel>(Body,panel=>panel.Name=="FeaturedtopratedBlock")!;
+        var rankingTabs=VisualElements<Button>(rankingBlock).Where(button=>button.Name.StartsWith("FeaturedRankingTab",StringComparison.Ordinal)).ToArray();
+        Check(rankingTabs.Length==3,"The ranking has a tab for each kind it holds.");
+        rankingTabs[2].RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await Settle();
+        rankingBlock=FindVisual<StackPanel>(Body,panel=>panel.Name=="FeaturedtopratedBlock")!;
+        Check(VisualElements<Button>(rankingBlock).Count(button=>button.Tag is MediaItem {Section:"Игры"})==2,"The games tab of the ranking shows the games.");
+        VisualElements<Button>(rankingBlock).First(button=>button.Name=="FeaturedRankingTab0").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await Settle();
         var scroll=FindVisual<ScrollViewer>(Body,_=>true);var baseline=renderCount;
         RefreshFeaturedRows();await Settle();
         Check(renderCount==baseline&&ReferenceEquals(scroll,FindVisual<ScrollViewer>(Body,_=>true)),"Shelf updates preserve the page and scroll viewer.");

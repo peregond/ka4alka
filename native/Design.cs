@@ -31,6 +31,27 @@ public partial class MainWindow
         else SubmitSearch(sender,e);
         Search.Focus();
     }
+    // One refresh for every page: checks the shared catalog and the award lists now, then reloads what the current page shows.
+    async void RefreshCatalogClicked(object sender,RoutedEventArgs e)
+    {
+        RefreshCatalogButton.IsEnabled=false;Status.Text=AppLanguage.T("Проверяем каталог…");
+        try
+        {
+            var changed=await sharedCatalog.RefreshAsync(force:true);
+            try{changed|=await Awards.RefreshAsync(force:true);}catch(Exception error)when(error is not OperationCanceledException){ErrorLog.Write(error);}
+            if(closed)return;
+            onlineIndex.RetryNow();ResetCatalogQualityChecks();catalogPages.Clear();ResetDiscoveryData();
+            Status.Text=AppLanguage.T(changed?"Каталог обновлён. Новые названия появятся в разделах.":"Новых названий пока нет.");
+            if(current!=null)return;
+            if(section is "Фильмы" or "Сериалы"){catalogRefreshRequested=true;liveKey="";Render();}
+            else if(section=="Игры")RefreshGames();
+            else if(section==FeaturedSection){featuredGroups=null;Render();}
+        }
+        catch(Exception error)when(error is not OperationCanceledException){ErrorLog.Write(error);if(!closed)Status.Text=AppLanguage.T("Не удалось проверить каталог: ")+error.Message;}
+        finally{RefreshCatalogButton.IsEnabled=true;}
+    }
+    // A second click inside the search field takes the whole query instead of the word under the pointer.
+    bool SearchDoubleClick(int clickCount){if(clickCount<2)return false;Search.Focus();Search.SelectAll();return true;}
     void ToggleTheme(object sender,RoutedEventArgs e){prefs.Light=!prefs.Light;prefs.Save();ApplyTheme();Render();}
     void FocusCatalogSearch(){if(SearchBar.Visibility!=Visibility.Visible){ShowCatalogSection(lastCatalogSection);Render();}Search.Focus();Search.SelectAll();}
     void EnableShortcuts()

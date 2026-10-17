@@ -26,6 +26,8 @@ public partial class MainWindow:Window
         AppLanguage.Set(prefs.UiLanguage);InitializeComponent();
         prefs.LiteMode=PerformanceBudget.DefaultLiteMode(prefs.LiteModeConfigured,prefs.LiteMode);
         InitializeStatusToast();InitializeShareLinks();PreviewMouseWheel+=(_,_)=>RestShimmerWhileScrolling();
+        // A double click in the search field selects the whole query, not just the word under the pointer.
+        Search.PreviewMouseLeftButtonDown+=(_,e)=>e.Handled=SearchDoubleClick(e.ClickCount)||e.Handled;
         onlineIndex=new(sourceClient,relays:new IndexRelays(sourceClient));sourceClient.TorrentRelay=onlineIndex.RelayTorrent;sharedCatalog=new(sourceClient);
         catalogRefreshTimer.Tick+=(_,_)=>
         {

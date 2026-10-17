@@ -135,6 +135,8 @@ public partial class MainWindow
             await ClickWithMouse(reset);await Settle();
             Check(CatalogSelection.IsDefault&&prefs.CatalogQualityHeight==0&&Search.Text=="Интерстеллар"&&submittedQuery==Search.Text&&prefs.HidePoorQuality==originalHide,"Native filter reset clears selected filters while preserving query and poor-quality preference.");
             Check(!VisualElements<Button>(FilterControls).Any(button=>button.Name.StartsWith("ActiveFilter_",StringComparison.Ordinal)),"Removing all selected filters also removes their chip row.");
+            Check(!VisualElements<Button>(FilterControls).Any(button=>button.Name=="ResetActiveCatalogFilters"),"Reset all is hidden while no filter is applied.");
+            Check(RefreshCatalogButton.IsVisible&&RefreshCatalogButton.TransformToAncestor(HeaderActions).Transform(new Point()).X<ThemeButton.TransformToAncestor(HeaderActions).Transform(new Point()).X,"The catalog refresh button sits to the left of the theme switch.");
             Search.Clear();searchDelay.Stop();submittedQuery="";searchCategory="";CancelPeopleSearch();liveKey=CurrentCatalogKey;Render();await Settle();
             await Size(510,720);Render();await Settle();CheckCards("narrow");Shot("interface-narrow-dark");
             prefs.Light=true;ApplyTheme();Render();await Settle();Shot("interface-narrow-light");

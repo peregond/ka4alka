@@ -191,11 +191,9 @@ public partial class MainWindow
             AddCatalogFilters(tabs);
             tabs.Children.Add(CatalogQualityControls(()=>{livePage=1;Render();}));
         }
-        if(!PeopleOnlySearch)sortBar.Children.Add(AddCatalogResetButton());
-        if(!favoritesOnly)
-        {
-            var refresh=ActionButton("","IconRefresh",()=>{onlineIndex.RetryNow();ResetCatalogQualityChecks();catalogPages.Clear();ResetDiscoveryData();catalogRefreshRequested=true;liveKey="";Render();},"PillButton");catalogRefreshButton=refresh;refresh.ToolTip=AppLanguage.T("Обновить каталог");System.Windows.Automation.AutomationProperties.SetName(refresh,AppLanguage.T("Обновить каталог"));refresh.Padding=new(0);refresh.Width=40;refresh.Margin=new(8,0,0,8);sortBar.Children.Add(refresh);
-        }
+        // "Сбросить всё" appears only when there is something to reset.
+        if(!PeopleOnlySearch&&ActiveCatalogFilters().Length>0)sortBar.Children.Add(AddCatalogResetButton());
+        // Refreshing the catalog lives in the header, next to the theme switch, so it is the same on every page.
         inlineCatalogFilters=tabs;
         inlineCatalogFilterScroll=new ScrollViewer{Content=tabs,VerticalScrollBarVisibility=ScrollBarVisibility.Disabled,HorizontalScrollBarVisibility=ScrollBarVisibility.Hidden,CanContentScroll=false};
         inlineCatalogFilterScroll.ScrollChanged+=(_,_)=>UpdateCatalogFilterOverflow();

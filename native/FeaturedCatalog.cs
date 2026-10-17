@@ -36,7 +36,8 @@ public static class FeaturedCatalog
         }
         // Rubrics drawn from the catalog itself, so the page has fresh material without any editorial work.
         if(Fresh(catalog) is {Length:>0} fresh)groups.Insert(Math.Min(1,groups.Count),new(new(FreshId,"Свежее в каталоге","Fresh in the catalog","Недавние релизы с раздачами","Recent releases"),fresh));
-        if(TopRated(catalog) is {Length:>0} top)groups.Insert(Math.Min(3,groups.Count),new(new(TopRatedId,"Лучшее по оценкам","Top rated","Фильмы и сериалы с самыми высокими оценками зрителей","Titles with the highest audience ratings",Layout:"ranking"),top));
+        // The ranking has a tab for films, one for series and one for games; the games are the editors' own list, as no rating of theirs is kept here.
+        if(TopRated(catalog) is {Length:>0} top)groups.Insert(Math.Min(3,groups.Count),new(new(TopRatedId,"Лучшее по оценкам","Top rated","Фильмы, сериалы и игры, которые выше всего ценят зрители","Films, series and games that viewers rate highest",Layout:"ranking"),top.Concat(TopGames()).ToArray()));
         // One shelf per big genre, from the best rated titles of the catalog.
         // Award lists from the backend: the winners of every year, newest first. A winner the catalog already has keeps its own card.
         var byImdb=catalog.Where(item=>item.ImdbId!=null).GroupBy(item=>item.ImdbId!,StringComparer.OrdinalIgnoreCase).ToDictionary(group=>group.Key,group=>group.First(),StringComparer.OrdinalIgnoreCase);
@@ -77,5 +78,13 @@ public static class FeaturedCatalog
     // The newest releases first; among equal years the better rated one comes first.
     static MediaItem[] Fresh(IEnumerable<MediaItem> catalog)=>catalog.Where(Presentable).OrderByDescending(item=>item.Year).ThenByDescending(Score).ThenBy(item=>item.Id).Take(40).ToArray();
     // Both sources must agree: a single enthusiastic rating of an obscure title does not make a ranking.
-    static MediaItem[] TopRated(IEnumerable<MediaItem> catalog)=>catalog.Where(Presentable).Where(item=>Score(item)>=7.8&&item.Year>=1960).OrderByDescending(Score).ThenByDescending(item=>item.Year).ThenBy(item=>item.Id).Take(40).ToArray();
+    // Ten of each kind, so that every tab of the ranking has its own list.
+    static MediaItem[] TopRated(IEnumerable<MediaItem> catalog)
+    {
+        var rated=catalog.Where(Presentable).Where(item=>Score(item)>=7.8&&item.Year>=1960).OrderByDescending(Score).ThenByDescending(item=>item.Year).ThenBy(item=>item.Id).ToArray();
+        return rated.Where(item=>item.Section=="Фильмы").Take(10).Concat(rated.Where(item=>item.Section=="Сериалы").Take(10)).ToArray();
+    }
+    // Tall store art, as a poster needs it; the wide capsule would be cropped to its middle.
+    public static string GamePortrait(int id)=>"https://cdn.akamai.steamstatic.com/steam/apps/"+id+"/library_600x900.jpg";
+    static MediaItem[] TopGames()=>Collections.FirstOrDefault(collection=>collection.IsGames)?.Games?.Take(10).Select(game=>GameCatalog.Item(game.Id,game.Title,GamePortrait(game.Id))).ToArray()??[];
 }

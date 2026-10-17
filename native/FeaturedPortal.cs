@@ -51,7 +51,9 @@ public partial class MainWindow
             var star=new TextBlock{Text="★",FontSize=size,Margin=new(0,0,4,0)};star.SetResourceReference(TextBlock.ForegroundProperty,"RatingInk");line.Children.Add(star);
             var rating=new TextBlock{Text=item.CardRating,FontSize=size,FontWeight=FontWeights.Bold,Margin=new(0,0,6,0)};rating.SetResourceReference(TextBlock.ForegroundProperty,"RatingInk");line.Children.Add(rating);
         }
-        var rest=string.Join(" · ",new[]{item.Year>0?item.Year.ToString():"",item.CardGenre}.Where(part=>part.Length>0));
+        // The kind of title first, so films, series and games sitting side by side can be told apart.
+        var kind=AppLanguage.T(item.Section switch{"Сериалы"=>"Сериал","Игры"=>"Игра",_=>"Фильм"});
+        var rest=string.Join(" · ",new[]{kind,item.Year>0?item.Year.ToString():"",item.CardGenre}.Where(part=>part.Length>0));
         var tail=new TextBlock{Text=rest,FontSize=size,TextTrimming=TextTrimming.CharacterEllipsis};tail.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");line.Children.Add(tail);
         return line;
     }
@@ -159,18 +161,34 @@ public partial class MainWindow
     }
 
     // ── Numbered ranking ──
-    // Large heavy numerals that overlap the lower left corner of each poster.
+    // Large heavy numerals that overlap the lower left corner of each poster. Films, series and games each have a tab.
+    string featuredRankingKind="Фильмы";
     void FillFeaturedRanking(StackPanel host,MediaItem[] items,int columns)
     {
-        var key=FeaturedKey(items)+"|"+columns;
+        var kinds=new[]{"Фильмы","Сериалы","Игры"}.Where(kind=>items.Any(item=>item.Section==kind)).ToArray();
+        if(kinds.Length==0){host.Children.Clear();return;}
+        if(!kinds.Contains(featuredRankingKind))featuredRankingKind=kinds[0];
+        var shown=kinds.Length>1?items.Where(item=>item.Section==featuredRankingKind).ToArray():items;
+        var key=FeaturedKey(items)+"|"+columns+"|"+featuredRankingKind;
         if(host.Tag as string==key&&host.Children.Count>0)return;host.Tag=key;
         host.Children.Clear();
-        var count=Math.Min(items.Length,Math.Clamp(columns,2,5));
+        if(kinds.Length>1)
+        {
+            var tabs=new StackPanel{Orientation=Orientation.Horizontal,Margin=new(0,0,0,12)};
+            foreach(var kind in kinds)
+            {
+                var tab=Button("",()=>{featuredRankingKind=kind;FillFeaturedRanking(host,items,columns);});tab.Style=(Style)FindResource("PillButton");tab.Content=ChipContent(kind,false);StyleChip(tab,kind==featuredRankingKind);
+                tab.MinHeight=34;tab.FontSize=13;tab.Padding=new(14,0,14,0);tab.Margin=new(0,0,8,0);tab.Name="FeaturedRankingTab"+Array.IndexOf(kinds,kind);
+                AutomationProperties.SetName(tab,AppLanguage.T(kind));tabs.Children.Add(tab);
+            }
+            host.Children.Add(tabs);
+        }
+        var count=Math.Min(shown.Length,Math.Clamp(columns,2,5));
         if(count==0)return;
         var grid=new UniformGrid{Columns=count,Margin=new(0,4,-16,0)};
         for(var index=0;index<count;index++)
         {
-            var item=items[index];
+            var item=shown[index];
             var cell=new StackPanel{Margin=new(0,0,16,18)};
             var stage=new Grid();
             var poster=StoryPoster(item);poster.Margin=new(34,0,0,0);stage.Children.Add(poster);

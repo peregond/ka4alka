@@ -65,6 +65,11 @@ public partial class MainWindow
             section="Фильмы";lastCatalogSection="Фильмы";current=null;Render();Width=510;await Settle();
             var windowCount=Application.Current.Windows.Count;
             Search.Text="Интерстелла";Search.Text="Интерстеллар";
+            // A double click inside the field selects the whole query, not only the word under the pointer.
+            Search.Text="Тёмный рыцарь";Search.Select(2,0);
+            Check(SearchDoubleClick(2),"A double click is taken over by the search field.");
+            Check(Search.SelectedText=="Тёмный рыцарь","A double click in the search field selects the whole query.");
+            Search.Text="Интерстеллар";
             SettingsButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));submittedQuery=Search.Text.Trim();searchCategory="";liveKey=CurrentCatalogKey;Render();await Task.Delay(450);await Settle();
             Check(section=="Настройки"&&SearchBar.Visibility==Visibility.Collapsed,"Settings did not open as a page.");
             Check(Application.Current.Windows.Count==windowCount,"Settings opened another window.");
