@@ -1,0 +1,63 @@
+name: Measure cold start and memory
+on:
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: Launches per variant
+        default: '5'
+permissions:
+  contents: read
+jobs:
+  measure:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Publish the shipped build and the same build with ReadyToRun
+        shell: pwsh
+        run: |
+          dotnet publish native/Kachalka.csproj -c Release -r win-x64 --self-contained true -o out/plain -p:DebugType=None -p:DebugSymbols=false
+          dotnet publish native/Kachalka.csproj -c Release -r win-x64 --self-contained true -o out/r2r -p:DebugType=None -p:DebugSymbols=false -p:PublishReadyToRun=true
+          foreach ($v in 'plain','r2r') {
+            $size=(Get-ChildItem out/$v/Kachalka.dll).Length
+            "$v Kachalka.dll: $([math]::Round($size/1MB,1)) MB; folder: $([math]::Round((Get-ChildItem out/$v -Recurse -File | Measure-Object Length -Sum).Sum/1MB,1)) MB" | Tee-Object -Append $env:GITHUB_STEP_SUMMARY
+          }
+      - name: Launch each variant and record time to window, time to responsive and memory
+        shell: pwsh
+        run: |
+          $runs=[int]'${{ inputs.runs }}'
+          "| variant | run | window shown, ms | memory after 10 s, MB | private, MB |`n|---|---|---|---|---|" | Add-Content $env:GITHUB_STEP_SUMMARY
+          $rows=@()
+          foreach ($v in 'plain','r2r','plain','r2r') {
+            for ($i=1; $i -le $runs; $i++) {
+              $data=Join-Path $PWD "profile-$v-$i"
+              $folder=Join-Path $data 'downloads'
+              New-Item -ItemType Directory -Force $folder | Out-Null
+              @{Folder=$folder;FolderConfigured=$true;AutoResumeDownloads=$false;CheckForUpdates=$false;AutoUpdate=$false;LiteMode=$false;LiteModeConfigured=$true} | ConvertTo-Json | Set-Content (Join-Path $data 'settings.json') -Encoding utf8NoBOM
+              $env:KACHALKA_DATA=$data
+              $watch=[System.Diagnostics.Stopwatch]::StartNew()
+              $app=Start-Process (Join-Path $PWD "out/$v/Kachalka.exe") -PassThru
+              $shown=$null
+              while ($watch.ElapsedMilliseconds -lt 30000) {
+                $app.Refresh()
+                if ($app.MainWindowHandle -ne 0) { $shown=$watch.ElapsedMilliseconds; break }
+                Start-Sleep -Milliseconds 10
+              }
+              Start-Sleep -Seconds 10
+              $app.Refresh()
+              $ws=[math]::Round($app.WorkingSet64/1MB); $pm=[math]::Round($app.PrivateMemorySize64/1MB)
+              $line="| $v | $i | $shown | $ws | $pm |"
+              $line | Add-Content $env:GITHUB_STEP_SUMMARY
+              $rows+=[pscustomobject]@{Variant=$v;Shown=$shown;Ws=$ws;Pm=$pm}
+              $app.Kill($true); $app.WaitForExit()
+            }
+          }
+          foreach ($v in 'plain','r2r') {
+            $r=$rows | Where-Object Variant -eq $v
+            $sorted=@($r.Shown | Where-Object { $_ -ne $null } | Sort-Object)
+            $median=if ($sorted.Count) { $sorted[[int]($sorted.Count/2)] } else { 'n/a' }
+            Write-Output "::notice title=startup $v::median window ${median} ms over $($r.Count) launches; memory after 10 s median $((@($r.Ws | Sort-Object))[[int]($r.Count/2)]) MB"
+          }
