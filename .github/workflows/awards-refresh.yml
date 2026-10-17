@@ -1,5 +1,9 @@
 name: Refresh award lists
 on:
+  # A push to this branch only collects and reports (nothing is published), so a change to the collector can be tried.
+  push:
+    branches: [claude/awards]
+    paths: ['scripts/collect_awards.py', '.github/workflows/awards-refresh.yml']
   schedule:
     - cron: '30 5 * * 1'
   workflow_dispatch:
