@@ -1,0 +1,40 @@
+name: Refresh award lists
+on:
+  schedule:
+    - cron: '30 5 * * 1'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: awards-refresh
+  cancel-in-progress: false
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check the collector offline
+        run: python scripts/test-collect-awards.py
+      - name: Collect the winners of every year from Wikidata
+        run: python scripts/collect_awards.py --output awards.json
+      - name: Publish awards.json next to the shared catalog
+        run: |
+          set -euo pipefail
+          # The release is created by the daily catalog job; a missing one means there is nothing to attach to yet.
+          gh release view catalog-data --json tagName >/dev/null
+          gh release upload catalog-data awards.json --clobber
+          mkdir verify
+          gh release download catalog-data --pattern awards.json --dir verify
+          cmp awards.json verify/awards.json
+          python - <<'PY'
+          import json
+          feed = json.load(open('awards.json', encoding='utf-8'))
+          lines = ', '.join(f"{a['id']}: {len(a['entries'])}" for a in feed['awards'])
+          open(__import__('os').environ['GITHUB_STEP_SUMMARY'], 'a').write(f"Published awards.json ({lines}), generated {feed['generatedAtUtc']}.\n")
+          PY
