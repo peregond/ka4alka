@@ -1,4 +1,5 @@
 using System.IO;
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 namespace Kachalka;
@@ -20,6 +21,7 @@ public sealed partial class AwardsCatalog(SourceClient client,Func<DateTime>? ut
     AwardCollection[] collections=[];
     DateTime nextTryUtc;
     bool restored;
+    string? contentHash;
     public IReadOnlyList<AwardCollection> All=>collections;
 
     // Strict reading: an unknown shape, a bad id or an oversized file discards the whole answer, never part of it.
@@ -78,9 +80,13 @@ public sealed partial class AwardsCatalog(SourceClient client,Func<DateTime>? ut
             if(restored)return;restored=true;
             try
             {
-                if(File.Exists(path)&&new FileInfo(path).Length<=MaxBytes)collections=await Task.Run(async()=>Parse(await CacheFiles.ReadAllBytesAsync(path,CancellationToken.None)),CancellationToken.None);
+                if(File.Exists(path)&&new FileInfo(path).Length<=MaxBytes)
+                {
+                    var saved=await CacheFiles.ReadAllBytesAsync(path,CancellationToken.None);
+                    collections=await Task.Run(()=>Parse(saved),CancellationToken.None);contentHash=Convert.ToHexString(SHA256.HashData(saved));
+                }
             }
-            catch(Exception error)when(error is IOException or InvalidDataException or JsonException or UnauthorizedAccessException){collections=[];}
+            catch(Exception error)when(error is IOException or InvalidDataException or JsonException or UnauthorizedAccessException or FormatException){collections=[];}
         }
         finally{gate.Release();}
     }
@@ -92,14 +98,15 @@ public sealed partial class AwardsCatalog(SourceClient client,Func<DateTime>? ut
         try
         {
             var now=clock();
-            if(!force&&(now<nextTryUtc||File.Exists(path)&&now-File.GetLastWriteTimeUtc(path)<RefreshInterval))return false;
+            // A saved copy that did not parse (no lists in memory) is not a reason to wait a day.
+            if(!force&&(now<nextTryUtc||collections.Length>0&&File.Exists(path)&&now-File.GetLastWriteTimeUtc(path)<RefreshInterval))return false;
             nextTryUtc=now+RetryInterval;
             try
             {
                 using var timeout=CancellationTokenSource.CreateLinkedTokenSource(ct);timeout.CancelAfter(TimeSpan.FromSeconds(10));
                 var bytes=await client.Read(FeedUri,MaxBytes,timeout.Token);
                 var fresh=Parse(bytes);
-                var changed=!SameLists(collections,fresh);collections=fresh;
+                var hash=Convert.ToHexString(SHA256.HashData(bytes));var changed=hash!=contentHash||!SameLists(collections,fresh);collections=fresh;contentHash=hash;
                 try{Directory.CreateDirectory(Path.GetDirectoryName(path)!);await CacheFiles.WriteAllBytesAsync(path,bytes,CancellationToken.None);}catch(IOException){}catch(UnauthorizedAccessException){}
                 return changed;
             }

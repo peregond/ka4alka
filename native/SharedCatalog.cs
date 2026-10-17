@@ -124,7 +124,22 @@ public sealed class SharedCatalog
         try
         {
             using var timeout=new CancellationTokenSource(TimeSpan.FromSeconds(8));
-            var bytes=await TextCatalogDownload.DownloadAsync((uri,maximum,token)=>client.Read(uri,maximum,token),timeout.Token);
+            string? known;lock(state)known=snapshotHash;
+            var bytes=await TextCatalogDownload.DownloadAsync((uri,maximum,token)=>client.Read(uri,maximum,token),timeout.Token,known);
+            // The manifest names the snapshot already held: only the check time moves, nothing is downloaded or rewritten.
+            if(ReferenceEquals(bytes,TextCatalogDownload.Unchanged))
+            {
+                await reader.WaitAsync();
+                try
+                {
+                    DateTime checkedUtc;
+                    lock(state){if(version!=generation)return false;checkedUtc=clock();}
+                    try{await CacheFiles.WriteAllTextAsync(syncPath,JsonSerializer.Serialize(new SyncState(checkedUtc)));}catch(IOException){}catch(UnauthorizedAccessException){}
+                    lock(state){if(version!=generation)return false;lastCheckedUtc=checkedUtc;retryAfterUtc=default;}
+                    return false;
+                }
+                finally{reader.Release();}
+            }
             var fresh=await Task.Run(()=>
             {
                 var parsed=Parse(bytes,clock());

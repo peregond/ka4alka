@@ -17,6 +17,13 @@ public partial class MainWindow
     // shimmer instead of its colour, so a shelf that fills up card by card shows which films are still loading. The
     // shimmer goes as soon as the cover is shown, fails or the card leaves the visible area; posters without a cover
     // address keep their colour.
+    // After a theme or Lite mode change the wave is rebuilt in the new colours and speed; posters still loading keep shimmering.
+    void ResetPosterShimmer()
+    {
+        var old=posterWave;posterWave=null;if(old==null)return;
+        var carried=old.Detach();if(carried.Length==0)return;
+        var next=posterWave=NewShimmer();foreach(var (overlay,lane) in carried)next.Show(overlay,lane);
+    }
     void SyncPosterShimmer(Image image,CoverRequest state)
     {
         // This runs for every poster on every scroll step, so it only looks at flags: a cover request exists only for

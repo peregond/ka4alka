@@ -9,6 +9,7 @@ public partial class MainWindow
     string featuredCollectionId="";
     string? featuredReturn;
     FeaturedGroup[]? featuredGroups;
+    string featuredLanguage="";
     CancellationTokenSource? featuredHubRequest;
     readonly Dictionary<string,DiscoveryShelfView> featuredShelves=[];
     TextBlock? featuredState;
@@ -50,6 +51,8 @@ public partial class MainWindow
     }
     void RenderFeatured()
     {
+        // Titles of seasonal shelves and awards are resolved in the interface language; a language change needs a new resolve.
+        if(featuredGroups!=null&&featuredLanguage!=AppLanguage.Current)featuredGroups=null;
         var group=featuredGroups?.FirstOrDefault(group=>group.Collection.Id==featuredCollectionId);
         var definition=group?.Collection??FeaturedCatalog.Collections.FirstOrDefault(row=>row.Id==featuredCollectionId);
         var title=Text(definition?.Label??FeaturedSection,compactHeight?22:28);title.FontWeight=FontWeights.SemiBold;title.Name="FeaturedHeading";PageHeader.Children.Add(title);
@@ -101,7 +104,7 @@ public partial class MainWindow
         {
             var groups=featuredProvider!=null?await featuredProvider(token).WaitAsync(token):await Load();
             if(token.IsCancellationRequested||closed||section!=FeaturedSection||current!=null)return;
-            featuredGroups=groups;
+            featuredGroups=groups;featuredLanguage=AppLanguage.Current;
             if(featuredRetry!=null)featuredRetry.Visibility=Visibility.Collapsed;
             RefreshFeaturedRows();
             async Task<FeaturedGroup[]> Load()
@@ -118,7 +121,7 @@ public partial class MainWindow
             if(closed||token.IsCancellationRequested)return;
             ErrorLog.Write(error);
             if(featuredGroups==null)foreach(var shelf in featuredShelves.Values)shelf.Set([],false);
-            featuredHero?.Children.Clear();
+            featuredHero?.Children.Clear();featuredHeroKey=featuredDigestKey=null;
             if(featuredRetry!=null)featuredRetry.Visibility=Visibility.Visible;
             if(featuredState!=null){featuredState.Text=AppLanguage.T("Не удалось загрузить подборки. Попробуй ещё раз.");featuredState.Visibility=Visibility.Visible;}
         }
@@ -145,7 +148,9 @@ public partial class MainWindow
                     // The banner and the digest hold the first two places of the page.
                     if(featuredPanel!=null&&shelf.Row.Parent is UIElement row&&featuredPanel.Children.IndexOf(row)!=index+2)
                     {featuredPanel.Children.Remove(row);featuredPanel.Children.Insert(Math.Min(index+2,featuredPanel.Children.Count),row);}
-                    shelf.Set(FeaturedVisible(group),false);
+                    var visible=FeaturedVisible(group);shelf.Set(visible,false);
+                    // A shelf emptied by the person's own filters is hidden rather than shown as unavailable.
+                    if(shelf.Row.Parent is UIElement whole)whole.Visibility=visible.Length>0?Visibility.Visible:Visibility.Collapsed;
                 }
             }
             if(featuredState!=null)featuredState.Visibility=Visibility.Collapsed;
@@ -170,7 +175,8 @@ public partial class MainWindow
         if(section!=FeaturedSection||current!=null||featuredCollectionId.Length>0)return;
         var width=Body.ActualWidth>0?Body.ActualWidth:Math.Max(320,Width-280);
         featuredWidth=width;if(carousel!=null)ArrangeFeatureCarousel(width);
-        if(featuredGroups!=null)BuildFeaturedDigest(featuredGroups);
+        // The digest only changes shape when its column count does; resizing the window by a few pixels must not rebuild it.
+        if(featuredGroups!=null&&DigestColumns(width)!=featuredDigestColumns)BuildFeaturedDigest(featuredGroups);
         foreach(var pair in featuredShelves)
         {
             var games=FeaturedCatalog.Collections.FirstOrDefault(row=>row.Id==pair.Key)?.IsGames==true;

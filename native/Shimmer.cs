@@ -34,7 +34,9 @@ sealed class ShimmerWave(bool animated,int framesPerSecond=30)
     bool running;
     internal bool IsRunning=>running;
     internal int LaneCount=>lanes.Count;
-    public void Stop(){foreach(var overlay in shown.ToArray())Hide(overlay);Set(false);}
+    public void Stop(){foreach(var overlay in shown.Keys.ToArray())Hide(overlay);Set(false);}
+    // Stops this wave and hands back the posters that were still shimmering, so a new wave (after a theme or Lite mode change) can carry on with them.
+    public (Border Overlay,int Lane)[] Detach(){var carried=shown.Select(pair=>(pair.Key,pair.Value)).ToArray();Stop();return carried;}
 
     // Colours the shape with the lane's brush, or with the plain theme colour when nothing animates.
     public void Paint(Border target,int lane,string resource="Raised")
@@ -55,12 +57,12 @@ sealed class ShimmerWave(bool animated,int framesPerSecond=30)
     }
     // For single cards: a poster whose cover is still on its way shows the shimmer until the cover arrives. The wave
     // runs only while at least one such poster is shown, and a poster that leaves the page drops out by itself.
-    readonly HashSet<Border> shown=[];
+    readonly Dictionary<Border,int> shown=[];
     public void Show(Border overlay,int lane)
     {
-        if(!animated||shown.Contains(overlay))return;
+        if(!animated||shown.ContainsKey(overlay))return;
         Paint(overlay,lane);overlay.Visibility=Visibility.Visible;
-        shown.Add(overlay);overlay.Unloaded+=Gone;
+        shown[overlay]=lane;overlay.Unloaded+=Gone;
         Set(true);
     }
     public void Hide(Border overlay)

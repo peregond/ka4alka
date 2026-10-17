@@ -1,8 +1,8 @@
-# Качалка · 0.43.9
+# Качалка · 0.43.10
 
 Нативное приложение для Windows: фильмы, сериалы и игры для Windows, поиск раздач и общая очередь torrent- и magnet-загрузок. Без Electron и встроенного браузера.
 
-**[Скачать установщик 0.43.9 для Windows x64](https://github.com/peregond/ka4alka/releases/download/v0.43.9/Kachalka-Setup-0.43.9.exe)**
+**[Скачать установщик 0.43.10 для Windows x64](https://github.com/peregond/ka4alka/releases/download/v0.43.10/Kachalka-Setup-0.43.10.exe)**
 
 [Все выпуски](https://github.com/peregond/ka4alka/releases) · [Описание возможностей](../README.md) · [Новости](https://t.me/ka4alkacc) · [Поддержка](https://t.me/+6sT2ocaKvLxlNmRi)
 
@@ -43,4 +43,4 @@
 
 Наличие карточки не гарантирует подходящую раздачу или активных участников. Доступность Steam и торрент-источников зависит от региона и сети. Игровые установщики не запускаются автоматически. Используйте приложение для материалов, которые вы вправе скачивать и распространять.
 
-[Что изменилось в 0.43.9](RELEASE-NOTES-0.43.9.md), [в 0.43.8](RELEASE-NOTES-0.43.8.md), [в 0.43.7](RELEASE-NOTES-0.43.7.md), [в 0.43.6](RELEASE-NOTES-0.43.6.md), [в 0.43.5](RELEASE-NOTES-0.43.5.md), [в 0.43.4](RELEASE-NOTES-0.43.4.md), [в 0.43.3](RELEASE-NOTES-0.43.3.md), [в 0.43.2](RELEASE-NOTES-0.43.2.md), [в 0.43.1](RELEASE-NOTES-0.43.1.md), [в 0.43.0](RELEASE-NOTES-0.43.0.md), [в 0.42.2](RELEASE-NOTES-0.42.2.md), [в 0.42.1](RELEASE-NOTES-0.42.1.md) и [в 0.42.0](RELEASE-NOTES-0.42.0.md). Лицензии используемых компонентов находятся в папке `licenses` сборки.
+[Что изменилось в 0.43.10](RELEASE-NOTES-0.43.10.md), [в 0.43.9](RELEASE-NOTES-0.43.9.md), [в 0.43.8](RELEASE-NOTES-0.43.8.md), [в 0.43.7](RELEASE-NOTES-0.43.7.md), [в 0.43.6](RELEASE-NOTES-0.43.6.md), [в 0.43.5](RELEASE-NOTES-0.43.5.md), [в 0.43.4](RELEASE-NOTES-0.43.4.md), [в 0.43.3](RELEASE-NOTES-0.43.3.md), [в 0.43.2](RELEASE-NOTES-0.43.2.md), [в 0.43.1](RELEASE-NOTES-0.43.1.md), [в 0.43.0](RELEASE-NOTES-0.43.0.md), [в 0.42.2](RELEASE-NOTES-0.42.2.md), [в 0.42.1](RELEASE-NOTES-0.42.1.md) и [в 0.42.0](RELEASE-NOTES-0.42.0.md). Лицензии используемых компонентов находятся в папке `licenses` сборки.

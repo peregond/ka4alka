@@ -80,9 +80,12 @@ public partial class MainWindow
 
     // ── Three stories ──
     // A digest of titles that are not in the banner: rubric, headline, a few lines of text and the rating.
+    int featuredDigestColumns;
+    static int DigestColumns(double width)=>width<760?1:width<1100?2:3;
     void BuildFeaturedDigest(FeaturedGroup[] groups)
     {
         if(featuredDigest==null)return;
+        featuredDigestColumns=DigestColumns(featuredWidth);
         var picks=groups.Where(group=>!group.Collection.IsGames&&!group.Collection.Id.StartsWith("award-",StringComparison.Ordinal)).Select(group=>(Group:group,Item:FeaturedVisible(group).Where(item=>!featuredHeroIds.Contains(item.Id)).OrderBy(item=>string.IsNullOrWhiteSpace(item.DisplayDescription)?1:0).FirstOrDefault())).Where(row=>row.Item!=null).DistinctBy(row=>row.Item!.Id).Take(3).ToArray();
         // Titles already told above (banner, digest) go last in the lead story's list below.
         featuredUsed.Clear();featuredUsed.UnionWith(featuredHeroIds);foreach(var row in picks)featuredUsed.Add(row.Item!.Id);
