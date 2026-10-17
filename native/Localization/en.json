@@ -1568,5 +1568,18 @@
   "Каталог обновлён. Новые названия появятся в разделах.": "Catalog updated. New titles will appear in the sections.",
   "Новых названий пока нет.": "No new titles yet.",
   "Не удалось проверить каталог: ": "Could not check the catalog: ",
-  "Номинант": "Nominee"
+  "Номинант": "Nominee",
+  "Источник не отдал новую раздачу. Попробуй позже.": "The source did not return a new release. Try again later.",
+  "Раздача обновлена. Скачанные серии сохранены, докачиваем новые.": "Release updated. The episodes already downloaded are kept and the new ones are being fetched.",
+  "Обновлений нет: у раздачи тот же торрент.": "No update: the release has the same torrent.",
+  "Не удалось обновить раздачу: ": "Could not update the release: ",
+  "Проверить, не вышла ли новая серия: раздача обновится на месте": "Check for a new episode: the release is updated in place",
+  "Обновить раздачу": "Update release",
+  "Фильтр раздач: Студия озвучки": "Release filter: Voice studio",
+  "Фильтр раздач: Тип озвучки": "Release filter: Voice type",
+  "Фильтр раздач: Субтитры": "Release filter: Subtitles",
+  "Фильтр раздач: Источник": "Release filter: Source",
+  "Фильтр раздач: Тип": "Release filter: Type",
+  "Фильтр раздач: Кодек": "Release filter: Codec",
+  "Фильтр раздач: HDR": "Release filter: HDR"
 }

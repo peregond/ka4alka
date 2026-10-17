@@ -311,6 +311,35 @@ public partial class MainWindow
         if(info is FrameworkElement element)element.Margin=stacked?new(0,10,0,0):new(0);
         if(grid.Children[0] is FrameworkElement files)files.Margin=stacked?new(0):new(0,0,24,0);
     }
+    // The one-click update of a running series: the tracker's topic is read again (or, for a magnet, the release is looked up
+    // again in the index) and a different torrent replaces the queued one in place.
+    async void UpdateDownloadRelease(object sender,RoutedEventArgs e)
+    {
+        if(sender is not Button {Tag:DownloadItem item} button)return;
+        button.IsEnabled=false;Status.Text=AppLanguage.T("Проверяем раздачу…");
+        try
+        {
+            var entry=new SourceEntry(item.ReleaseId??"",item.ReleaseTitle??item.Name,item.ReleaseSource??"",item.ReleasePageUrl??"",item.ReleaseUrl,item.ImageUrl);
+            if(string.IsNullOrWhiteSpace(entry.TorrentUrl)||entry.TorrentUrl.StartsWith("magnet:",StringComparison.OrdinalIgnoreCase))
+            {
+                // A magnet link never changes, so the same release is found again in a fresh search.
+                var card=DownloadMetadata.Card(item);
+                if(card!=null)
+                {
+                    var fresh=await onlineIndex.Releases(card,metadataLifetime.Token,true);
+                    var same=fresh.FirstOrDefault(row=>row.Source==item.ReleaseSource&&(row.Id==item.ReleaseId&&row.Id.Length>0||row.PageUrl==item.ReleasePageUrl&&row.PageUrl.Length>0));
+                    if(same?.TorrentUrl!=null)entry=same;
+                }
+            }
+            if(string.IsNullOrWhiteSpace(entry.TorrentUrl)){Status.Text=AppLanguage.T("Источник не отдал новую раздачу. Попробуй позже.");return;}
+            var source=await sourceClient.TorrentFile(entry,metadataLifetime.Token);
+            var result=await downloads.ReplaceTorrentAsync(item,source);
+            Status.Text=AppLanguage.T(result==DownloadService.TorrentUpdate.Updated?"Раздача обновлена. Скачанные серии сохранены, докачиваем новые.":"Обновлений нет: у раздачи тот же торрент.");
+        }
+        catch(OperationCanceledException){}
+        catch(Exception error){Status.Text=AppLanguage.T("Не удалось обновить раздачу: ")+error.Message;}
+        finally{button.IsEnabled=true;}
+    }
     void WatchDownloadClick(object sender,RoutedEventArgs e){if(sender is FrameworkElement {Tag:DownloadItem item})WatchDownload(item);}
     void DownloadMoreClick(object sender,RoutedEventArgs e)
     {
