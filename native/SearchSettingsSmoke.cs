@@ -82,9 +82,9 @@ public partial class MainWindow
             // The window may be limited by a small screen in some runs; the wide layout needs real room, so the limit is lifted here.
             // A fixture minimum forces the viewport: on a small or virtual monitor the native limits would shrink the window.
             var minimumWidth=MinWidth;MaxWidth=Math.Max(MaxWidth,1800);MinWidth=1500;Width=1500;Height=Math.Min(900,MaxHeight-24);await Settle();
-            // The second column needs about 940 px of room; on a monitor too small to give it, the page must stay in one column instead.
+            // The second column needs about 960 px of room; on a monitor too small to give it, the page must stay in one column instead.
             var room=FindVisual<ScrollViewer>(Body,_=>true)?.ViewportWidth??0;var secondColumn=FindVisual<StackPanel>(Body,panel=>panel.Name=="SettingsColumnB")?.Children.Count??0;
-            Check(room>=940?secondColumn>0:room<900&&secondColumn==0||room>=900,$"A wide settings page puts cards in two columns, a narrow one in a single column (room {room:0}, second column {secondColumn}, window {ActualWidth:0}).");Shot("settings-wide");
+            Check(room>=960?secondColumn>0:room>=900||secondColumn==0,$"A wide settings page puts cards in two columns, a narrow one in a single column (room {room:0}, second column {secondColumn}, window {ActualWidth:0}).");Shot("settings-wide");
             var chipRow=FindVisual<ScrollViewer>(PageHeader,panel=>panel.Name=="SettingsSections")?.Content as StackPanel;
             var settingsPage=FindVisual<ScrollViewer>(Body,_=>true)??throw new Exception("Settings scroll viewer missing.");
             var sectionChips=chipRow?.Children.OfType<Button>().ToArray()??[];

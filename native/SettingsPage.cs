@@ -351,12 +351,13 @@ public partial class MainWindow
             catch(InvalidOperationException){}
         }
         settingsScroll.ScrollChanged+=(_,e)=>{if(e.VerticalChange!=0)SyncSection();};
-        // Two columns from about 940 px of room (the page is then up to 1120 wide, otherwise 760); the cards go to the shorter column in turn, so both end about even.
+        // Two columns from about 960 px of room (the page is then up to 1120 wide, otherwise 760); the cards go to the shorter column in turn, so both end about even.
         var twoColumns=false;
-        void Arrange()
+        // "room" is the width the scroll viewer was just given, taken from its size change: its viewport width follows
+        // one layout pass later, so a sudden jump (maximizing the window) would be judged by the old width.
+        void Arrange(double room)
         {
-            var room=settingsScroll.ViewportWidth;
-            var wide=twoColumns?room>=900:room>=940;
+            var wide=twoColumns?room>=920:room>=960;
             if(wide==twoColumns)return;twoColumns=wide;page.MaxWidth=wide?1120:760;
             var ordered=chips.Select(row=>row.Frame).Concat(sectionFrames.Values.Except(chips.Select(row=>row.Frame))).ToList();
             content.Children.Clear();columnB.Children.Clear();
@@ -369,7 +370,7 @@ public partial class MainWindow
                 if(heightA<=heightB){content.Children.Add(card);heightA+=height;}else{columnB.Children.Add(card);heightB+=height;}
             }
         }
-        settingsScroll.SizeChanged+=(_,_)=>{Arrange();SyncSection();};
+        settingsScroll.SizeChanged+=(_,e)=>{Arrange(e.NewSize.Width);SyncSection();};
         var about=new WrapPanel{Margin=new(4,4,0,12)};page.Children.Add(about);
         var appName=Text("Качалка",13);appName.FontWeight=FontWeights.SemiBold;appName.Margin=new(0,0,10,4);about.Children.Add(appName);
         var version=new TextBlock{Text=AppLanguage.T("Версия "+(typeof(MainWindow).Assembly.GetName().Version?.ToString(3)??"")),FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=12,Margin=new(0,1,0,4)};version.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");about.Children.Add(version);
