@@ -3,6 +3,11 @@ on:
   schedule:
     - cron: '30 5 * * 1'
   workflow_dispatch:
+    inputs:
+      publish:
+        description: Upload awards.json to the catalog-data release (otherwise only collect and report)
+        type: boolean
+        default: false
 permissions:
   contents: write
 concurrency:
@@ -22,8 +27,24 @@ jobs:
       - name: Check the collector offline
         run: python scripts/test-collect-awards.py
       - name: Collect the winners of every year from Wikidata
-        run: python scripts/collect_awards.py --output awards.json
+        run: |
+          set +e
+          python scripts/collect_awards.py --output awards.json 2> collect-error.txt
+          status=$?
+          if [ $status -ne 0 ]; then
+            echo "::error title=Collect awards::$(tr '\n' ' ' < collect-error.txt)"
+            exit $status
+          fi
+          # A compact copy in the run's annotations, so the collected lists can be reviewed before they are published.
+          python - <<'PY'
+          import json
+          feed = json.load(open('awards.json', encoding='utf-8'))
+          for award in feed['awards']:
+              line = ' | '.join(f"{e['year']} {e['titleEn'] or e['originalTitle']} {e['imdbId']}" + ('' if e.get('poster') else ' (no poster)') for e in award['entries'])
+              print(f"::notice title={award['id']} ({len(award['entries'])})::{line[:30000]}")
+          PY
       - name: Publish awards.json next to the shared catalog
+        if: ${{ github.event_name == 'schedule' || inputs.publish }}
         run: |
           set -euo pipefail
           # The release is created by the daily catalog job; a missing one means there is nothing to attach to yet.
