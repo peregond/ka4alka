@@ -1,5 +1,8 @@
 name: Measure cold start and memory
 on:
+  push:
+    branches: [claude/fix-0.43.8]
+    paths: ['.github/workflows/startup-measure.yml']
   workflow_dispatch:
     inputs:
       runs:
@@ -28,7 +31,7 @@ jobs:
       - name: Launch each variant and record time to window, time to responsive and memory
         shell: pwsh
         run: |
-          $runs=[int]'${{ inputs.runs }}'
+          $runs=[int]'${{ inputs.runs || '5' }}'
           "| variant | run | window shown, ms | memory after 10 s, MB | private, MB |`n|---|---|---|---|---|" | Add-Content $env:GITHUB_STEP_SUMMARY
           $rows=@()
           foreach ($v in 'plain','r2r','plain','r2r') {
