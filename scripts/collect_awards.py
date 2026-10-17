@@ -11,7 +11,7 @@ Each entry carries the film's IMDb id: the app shows it as an IMDb-only card, lo
 The file is checked before it is written: shape, uniqueness, plausible counts and a few well known anchor winners,
 so a changed or broken Wikidata answer fails the run instead of publishing a wrong list.
 """
-import argparse, datetime, json, re, sys, time, urllib.parse, urllib.request
+import argparse, datetime, json, re, sys, time, urllib.error, urllib.parse, urllib.request
 
 ENDPOINT = 'https://query.wikidata.org/sparql'
 USER_AGENT = 'Kachalka-awards/1.0 (https://github.com/peregond/ka4alka)'
@@ -56,11 +56,21 @@ SELECT ?film ?imdb ?labelRu ?labelEn ?original ?published ?date ?poster WHERE {{
 }}"""
 
 
-def fetch(qid, opener=urllib.request.urlopen):
+def fetch(qid, opener=urllib.request.urlopen, sleep=time.sleep, attempts=5):
+    """One SPARQL query. Wikidata answers 429 or 503 when it is busy; waiting as long as it asks (or a growing pause) is the polite way."""
     url = ENDPOINT + '?' + urllib.parse.urlencode({'query': query(qid), 'format': 'json'})
     request = urllib.request.Request(url, headers={'User-Agent': USER_AGENT, 'Accept': 'application/sparql-results+json'})
-    with opener(request, timeout=90) as response:
-        return json.load(response)
+    for attempt in range(1, attempts + 1):
+        try:
+            with opener(request, timeout=90) as response:
+                return json.load(response)
+        except urllib.error.HTTPError as error:
+            if error.code not in (429, 502, 503, 504) or attempt == attempts:
+                raise
+            asked = error.headers.get('Retry-After') if error.headers else None
+            pause = int(asked) if asked and asked.isdigit() else 30 * attempt
+            print(f'Wikidata answered {error.code}; waiting {pause} s (attempt {attempt} of {attempts})', file=sys.stderr)
+            sleep(min(pause, 180))
 
 
 def imdb_poster(imdb, opener=urllib.request.urlopen):
@@ -198,7 +208,9 @@ def main(argv=None):
         with open(args.from_file, encoding='utf-8') as handle:
             responses[args.award] = json.load(handle)
     else:
-        for award in AWARDS:
+        for index, award in enumerate(AWARDS):
+            if index:
+                time.sleep(10)  # one query after another, not side by side
             responses[award['id']] = fetch(award['qid'])
     document = build(responses, posters=None if args.no_posters else imdb_poster)
     text = json.dumps(document, ensure_ascii=False, indent=1, sort_keys=False) + '\n'

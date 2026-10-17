@@ -110,4 +110,30 @@ assert awards.imdb_poster('tt0000002', lambda request, timeout: Reply(page)) is 
 def broken(request, timeout): raise OSError('offline')
 assert awards.imdb_poster('tt0110912', broken) is None
 
+# A busy Wikidata is asked again after the pause it names; other errors and a last failure surface.
+import io, urllib.error
+class Headers(dict):
+    def get(self, key, default=None): return super().get(key, default)
+def busy(code, retry=None):
+    return urllib.error.HTTPError('https://query.wikidata.org', code, 'busy', Headers({'Retry-After': retry} if retry else {}), io.BytesIO(b''))
+calls, pauses = [], []
+def flaky(request, timeout):
+    calls.append(1)
+    if len(calls) < 3: raise busy(429, '7')
+    return Reply(json.dumps(response(*rows[:1])))
+result = awards.fetch('Q102427', flaky, pauses.append)
+assert len(calls) == 3 and pauses == [7, 7] and result['results']['bindings'], (calls, pauses)
+def forbidden(request, timeout): raise busy(403)
+try:
+    awards.fetch('Q102427', forbidden, pauses.append)
+    raise AssertionError('a 403 is not retried')
+except urllib.error.HTTPError as error:
+    assert error.code == 403
+def always(request, timeout): raise busy(503)
+try:
+    awards.fetch('Q102427', always, pauses.append, attempts=2)
+    raise AssertionError('the last failure surfaces')
+except urllib.error.HTTPError as error:
+    assert error.code == 503
+
 print('PASS: Wikidata rows become entries, checks reject wrong lists, the file is written for the app')
