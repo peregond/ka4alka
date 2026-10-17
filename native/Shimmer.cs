@@ -9,14 +9,13 @@ namespace Kachalka;
 //   twenty cards costs a handful of animations, and each lane starts a moment after the previous one: the light
 //   rolls across the shelf instead of blinking on all cards at once.
 // - The animation moves a brush transform on WPF's render thread (no timer, no per-frame code), at 30 frames a
-//   second, and runs only while its placeholder is on screen. A hidden or removed placeholder stops it.
-// - With motion off (Lite mode, Windows animations off, smoke tests) nothing is created: the shapes keep the
+//   second (20 in Lite mode), and runs only while its placeholder is on screen. A hidden or removed placeholder stops it.
+// - With motion off (Windows animations off, smoke tests) nothing is created: the shapes keep the
 //   flat theme colour through a resource reference, exactly as before.
-sealed class ShimmerWave(bool animated)
+sealed class ShimmerWave(bool animated,int framesPerSecond=30)
 {
-    const int FramesPerSecond=30;
     static readonly TimeSpan Sweep=TimeSpan.FromMilliseconds(1100),Cycle=TimeSpan.FromMilliseconds(1900);
-    sealed class Lane(LinearGradientBrush brush,TranslateTransform slide,int index)
+    sealed class Lane(LinearGradientBrush brush,TranslateTransform slide,int index,int framesPerSecond)
     {
         public readonly LinearGradientBrush Brush=brush;
         readonly TranslateTransform slide=slide;
@@ -26,7 +25,7 @@ sealed class ShimmerWave(bool animated)
             var frames=new DoubleAnimationUsingKeyFrames{Duration=Cycle,RepeatBehavior=RepeatBehavior.Forever,BeginTime=TimeSpan.FromMilliseconds(70*Math.Min(index,10))};
             frames.KeyFrames.Add(new LinearDoubleKeyFrame(-1,KeyTime.FromTimeSpan(TimeSpan.Zero)));
             frames.KeyFrames.Add(new EasingDoubleKeyFrame(1,KeyTime.FromTimeSpan(Sweep),new SineEase{EasingMode=EasingMode.EaseInOut}));
-            Timeline.SetDesiredFrameRate(frames,FramesPerSecond);
+            Timeline.SetDesiredFrameRate(frames,framesPerSecond);
             slide.BeginAnimation(TranslateTransform.XProperty,frames);
         }
         public void Stop(){slide.BeginAnimation(TranslateTransform.XProperty,null);slide.X=-1;}
@@ -50,7 +49,7 @@ sealed class ShimmerWave(bool animated)
         // The gradient is flat outside the light, so while the transform rests at either end the shape shows its plain colour.
         var brush=new LinearGradientBrush{StartPoint=new(0,0),EndPoint=new(1,0),RelativeTransform=slide};
         brush.GradientStops.Add(new(color,0));brush.GradientStops.Add(new(color,.2));brush.GradientStops.Add(new(light,.5));brush.GradientStops.Add(new(color,.8));brush.GradientStops.Add(new(color,1));
-        var lane=new Lane(brush,slide,index);lanes.Add((resource,index),lane);
+        var lane=new Lane(brush,slide,index,framesPerSecond);lanes.Add((resource,index),lane);
         if(running)lane.Start();
         return lane;
     }

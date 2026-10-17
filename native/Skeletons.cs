@@ -22,14 +22,14 @@ public partial class MainWindow
         if(image.Parent is not Panel panel)return;
         Border? overlay=null;foreach(var child in panel.Children)if(child is Border {Name:"PosterShimmer"} found){overlay=found;break;}
         if(overlay==null)return;
-        if(image.DataContext is MediaItem media&&image.Source==null&&CoverViewportFor(image)?.Measure(image).Visible==true&&(state.Request!=null||state.PresentationPending)&&!closing&&!closed)(posterWave??=new(Motion)).Show(overlay,Math.Abs(media.Id)%6);
+        if(image.DataContext is MediaItem media&&image.Source==null&&CoverViewportFor(image)?.Measure(image).Visible==true&&(state.Request!=null||state.PresentationPending)&&!closing&&!closed)(posterWave??=NewShimmer()).Show(overlay,Math.Abs(media.Id)%6);
         else if(posterWave!=null)posterWave.Hide(overlay);else overlay.Visibility=Visibility.Collapsed;
     }
     // Real content that replaces a placeholder fades in over a quarter of a second instead of snapping in.
     // One short opacity animation on the container, not on each card; skipped with motion off.
     static void Reveal(UIElement content)
     {
-        if(!Motion)return;
+        if(!MotionAllowed||!SystemParameters.ClientAreaAnimation)return;
         content.BeginAnimation(UIElement.OpacityProperty,new System.Windows.Media.Animation.DoubleAnimation(0,1,TimeSpan.FromMilliseconds(260))
             {FillBehavior=System.Windows.Media.Animation.FillBehavior.Stop,EasingFunction=new System.Windows.Media.Animation.CubicEase{EasingMode=System.Windows.Media.Animation.EasingMode.EaseOut}});
     }
@@ -44,7 +44,7 @@ public partial class MainWindow
     // Three lines in place of the synopsis while the film's description is on its way.
     static FrameworkElement SynopsisSkeleton()
     {
-        var wave=new ShimmerWave(Motion);var lane=0;
+        var wave=NewShimmer();var lane=0;
         var lines=new StackPanel{Name="DetailSynopsisSkeleton",IsHitTestVisible=false,Margin=new(0,4,0,4)};AutomationProperties.SetName(lines,AppLanguage.T("Загружаем описание"));
         foreach(var (right,opacity) in new[]{(0d,1d),(40d,1d),(160d,.7d)})lines.Children.Add(SkeletonBar(13,new(0,0,right,10),opacity,wave,lane++,"BannerChip"));
         return wave.Run(lines);
@@ -52,7 +52,7 @@ public partial class MainWindow
     // Release rows while the first source has not answered yet.
     static FrameworkElement ReleaseSkeleton()
     {
-        var wave=new ShimmerWave(Motion);
+        var wave=NewShimmer();
         var rows=new StackPanel{Name="ReleaseSkeleton",IsHitTestVisible=false};AutomationProperties.SetName(rows,AppLanguage.T("Ищем раздачи"));
         for(var index=0;index<3;index++)
         {
@@ -77,7 +77,7 @@ public partial class MainWindow
         Func<double,int> columnsFor=games?WindowSizing.GameColumns:WindowSizing.PosterColumns;
         var grid=new UniformGrid{Name=name,Columns=Math.Max(1,columnsFor(Math.Max(0,Body.ActualWidth))),Margin=new(0,5,-16,0),IsHitTestVisible=false};
         AutomationProperties.SetName(grid,AppLanguage.T("Загружаем подборку"));
-        var wave=new ShimmerWave(Motion);
+        var wave=NewShimmer();
         void Fill()
         {
             grid.Children.Clear();
@@ -112,7 +112,7 @@ public partial class MainWindow
         var frame=new Border{Name="FeatureSkeleton",CornerRadius=new(22),MinHeight=300,Margin=new(0,0,0,28),Padding=new(36,32,36,32),IsHitTestVisible=false};frame.SetResourceReference(Border.BackgroundProperty,"Panel");
         AutomationProperties.SetName(frame,AppLanguage.T("Загружаем подборку"));
         // The big frame stays flat; the light runs over the title, the line under it and the button.
-        var wave=new ShimmerWave(Motion);
+        var wave=NewShimmer();
         var lines=new StackPanel{VerticalAlignment=VerticalAlignment.Bottom,MaxWidth=520,HorizontalAlignment=HorizontalAlignment.Left};frame.Child=lines;
         var title=SkeletonBar(44,new(0,0,0,16),1,wave,0);title.Width=420;title.HorizontalAlignment=HorizontalAlignment.Left;lines.Children.Add(title);
         var meta=SkeletonBar(14,new(0,0,0,22),.7,wave,1);meta.Width=220;meta.HorizontalAlignment=HorizontalAlignment.Left;lines.Children.Add(meta);
@@ -122,7 +122,7 @@ public partial class MainWindow
     // Round portraits with a name line, matching the participant tiles.
     FrameworkElement PeopleSkeleton()
     {
-        var wave=new ShimmerWave(Motion);
+        var wave=NewShimmer();
         var grid=new UniformGrid{Name="CinemaPeopleSkeleton",Columns=6,Margin=new(0,0,-8,0),IsHitTestVisible=false};AutomationProperties.SetName(grid,AppLanguage.T("Загружаем участников"));
         for(var index=0;index<6;index++)
         {

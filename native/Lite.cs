@@ -3,7 +3,7 @@ using System.Windows.Media;
 namespace Kachalka;
 
 // Lite mode removes decorative backdrops (carousel and film banner use the flat Panel surface with the small poster)
-// and lets WPF scale posters with the cheaper filter. It adds no timers, effects or animations.
+// and lets WPF scale posters with the cheaper filter. It adds no timers or effects; the loading shimmer stays, at a lower frame rate.
 public partial class MainWindow
 {
     void ApplyLiteMode()

@@ -56,16 +56,12 @@ public partial class MainWindow
         var header=new Grid{Margin=new(0,0,0,compactHeight?4:6)};
         var title=Text("Настройки",compactHeight?23:28);title.FontFamily=(FontFamily)FindResource("DisplayFont");title.FontWeight=FontWeights.Bold;title.Margin=new(0);title.VerticalAlignment=VerticalAlignment.Center;header.Children.Add(title);PageHeader.Children.Add(header);
         var subtitle=Text("Всё сохраняется сразу.",13,true);subtitle.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");subtitle.Margin=new(0,0,0,12);subtitle.Visibility=compactHeight?Visibility.Collapsed:Visibility.Visible;PageHeader.Children.Add(subtitle);
-        // Cards sit in one column, or in two on wide windows so more of them fit on the screen. "content" is the first
-        // column and holds every card until the page is wide enough for the second one; the chips under the title jump
-        // between the cards.
-        var content=new StackPanel{Name="SettingsColumnA"};
-        var columnB=new StackPanel{Name="SettingsColumnB",Margin=new(14,0,0,0)};
-        var columns=new Grid{Name="SettingsColumns"};columns.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});columns.ColumnDefinitions.Add(new(){Width=new GridLength(0)});
-        columns.Children.Add(content);Grid.SetColumn(columnB,1);columns.Children.Add(columnB);
-        var page=new StackPanel{MaxWidth=760,HorizontalAlignment=HorizontalAlignment.Left,Margin=new(0,0,6,12)};page.Children.Add(columns);
-        var settingsScroll=new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=page,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};
-        var settingsLayout=new Grid{Name="SettingsLayout"};settingsLayout.Children.Add(settingsScroll);Body.Children.Add(settingsLayout);
+        // Two columns on wide windows: section navigation on the left, cards on the right (up to 820 wide).
+        var content=new StackPanel{MaxWidth=820,HorizontalAlignment=HorizontalAlignment.Left,Margin=new(0,0,6,12)};
+        var settingsScroll=new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=content,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};
+        var settingsLayout=new Grid{Name="SettingsLayout"};settingsLayout.ColumnDefinitions.Add(new(){Width=new GridLength(0)});settingsLayout.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});
+        var sectionNav=new StackPanel{Name="SettingsSections",Margin=new(0,0,24,0),Visibility=Visibility.Collapsed};settingsLayout.Children.Add(sectionNav);
+        Grid.SetColumn(settingsScroll,1);settingsLayout.Children.Add(settingsScroll);Body.Children.Add(settingsLayout);
         var sectionFrames=new Dictionary<string,Border>();var sectionIcons=new Dictionary<string,string>();
         StackPanel Card(string heading,string description,string icon)
         {
@@ -118,7 +114,7 @@ public partial class MainWindow
             var themeContent=new StackPanel();
             var palette=InterfacePalette.For(light);
             // Miniature of the real interface drawn from the frozen palette of that theme.
-            var preview=new Grid{Height=96};preview.ColumnDefinitions.Add(new(){Width=new GridLength(40)});preview.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});
+            var preview=new Grid{Height=72};preview.ColumnDefinitions.Add(new(){Width=new GridLength(40)});preview.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});
             var sidebar=new Border{Background=palette["Sidebar"],CornerRadius=new(8,0,0,8),Padding=new(6,10,6,0)};preview.Children.Add(sidebar);
             var sideRows=new StackPanel();sidebar.Child=sideRows;
             sideRows.Children.Add(new Border{Background=palette["Accent"],Height=5,Margin=new(0,0,10,8),CornerRadius=new(2)});
@@ -143,7 +139,7 @@ public partial class MainWindow
         // Lite mode drops decorative backdrops; posters, catalog and every function stay.
         var liteTitle=new WrapPanel();liteTitle.Children.Add(SwitchTitle("Лёгкий режим"));
         var litePill=PillRadius.Apply(new Border{Padding=new(9,2,9,2),Margin=new(10,2,0,2),VerticalAlignment=VerticalAlignment.Center,Child=new TextBlock{Text=AppLanguage.T("Для слабых ноутбуков"),FontSize=11,FontWeight=FontWeights.SemiBold}});litePill.SetResourceReference(Border.BackgroundProperty,"Raised");((TextBlock)litePill.Child).SetResourceReference(TextBlock.ForegroundProperty,"Muted");liteTitle.Children.Add(litePill);
-        var liteContent=new StackPanel();liteContent.Children.Add(liteTitle);var liteHint=Hint("Без фоновых обложек и анимаций. На слабых компьютерах включается сам; здесь можно переключить.");liteHint.Margin=new(0,4,0,0);liteContent.Children.Add(liteHint);
+        var liteContent=new StackPanel();liteContent.Children.Add(liteTitle);var liteHint=Hint("Без фоновых обложек и лишних эффектов. На слабых компьютерах включается сам; здесь можно переключить.");liteHint.Margin=new(0,4,0,0);liteContent.Children.Add(liteHint);
         var lite=new CheckBox{Name="SettingsLiteMode",Style=(Style)FindResource("SettingsSwitch"),Content=liteContent,IsChecked=prefs.LiteMode,VerticalContentAlignment=VerticalAlignment.Center};
         AutomationProperties.SetName(lite,AppLanguage.T("Лёгкий режим"));appearance.Children.Add(lite);
         var liteNotice=Notice(appearance);
@@ -308,15 +304,11 @@ public partial class MainWindow
         var help=ActionButton("Сообщить об ошибке","IconHelp",()=>OpenTelegram("https://t.me/+6sT2ocaKvLxlNmRi"));
         help.ToolTip=AppLanguage.T("Открыть чат поддержки в Telegram");AutomationProperties.SetName(help,AppLanguage.T("Сообщить об ошибке"));communityActions.Children.Add(help);
 
-        // Sections run from what people change often to what they set once or open when something goes wrong.
-        // A row of chips under the title jumps between the cards and follows the scroll position.
+        // Sections run from what people change often to what they set once or open when something goes wrong;
+        // on wide windows the list on the left groups them the same way and jumps between the cards.
         var groups=new (string Caption,string[] Sections)[]{("Основное",["Загрузки","Внешний вид","Каталог","Игнорируемое","Уведомления"]),("Система",["Устройства в сети","Запуск и Windows","Обновления"]),("Обслуживание",["Новости и поддержка","Кэш","Помощь и диагностика"])};
         var wanted=groups.SelectMany(group=>group.Sections).ToArray();
         foreach(var name in wanted.Reverse())if(sectionFrames.TryGetValue(name,out var frame)){content.Children.Remove(frame);content.Children.Insert(0,frame);}
-        var chipRow=new StackPanel{Orientation=Orientation.Horizontal};
-        var chipScroll=new ScrollViewer{Name="SettingsSections",Content=chipRow,VerticalScrollBarVisibility=ScrollBarVisibility.Disabled,HorizontalScrollBarVisibility=ScrollBarVisibility.Hidden,Margin=new(0,0,0,12),Focusable=false};
-        PageHeader.Children.Add(chipScroll);
-        var chips=new List<(Border Frame,Button Chip)>();
         Button? activeSection=null;
         void MarkSection(Button button)
         {
@@ -327,51 +319,42 @@ public partial class MainWindow
         foreach(var name in sections)
         {
             if(!sectionFrames.TryGetValue(name,out var frame))continue;
-            if(name==sections[0]&&chips.Count>0){var gap=new Border{Width=1,Height=18,Margin=new(6,0,10,0)};gap.SetResourceReference(Border.BackgroundProperty,"EdgeSoft");chipRow.Children.Add(gap);}
-            var jump=new Button{Style=(Style)FindResource("QuietButton"),Content=IconLabel(name,sectionIcons[name],15),HorizontalContentAlignment=HorizontalAlignment.Left,MinHeight=34,Height=34,Padding=new(12,0,14,0),Margin=new(0,0,4,0),FontSize=13};
+            if(name==sections[0])
+            {
+                var label=Text(AppLanguage.T(caption).ToUpperInvariant(),11);label.FontWeight=FontWeights.SemiBold;label.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");
+                label.Margin=new(14,sectionNav.Children.Count==0?4:18,0,6);sectionNav.Children.Add(label);
+            }
+            var jump=new Button{Style=(Style)FindResource("QuietButton"),Content=IconLabel(name,sectionIcons[name],17),HorizontalContentAlignment=HorizontalAlignment.Left,MinHeight=36,Height=36,Padding=new(14,0,14,0),Margin=new(0,0,0,2),FontSize=14,Tag=frame};
             jump.Click+=(_,_)=>
             {
                 MarkSection(jump);settingsScroll.UpdateLayout();
-                settingsScroll.ScrollToVerticalOffset(Math.Max(0,frame.TransformToAncestor(page).Transform(new Point()).Y));
+                settingsScroll.ScrollToVerticalOffset(Math.Max(0,frame.TransformToAncestor(content).Transform(new Point()).Y));
             };
-            AutomationProperties.SetName(jump,AppLanguage.T("Раздел: "+name));chipRow.Children.Add(jump);chips.Add((frame,jump));if(activeSection==null)MarkSection(jump);
+            AutomationProperties.SetName(jump,AppLanguage.T("Раздел: "+name));sectionNav.Children.Add(jump);if(activeSection==null)MarkSection(jump);
         }
-        // The chip of the card under the reading line is highlighted while scrolling; at the very end it is the last one.
+        // The entry of the card under the reading line is highlighted while scrolling; at the very end it is the last one.
+        var spy=new List<(Border Frame,Button Entry)>();
+        foreach(var entry in sectionNav.Children.OfType<Button>())
+            if(entry.Tag is Border owner)spy.Add((owner,entry));
         void SyncSection()
         {
-            if(chips.Count==0)return;
+            if(spy.Count==0)return;
             try
             {
-                var line=settingsScroll.VerticalOffset+90;var current=chips[0];
-                foreach(var row in chips)if(row.Frame.TransformToAncestor(page).Transform(new Point()).Y<=line)current=row;
-                if(settingsScroll.ScrollableHeight>0&&settingsScroll.VerticalOffset>=settingsScroll.ScrollableHeight-2)current=chips[^1];
-                if(ReferenceEquals(activeSection,current.Chip))return;
-                MarkSection(current.Chip);current.Chip.BringIntoView();
+                var line=settingsScroll.VerticalOffset+90;var current=spy[0];
+                foreach(var row in spy)if(row.Frame.TransformToAncestor(content).Transform(new Point()).Y<=line)current=row;
+                if(settingsScroll.ScrollableHeight>0&&settingsScroll.VerticalOffset>=settingsScroll.ScrollableHeight-2)current=spy[^1];
+                if(!ReferenceEquals(activeSection,current.Entry))MarkSection(current.Entry);
             }
             catch(InvalidOperationException){}
         }
         settingsScroll.ScrollChanged+=(_,e)=>{if(e.VerticalChange!=0)SyncSection();};
-        // Two columns from about 960 px of room (the page is then up to 1120 wide, otherwise 760); the cards go to the shorter column in turn, so both end about even.
-        var twoColumns=false;
-        // "room" is the width the scroll viewer was just given, taken from its size change: its viewport width follows
-        // one layout pass later, so a sudden jump (maximizing the window) would be judged by the old width.
-        void Arrange(double room)
+        settingsLayout.SizeChanged+=(_,_)=>
         {
-            var wide=twoColumns?room>=920:room>=960;
-            if(wide==twoColumns)return;twoColumns=wide;page.MaxWidth=wide?1120:760;
-            var ordered=chips.Select(row=>row.Frame).Concat(sectionFrames.Values.Except(chips.Select(row=>row.Frame))).ToList();
-            content.Children.Clear();columnB.Children.Clear();
-            if(!wide){columns.ColumnDefinitions[1].Width=new GridLength(0);foreach(var card in ordered)content.Children.Add(card);return;}
-            columns.ColumnDefinitions[1].Width=new GridLength(1,GridUnitType.Star);
-            var width=Math.Max(300,(Math.Min(page.MaxWidth,room)-6-14)/2);double heightA=0,heightB=0;
-            foreach(var card in ordered)
-            {
-                card.Measure(new Size(width,double.PositiveInfinity));var height=card.DesiredSize.Height;
-                if(heightA<=heightB){content.Children.Add(card);heightA+=height;}else{columnB.Children.Add(card);heightB+=height;}
-            }
-        }
-        settingsScroll.SizeChanged+=(_,e)=>{Arrange(e.NewSize.Width);SyncSection();};
-        var about=new WrapPanel{Margin=new(4,4,0,12)};page.Children.Add(about);
+            var wide=settingsLayout.ActualWidth>=1000;
+            sectionNav.Visibility=wide?Visibility.Visible:Visibility.Collapsed;settingsLayout.ColumnDefinitions[0].Width=wide?new GridLength(240):new GridLength(0);
+        };
+        var about=new WrapPanel{Margin=new(4,4,0,12)};content.Children.Add(about);
         var appName=Text("Качалка",13);appName.FontWeight=FontWeights.SemiBold;appName.Margin=new(0,0,10,4);about.Children.Add(appName);
         var version=new TextBlock{Text=AppLanguage.T("Версия "+(typeof(MainWindow).Assembly.GetName().Version?.ToString(3)??"")),FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=12,Margin=new(0,1,0,4)};version.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");about.Children.Add(version);
     }

@@ -26,6 +26,14 @@ public partial class MainWindow
         Check(placeholder.IsRunning,"A visible loading placeholder starts its animation.");
         skeleton.Visibility=Visibility.Collapsed;await Settle();Check(!placeholder.IsRunning,"Collapsing a filled placeholder stops its animation.");
         var still=new ShimmerWave(false);var quiet=new Border();still.Paint(quiet,0);still.Show(quiet,0);Check(!still.IsRunning&&still.LaneCount==0,"Motion-disabled placeholders create no animation lanes.");
+        // Lite mode keeps the loading shimmer (it is only a brush transform), unlike the heavier decorative animations.
+        var motionBefore=MotionAllowed;var liteBefore=lightweightMotion;MotionAllowed=true;lightweightMotion=true;
+        try
+        {
+            var lite=NewShimmer();var liteShape=new Border();lite.Paint(liteShape,0);
+            Check(lite.LaneCount==(SystemParameters.ClientAreaAnimation?1:0)&&!Motion,"Lite mode keeps the loading shimmer while the heavier animations stay off.");
+        }
+        finally{MotionAllowed=motionBefore;lightweightMotion=liteBefore;}
         Check(ShimmerWave.Lift(Colors.Black)!=Colors.Black&&ShimmerWave.Lift(Colors.White)!=Colors.White,"The shimmer remains visible in dark and light themes.");
         File.WriteAllText(Path.Combine(output,"checks.json"),JsonSerializer.Serialize(checks));Close();
     }

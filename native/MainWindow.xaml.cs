@@ -102,6 +102,8 @@ public partial class MainWindow:Window
     public static bool MotionAllowed {get;set;}=true;
     static bool lightweightMotion;
     static bool Motion=>MotionAllowed&&!lightweightMotion&&SystemParameters.ClientAreaAnimation;
+    // The loading shimmer is cheap (one brush transform on the render thread), so Lite mode keeps it at a lower frame rate.
+    static ShimmerWave NewShimmer()=>new(MotionAllowed&&SystemParameters.ClientAreaAnimation,lightweightMotion?20:30);
     string? lastViewKey;
     // A new section, card or person page fades in; refreshing the same view does not.
     void AnimateViewChange()
