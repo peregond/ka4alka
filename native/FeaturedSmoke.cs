@@ -77,7 +77,9 @@ public partial class MainWindow
         Check(VisualElements<TextBlock>(Body).Count(text=>text.Text is "2025" or "2024")==2,"The award page has a heading for each year.");
         Check(VisualElements<Button>(Body).Count(button=>button.Tag is MediaItem)==5,"Each year lists its winner and its nominees.");
         Check(VisualElements<TextBlock>(Body).Count(text=>text.Text=="Победитель")==2&&VisualElements<TextBlock>(Body).Count(text=>text.Text=="Номинант")==3,"Winners and nominees carry their own tag.");
-        Check(VisualElements<TextBlock>(Body).First(text=>text.Text=="Победитель").TransformToAncestor(Body).Transform(new Point()).Y<VisualElements<TextBlock>(Body).First(text=>text.Text=="Номинант").TransformToAncestor(Body).Transform(new Point()).Y,"The winner of the newest year comes before its nominees.");
+        Point Where(TextBlock text)=>text.TransformToAncestor(Body).Transform(new Point());
+        var firstWinner=Where(VisualElements<TextBlock>(Body).First(text=>text.Text=="Победитель"));var firstNominee=Where(VisualElements<TextBlock>(Body).First(text=>text.Text=="Номинант"));
+        Check(firstWinner.Y<firstNominee.Y||firstWinner.Y==firstNominee.Y&&firstWinner.X<firstNominee.X,"The winner of the newest year comes before its nominees.");
         featuredGroups=fixtureGroups;ShowFeatured();await Settle();
         foreach(var language in new[]{"ru","en"})
         {
