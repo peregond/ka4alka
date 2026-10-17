@@ -1,0 +1,16 @@
+name: Probe catalog freshness
+on:
+  push:
+    branches: [claude/catalog-probe]
+    paths: ['scripts/probe-catalog-freshness.py', '.github/workflows/catalog-probe.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Probe the source and compare it with the published library
+        run: python scripts/probe-catalog-freshness.py
