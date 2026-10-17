@@ -9,7 +9,7 @@ public sealed class SharedCatalog
 {
     public static readonly Uri FeedUri=new("https://github.com/peregond/ka4alka/releases/download/catalog-data/catalog.json");
     public const int MaxBytes=32*1024*1024;
-    static readonly TimeSpan RefreshInterval=TimeSpan.FromDays(7);
+    static readonly TimeSpan RefreshInterval=TimeSpan.FromDays(1);
     sealed record SyncState(DateTime LastCheckedUtc);
     readonly SourceClient client;
     readonly Func<DateTime> clock;
@@ -103,7 +103,7 @@ public sealed class SharedCatalog
         }
         finally{reader.Release();}
     }
-    // All callers join one refresh; a force request bypasses the weekly/offline gates.
+    // All callers join one refresh; a force request bypasses the daily/offline gates.
     public async Task<bool> RefreshAsync(CancellationToken ct=default,bool force=false)
     {
         await RestoreAsync(ct);Task<bool> refreshing;
