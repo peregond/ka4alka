@@ -9,7 +9,7 @@ public sealed class SharedCatalog
 {
     public static readonly Uri FeedUri=new("https://github.com/peregond/ka4alka/releases/download/catalog-data/catalog.json");
     public const int MaxBytes=32*1024*1024;
-    static readonly TimeSpan RefreshInterval=TimeSpan.FromDays(7);
+    static readonly TimeSpan RefreshInterval=TimeSpan.FromDays(1);
     sealed record SyncState(DateTime LastCheckedUtc);
     readonly SourceClient client;
     readonly Func<DateTime> clock;
@@ -32,6 +32,7 @@ public sealed class SharedCatalog
     bool Due(DateTime now)=>now>=retryAfterUtc&&(lastCheckedUtc==default||lastCheckedUtc>now||now-lastCheckedUtc>=RefreshInterval);
     public bool RefreshDue {get{lock(state)return Due(clock());}}
     public DateTime LastCheckedUtc {get{lock(state)return lastCheckedUtc;}}
+    public DateTime GeneratedUtc {get{lock(state)return generatedUtc;}}
     public IReadOnlyList<MediaItem> All=>items??BundledCatalog.All;
     public IReadOnlyList<SeasonalCollection> Collections=>collections??BundledCatalog.Collections;
     public IReadOnlyList<SeasonalCollection> ActiveCollections=>Collections.Where(x=>x.Active(clock())).ToArray();
@@ -103,7 +104,7 @@ public sealed class SharedCatalog
         }
         finally{reader.Release();}
     }
-    // All callers join one refresh; a force request bypasses the weekly/offline gates.
+    // All callers join one refresh; a force request bypasses the daily/offline gates.
     public async Task<bool> RefreshAsync(CancellationToken ct=default,bool force=false)
     {
         await RestoreAsync(ct);Task<bool> refreshing;
@@ -124,7 +125,22 @@ public sealed class SharedCatalog
         try
         {
             using var timeout=new CancellationTokenSource(TimeSpan.FromSeconds(8));
-            var bytes=await TextCatalogDownload.DownloadAsync((uri,maximum,token)=>client.Read(uri,maximum,token),timeout.Token);
+            string? known;lock(state)known=snapshotHash;
+            var bytes=await TextCatalogDownload.DownloadAsync((uri,maximum,token)=>client.Read(uri,maximum,token),timeout.Token,known);
+            // The manifest names the snapshot already held: only the check time moves, nothing is downloaded or rewritten.
+            if(ReferenceEquals(bytes,TextCatalogDownload.Unchanged))
+            {
+                await reader.WaitAsync();
+                try
+                {
+                    DateTime checkedUtc;
+                    lock(state){if(version!=generation)return false;checkedUtc=clock();}
+                    try{await CacheFiles.WriteAllTextAsync(syncPath,JsonSerializer.Serialize(new SyncState(checkedUtc)));}catch(IOException){}catch(UnauthorizedAccessException){}
+                    lock(state){if(version!=generation)return false;lastCheckedUtc=checkedUtc;retryAfterUtc=default;}
+                    return false;
+                }
+                finally{reader.Release();}
+            }
             var fresh=await Task.Run(()=>
             {
                 var parsed=Parse(bytes,clock());

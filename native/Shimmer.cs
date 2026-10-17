@@ -9,14 +9,13 @@ namespace Kachalka;
 //   twenty cards costs a handful of animations, and each lane starts a moment after the previous one: the light
 //   rolls across the shelf instead of blinking on all cards at once.
 // - The animation moves a brush transform on WPF's render thread (no timer, no per-frame code), at 30 frames a
-//   second, and runs only while its placeholder is on screen. A hidden or removed placeholder stops it.
-// - With motion off (Lite mode, Windows animations off, smoke tests) nothing is created: the shapes keep the
+//   second (20 in Lite mode), and runs only while its placeholder is on screen. A hidden or removed placeholder stops it.
+// - With motion off (Windows animations off, smoke tests) nothing is created: the shapes keep the
 //   flat theme colour through a resource reference, exactly as before.
-sealed class ShimmerWave(bool animated)
+sealed class ShimmerWave(bool animated,int framesPerSecond=30)
 {
-    const int FramesPerSecond=30;
     static readonly TimeSpan Sweep=TimeSpan.FromMilliseconds(1100),Cycle=TimeSpan.FromMilliseconds(1900);
-    sealed class Lane(LinearGradientBrush brush,TranslateTransform slide,int index)
+    sealed class Lane(LinearGradientBrush brush,TranslateTransform slide,int index,int framesPerSecond)
     {
         public readonly LinearGradientBrush Brush=brush;
         readonly TranslateTransform slide=slide;
@@ -26,13 +25,18 @@ sealed class ShimmerWave(bool animated)
             var frames=new DoubleAnimationUsingKeyFrames{Duration=Cycle,RepeatBehavior=RepeatBehavior.Forever,BeginTime=TimeSpan.FromMilliseconds(70*Math.Min(index,10))};
             frames.KeyFrames.Add(new LinearDoubleKeyFrame(-1,KeyTime.FromTimeSpan(TimeSpan.Zero)));
             frames.KeyFrames.Add(new EasingDoubleKeyFrame(1,KeyTime.FromTimeSpan(Sweep),new SineEase{EasingMode=EasingMode.EaseInOut}));
-            Timeline.SetDesiredFrameRate(frames,FramesPerSecond);
+            Timeline.SetDesiredFrameRate(frames,framesPerSecond);
             slide.BeginAnimation(TranslateTransform.XProperty,frames);
         }
         public void Stop(){slide.BeginAnimation(TranslateTransform.XProperty,null);slide.X=-1;}
     }
     readonly Dictionary<(string Resource,int Index),Lane> lanes=[];
     bool running;
+    internal bool IsRunning=>running;
+    internal int LaneCount=>lanes.Count;
+    public void Stop(){foreach(var overlay in shown.Keys.ToArray())Hide(overlay);Set(false);}
+    // Stops this wave and hands back the posters that were still shimmering, so a new wave (after a theme or Lite mode change) can carry on with them.
+    public (Border Overlay,int Lane)[] Detach(){var carried=shown.Select(pair=>(pair.Key,pair.Value)).ToArray();Stop();return carried;}
 
     // Colours the shape with the lane's brush, or with the plain theme colour when nothing animates.
     public void Paint(Border target,int lane,string resource="Raised")
@@ -47,18 +51,18 @@ sealed class ShimmerWave(bool animated)
         // The gradient is flat outside the light, so while the transform rests at either end the shape shows its plain colour.
         var brush=new LinearGradientBrush{StartPoint=new(0,0),EndPoint=new(1,0),RelativeTransform=slide};
         brush.GradientStops.Add(new(color,0));brush.GradientStops.Add(new(color,.2));brush.GradientStops.Add(new(light,.5));brush.GradientStops.Add(new(color,.8));brush.GradientStops.Add(new(color,1));
-        var lane=new Lane(brush,slide,index);lanes.Add((resource,index),lane);
+        var lane=new Lane(brush,slide,index,framesPerSecond);lanes.Add((resource,index),lane);
         if(running)lane.Start();
         return lane;
     }
     // For single cards: a poster whose cover is still on its way shows the shimmer until the cover arrives. The wave
     // runs only while at least one such poster is shown, and a poster that leaves the page drops out by itself.
-    readonly HashSet<Border> shown=[];
+    readonly Dictionary<Border,int> shown=[];
     public void Show(Border overlay,int lane)
     {
-        if(!animated)return;
+        if(!animated||shown.ContainsKey(overlay))return;
         Paint(overlay,lane);overlay.Visibility=Visibility.Visible;
-        if(shown.Add(overlay))overlay.Unloaded+=Gone;
+        shown[overlay]=lane;overlay.Unloaded+=Gone;
         Set(true);
     }
     public void Hide(Border overlay)
@@ -75,8 +79,13 @@ sealed class ShimmerWave(bool animated)
         host.Loaded+=(_,_)=>Sync();host.IsVisibleChanged+=(_,_)=>Sync();host.Unloaded+=(_,_)=>Set(false);
         return host;
     }
-    void Set(bool on)
+    // While the page is being scrolled the light rests, so the render thread works for the scroll alone.
+    bool wanted,paused;
+    public void Pause(bool value){if(paused==value)return;paused=value;Apply();}
+    void Set(bool on){wanted=on;Apply();}
+    void Apply()
     {
+        var on=wanted&&!paused;
         if(running==on)return;running=on;
         foreach(var lane in lanes.Values){if(on)lane.Start();else lane.Stop();}
     }

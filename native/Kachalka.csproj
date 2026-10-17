@@ -7,7 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>Kachalka</AssemblyName>
     <Product>Качалка</Product>
-    <Version>0.42.2</Version>
+    <Version>0.43.12</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets/app.ico</ApplicationIcon>
     <ServerGarbageCollection>false</ServerGarbageCollection>
@@ -20,6 +20,8 @@
   <ItemGroup><EmbeddedResource Include="../web-index/app/data/title-aliases.json" LogicalName="Kachalka.title-aliases.json" /></ItemGroup>
   <ItemGroup><EmbeddedResource Include="../scripts/catalog-collections.json" LogicalName="Kachalka.catalog-collections.json" /></ItemGroup>
   <ItemGroup><Resource Include="Fonts/*.ttf" /></ItemGroup>
+  <ItemGroup><EmbeddedResource Include="FeaturedCollections.json" LogicalName="Kachalka.FeaturedCollections.json" /></ItemGroup>
+  <ItemGroup><EmbeddedResource Include="Localization/en.json" LogicalName="Kachalka.Localization.en.json" /></ItemGroup>
   <ItemGroup><Resource Include="Assets/logo.png" /><Resource Include="Assets/app.ico" /></ItemGroup>
   <ItemGroup><Resource Include="Assets/tmdb-logo.png" /></ItemGroup>
   <ItemGroup>

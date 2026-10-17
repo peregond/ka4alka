@@ -5,6 +5,16 @@ using System.Text;
 using System.Text.Json;
 using Kachalka;
 
+var savedLanguage=AppLanguage.Current;
+try
+{
+    AppLanguage.Set("en");
+    var localized=new MediaItem(-1,"Дюна","Фильмы","",2021,"—","—","#526B69"){OriginalTitle="Dune",English=new("Dune")};
+    if(MediaIdentity.Queries(localized).First()!="Dune"||SearchLanguage.TitleRank(localized,"en")!=1)throw new Exception("English title identity/ranking fixture is inconsistent.");
+    if(SearchLanguage.EnglishAudioRank(new("Dune ENGLISH 1080p","Fixture",10))!=3)throw new Exception("Real audio ranking is not wired into the text harness.");
+    Console.WriteLine("PASS: real localized identity, title ranking and English audio helpers compile in the Linux catalog harness");
+}
+finally{AppLanguage.Set(savedLanguage);}
 await BundledCatalogTests.Run();
 await TransportTests.Run();
 SeasonalCatalogTests.Run();
@@ -52,6 +62,8 @@ static class TransportTests
         ["uncompressedBytes"] = raw.Length,
     };
 
+    static byte[] shortRawForCheck(byte[] raw) => raw[..^1];
+
     static async Task Reject(Dictionary<string, object> manifest, byte[] compressed, string reason, byte[]? manifestBytes = null)
     {
         var calls = new List<Uri>();
@@ -80,6 +92,14 @@ static class TransportTests
         var result = await TextCatalogDownload.DownloadAsync(Read, default);
         Check(result.SequenceEqual(raw) && calls.Count == 2 && calls[0].Limit == 64 * 1024 && calls[1].Limit == compressed.Length,
             "manifest and immutable gzip load exact verified raw bytes with bounded reads");
+
+        calls.Clear();
+        var same = await TextCatalogDownload.DownloadAsync(Read, default, Hash(raw).ToUpperInvariant());
+        Check(ReferenceEquals(same, TextCatalogDownload.Unchanged) && calls.Count == 1 && calls[0].Uri == TextCatalogDownload.ManifestUri,
+            "a manifest naming the revision already held downloads no archive");
+        calls.Clear();
+        var other = await TextCatalogDownload.DownloadAsync(Read, default, Hash(shortRawForCheck(raw)));
+        Check(other.SequenceEqual(raw) && calls.Count == 2, "a manifest naming a different revision downloads the archive");
 
         await Reject(manifest, compressed[..^1], "truncated download is rejected");
         var altered = compressed.ToArray(); altered[10] ^= 1;

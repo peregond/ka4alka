@@ -19,5 +19,5 @@ public static class HiddenCatalog
         return (choices??CatalogChoices.Genres).Where(choice=>item.GenreKeys.Contains(choice.Key)||labels.Contains(MediaIdentity.Normalize(choice.Label))).DistinctBy(choice=>choice.Key).ToArray();
     }
     public static bool Hidden(MediaItem item,Preferences prefs,IEnumerable<CatalogChoice>? choices=null)=>
-        TitleHidden(item,prefs.HiddenTitles)||Genres(item,choices).Any(choice=>prefs.HiddenGenres.Contains(choice.Key));
+        prefs.HiddenTitles.Count>0&&TitleHidden(item,prefs.HiddenTitles)||prefs.HiddenGenres.Count>0&&Genres(item,choices).Any(choice=>prefs.HiddenGenres.Contains(choice.Key));
 }

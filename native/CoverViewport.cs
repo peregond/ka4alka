@@ -17,12 +17,14 @@ internal sealed class CoverViewport(Window owner):IDisposable
         public readonly Image Image=image;
         public readonly Action<Position> Changed=changed;
         public FrameworkElement? Anchor;
+        public bool Dirty=true;
+        public Position? Previous;
         public readonly List<ScrollContentPresenter> Clips=[];
         public readonly List<ScrollViewer> Scrollers=[];
     }
     readonly Dictionary<Image,Entry> entries=[];
     readonly Dictionary<ScrollViewer,int> scrollers=[];
-    DispatcherOperation? scheduled;
+    readonly DispatcherTimer scheduled=new(DispatcherPriority.Background,owner.Dispatcher){Interval=TimeSpan.FromMilliseconds(33)};
     bool listening,disposed;
     internal int SweepCount {get;private set;}
     internal int TrackedCount=>entries.Count;
@@ -30,7 +32,7 @@ internal sealed class CoverViewport(Window owner):IDisposable
     internal void Track(Image image,Action<Position> changed)
     {
         if(disposed||!image.IsLoaded)return;
-        if(entries.ContainsKey(image)){Schedule();return;}
+        if(entries.TryGetValue(image,out var prior)){prior.Dirty=true;Schedule();return;}
         var entry=new Entry(image,changed);entries.Add(image,entry);
         image.Unloaded+=Unloaded;image.SizeChanged+=Resized;
         entry.Anchor=Anchor(image);
@@ -50,7 +52,10 @@ internal sealed class CoverViewport(Window owner):IDisposable
     }
     internal void Schedule()
     {
-        if(!disposed&&scheduled==null)scheduled=owner.Dispatcher.BeginInvoke(DispatcherPriority.Background,new Action(Sweep));
+        if(disposed)return;
+        if(scheduled.IsEnabled&&scheduled.Interval<=TimeSpan.FromMilliseconds(33))return;
+        scheduled.Stop();scheduled.Interval=TimeSpan.FromMilliseconds(33);
+        scheduled.Tick-=SweepTick;scheduled.Tick+=SweepTick;scheduled.Start();
     }
     internal Position Measure(Image image)=>entries.TryGetValue(image,out var entry)?Measure(entry):default;
     static FrameworkElement? Anchor(Image image)
@@ -98,13 +103,19 @@ internal sealed class CoverViewport(Window owner):IDisposable
         }
         catch(InvalidOperationException){return default;}
     }
+    void SweepTick(object? sender,EventArgs args)=>Sweep();
     void Sweep()
     {
-        scheduled=null;if(disposed)return;SweepCount++;
+        scheduled.Stop();if(disposed)return;SweepCount++;
         // Let currently visible posters take both slots before prefetched rows.
         var positions=entries.Values.Select(entry=>(Entry:entry,Position:Measure(entry))).ToArray();
-        foreach(var entry in positions.Where(x=>!x.Position.Near))entry.Entry.Changed(entry.Position);
-        foreach(var entry in positions.Where(x=>x.Position.Near).OrderBy(x=>!x.Position.Visible).ThenBy(x=>x.Position.Distance))entry.Entry.Changed(entry.Position);
+        foreach(var entry in positions.Where(x=>!x.Position.Near))Publish(entry.Entry,entry.Position);
+        foreach(var entry in positions.Where(x=>x.Position.Near).OrderBy(x=>!x.Position.Visible).ThenBy(x=>x.Position.Distance))Publish(entry.Entry,entry.Position);
+    }
+    static void Publish(Entry entry,Position position)
+    {
+        if(!entry.Dirty&&entry.Previous is {} previous&&previous.Visible==position.Visible&&previous.Near==position.Near)return;
+        entry.Dirty=false;entry.Previous=position;entry.Changed(position);
     }
     void Unloaded(object sender,RoutedEventArgs args)
     {
@@ -125,12 +136,18 @@ internal sealed class CoverViewport(Window owner):IDisposable
     void Resized(object sender,SizeChangedEventArgs args)=>Schedule();
     void Scrolled(object sender,ScrollChangedEventArgs args)=>Schedule();
     void StateChanged(object? sender,EventArgs args)=>Schedule();
-    void LayoutChanged(object? sender,EventArgs args){if(entries.Count>0)Schedule();}
+    void LayoutChanged(object? sender,EventArgs args)
+    {
+        // Canvas/ancestor moves still need observation, but unrelated text/layout updates must not
+        // sweep every poster at scroll frequency. Real scrolling, resizing and new URLs preempt this delay.
+        if(disposed||entries.Count==0||scheduled.IsEnabled)return;
+        scheduled.Interval=TimeSpan.FromMilliseconds(150);scheduled.Tick-=SweepTick;scheduled.Tick+=SweepTick;scheduled.Start();
+    }
     void VisibilityChanged(object sender,DependencyPropertyChangedEventArgs args)=>Schedule();
     void Closed(object? sender,EventArgs args)=>Dispose();
     public void Dispose()
     {
-        if(disposed)return;disposed=true;scheduled?.Abort();scheduled=null;
+        if(disposed)return;disposed=true;scheduled.Stop();scheduled.Tick-=SweepTick;
         foreach(var entry in entries.Values.ToArray()){Detach(entry);entry.Changed(default);}entries.Clear();
         if(listening){owner.SizeChanged-=Resized;owner.StateChanged-=StateChanged;owner.IsVisibleChanged-=VisibilityChanged;owner.LayoutUpdated-=LayoutChanged;owner.Closed-=Closed;listening=false;}
     }

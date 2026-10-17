@@ -12,7 +12,7 @@ public partial class MainWindow
     void InitializeStatusToast()
     {
         statusTimer=new DispatcherTimer(DispatcherPriority.Background,Dispatcher){Interval=TimeSpan.FromSeconds(5)};
-        statusTimer.Tick+=(_,_)=>{statusTimer.Stop();Status.Text="";};
+        statusTimer.Tick+=(_,_)=>{statusTimer.Stop();Status.Text=AppLanguage.T("");};
         DependencyPropertyDescriptor.FromProperty(TextBlock.TextProperty,typeof(TextBlock)).AddValueChanged(Status,(_,_)=>ShowStatus());
     }
     void ShowStatus()

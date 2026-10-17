@@ -20,13 +20,13 @@ public partial class MainWindow
     void UpdateStatus(string text)
     {
         updateStatus = text;RefreshSidebarUpdate();
-        if (updateStatusLabel is not null) updateStatusLabel.Text = text;
+        if (updateStatusLabel is not null) updateStatusLabel.Text = AppLanguage.T(text);
         if (updateActionButton is not null)
         {
-            updateActionButton.Content=checkingUpdate?preparedUpdateJob is not null?"Устанавливаем…":updateOffer is null?"Проверяем…":"Скачиваем…":preparedUpdateJob is not null?"Обновить":updateOffer is not null?"Скачать":"Проверить обновления";
+            updateActionButton.Content=AppLanguage.T(checkingUpdate?preparedUpdateJob is not null?"Устанавливаем…":updateOffer is null?"Проверяем…":"Скачиваем…":preparedUpdateJob is not null?"Обновить":updateOffer is not null?"Скачать":"Проверить обновления");
             updateActionButton.IsEnabled=!checkingUpdate;updateActionButton.Style=(Style)FindResource(updateOffer is not null||preparedUpdateJob is not null?"PrimaryButton":typeof(Button));
-            updateActionButton.ToolTip=preparedUpdateJob is not null?"Установить обновление и перезапустить приложение":updateOffer is not null?"Скачать обновлённые компоненты":"Проверить новую версию на GitHub";
-            System.Windows.Automation.AutomationProperties.SetName(updateActionButton,updateActionButton.Content.ToString());
+            updateActionButton.ToolTip=AppLanguage.T(preparedUpdateJob is not null?"Установить обновление и перезапустить приложение":updateOffer is not null?"Скачать обновлённые компоненты":"Проверить новую версию на GitHub");
+            System.Windows.Automation.AutomationProperties.SetName(updateActionButton,AppLanguage.T(updateActionButton.Content.ToString()));
         }
     }
     internal async Task CheckUpdatesAsync(bool manual = false)
@@ -87,7 +87,7 @@ public partial class MainWindow
             preparedUpdateJob = path;
             ready = true;
             UpdateStatus("Версия " + updateOffer.Manifest.Version + " готова. "+(prefs.AutoUpdate?"Установится при выходе из приложения.":"Нажми «Обновить», чтобы установить."));
-            Status.Text = "Обновление готово. Нажми «Обновить», чтобы установить его и перезапустить приложение.";
+            Status.Text = AppLanguage.T("Обновление готово. Нажми «Обновить», чтобы установить его и перезапустить приложение.");
         }
         finally { if (!ready) { preparedUpdateJob = null; Directory.Delete(work, true); } }
     }
@@ -136,7 +136,7 @@ public partial class MainWindow
         var tile=new Border{Width=48,Height=48,CornerRadius=new(14),Margin=new(0,0,16,0),VerticalAlignment=VerticalAlignment.Center};tile.SetResourceReference(Border.BackgroundProperty,"Accent");
         var tileGlyph=new System.Windows.Shapes.Path{Data=(System.Windows.Media.Geometry)FindResource("IconDownload"),Width=22,Height=22,Stretch=System.Windows.Media.Stretch.Uniform,StrokeThickness=2,StrokeStartLineCap=System.Windows.Media.PenLineCap.Round,StrokeEndLineCap=System.Windows.Media.PenLineCap.Round,StrokeLineJoin=System.Windows.Media.PenLineJoin.Round};tileGlyph.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty,"AccentInk");tile.Child=tileGlyph;head.Children.Add(tile);
         var info=new StackPanel{VerticalAlignment=VerticalAlignment.Center};Grid.SetColumn(info,1);head.Children.Add(info);
-        var nameLine=new StackPanel{Orientation=Orientation.Horizontal};nameLine.Children.Add(new TextBlock{Text="Качалка ",FontSize=15,FontWeight=FontWeights.SemiBold});
+        var nameLine=new StackPanel{Orientation=Orientation.Horizontal};nameLine.Children.Add(new TextBlock{Text=AppLanguage.T("Качалка "),FontSize=15,FontWeight=FontWeights.SemiBold});
         nameLine.Children.Add(new TextBlock{Text=typeof(MainWindow).Assembly.GetName().Version?.ToString(3)??"",FontFamily=(System.Windows.Media.FontFamily)FindResource("MonoFont"),FontSize=15,FontWeight=FontWeights.SemiBold,VerticalAlignment=VerticalAlignment.Center});info.Children.Add(nameLine);
         updateStatusLabel = Text(updateStatus,13);updateStatusLabel.Margin=new(0,3,0,0);updateStatusLabel.SetResourceReference(TextBlock.ForegroundProperty,"Accent");info.Children.Add(updateStatusLabel);
         updateActionButton=new Button {Name="SettingsUpdateAction",Height=48,MinHeight=48,Margin=new(16,0,0,0),VerticalAlignment=VerticalAlignment.Center};Grid.SetColumn(updateActionButton,2);head.Children.Add(updateActionButton);
@@ -153,7 +153,7 @@ public partial class MainWindow
         panel.Children.Add(head);
         Toggle("Проверять обновления при запуске", prefs.CheckForUpdates, v => prefs.CheckForUpdates = v);
         Toggle("Автоматически скачивать и устанавливать при выходе", prefs.AutoUpdate, v => prefs.AutoUpdate = v);
-        panel.Children.Add(Hint("Обновление применяется после сохранения очереди. Неизменившиеся компоненты повторно не скачиваются. Настройки и загруженные файлы остаются на месте."));
+        panel.Children.Add(Hint("Перед установкой сохраняем очередь. Скачиваются только изменившиеся части; настройки и файлы не затрагиваются."));
         var actions = new WrapPanel(); panel.Children.Add(actions);
         var notes=new TextBlock {Margin=new(10,0,0,0),VerticalAlignment=VerticalAlignment.Center};
         var link=new System.Windows.Documents.Hyperlink(new System.Windows.Documents.Run("Что нового"));link.SetResourceReference(System.Windows.Documents.TextElement.ForegroundProperty,"Accent");

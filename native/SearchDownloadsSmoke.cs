@@ -14,6 +14,23 @@ using System.Windows.Threading;
 namespace Kachalka;
 public partial class MainWindow
 {
+    public async Task SearchDownloadsSmokeTest(string output)
+    {
+        Directory.CreateDirectory(output);liveRequest?.Cancel();ResetDiscoveryData();searchDelay.Stop();
+        current=null;section="Фильмы";Search.Text="";searchDelay.Stop();submittedQuery="";searchCategory="";
+        favoritesOnly=false;ResetCatalogFilters();livePage=1;liveKey="";
+        MaxWidth=1800;MaxHeight=1000;MinWidth=1280;MinHeight=300;Width=1280;Height=800;
+        var checks=0;
+        void Check(bool ok,string label)
+        {
+            if(!ok)throw new Exception(label);
+            checks++;File.AppendAllText(Path.Combine(output,"checks.txt"),"PASS: "+label+Environment.NewLine);
+        }
+        await SearchDownloadsSmoke(output,Check);
+        File.WriteAllText(Path.Combine(output,"checks.json"),JsonSerializer.Serialize(new{Checks=checks,UnifiedSearch=true,Downloads=true,SavedNavigation=true}));
+        Close();
+    }
+
     [StructLayout(LayoutKind.Sequential)] struct DownloadSmokePoint {public int X,Y;}
     [DllImport("user32.dll",SetLastError=true)] static extern bool GetCursorPos(out DownloadSmokePoint point);
     [DllImport("user32.dll",SetLastError=true)] static extern bool SetCursorPos(int x,int y);
@@ -63,12 +80,16 @@ public partial class MainWindow
         }
         foreach(var item in films.Concat(series))cardMetadata[item.Id]=Task.FromResult(item);
         var release=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);int calls=0,peopleCalls=0;
-        searchProvider=async(kind,query,token)=>{calls++;await release.Task.WaitAsync(token);return kind=="Фильмы"?films:series;};
-        peopleSearchProvider=async(query,token)=>{peopleCalls++;await release.Task.WaitAsync(token);return searchedPeople;};
+        searchProvider=async(kind,query,token)=>{Interlocked.Increment(ref calls);await release.Task.WaitAsync(token);return kind=="Фильмы"?films:series;};
+        peopleSearchProvider=async(query,token)=>{Interlocked.Increment(ref peopleCalls);await release.Task.WaitAsync(token);return searchedPeople;};
         Search.Text="Поисковая искра";check(!SearchActive&&peopleCalls==0,"typing does not submit a film or people query before Search or Enter");
         SubmitSearch(Search,new RoutedEventArgs());UpdateLayout();
         check(SearchActive&&searchCategory==""&&LoadingIndicator.Visibility==Visibility.Visible,"submitted query defaults to both types with visible animated loading indicator");
-        await Task.Delay(100);check(calls==2&&peopleCalls==1,"search dispatches film, series and people requests together");release.SetResult();
+        // A fresh process may still restore the persisted index before dispatch.
+        // Keep every provider blocked: all three must start before any completes.
+        var dispatchDeadline=DateTime.UtcNow.AddSeconds(3);
+        while((Volatile.Read(ref calls)!=2||Volatile.Read(ref peopleCalls)!=1)&&DateTime.UtcNow<dispatchDeadline)await Task.Delay(25);
+        check(calls==2&&peopleCalls==1,"search dispatches film, series and people requests together");release.SetResult();
         var end=DateTime.UtcNow.AddSeconds(15);while((liveLoading||PeopleSearchLoading)&&DateTime.UtcNow<end)await Task.Delay(30);UpdateLayout();
         check(!liveLoading&&LoadingIndicator.Visibility==Visibility.Collapsed&&liveItems.Count==50&&catalogDisplay.Any(x=>x.Section=="Сериалы")&&catalogDisplay.Any(x=>x.Section=="Фильмы"),"combined results include both types and hide completed loading indicator");
         Button Filter(string type)=>FindVisual<Button>(FilterControls,b=>AutomationProperties.GetName(b)=="Результаты: "+type)??throw new Exception("Missing search type "+type);

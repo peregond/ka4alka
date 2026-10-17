@@ -4,7 +4,9 @@ export const runtime = "edge";
 // Fixed TMDB image host and size; this route cannot proxy arbitrary destinations.
 export async function GET(request: Request) {
   const path = new URL(request.url).searchParams.get("file");
-  const url = imageUrl(path);
+  const size = new URL(request.url).searchParams.get("size");
+  if (size && size !== "w500") return new Response(null, { status: 400 });
+  const url = imageUrl(path)?.replace("/w1280/", size === "w500" ? "/w500/" : "/w1280/");
   if (!url) return new Response(null, { status: 400 });
   try {
     const response = await fetch(url, { signal: AbortSignal.timeout(6000), redirect: "manual" });

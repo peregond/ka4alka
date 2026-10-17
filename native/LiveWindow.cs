@@ -42,6 +42,7 @@ public partial class MainWindow
     readonly OnlineIndexClient onlineIndex;
     Task<MediaItem> Metadata(MediaItem item,bool priority=false,CancellationToken ct=default,Action<MediaItem>? updated=null,bool force=false)
     {
+        if(prefs.UiLanguage=="en"&&item.Cinema)return EnglishMetadata(item,priority,ct,updated,force);
         // A title found only on IMDb has no catalog page to read. An opened card asks the site for its text and cast, TheTVDB for series and TMDB for films (shelf cards do not); TVmaze backs up series.
         if(ImdbSuggestions.IsImdbOnly(item))return priority?ImdbMetadata(item,ct,updated,force):Task.FromResult(item);
         item=DownloadMetadata.EnrichMedia(item,new[]{sharedCatalog.Find(item)}.OfType<MediaItem>().Concat(BundledCatalog.Search(item.Section,item.Title)));
@@ -123,7 +124,7 @@ public partial class MainWindow
             lookup.Task=Metadata(item,ct:lookup.Request.Token);
         }
         lookup.Subscribers++;
-        try{var data=await lookup.Task.WaitAsync(ct);if(!closed&&!ct.IsCancellationRequested){item.SetScores(data.Kinopoisk,data.Imdb,data.Genre);if(prefs.HiddenGenres.Count>0&&!PersonallyVisible(item))ScheduleCatalogEvidenceRefresh();}}
+        try{var data=await lookup.Task.WaitAsync(ct);if(!closed&&!ct.IsCancellationRequested){item.SetEnglish(data.English);item.SetScores(data.Kinopoisk,data.Imdb,data.Genre);if(prefs.HiddenGenres.Count>0&&!PersonallyVisible(item))ScheduleCatalogEvidenceRefresh();}}
         catch{ /* A missing rating stays unavailable. */ }
         finally
         {
@@ -152,7 +153,7 @@ public partial class MainWindow
         var boundary=SharedCatalog.BoundaryUtc(DateTime.UtcNow);if(boundary==catalogMemoryBoundary)return false;
         catalogMemoryBoundary=boundary;catalogPages.Clear();ResetDiscoveryData();cardMetadata.Clear();catalogLastPage=null;if(!SearchActive)liveKey="";return true;
     }
-    string CurrentCatalogKey=>(SearchActive?"Поиск|"+submittedQuery:section+"|"+livePage+"|"+CatalogSelection.Filter+"|"+CatalogSelection.Collection+"|region:"+catalogRegion+"|home:"+CatalogRegions.HomeCountry(prefs.HomeCountry))+"|quality:"+prefs.CatalogQualityHeight;
+    string CurrentCatalogKey=>(SearchActive?"Поиск|"+submittedQuery+"|language:"+prefs.UiLanguage:section+"|"+livePage+"|"+CatalogSelection.Filter+"|"+CatalogSelection.Collection+"|region:"+catalogRegion+"|home:"+CatalogRegions.HomeCountry(prefs.HomeCountry))+"|quality:"+prefs.CatalogQualityHeight;
     CatalogSelection CatalogSelection=>new(catalogGenre,catalogCountry,catalogYear,catalogRating,catalogOrder switch{"По рейтингу"=>"rating","По популярности"=>"popular",_=>"date"},catalogCollection,catalogRegion,prefs.HomeCountry);
     void ResetCatalogFilters(){catalogYear=null;catalogGenre="";catalogCountry="";catalogRating=0;catalogOrder="Сначала новые";catalogCollection="all";catalogRegion="";catalogLastPage=null;}
     void ChangeCatalogFilter(Action change)
@@ -183,17 +184,16 @@ public partial class MainWindow
         var sortBar=new StackPanel{Orientation=Orientation.Horizontal,Margin=new(8,0,0,0)};
         if(SearchActive)SearchTabs(tabs);
         else {
-        topAll=Button("",()=>{favoritesOnly=false;catalogLastPage=null;livePage=1;Render();});topAll.Style=(Style)FindResource("PillButton");topAll.Content=ChipContent("Все",false);StyleChip(topAll,!favoritesOnly&&!ActiveCatalogFilters().Any());System.Windows.Automation.AutomationProperties.SetName(topAll,"Все");tabs.Children.Add(topAll);
+        topAll=Button("",()=>{favoritesOnly=false;catalogLastPage=null;livePage=1;Render();});topAll.Style=(Style)FindResource("PillButton");topAll.Content=ChipContent("Все",false);StyleChip(topAll,!favoritesOnly&&!ActiveCatalogFilters().Any());System.Windows.Automation.AutomationProperties.SetName(topAll,AppLanguage.T("Все"));tabs.Children.Add(topAll);
         }
         if(!PeopleOnlySearch)
         {
-            AddCatalogFilters(tabs,sortBar);
+            AddCatalogFilters(tabs);
             tabs.Children.Add(CatalogQualityControls(()=>{livePage=1;Render();}));
         }
-        if(!favoritesOnly)
-        {
-            var refresh=ActionButton("","IconRefresh",()=>{onlineIndex.RetryNow();ResetCatalogQualityChecks();catalogPages.Clear();ResetDiscoveryData();catalogRefreshRequested=true;liveKey="";Render();},"PillButton");catalogRefreshButton=refresh;refresh.ToolTip="Обновить каталог";System.Windows.Automation.AutomationProperties.SetName(refresh,"Обновить каталог");refresh.Padding=new(0);refresh.Width=40;refresh.Margin=new(8,0,0,8);sortBar.Children.Add(refresh);
-        }
+        // "Сбросить всё" appears only when there is something to reset.
+        if(!PeopleOnlySearch&&ActiveCatalogFilters().Length>0)sortBar.Children.Add(AddCatalogResetButton());
+        // Refreshing the catalog lives in the header, next to the theme switch, so it is the same on every page.
         inlineCatalogFilters=tabs;
         inlineCatalogFilterScroll=new ScrollViewer{Content=tabs,VerticalScrollBarVisibility=ScrollBarVisibility.Disabled,HorizontalScrollBarVisibility=ScrollBarVisibility.Hidden,CanContentScroll=false};
         inlineCatalogFilterScroll.ScrollChanged+=(_,_)=>UpdateCatalogFilterOverflow();
@@ -203,9 +203,9 @@ public partial class MainWindow
             if(inlineCatalogFilterScroll is not {} scroll||scroll.ScrollableWidth<=0)return;
             scroll.ScrollToHorizontalOffset(scroll.HorizontalOffset-args.Delta/120d*96);args.Handled=true;
         };
-        catalogFilterBack=ActionButton("","IconBack",()=>ScrollCatalogFilters(-1),"QuietButton");catalogFilterBack.ToolTip="Предыдущие фильтры";System.Windows.Automation.AutomationProperties.SetName(catalogFilterBack,"Фильтры: назад");catalogFilterBack.Padding=new(6);catalogFilterBack.Width=32;catalogFilterBack.MinHeight=40;catalogFilterBack.Margin=new(0,0,4,8);DockPanel.SetDock(catalogFilterBack,Dock.Left);toolbar.Children.Add(catalogFilterBack);
+        catalogFilterBack=ActionButton("","IconBack",()=>ScrollCatalogFilters(-1),"QuietButton");catalogFilterBack.ToolTip=AppLanguage.T("Предыдущие фильтры");System.Windows.Automation.AutomationProperties.SetName(catalogFilterBack,AppLanguage.T("Фильтры: назад"));catalogFilterBack.Padding=new(6);catalogFilterBack.Width=32;catalogFilterBack.MinHeight=40;catalogFilterBack.Margin=new(0,0,4,8);DockPanel.SetDock(catalogFilterBack,Dock.Left);toolbar.Children.Add(catalogFilterBack);
         DockPanel.SetDock(sortBar,Dock.Right);toolbar.Children.Add(sortBar);
-        catalogFilterForward=ActionButton("","IconChevron",()=>ScrollCatalogFilters(1),"QuietButton");catalogFilterForward.ToolTip="Следующие фильтры";System.Windows.Automation.AutomationProperties.SetName(catalogFilterForward,"Фильтры: вперёд");catalogFilterForward.Padding=new(6);catalogFilterForward.Width=32;catalogFilterForward.MinHeight=40;catalogFilterForward.Margin=new(4,0,0,8);DockPanel.SetDock(catalogFilterForward,Dock.Right);toolbar.Children.Add(catalogFilterForward);
+        catalogFilterForward=ActionButton("","IconChevron",()=>ScrollCatalogFilters(1),"QuietButton");catalogFilterForward.ToolTip=AppLanguage.T("Следующие фильтры");System.Windows.Automation.AutomationProperties.SetName(catalogFilterForward,AppLanguage.T("Фильтры: вперёд"));catalogFilterForward.Padding=new(6);catalogFilterForward.Width=32;catalogFilterForward.MinHeight=40;catalogFilterForward.Margin=new(4,0,0,8);DockPanel.SetDock(catalogFilterForward,Dock.Right);toolbar.Children.Add(catalogFilterForward);
         toolbar.Children.Add(inlineCatalogFilterScroll);FilterControls.Children.Add(toolbar);
         RenderActiveCatalogFilters();
         UpdateFilterRail();
@@ -216,12 +216,7 @@ public partial class MainWindow
             Body.Children.Add(new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=people,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});
             return;
         }
-        IEnumerable<MediaItem> shown=favoritesOnly?prefs.LiveFavorites.Where(x=>x.Section==section&&x.Title.Contains(submittedQuery,StringComparison.CurrentCultureIgnoreCase)).DistinctBy(x=>x.Id).Where(selection.Matches):SearchActive?UnifiedSearch.Filter(liveItems,searchCategory).Where(selection.Matches):liveItems;
-        if(favoritesOnly)shown=catalogOrder=="По рейтингу"?shown.OrderByDescending(CatalogPaging.Rating):shown.OrderByDescending(x=>x.Year);
-        var local=favoritesOnly||SearchActive;
-        var all=shown.Where(x=>favoritesOnly||SearchActive||!NoDownloads(x)&&PersonallyVisible(x)).ToArray();
-        if(local&&!liveLoading){catalogLastPage=Math.Max(1,(all.Length+CatalogPaging.Size-1)/CatalogPaging.Size);livePage=Math.Min(livePage,catalogLastPage.Value);catalogHasNext=livePage<catalogLastPage;}
-        var rawPage=local?all.Skip((livePage-1)*CatalogPaging.Size).Take(CatalogPaging.Size).ToArray():all;
+        var rawPage=CatalogPageItems();
         StartCatalogQualityCheck(rawPage);
         var cards=rawPage.Where(item=>(!DiscoveryCatalog||RecommendableTitle(item))&&CatalogQualityMatches(item)).ToArray();
         ShowCatalog(cards);
@@ -233,23 +228,14 @@ public partial class MainWindow
         // lists keep the row pinned under the search so selected-filter chips never move the list below them.
         AddDiscovery(content,cards,DiscoveryCatalog?TakeFiltersPanel():null);
         content.Children.Add(list);
-        if(cards.Length>0&&catalogSkeletonShown){catalogSkeletonShown=false;Reveal(list);}
-        if(cards.Length==0&&liveLoading&&!CatalogQualityChecking){content.Children.Add(PosterSkeleton(2,"CatalogSkeleton"));catalogSkeletonShown=true;}
-        else if(cards.Length==0)
-        {
-            var empty=new StackPanel{HorizontalAlignment=HorizontalAlignment.Center,MaxWidth=370,Margin=new(24)};
-            var label=Text(liveLoading?"Загружаем подборку…":CatalogQualityChecking?(prefs.CatalogQualityHeight==0?"Проверяем варианты загрузки…":"Проверяем качество раздач…"):liveError.Length>0?"Каталог пока недоступен":SearchActive&&peopleSearchItems.Length>0?"Фильмы и сериалы не найдены":"Ничего не найдено",23);label.FontWeight=FontWeights.SemiBold;label.TextAlignment=TextAlignment.Center;empty.Children.Add(label);
-            var hint=Text(liveLoading?"Это займёт несколько секунд.":CatalogQualityChecking?"Фильмы появятся по мере проверки источников.":favoritesOnly?"Сохраняй фильмы и сериалы из карточки — они останутся под рукой.":!SearchActive&&(prefs.HiddenTitles.Count>0||prefs.HiddenGenres.Count>0)?"Проверь скрытые названия и жанры в настройках или выбери другую страницу.":"Попробуй другую страницу, запрос или сбрось фильтры.",13,true);hint.TextAlignment=TextAlignment.Center;empty.Children.Add(hint);
-            if(!liveLoading){var retry=ActionButton("Сбросить фильтры","IconRefresh",()=>ChangeCatalogFilter(()=>{favoritesOnly=false;ResetCatalogFilters();prefs.HidePoorQuality=false;prefs.CatalogQualityHeight=0;ResetCatalogQualityChecks();prefs.Save();}));retry.HorizontalAlignment=HorizontalAlignment.Center;empty.Children.Add(retry);}
-            content.Children.Add(empty);
-        }
+        catalogEmptyHost=new StackPanel();content.Children.Add(catalogEmptyHost);UpdateCatalogEmptyState(cards);
         var footer=new StackPanel{HorizontalAlignment=HorizontalAlignment.Center,Margin=new(5,18,8,18)};
         var numbers=new WrapPanel{HorizontalAlignment=HorizontalAlignment.Center};
         void PageButton(string label,int page,bool enabled)
         {
             var button=Button(label,()=>GoCatalogPage(page));button.Style=(Style)FindResource("PillButton");button.IsEnabled=enabled&&!liveLoading;button.MinWidth=36;button.Padding=new(10,7,10,7);button.Margin=new(2);
             if(page==livePage&&int.TryParse(label,out _)){button.SetResourceReference(Control.BackgroundProperty,"Selected");button.FontWeight=FontWeights.SemiBold;}
-            System.Windows.Automation.AutomationProperties.SetName(button,int.TryParse(label,out _)?"Страница "+page:label);numbers.Children.Add(button);
+            System.Windows.Automation.AutomationProperties.SetName(button,AppLanguage.T(int.TryParse(label,out _)?"Страница "+page:label));numbers.Children.Add(button);
         }
         PageButton("Назад",livePage-1,livePage>1);
         if(CatalogPaging.Numbers(livePage,catalogLastPage)[0]>1){PageButton("1",1,true);numbers.Children.Add(Text("…",12,true));}
@@ -260,6 +246,34 @@ public partial class MainWindow
         content.Children.Add(footer);
         Body.Children.Add(new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=content,Margin=new(-6,-6,-6,0),VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});
         UpdateFilterRail();
+    }
+    StackPanel? catalogEmptyHost;
+    string catalogEmptyKey="";
+    void UpdateCatalogEmptyState(MediaItem[] cards)
+    {
+        if(catalogEmptyHost==null)return;
+        var key=cards.Length>0?"ready":$"{liveLoading}|{CatalogQualityChecking}|{liveError}|{favoritesOnly}|{SearchActive}|{peopleSearchItems.Length}";
+        if(catalogEmptyKey==key&&catalogEmptyHost.Children.Count>0||key=="ready"&&catalogEmptyHost.Children.Count==0){catalogEmptyKey=key;return;}
+        catalogEmptyKey=key;catalogEmptyHost.Children.Clear();
+        if(cards.Length==0&&liveLoading&&!CatalogQualityChecking)catalogEmptyHost.Children.Add(PosterSkeleton(2,"CatalogSkeleton"));
+        else if(cards.Length==0)
+        {
+            var empty=new StackPanel{HorizontalAlignment=HorizontalAlignment.Center,MaxWidth=370,Margin=new(24)};
+            var label=Text(liveLoading?"Загружаем подборку…":CatalogQualityChecking?(prefs.CatalogQualityHeight==0?"Проверяем варианты загрузки…":"Проверяем качество раздач…"):liveError.Length>0?"Каталог пока недоступен":SearchActive&&peopleSearchItems.Length>0?"Фильмы и сериалы не найдены":"Ничего не найдено",23);label.FontWeight=FontWeights.SemiBold;label.TextAlignment=TextAlignment.Center;empty.Children.Add(label);
+            var hint=Text(liveLoading?"Это займёт несколько секунд.":CatalogQualityChecking?"Фильмы появятся по мере проверки источников.":favoritesOnly?"Сохраняй фильмы и сериалы из карточки — они останутся под рукой.":!SearchActive&&(prefs.HiddenTitles.Count>0||prefs.HiddenGenres.Count>0)?"Проверь скрытые названия и жанры в настройках или выбери другую страницу.":"Попробуй другую страницу, запрос или сбрось фильтры.",13,true);hint.TextAlignment=TextAlignment.Center;empty.Children.Add(hint);
+            if(!liveLoading){var retry=ActionButton("Сбросить фильтры","IconRefresh",()=>ChangeCatalogFilter(()=>{favoritesOnly=false;ResetCatalogFilters();prefs.HidePoorQuality=false;prefs.CatalogQualityHeight=0;ResetCatalogQualityChecks();prefs.Save();}));retry.HorizontalAlignment=HorizontalAlignment.Center;empty.Children.Add(retry);}
+            catalogEmptyHost.Children.Add(empty);
+        }
+    }
+    MediaItem[] CatalogPageItems()
+    {
+        var selection=CatalogSelection;
+        IEnumerable<MediaItem> shown=favoritesOnly?prefs.LiveFavorites.Where(x=>x.Section==section&&x.Title.Contains(submittedQuery,StringComparison.CurrentCultureIgnoreCase)).DistinctBy(x=>x.Id).Where(selection.Matches):SearchActive?UnifiedSearch.Filter(liveItems,searchCategory).Where(selection.Matches):liveItems;
+        if(favoritesOnly)shown=catalogOrder=="По рейтингу"?shown.OrderByDescending(CatalogPaging.Rating):shown.OrderByDescending(x=>x.Year);
+        var local=favoritesOnly||SearchActive;
+        var all=shown.Where(x=>favoritesOnly||SearchActive||!NoDownloads(x)&&PersonallyVisible(x)).ToArray();
+        if(local&&!liveLoading){catalogLastPage=Math.Max(1,(all.Length+CatalogPaging.Size-1)/CatalogPaging.Size);livePage=Math.Min(livePage,catalogLastPage.Value);catalogHasNext=livePage<catalogLastPage;}
+        return local?all.Skip((livePage-1)*CatalogPaging.Size).Take(CatalogPaging.Size).ToArray():all;
     }
     // The filter row lives in the page flow on the catalog (after the banner) and is returned to the header elsewhere.
     Border TakeFiltersPanel()
@@ -290,12 +304,12 @@ public partial class MainWindow
             button.Content=ChipContent(full,!sorting,sorting?"IconFilter":null);
             catalogFilterCaptions[button]=new(full,compact);
             StyleChip(button,!sorting&&selected!=items[0].Key);
-            button.ToolTip=label+": "+current.Label;System.Windows.Automation.AutomationProperties.SetName(button,label);
+            button.ToolTip=AppLanguage.T(label)+": "+AppLanguage.T(current.Label);System.Windows.Automation.AutomationProperties.SetName(button,AppLanguage.T(label));
             var menu=new ToggleContextMenu{PlacementTarget=button,Placement=System.Windows.Controls.Primitives.PlacementMode.Bottom,MaxHeight=360};
             menu.SetResourceReference(Control.BackgroundProperty,"Raised");menu.SetResourceReference(Control.ForegroundProperty,"Text");
             foreach(var item in items)
             {
-                var option=new MenuItem{Header=item.Label,Tag=item.Key,IsCheckable=true,IsChecked=item.Key==selected};
+                var option=new MenuItem{Header=AppLanguage.T(item.Label),Tag=item.Key,IsCheckable=true,IsChecked=item.Key==selected};
                 option.Click+=(_,_)=>{menu.IsOpen=false;if(item.Key!=selected)ChangeCatalogFilter(()=>changed(item.Key));};menu.Items.Add(option);
             }
             AttachMenuToggle(button,menu);(sorting?sortTarget??target:target).Children.Add(button);
@@ -314,15 +328,13 @@ public partial class MainWindow
     }
     void RenderCatalogKeepingPosition()
     {
-        // Render retains the visible title through CatalogNavigation. Replaying
-        // the old pixel offset would undo its anchor when a row is inserted.
-        Render();
+        if(!RefreshCatalogInPlace())Render();
     }
     async Task FetchCatalog(string key,string category,string query,int page)
     {
         liveRequest?.Cancel();liveRequest?.Dispose();liveRequest=new();var token=liveRequest.Token;liveLoading=true;liveError="";
-        var request=liveRequest;var selection=CatalogSelection;var forceRefresh=catalogRefreshRequested;catalogRefreshRequested=false;
-        bool IsCurrent()=>ReferenceEquals(liveRequest,request)&&!token.IsCancellationRequested&&liveKey==key&&submittedQuery==query;
+        var request=liveRequest;var searchLanguage=prefs.UiLanguage;var selection=CatalogSelection;var forceRefresh=catalogRefreshRequested;catalogRefreshRequested=false;
+        bool IsCurrent()=>ReferenceEquals(liveRequest,request)&&!token.IsCancellationRequested&&liveKey==key&&submittedQuery==query&&(query.Length==0||prefs.UiLanguage==searchLanguage);
         if(!forceRefresh){liveItems=[];catalogHasNext=false;}
         var cacheKey=category+"|"+selection.Filter+"|"+page+(selection.Region.Length>0?"|region:"+selection.Region+"|home:"+CatalogRegions.HomeCountry(selection.HomeCountry):"")+(selection.Collection.StartsWith("seasonal:",StringComparison.Ordinal)?"|"+selection.Collection:"");
         await Task.Yield();
@@ -378,7 +390,7 @@ public partial class MainWindow
                         if(!IsCurrent())return;
                         liveItems=updated.Items;
                         if(!closed&&current==null&&activePerson==null&&section==category&&!favoritesOnly)RenderCatalogKeepingPosition();
-                    });
+                    },preferredLanguage:searchLanguage);
                 items=result.Items;if(result.Offline)liveError="Часть источников недоступна · добавлены результаты из сохранённого каталога";
             }
             try{await catalogIndex.AddAsync(items,token);}catch(IOException){}catch(UnauthorizedAccessException){}

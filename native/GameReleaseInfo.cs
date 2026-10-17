@@ -48,14 +48,15 @@ public static class GameReleaseInfo
 public static class GameReleaseRecommendation
 {
     public const int MinimumSeeds=10;
-    public static ReleaseRecommendation.Choice? Pick(IReadOnlyList<SourceEntry> releases)
+    public static ReleaseRecommendation.Choice? Pick(IReadOnlyList<SourceEntry> releases,string language="ru")
     {
         var candidates=releases.Where(x=>ReleaseQuality.Downloadable(x)&&x.Seeds>=MinimumSeeds&&GameReleaseSources.WindowsRelease(x.Title)).ToArray();
         if(candidates.Length==0)return null;
         var most=candidates.Max(x=>x.Seeds)!.Value;
         // A release with half of the best seeder count is as fast in practice, so language may decide between them.
         var pool=candidates.Where(x=>x.Seeds>=Math.Max(MinimumSeeds,most/2)).ToArray();
-        var best=pool.OrderByDescending(GameReleaseInfo.Russian).ThenByDescending(x=>x.Seeds).ThenBy(x=>x.Size??long.MaxValue).First();
+        var ordered=AppLanguage.Normalize(language)=="en"?SearchLanguage.AudioOrder(candidates,language):pool.OrderByDescending(GameReleaseInfo.Russian).ThenByDescending(x=>x.Seeds);
+        var best=ordered.First();
         return new(best,Reason(best,most));
     }
     static string Reason(SourceEntry best,int most)

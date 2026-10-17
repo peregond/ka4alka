@@ -7,6 +7,7 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        AppLanguage.Set(Preferences.Load().UiLanguage);
         var key=Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(Preferences.DataDir)))[..16];
         instance=new Mutex(true,@"Local\Kachalka-"+key,out bool first);
         // A click on a kachalka:// link starts the app with the link as its only argument.
@@ -14,10 +15,10 @@ public partial class App : Application
         if(!first)
         {
             if(shareLink!=null&&ShareLinkPipe.Send(key,shareLink)){Shutdown();return;}
-            if(!e.Args.Contains("--startup"))MessageBox.Show("Качалка уже запущена.","Качалка");Shutdown();return;
+            if(!e.Args.Contains("--startup"))LocalizedDialog.Show(AppLanguage.T("Качалка уже запущена."),AppLanguage.T("Качалка"));Shutdown();return;
         }
         installPresence=new Mutex(false,@"Local\Kachalka-Install");
-        DispatcherUnhandledException += (_, args) => { ErrorLog.Write(args.Exception); MessageBox.Show(args.Exception.Message, "Качалка"); args.Handled = true; };
+        DispatcherUnhandledException += (_, args) => { ErrorLog.Write(args.Exception); LocalizedDialog.Show(AppLanguage.T(args.Exception.Message), AppLanguage.T("Качалка")); args.Handled = true; };
         var window=new MainWindow();
         if(e.Args.Length==2 && e.Args[0]=="--update-health" && Guid.TryParseExact(e.Args[1],"N",out _))
         {
@@ -70,13 +71,22 @@ public partial class App : Application
                 catch(Exception error){System.IO.Directory.CreateDirectory(e.Args[1]);System.IO.File.WriteAllText(System.IO.Path.Combine(e.Args[1],"error.txt"),error.ToString());window.Close();}
             };
         }
+        RegisterSmoke("--shimmer-smoke-test",window.ShimmerSmokeTest);
+        RegisterSmoke("--featured-smoke-test",window.FeaturedSmokeTest);
         RegisterSmoke("--games-smoke-test",window.GamesSmokeTest);
+        RegisterSmoke("--search-downloads-smoke-test",window.SearchDownloadsSmokeTest);
         RegisterSmoke("--home-availability-smoke-test",window.HomeAvailabilitySmokeTest);
         RegisterSmoke("--startup-performance-smoke-test",window.StartupPerformanceSmokeTest);
         RegisterSmoke("--cover-viewport-smoke-test",window.CoverViewportSmokeTest);
+        RegisterSmoke("--catalog-loading-smoke-test",window.CatalogLoadingSmokeTest);
+        RegisterSmoke("--wheel-input-smoke-test",window.WheelInputSmokeTest);
+        RegisterSmoke("--poster-actions-smoke-test",window.PosterActionsSmokeTest);
+        RegisterSmoke("--feature-summary-smoke-test",window.FeatureSummarySmokeTest);
         RegisterSmoke("--catalog-navigation-smoke-test",window.CatalogNavigationSmokeTest);
         RegisterSmoke("--release-freshness-smoke-test",window.ReleaseFreshnessSmokeTest);
         RegisterSmoke("--interface-polish-smoke-test",window.InterfacePolishSmokeTest);
+        RegisterSmoke("--language-smoke-test",window.LanguageSmokeTest);
+        RegisterSmoke("--queue-virtualization-smoke-test",window.QueueVirtualizationSmokeTest);
         RegisterSmoke("--bug-report-smoke-test",window.BugReportSmokeTest);
         RegisterSmoke("--lan-smoke-test",window.LanSmokeTest);
         RegisterSmoke("--text-rendering-smoke-test",window.TextRenderingSmokeTest);

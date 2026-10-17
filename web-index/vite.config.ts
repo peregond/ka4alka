@@ -14,6 +14,7 @@ const managedLinux = readExecutionProfile() === "managed-linux";
 
 export default defineConfig(async () => {
   if (process.env.KACHALKA_TARGET === "railway") return {
+    json: { stringify: false },
     plugins: [vinext()],
     resolve: { alias: { "cloudflare:workers": fileURLToPath(new URL("./lib/railway-env.ts", import.meta.url)) } },
   };
@@ -56,6 +57,9 @@ export default defineConfig(async () => {
   const { cloudflare } = await import("@cloudflare/vite-plugin");
 
   return {
+    // Keep multiline JSON module output: the CommonJS detector otherwise scans
+    // the 9 MB catalog and its thousands of URLs as a single unterminated line.
+    json: { stringify: false },
     server: {
       ...(managedLinux ? { host: "0.0.0.0", allowedHosts: ["terminal.local"] } : {}),
       ...(isCodexSeatbeltSandbox ? { watch: { useFsEvents: false, usePolling: true } } : {}),

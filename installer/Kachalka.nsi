@@ -24,7 +24,9 @@ Name "Качалка ${VERSION}"
 OutFile "${OUTPUT}"
 InstallDir "$LOCALAPPDATA\Programs\Kachalka"
 RequestExecutionLevel user
-SetCompressor /SOLID zlib
+; Keep extraction memory modest on low-end PCs; compression happens only during builds.
+SetCompressor /SOLID lzma
+SetCompressorDictSize 8
 VIProductVersion "${VERSION}.0"
 VIAddVersionKey /LANG=1049 "ProductName" "Качалка"
 VIAddVersionKey /LANG=1049 "ProductVersion" "${VERSION}"

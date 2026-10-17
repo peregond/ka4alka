@@ -1,0 +1,31 @@
+name: Windows installer compression
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/quirky-hopper-1vlmj6]
+    paths:
+      - 'installer/Kachalka.nsi'
+      - 'tests/WindowsInstallerCompression.ps1'
+      - '.github/workflows/installer-compression.yml'
+permissions:
+  contents: read
+jobs:
+  compression:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download published reference payload
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download v0.43.1 --repo peregond/ka4alka --pattern Kachalka-win-x64.zip --dir reference
+      - name: Install NSIS
+        run: ./scripts/install-nsis.ps1
+      - name: Compare size, extraction, payload hashes and uninstall
+        run: ./tests/WindowsInstallerCompression.ps1 -Archive reference/Kachalka-win-x64.zip
+      - name: Preserve compression measurements
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-compression
+          path: test-output/installer-compression/checks.json

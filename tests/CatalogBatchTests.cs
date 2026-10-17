@@ -42,6 +42,15 @@ static class CatalogBatchTests
         show.SetScores("8.3","8.1","\nдетектив\n , \r\n триллер\n");
         Check(show.CardGenre=="детектив, триллер","late series metadata cannot introduce line breaks into card layout");
         Check((show with{Genre=""}).Subtitle=="Сериал · 2025","empty metadata does not add a dangling separator");
+        var notifications=new List<string?>();show.PropertyChanged+=(_,args)=>notifications.Add(args.PropertyName);
+        show.SetScores("8.3","8.1","детектив, триллер");
+        Check(notifications.Count==0,"identical ratings and normalized genres do not invalidate card bindings");
+        show.SetScores("8.4","8.1","драма");
+        Check(notifications.Contains(nameof(MediaItem.CardRating))&&notifications.Contains(nameof(MediaItem.CardMeta))&&!notifications.Any(name=>string.IsNullOrEmpty(name)||name is nameof(MediaItem.Cover) or nameof(MediaItem.DisplayImageUrl)),"late ratings only notify changed text and badge fields, never poster bindings");
+        var originalNotifications=0;show.PropertyChanged+=(_,_)=>originalNotifications++;
+        var metadataCopy=show with{Description="Новое описание"};metadataCopy.SetScores("8.7","8.5","комедия");
+        Check(originalNotifications==0,"metadata record copies cannot retain a previous card's binding subscriptions");
+        show.SetScores("8.8","8.1");Check(originalNotifications>0,"original card bindings remain subscribed after metadata is copied");
         foreach(var rate in new[]{60,120})
         {
             var position=0d;var velocity=0d;var monotonic=true;

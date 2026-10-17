@@ -21,9 +21,9 @@ public partial class MainWindow
         var silhouette=new System.Windows.Shapes.Path{Data=Geometry.Parse("M12,3 A4,4 0 1 1 11.99,3 M4,21 L4,19 C4,13 20,13 20,19 L20,21"),Width=34,Height=34,Stretch=Stretch.Uniform,StrokeThickness=1.5,Opacity=.45};
         silhouette.SetResourceReference(Shape.StrokeProperty,"Muted");fallback.Children.Add(silhouette);
         var absent=Text("Нет фото",10,true);absent.HorizontalAlignment=HorizontalAlignment.Center;absent.Margin=new(0,9,0,0);absent.Opacity=.7;fallback.Children.Add(absent);grid.Children.Add(fallback);
-        AutomationProperties.SetName(fallback,"Нет фотографии: "+person.Name);
+        AutomationProperties.SetName(fallback,AppLanguage.T("Нет фотографии: "+person.Name));
         var image=new Image{Stretch=Stretch.UniformToFill};
-        AutomationProperties.SetName(image,"Фотография: "+person.Name);grid.Children.Add(image);
+        AutomationProperties.SetName(image,AppLanguage.T("Фотография: "+person.Name));grid.Children.Add(image);
         var progress=Text("Фото…",9,true);progress.HorizontalAlignment=HorizontalAlignment.Center;progress.VerticalAlignment=VerticalAlignment.Bottom;progress.Margin=new(0,0,0,7);progress.Visibility=Visibility.Collapsed;progress.IsHitTestVisible=false;grid.Children.Add(progress);
         var frame=new Border{Width=width,Height=height,CornerRadius=new(11),ClipToBounds=true,Child=grid,Margin=new(0,0,0,8),BorderThickness=new(1)};
         frame.SetResourceReference(Border.BackgroundProperty,"PanelAlt");frame.SetResourceReference(Border.BorderBrushProperty,"EdgeSoft");
@@ -54,8 +54,8 @@ public partial class MainWindow
             catch(InvalidOperationException){return false;}
         }
         var retryMenu=new ContextMenu();retryMenu.SetResourceReference(Control.BackgroundProperty,"Panel");retryMenu.SetResourceReference(Control.ForegroundProperty,"Text");
-        var retry=new MenuItem{Header="Повторить загрузку фотографии"};retry.Click+=(_,_)=>{_ = LoadPhoto(true);};retryMenu.Items.Add(retry);
-        AutomationProperties.SetName(retry,"Повторить фотографию: "+person.Name);
+        var retry=new MenuItem{Header=AppLanguage.T("Повторить загрузку фотографии")};retry.Click+=(_,_)=>{_ = LoadPhoto(true);};retryMenu.Items.Add(retry);
+        AutomationProperties.SetName(retry,AppLanguage.T("Повторить фотографию: "+person.Name));
         void RetryMenu(bool available)
         {
             frame.ContextMenu=available?retryMenu:null;frame.Focusable=available&&portraitOwner==null;
@@ -64,7 +64,7 @@ public partial class MainWindow
         async Task LoadPhoto(bool force=false)
         {
             if(request!=null||!InViewport()||image.Source!=null||attempted&&!force)return;
-            attempted=true;cancelledByUnload=false;using var pending=new CancellationTokenSource(TimeSpan.FromSeconds(55));request=pending;RetryMenu(false);progress.Visibility=Visibility.Visible;absent.Visibility=Visibility.Collapsed;frame.ToolTip="Загружаем фотографию…";
+            attempted=true;cancelledByUnload=false;using var pending=new CancellationTokenSource(TimeSpan.FromSeconds(55));request=pending;RetryMenu(false);progress.Visibility=Visibility.Visible;absent.Visibility=Visibility.Collapsed;frame.ToolTip=AppLanguage.T("Загружаем фотографию…");
             bool unavailable=false;
             try
             {
@@ -117,7 +117,7 @@ public partial class MainWindow
                 if(image.Source==null)
                 {
                     absent.Visibility=Visibility.Visible;
-                    frame.ToolTip=unavailable?"Фотография временно недоступна. Можно повторить загрузку через меню правой кнопки.":"У источников пока нет фотографии.";
+                    frame.ToolTip=AppLanguage.T(unavailable?"Фотография временно недоступна. Можно повторить загрузку через меню правой кнопки.":"У источников пока нет фотографии.");
                     RetryMenu(true);
                     // Only unloading resets the automatic attempt. A deadline
                     // must settle into the fallback, rather than restart forever.

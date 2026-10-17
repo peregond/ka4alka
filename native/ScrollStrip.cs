@@ -32,12 +32,12 @@ public partial class MainWindow
         var strip=new ScrollStrip();
         var line=new Grid{Margin=new(0,0,0,10)};
         line.ColumnDefinitions.Add(new(){Width=new GridLength(ScrollStrip.CaptionWidth)});line.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});
-        var label=new TextBlock{Text=caption,FontSize=12,FontWeight=FontWeights.SemiBold,VerticalAlignment=VerticalAlignment.Center};label.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");line.Children.Add(label);
+        var label=new TextBlock{Text=AppLanguage.T(caption),FontSize=12,FontWeight=FontWeights.SemiBold,VerticalAlignment=VerticalAlignment.Center};label.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");line.Children.Add(label);
 
         // The frame hugs its segments while they fit and takes the whole row once they do not.
         var frame=new Border{CornerRadius=new(12),BorderThickness=new(1),Padding=new(4),HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center};
         frame.SetResourceReference(Border.BackgroundProperty,"Panel");frame.SetResourceReference(Border.BorderBrushProperty,"EdgeSoft");
-        AutomationProperties.SetName(frame,name);Grid.SetColumn(frame,1);line.Children.Add(frame);
+        AutomationProperties.SetName(frame,AppLanguage.T(name));Grid.SetColumn(frame,1);line.Children.Add(frame);
         var inner=new Grid();
         inner.ColumnDefinitions.Add(new(){Width=GridLength.Auto});inner.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});inner.ColumnDefinitions.Add(new(){Width=GridLength.Auto});inner.ColumnDefinitions.Add(new(){Width=GridLength.Auto});
         frame.Child=inner;
@@ -49,7 +49,7 @@ public partial class MainWindow
         Button Control(string icon,string tip,int column,Thickness margin)
         {
             var button=new Button{Style=(Style)FindResource("IconButton"),Width=34,Height=34,Margin=margin,Visibility=Visibility.Collapsed,ToolTip=tip,VerticalAlignment=VerticalAlignment.Center};
-            button.Content=IconLabel("",icon,16);AutomationProperties.SetName(button,tip+": "+name);Grid.SetColumn(button,column);inner.Children.Add(button);return button;
+            button.Content=IconLabel("",icon,16);AutomationProperties.SetName(button,AppLanguage.T(tip+": "+name));Grid.SetColumn(button,column);inner.Children.Add(button);return button;
         }
         strip.Previous=Control("IconChevronLeft","Прокрутить влево",0,new(0,0,4,0));
         strip.Next=Control("IconChevron","Прокрутить вправо",2,new(4,0,0,0));
@@ -135,10 +135,10 @@ public partial class MainWindow
         {
             var header=new Grid();header.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});header.ColumnDefinitions.Add(new(){Width=GridLength.Auto});
             header.Children.Add(new TextBlock{Text=entry.Label,VerticalAlignment=VerticalAlignment.Center});
-            var count=new TextBlock{Text=entry.Count.ToString(),FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=12,Margin=new(18,0,0,0),VerticalAlignment=VerticalAlignment.Center};
+            var count=new TextBlock{Text=AppLanguage.T(entry.Count.ToString()),FontFamily=(FontFamily)FindResource("MonoFont"),FontSize=12,Margin=new(18,0,0,0),VerticalAlignment=VerticalAlignment.Center};
             count.SetResourceReference(TextBlock.ForegroundProperty,"Subtle");Grid.SetColumn(count,1);header.Children.Add(count);
             var item=new MenuItem{Header=header,IsChecked=entry.Button.IsChecked==true,MinHeight=36,Tag=entry.Value};
-            AutomationProperties.SetName(item,entry.Label+", раздач: "+entry.Count);
+            AutomationProperties.SetName(item,AppLanguage.T(entry.Label+", раздач: "+entry.Count));
             var target=entry.Button;
             item.Click+=(_,_)=>{strip.Menu.IsOpen=false;target.IsChecked=true;};
             strip.Menu.Items.Add(item);

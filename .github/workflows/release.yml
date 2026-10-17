@@ -14,7 +14,7 @@ on:
       version:
         description: Version matching native/Kachalka.csproj
         required: true
-        default: '0.42.2'
+        default: '0.43.12'
       publish:
         description: Publish the release as soon as every release check passes
         type: boolean
@@ -26,14 +26,14 @@ permissions:
   contents: write
   actions: read
 concurrency:
-  group: kachalka-release-0.42.2
+  group: kachalka-release-0.43.12
   cancel-in-progress: false
 jobs:
   release:
     runs-on: windows-latest
     timeout-minutes: 25
     env:
-      RELEASE_VERSION: ${{ inputs.version || '0.42.2' }}
+      RELEASE_VERSION: ${{ inputs.version || '0.43.12' }}
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
     steps:
       - uses: actions/checkout@v4
@@ -59,6 +59,8 @@ jobs:
           node tests/title-identity.mjs
           if($LASTEXITCODE -ne 0){throw 'Server multilingual identity checks failed'}
           node tests/title-lookup.mjs
+          node tests/localized-media.mjs
+          node tests/tmdb-backdrop.mjs
           if($LASTEXITCODE -ne 0){throw 'Title lookup checks failed'}
           node node_modules/typescript/bin/tsc --noEmit --incremental false
           if($LASTEXITCODE -ne 0){throw 'Server type check failed'}
@@ -170,9 +172,9 @@ jobs:
           $process=Start-Process $application -ArgumentList @('--cinema-smoke-test',$output) -PassThru
           if(-not $process.WaitForExit(60000)){$process.Kill();throw 'Person card UI smoke timed out'}
           if($process.ExitCode -ne 0 -or (Test-Path "$output/error.txt") -or -not (Test-Path "$output/checks.json")){throw 'Person card UI smoke failed'}
-      - name: Verify upgrade from previously published 0.42.1
+      - name: Verify upgrade from previously published 0.43.11
         shell: pwsh
-        run: ./tests/WindowsPublishedUpgrade.ps1 -FromVersion 0.42.1 -ReleaseDirectory ('dist/release-'+$env:RELEASE_VERSION)
+        run: ./tests/WindowsPublishedUpgrade.ps1 -FromVersion 0.43.11 -ReleaseDirectory ('dist/release-'+$env:RELEASE_VERSION)
       - name: Upload verified files to draft GitHub Release
         shell: pwsh
         env:
@@ -248,6 +250,10 @@ jobs:
             test-output/cache-reliability/*
             test-output/download-reliability/*
             test-output/person-performance/*
+            test-output/poster-actions/*
+            test-output/feature-summary/*
+            test-output/featured/*
+            test-output/shimmer/*
             test-output/startup-performance/*
             test-output/cover-viewport/*
             test-output/catalog-navigation/*
@@ -268,6 +274,8 @@ jobs:
             test-output/catalog-paging/*
             test-output/design-modern/*
             test-output/search-downloads/*
+            test-output/language/*
+            test-output/queue-virtualization/**
             test-output/download-end-to-end/*.json
             test-output/download-end-to-end/error.txt
             test-output/published-site/checks.json

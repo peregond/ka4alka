@@ -37,7 +37,7 @@ public partial class MainWindow
         // Disk checks can wait on a network share. Keep all other transfer
         // counters and completion notifications updating while that I/O runs.
         try{downloads.Update();RefreshDownloadView();SyncTimer();}
-        catch(Exception error){ErrorLog.Write(error);Status.Text="Не удалось обновить загрузки: "+error.Message;}
+        catch(Exception error){ErrorLog.Write(error);Status.Text=AppLanguage.T("Не удалось обновить загрузки: "+error.Message);}
         if(reliabilityPollBusy)return;
         reliabilityPollBusy=true;
         try
@@ -49,7 +49,7 @@ public partial class MainWindow
         catch(OperationCanceledException)when(reliabilityCancellation.IsCancellationRequested){}
         catch(Exception error)
         {
-            if(!closing&&!closed){ErrorLog.Write(error);Status.Text="Не удалось проверить загрузки: "+error.Message;}
+            if(!closing&&!closed){ErrorLog.Write(error);Status.Text=AppLanguage.T("Не удалось проверить загрузки: "+error.Message);}
         }
         finally{reliabilityPollBusy=false;}
     }
@@ -71,7 +71,7 @@ public partial class MainWindow
         catch(OperationCanceledException)when(reliabilityCancellation.IsCancellationRequested){}
         catch(Exception error)
         {
-            if(!closing&&!closed){ErrorLog.Write(error);Status.Text="Не удалось восстановить подключения: "+error.Message;}
+            if(!closing&&!closed){ErrorLog.Write(error);Status.Text=AppLanguage.T("Не удалось восстановить подключения: "+error.Message);}
         }
         finally{recoveryBusy=false;}
     }

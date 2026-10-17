@@ -48,7 +48,7 @@ public static class MediaIdentity
         var matches=known.Value.Where(row=>row.Aliases.Any(name=>Normalize(name)==term)).Select(row=>row.OriginalTitle).Distinct().Take(2).ToArray();
         return matches.Length==1?matches[0]:query;
     }
-    public static string[] Queries(MediaItem item)=>Names(item).Take(4).ToArray();
+    public static string[] Queries(MediaItem item)=>(AppLanguage.Current=="en"?new[]{item.English?.Title,item.OriginalTitle}.Where(x=>!string.IsNullOrWhiteSpace(x)).Cast<string>().Concat(Names(item)).Distinct(StringComparer.OrdinalIgnoreCase):Names(item)).Take(4).ToArray();
     public static bool MatchesQuery(MediaItem item,string[] words)=>Index(item).Words.Any(title=>words.All(word=>title.Any(part=>part.StartsWith(word,StringComparison.Ordinal))||item.Year>0&&item.Year.ToString().StartsWith(word,StringComparison.Ordinal)));
     public static int Score(MediaItem item,string term,string[] words)
     {

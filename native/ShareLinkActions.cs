@@ -49,7 +49,7 @@ public partial class MainWindow
     void CopyShareLink(MediaItem item)
     {
         if(ShareLink.Create(item) is not {} link)return;
-        try{Clipboard.SetText(link);Status.Text="Ссылка на «"+item.Title+"» скопирована. Её можно открыть в Качалке или вставить в поиск.";}
-        catch(System.Runtime.InteropServices.COMException){Status.Text="Не удалось скопировать ссылку: буфер обмена занят другим приложением.";}
+        try{Clipboard.SetText(link);Status.Text=AppLanguage.T("Ссылка на «"+item.Title+"» скопирована. Её можно открыть в Качалке или вставить в поиск.");}
+        catch(System.Runtime.InteropServices.COMException){Status.Text=AppLanguage.T("Не удалось скопировать ссылку: буфер обмена занят другим приложением.");}
     }
 }

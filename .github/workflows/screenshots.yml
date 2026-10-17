@@ -5,7 +5,7 @@ on:
       version:
         description: Published version to capture
         required: true
-        default: '0.42.0'
+        default: '0.43.4'
       publish_reviewed:
         description: Publish reviewed repository screenshots instead of capturing again
         type: boolean
@@ -22,6 +22,10 @@ jobs:
     with:
       version: ${{ inputs.version }}
   screenshots:
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ru, en]
     if: ${{ !inputs.publish_reviewed }}
     runs-on: windows-latest
     timeout-minutes: 15
@@ -30,6 +34,7 @@ jobs:
       DOTNET_NOLOGO: '1'
       RELEASE_VERSION: ${{ inputs.version }}
       KACHALKA_SCREENSHOT_VERSION: ${{ inputs.version }}
+      KACHALKA_SCREENSHOT_LANGUAGE: ${{ matrix.language }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -67,7 +72,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference='Stop'
-          $output=Join-Path $PWD 'test-output/documentation-current'
+          $output=Join-Path $PWD 'test-output/documentation-${{ matrix.language }}'
           New-Item -ItemType Directory -Force $output | Out-Null
           $driver=Join-Path $PWD 'scripts/screenshots/bin/Release/net10.0-windows/CaptureReleaseScreenshot.dll'
           $stdout=Join-Path $env:RUNNER_TEMP 'kachalka-capture-stdout.txt'
@@ -87,15 +92,16 @@ jobs:
           $info=Get-Content -LiteralPath $infoPath -Raw | ConvertFrom-Json
           $dllHash=(Get-FileHash -LiteralPath (Join-Path $env:KACHALKA_SCREENSHOT_RELEASE 'Kachalka.dll') -Algorithm SHA256).Hash.ToLowerInvariant()
           if($info.Version -ne $env:RELEASE_VERSION -or $info.ReleaseDllSha256 -ne $dllHash){throw 'Screenshots were not captured from the verified published DLL'}
+          if($info.Language -ne $env:KACHALKA_SCREENSHOT_LANGUAGE){throw 'Capture language mismatch'}
           foreach($name in @('catalog-dark.png','catalog-light.png','series-dark.png','detail-dark.png','games-dark.png','games-light.png','game-detail-dark.png','downloads-dark.png','settings-dark.png')){
             if(-not(Test-Path -LiteralPath (Join-Path $output $name))){throw ('Missing required screenshot: '+$name)}
           }
           # Persist only public screenshot metadata, never the isolated profile or keys.
           $captures=@($info.Captures | ForEach-Object {
             if($_.File -notmatch '^[a-z0-9][a-z0-9.-]*\.png$'){throw 'Invalid capture filename'}
-            [ordered]@{File=$_.File;Width=$_.Width;Height=$_.Height;LoadedVisiblePosters=$_.LoadedVisiblePosters;PendingVisiblePosters=$_.PendingVisiblePosters;Titles=@($_.Titles)}
+            [ordered]@{File=$_.File;Language=$_.Language;Width=$_.Width;Height=$_.Height;LoadedVisiblePosters=$_.LoadedVisiblePosters;PendingVisiblePosters=$_.PendingVisiblePosters;Titles=@($_.Titles)}
           })
-          [ordered]@{Version=$env:RELEASE_VERSION;ReleaseArchiveSha256=$env:RELEASE_ARCHIVE_SHA256;ReleaseDllSha256=$dllHash;Captures=$captures} | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $infoPath -Encoding utf8NoBOM
+          [ordered]@{Version=$env:RELEASE_VERSION;Language=$env:KACHALKA_SCREENSHOT_LANGUAGE;CaptureMethod=$info.CaptureMethod;ReleaseArchiveSha256=$env:RELEASE_ARCHIVE_SHA256;ReleaseDllSha256=$dllHash;Captures=$captures} | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $infoPath -Encoding utf8NoBOM
           Get-Content -LiteralPath $infoPath
       - name: Save screenshots in a temporary documentation draft
         shell: pwsh
@@ -103,11 +109,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference='Stop'
-          $folder=Join-Path $PWD 'test-output/documentation-current'
+          $folder=Join-Path $PWD 'test-output/documentation-${{ matrix.language }}'
           $files=@(Get-ChildItem -LiteralPath $folder -Filter '*.png' -File | Where-Object {$_.Name -match '^[a-z0-9][a-z0-9.-]*\.png$'} | ForEach-Object {$_.FullName})
           $files+=(Join-Path $folder 'capture-info.json')
           if($files.Count -lt 10){throw 'Expected nine screenshots and sanitized capture metadata'}
-          $tag='docs-preview-${{ github.run_id }}'
+          $tag='docs-preview-${{ github.run_id }}-${{ matrix.language }}'
           $existing=gh release view $tag --json isDraft --jq '.isDraft' 2>$null
           if($LASTEXITCODE -ne 0){
             gh release create $tag --draft --target '${{ github.sha }}' --title ('Temporary published '+$env:RELEASE_VERSION+' screenshots') --notes ('Documentation review evidence from the verified public '+$env:RELEASE_VERSION+' binary; not an application release.')
@@ -119,7 +125,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: published-documentation-screenshots
+          name: published-documentation-screenshots-${{ matrix.language }}
           path: |
-            test-output/documentation-current/*.png
-            test-output/documentation-current/capture-info.json
+            test-output/documentation-${{ matrix.language }}/*.png
+            test-output/documentation-${{ matrix.language }}/capture-info.json

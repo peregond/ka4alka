@@ -11,8 +11,54 @@ namespace Kachalka;
 // ShimmerWave). There is no timer behind them.
 public partial class MainWindow
 {
-    // The catalog grid showed placeholders on the previous render; its cards then fade in.
-    bool catalogSkeletonShown;
+    // One wave for the posters whose covers are loading; rebuilt after a theme or Lite mode change.
+    ShimmerWave? posterWave;
+    // A catalog poster whose cover is still on its way (loading, or waiting for its turn to be shown) wears the
+    // shimmer instead of its colour, so a shelf that fills up card by card shows which films are still loading. The
+    // shimmer goes as soon as the cover is shown, fails or the card leaves the visible area; posters without a cover
+    // address keep their colour.
+    // The light rests while the wheel scrolls the page and goes on a moment after the last turn.
+    System.Windows.Threading.DispatcherTimer? shimmerRest;
+    void RestShimmerWhileScrolling()
+    {
+        if(posterWave==null)return;
+        posterWave.Pause(true);
+        if(shimmerRest==null)
+        {
+            shimmerRest=new(System.Windows.Threading.DispatcherPriority.Background){Interval=TimeSpan.FromMilliseconds(260)};
+            shimmerRest.Tick+=(_,_)=>{shimmerRest.Stop();posterWave?.Pause(false);};
+        }
+        shimmerRest.Stop();shimmerRest.Start();
+    }
+    // After a theme or Lite mode change the wave is rebuilt in the new colours and speed; posters still loading keep shimmering.
+    void ResetPosterShimmer()
+    {
+        var old=posterWave;posterWave=null;if(old==null)return;
+        var carried=old.Detach();if(carried.Length==0)return;
+        var next=posterWave=NewShimmer();foreach(var (overlay,lane) in carried)next.Show(overlay,lane);
+    }
+    void SyncPosterShimmer(Image image,CoverRequest state)
+    {
+        // This runs for every poster on every scroll step, so it only looks at flags: a cover request exists only for
+        // posters near the screen, and the overlay is found once per poster.
+        if(!state.ShimmerLooked&&image.Parent is Panel panel)
+        {
+            state.ShimmerLooked=true;
+            foreach(var child in panel.Children)if(child is Border {Name:"PosterShimmer"} found){state.Shimmer=found;break;}
+        }
+        var overlay=state.Shimmer;
+        if(overlay==null)return;
+        if(image.DataContext is MediaItem media&&image.Source==null&&(state.Request!=null||state.PresentationPending)&&!closing&&!closed)(posterWave??=NewShimmer()).Show(overlay,Math.Abs(media.Id)%6);
+        else if(posterWave!=null)posterWave.Hide(overlay);else if(overlay.Visibility!=Visibility.Collapsed)overlay.Visibility=Visibility.Collapsed;
+    }
+    // Real content that replaces a placeholder fades in over a quarter of a second instead of snapping in.
+    // One short opacity animation on the container, not on each card; skipped with motion off.
+    static void Reveal(UIElement content)
+    {
+        if(!MotionAllowed||!SystemParameters.ClientAreaAnimation)return;
+        content.BeginAnimation(UIElement.OpacityProperty,new System.Windows.Media.Animation.DoubleAnimation(0,1,TimeSpan.FromMilliseconds(260))
+            {FillBehavior=System.Windows.Media.Animation.FillBehavior.Stop,EasingFunction=new System.Windows.Media.Animation.CubicEase{EasingMode=System.Windows.Media.Animation.EasingMode.EaseOut}});
+    }
     // A slow pulse for a single line (the release search bar). Off in smoke tests, in Lite mode and when Windows
     // animations are turned off; the placeholder then stays still.
     static T Breathe<T>(T placeholder) where T:UIElement
@@ -21,41 +67,19 @@ public partial class MainWindow
             {AutoReverse=true,RepeatBehavior=System.Windows.Media.Animation.RepeatBehavior.Forever,EasingFunction=new System.Windows.Media.Animation.SineEase{EasingMode=System.Windows.Media.Animation.EasingMode.EaseInOut}});
         return placeholder;
     }
-    // One wave for the posters whose covers are loading; rebuilt after a theme change so it picks up the new colours.
-    ShimmerWave? posterWave;
-    // A catalog poster whose cover is still on its way wears the shimmer instead of its colour, so a shelf that fills
-    // up card by card shows which films are still loading. The shimmer goes as soon as the cover arrives, fails or the
-    // card leaves the visible area; posters without a cover address keep their colour.
-    void SyncPosterShimmer(Image image,CoverRequest state)
-    {
-        if(image.Parent is not Panel panel)return;
-        Border? overlay=null;foreach(var child in panel.Children)if(child is Border {Name:"PosterShimmer"} found){overlay=found;break;}
-        if(overlay==null)return;
-        if(image.DataContext is MediaItem media&&image.Source==null&&state.Request!=null&&!closing&&!closed)(posterWave??=new(Motion)).Show(overlay,Math.Abs(media.Id)%6);
-        else if(posterWave!=null)posterWave.Hide(overlay);else overlay.Visibility=Visibility.Collapsed;
-    }
-    // Real content that replaces a placeholder fades in over a quarter of a second instead of snapping in.
-    // One short opacity animation on the container, not on each card; skipped with motion off.
-    static void Reveal(UIElement content)
-    {
-        if(!Motion)return;
-        content.BeginAnimation(UIElement.OpacityProperty,new System.Windows.Media.Animation.DoubleAnimation(0,1,TimeSpan.FromMilliseconds(260))
-            {FillBehavior=System.Windows.Media.Animation.FillBehavior.Stop,EasingFunction=new System.Windows.Media.Animation.CubicEase{EasingMode=System.Windows.Media.Animation.EasingMode.EaseOut}});
-    }
     // Three lines in place of the synopsis while the film's description is on its way.
     static FrameworkElement SynopsisSkeleton()
     {
-        var wave=new ShimmerWave(Motion);
-        var lines=new StackPanel{Name="DetailSynopsisSkeleton",IsHitTestVisible=false,Margin=new(0,4,0,4)};AutomationProperties.SetName(lines,"Загружаем описание");
-        var lane=0;
+        var wave=NewShimmer();var lane=0;
+        var lines=new StackPanel{Name="DetailSynopsisSkeleton",IsHitTestVisible=false,Margin=new(0,4,0,4)};AutomationProperties.SetName(lines,AppLanguage.T("Загружаем описание"));
         foreach(var (right,opacity) in new[]{(0d,1d),(40d,1d),(160d,.7d)})lines.Children.Add(SkeletonBar(13,new(0,0,right,10),opacity,wave,lane++,"BannerChip"));
         return wave.Run(lines);
     }
     // Release rows while the first source has not answered yet.
     static FrameworkElement ReleaseSkeleton()
     {
-        var wave=new ShimmerWave(Motion);
-        var rows=new StackPanel{Name="ReleaseSkeleton",IsHitTestVisible=false};AutomationProperties.SetName(rows,"Ищем раздачи");
+        var wave=NewShimmer();
+        var rows=new StackPanel{Name="ReleaseSkeleton",IsHitTestVisible=false};AutomationProperties.SetName(rows,AppLanguage.T("Ищем раздачи"));
         for(var index=0;index<3;index++)
         {
             var row=new Border{CornerRadius=new(16),Padding=new(20,18,20,18),Margin=new(0,0,0,10),BorderThickness=new(1)};row.SetResourceReference(Border.BackgroundProperty,"Panel");row.SetResourceReference(Border.BorderBrushProperty,"EdgeSoft");
@@ -78,8 +102,8 @@ public partial class MainWindow
         var games=section=="Игры";
         Func<double,int> columnsFor=games?WindowSizing.GameColumns:WindowSizing.PosterColumns;
         var grid=new UniformGrid{Name=name,Columns=Math.Max(1,columnsFor(Math.Max(0,Body.ActualWidth))),Margin=new(0,5,-16,0),IsHitTestVisible=false};
-        AutomationProperties.SetName(grid,"Загружаем подборку");
-        var wave=new ShimmerWave(Motion);
+        AutomationProperties.SetName(grid,AppLanguage.T("Загружаем подборку"));
+        var wave=NewShimmer();
         void Fill()
         {
             grid.Children.Clear();
@@ -91,11 +115,10 @@ public partial class MainWindow
                 var poster=new Border{CornerRadius=new(12)};wave.Paint(poster,lane);
                 if(games)poster.SizeChanged+=GamePosterSized;else poster.SizeChanged+=PosterResized;cell.Children.Add(poster);
                 // The lines take exactly the room of a real card's text (two 18 px title lines, then the 16 px line under them).
-                var title=new StackPanel{Margin=new(2,10,2,0),Height=36};
+                var title=new StackPanel{Height=36,Margin=new(2,10,2,0)};
                 title.Children.Add(SkeletonBar(12,new(0,3,TitleTrim[index%4],3),1,wave,lane));
-                title.Children.Add(SkeletonBar(12,new(0,3,TitleTail[index%4],3),.8,wave,lane));
-                cell.Children.Add(title);
-                cell.Children.Add(SkeletonBar(10,new(2,5,MetaTrim[index%4],3),.6,wave,lane));
+                title.Children.Add(SkeletonBar(12,new(0,3,TitleTail[index%4],3),.8,wave,lane));cell.Children.Add(title);
+                var meta=new Grid{Height=16,Margin=new(2,2,2,0)};meta.Children.Add(SkeletonBar(10,new(0,3,MetaTrim[index%4],3),.6,wave,lane));cell.Children.Add(meta);
                 grid.Children.Add(cell);
             }
         }
@@ -113,9 +136,9 @@ public partial class MainWindow
     FrameworkElement BannerSkeleton()
     {
         var frame=new Border{Name="FeatureSkeleton",CornerRadius=new(22),MinHeight=300,Margin=new(0,0,0,28),Padding=new(36,32,36,32),IsHitTestVisible=false};frame.SetResourceReference(Border.BackgroundProperty,"Panel");
-        AutomationProperties.SetName(frame,"Загружаем подборку");
+        AutomationProperties.SetName(frame,AppLanguage.T("Загружаем подборку"));
         // The big frame stays flat; the light runs over the title, the line under it and the button.
-        var wave=new ShimmerWave(Motion);
+        var wave=NewShimmer();
         var lines=new StackPanel{VerticalAlignment=VerticalAlignment.Bottom,MaxWidth=520,HorizontalAlignment=HorizontalAlignment.Left};frame.Child=lines;
         var title=SkeletonBar(44,new(0,0,0,16),1,wave,0);title.Width=420;title.HorizontalAlignment=HorizontalAlignment.Left;lines.Children.Add(title);
         var meta=SkeletonBar(14,new(0,0,0,22),.7,wave,1);meta.Width=220;meta.HorizontalAlignment=HorizontalAlignment.Left;lines.Children.Add(meta);
@@ -125,8 +148,8 @@ public partial class MainWindow
     // Round portraits with a name line, matching the participant tiles.
     FrameworkElement PeopleSkeleton()
     {
-        var wave=new ShimmerWave(Motion);
-        var grid=new UniformGrid{Name="CinemaPeopleSkeleton",Columns=6,Margin=new(0,0,-8,0),IsHitTestVisible=false};AutomationProperties.SetName(grid,"Загружаем участников");
+        var wave=NewShimmer();
+        var grid=new UniformGrid{Name="CinemaPeopleSkeleton",Columns=6,Margin=new(0,0,-8,0),IsHitTestVisible=false};AutomationProperties.SetName(grid,AppLanguage.T("Загружаем участников"));
         for(var index=0;index<6;index++)
         {
             var cell=new StackPanel{Margin=new(0,0,8,8),HorizontalAlignment=HorizontalAlignment.Center};

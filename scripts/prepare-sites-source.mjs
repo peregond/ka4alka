@@ -38,6 +38,10 @@ const manifest = {
   r2: hosting.r2,
   siteUrl: 'https://ka4alka-online-new.peregon.chatgpt.site/',
   archive: archiveName,
+  sourceFiles: files.map(path => ({
+    path,
+    sha256: createHash('sha256').update(execFileSync('git', ['show', `HEAD:web-index/${path}`], { cwd: root, maxBuffer: 64 * 1024 * 1024 })).digest('hex'),
+  })),
   archiveSha256: createHash('sha256').update(readFileSync(archivePath)).digest('hex'),
 };
 writeFileSync(resolve(directory, 'source-manifest.json'), JSON.stringify(manifest, null, 2) + '\n');

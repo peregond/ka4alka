@@ -21,7 +21,10 @@ public static class TextCatalogDownload
 
     sealed record Manifest(string Revision, Uri DownloadUri, string Sha256, int Bytes, int UncompressedBytes);
 
-    public static async Task<byte[]> DownloadAsync(Func<Uri, int, CancellationToken, Task<byte[]>> read, CancellationToken ct)
+    // Returned instead of the catalog when the manifest names the revision the caller already holds.
+    public static readonly byte[] Unchanged = new byte[1];
+
+    public static async Task<byte[]> DownloadAsync(Func<Uri, int, CancellationToken, Task<byte[]>> read, CancellationToken ct, string? knownRevision = null)
     {
         ct.ThrowIfCancellationRequested();
         byte[] manifestBytes;
@@ -40,6 +43,8 @@ public static class TextCatalogDownload
 
         ct.ThrowIfCancellationRequested();
         var manifest = ParseManifest(manifestBytes);
+        if (knownRevision != null && string.Equals(knownRevision, manifest.Revision, StringComparison.OrdinalIgnoreCase))
+            return Unchanged;
         var compressed = await read(manifest.DownloadUri, manifest.Bytes, ct);
         ct.ThrowIfCancellationRequested();
         if (compressed.Length != manifest.Bytes || !MatchesHash(compressed, manifest.Sha256))

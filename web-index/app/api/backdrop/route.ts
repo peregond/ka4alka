@@ -17,7 +17,8 @@ export async function GET(request: Request) {
     // D1 rows keep no IMDb ID; the catalog's exact identity still reaches TMDB.
     const item = stored ? { ...stored, imdbId: catalog?.imdbId ?? null } : catalog;
     if (!item) return Response.json({ error: "Карточка не найдена." }, { status: 404 });
-    const backdrop = await lookup(id, item as BackdropIdentity);
+    const language = new URL(request.url).searchParams.get("language") === "en" ? "en" : "ru";
+    const backdrop = await lookup(id, { ...item, language } as BackdropIdentity);
     return Response.json({ id, backdrop }, { headers: { "Cache-Control": `public, max-age=${backdrop ? 86400 : 3600}, s-maxage=${backdrop ? 604800 : 21600}` } });
   } catch { return Response.json({ error: "Фон временно недоступен." }, { status: 503, headers: { "Cache-Control": "no-store", "Retry-After": "60" } }); }
 }

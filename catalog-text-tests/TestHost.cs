@@ -14,8 +14,13 @@ public record MediaItem(int Id, string Title, string Section, string Genre, int 
     public string? Description { get; init; }
     public string? OriginalTitle { get; init; }
     public string? ImdbId { get; init; }
+    public EnglishMedia? English {get;init;}
     public string[] TitleAliases { get; init; }=[];
 }
+
+// Presentation adapters used by the real identity and language ranking helpers.
+public sealed record EnglishMedia(string Title);
+public sealed record SourceEntry(string Title,string Source,int? Seeds=null);
 
 public static class Preferences
 {

@@ -27,7 +27,7 @@ public partial class MainWindow
         var portrait=PersonPortrait(person,150,190,origin);portrait.Name="PersonPortrait";portrait.VerticalAlignment=VerticalAlignment.Top;portrait.HorizontalAlignment=HorizontalAlignment.Left;portrait.Margin=new(0,0,24,0);hero.Children.Add(portrait);
         var identity=new StackPanel{Name="PersonIdentity"};Grid.SetColumn(identity,1);hero.Children.Add(identity);
         var role=Text(person.Role,12,true);role.Margin=new(0,0,0,7);identity.Children.Add(role);
-        var name=Text(person.Name,30);name.Name="PersonName";name.FontWeight=FontWeights.SemiBold;name.Margin=new(0,0,0,16);identity.Children.Add(name);
+        var name=TextRaw(person.Name,30);name.Name="PersonName";name.FontWeight=FontWeights.SemiBold;name.Margin=new(0,0,0,16);identity.Children.Add(name);
         var biographyPanel=new StackPanel{Name="PersonBiographyPanel"};identity.Children.Add(biographyPanel);
         var biography=Text("Загружаем биографию…",14,true);biography.Name="PersonBiography";biography.LineHeight=21;biography.MaxHeight=126;biography.Margin=new(0);biographyPanel.Children.Add(biography);
         bool expanded=false;string? measuredBiography=null;double measuredWidth=0,measuredDpi=0;bool biographyOverflows=false;
@@ -39,7 +39,7 @@ public partial class MainWindow
         {
             biographyUpdates++;
             biography.MaxHeight=expanded?double.PositiveInfinity:126;
-            expand.Content=expanded?"Свернуть":"Подробнее";
+            expand.Content=AppLanguage.T(expanded?"Свернуть":"Подробнее");
             if(biography.ActualWidth<=0)return;
             var width=Math.Max(1,biography.ActualWidth);var dpi=VisualTreeHelper.GetDpi(biography).PixelsPerDip;
             if(measuredBiography!=biography.Text||Math.Abs(measuredWidth-width)>.5||measuredDpi!=dpi)
@@ -98,7 +98,7 @@ public partial class MainWindow
             all.Update(films);all.Frame.Visibility=films.Length>0?Visibility.Visible:Visibility.Collapsed;
             var best=CinemaMetadata.Top(films);top.Update(best);top.Frame.Visibility=films.Length>3&&best.Length>1?Visibility.Visible:Visibility.Collapsed;
             var winners=films.Where(film=>film.Awards.Any(award=>award.Winner&&person.PageUrl.Length>0&&award.PersonUrl==person.PageUrl)).ToArray();awards.Update(winners);awards.Frame.Visibility=winners.Length>0?Visibility.Visible:Visibility.Collapsed;
-            status.Text=complete?(films.Length>0?$"Подтверждённые работы: {films.Length}":"Фильмография пока недоступна."):(films.Length>0?$"Подтверждённые работы: {films.Length} · загружаем остальные…":"Загружаем фильмографию…");
+            status.Text=AppLanguage.T(complete?(films.Length>0?$"Подтверждённые работы: {films.Length}":"Фильмография пока недоступна."):(films.Length>0?$"Подтверждённые работы: {films.Length} · загружаем остальные…":"Загружаем фильмографию…"));
             empty.Visibility=complete&&films.Length==0?Visibility.Visible:Visibility.Collapsed;
             retry.Visibility=complete&&(!hasBiography||films.Length<2)?Visibility.Visible:Visibility.Collapsed;
             if(navigationPendingPosition!=null)ScheduleCatalogPositionRestore();
@@ -108,7 +108,7 @@ public partial class MainWindow
             if(!IsCurrent())return;
             var attempt=++refreshAttempt;
             personProfileLoading=true;
-            retry.Visibility=Visibility.Collapsed;status.Text="Загружаем фильмографию…";
+            retry.Visibility=Visibility.Collapsed;status.Text=AppLanguage.T("Загружаем фильмографию…");
             try
             {
                 // Snapshot UI-owned lists first. Providers read disk caches and
@@ -125,8 +125,8 @@ public partial class MainWindow
             catch(OperationCanceledException)when(request.IsCancellationRequested){}
             catch
             {
-                if(!IsCurrent()||attempt!=refreshAttempt)return;settledAttempt=attempt;personProfileLoading=false;status.Text="Не удалось обновить фильмографию.";retry.Visibility=Visibility.Visible;
-                if(biography.Text=="Загружаем биографию…")biography.Text="Биография пока недоступна.";
+                if(!IsCurrent()||attempt!=refreshAttempt)return;settledAttempt=attempt;personProfileLoading=false;status.Text=AppLanguage.T("Не удалось обновить фильмографию.");retry.Visibility=Visibility.Visible;
+                if(biography.Text==AppLanguage.T("Загружаем биографию…"))biography.Text=AppLanguage.T("Биография пока недоступна.");
                 if(navigationPendingPosition!=null)ScheduleCatalogPositionRestore();
             }
         }

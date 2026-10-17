@@ -1,0 +1,78 @@
+name: Measure cold start and memory
+on:
+  push:
+    branches: [claude/fix-0.43.8]
+    paths: ['.github/workflows/startup-measure.yml']
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: Launches per variant
+        default: '5'
+permissions:
+  contents: read
+jobs:
+  measure:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Publish the shipped build and the same build with ReadyToRun
+        shell: pwsh
+        run: |
+          dotnet publish native/Kachalka.csproj -c Release -r win-x64 --self-contained true -o out/plain -p:DebugType=None -p:DebugSymbols=false
+          dotnet publish native/Kachalka.csproj -c Release -r win-x64 --self-contained true -o out/r2r -p:DebugType=None -p:DebugSymbols=false -p:PublishReadyToRun=true
+          foreach ($v in 'plain','r2r') {
+            $size=(Get-ChildItem out/$v/Kachalka.dll).Length
+            "$v Kachalka.dll: $([math]::Round($size/1MB,1)) MB; folder: $([math]::Round((Get-ChildItem out/$v -Recurse -File | Measure-Object Length -Sum).Sum/1MB,1)) MB" | Tee-Object -Append $env:GITHUB_STEP_SUMMARY
+          }
+      - name: Launch each variant and record time to window and memory
+        shell: pwsh
+        run: |
+          $runs=[int]'${{ inputs.runs || '5' }}'
+          $variants=@(
+            @{Name='plain';Dir='plain';Env=@{}},
+            @{Name='r2r';Dir='r2r';Env=@{}},
+            @{Name='r2r-nopgo';Dir='r2r';Env=@{DOTNET_TieredPGO='0'}},
+            @{Name='r2r-nonconcurrent-gc';Dir='r2r';Env=@{DOTNET_gcConcurrent='0'}},
+            @{Name='r2r-conserve7';Dir='r2r';Env=@{DOTNET_GCConserveMemory='7'}},
+            @{Name='r2r-all';Dir='r2r';Env=@{DOTNET_TieredPGO='0';DOTNET_gcConcurrent='0';DOTNET_GCConserveMemory='7'}}
+          )
+          "| variant | run | window shown, ms | working set after 10 s, MB | private, MB |`n|---|---|---|---|---|" | Add-Content $env:GITHUB_STEP_SUMMARY
+          $rows=@()
+          foreach ($round in 1,2) {
+          foreach ($v in $variants) {
+            for ($i=1; $i -le $runs; $i++) {
+              $data=Join-Path $PWD "profile-$($v.Name)-$round-$i"
+              $folder=Join-Path $data 'downloads'
+              New-Item -ItemType Directory -Force $folder | Out-Null
+              @{Folder=$folder;FolderConfigured=$true;AutoResumeDownloads=$false;CheckForUpdates=$false;AutoUpdate=$false;LiteMode=$false;LiteModeConfigured=$true} | ConvertTo-Json | Set-Content (Join-Path $data 'settings.json') -Encoding utf8NoBOM
+              $env:KACHALKA_DATA=$data
+              foreach ($k in $v.Env.Keys) { Set-Item "env:$k" $v.Env[$k] }
+              $watch=[System.Diagnostics.Stopwatch]::StartNew()
+              $app=Start-Process (Join-Path $PWD "out/$($v.Dir)/Kachalka.exe") -PassThru
+              $shown=$null
+              while ($watch.ElapsedMilliseconds -lt 30000) {
+                $app.Refresh()
+                if ($app.MainWindowHandle -ne 0) { $shown=$watch.ElapsedMilliseconds; break }
+                Start-Sleep -Milliseconds 10
+              }
+              Start-Sleep -Seconds 10
+              $app.Refresh()
+              $ws=[math]::Round($app.WorkingSet64/1MB); $pm=[math]::Round($app.PrivateMemorySize64/1MB)
+              "| $($v.Name) | $round.$i | $shown | $ws | $pm |" | Add-Content $env:GITHUB_STEP_SUMMARY
+              $rows+=[pscustomobject]@{Variant=$v.Name;Shown=$shown;Ws=$ws;Pm=$pm}
+              $app.Kill($true); $app.WaitForExit()
+              foreach ($k in $v.Env.Keys) { Remove-Item "env:$k" }
+            }
+          }
+          }
+          foreach ($v in $variants) {
+            $r=@($rows | Where-Object Variant -eq $v.Name)
+            $sorted=@($r.Shown | Where-Object { $_ -ne $null } | Sort-Object)
+            $median=if ($sorted.Count) { $sorted[[int]($sorted.Count/2)] } else { 'n/a' }
+            $ws=@($r.Ws | Sort-Object); $pm=@($r.Pm | Sort-Object)
+            Write-Output "::notice title=startup $($v.Name)::median window $median ms; working set $($ws[[int]($ws.Count/2)]) MB; private $($pm[[int]($pm.Count/2)]) MB; $($r.Count) launches"
+          }

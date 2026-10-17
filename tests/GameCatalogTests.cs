@@ -59,6 +59,28 @@ static class GameCatalogTests
         SourceEntry Row(string title)=>new("fixture",title,"Fixture","","magnet:?xt=urn:btih:"+new string('a',40),null);
         Check(GameReleaseSources.Matches(detail.Item,Row("Portal 2 (2011) PC RePack"))&&!GameReleaseSources.Matches(detail.Item,Row("Portal 3 (2026) PC"))&&!GameReleaseSources.Matches(GameCatalog.Item(400,"Portal"),Row("Portal Knights (2017) PC")),"game release matching rejects numbered sequels and another title sharing a prefix");
         Check(!GameReleaseSources.Matches(detail.Item,Row("Portal 2 (2011) Xbox360"))&&!GameReleaseSources.Matches(detail.Item,Row("Portal 2 Update v1.0 PC")),"console and update-only packages stay out of Windows game offers");
+        Check(GameReleaseSources.Matches(detail.Item,Row("Portal 2 [v. 2.0.0.1 build 6180] (2011) PC | RePack от Tolyak26"))&&GameReleaseSources.Matches(detail.Item,Row("Portal 2 v. 2.0.0.1 PC"))&&GameReleaseSources.Matches(detail.Item,Row("Portal 2 (2011) РС | RePack от NSIS")),"real version brackets, spaced versions and Cyrillic PC labels are accepted");
+        Check(GameReleaseSources.Matches(detail.Item,Row("[PC] Portal 2 [L] [RUS + ENG] (2011)"))&&GameReleaseSources.Matches(detail.Item,Row("[CD] Portal 2 [P] (2011)")),"existing platform and disc metadata prefixes remain valid");
+        Check(!GameReleaseSources.Matches(detail.Item,Row("Portal 2 [DLC] PC"))&&!GameReleaseSources.Matches(detail.Item,Row("Portal 2 (2011) Update v1.0 PC"))&&!GameReleaseSources.Matches(detail.Item,Row("Portal 2 - Любительские карты (2011) PC")),"standalone DLC, dated updates and custom maps are not offered as the base game");
+        var elden=GameCatalog.Item(1245620,"ELDEN RING");
+        Check(GameReleaseSources.Matches(elden,Row("[DL] Elden Ring [P] [RUS + ENG + 12 / ENG] (2022, RPG) (1.16.1 + 6 DLC) [Scene]"))&&!GameReleaseSources.Matches(elden,Row("Elden Ring Nightreign: Deluxe Edition (2025) PC"))&&!GameReleaseSources.Matches(elden,Row("[PS4] Elden Ring (2022)")),"RuTracker metadata tags keep the exact game while related titles and console packages remain excluded");
+        Check(GameReleaseSources.Queries(GameCatalog.Item(1086940,"Baldur’s Gate 3™")).SequenceEqual(["Baldur's Gate 3"]),"Steam typography is cleaned for queries without changing the displayed title");
+        var rutorGames=File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory,"Fixtures","rutor-games-portal2.html"));
+        var gameRows=GameReleaseSources.ParseRutor(rutorGames,detail.Item);
+        Check(gameRows.Count>=3&&gameRows.Any(x=>x.Title.Contains("РС"))&&gameRows.Any(x=>x.Title.Contains("[v."))&&gameRows.All(x=>ReleaseQuality.Downloadable(x)&&GameReleaseSources.WindowsRelease(x.Title)),"the observed RuTor game table produces real downloadable Windows rows");
+        var knabenGames=KnabenSource.Parse(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory,"Fixtures","knaben-games-elden.json")),elden);
+        Check(knabenGames.Any(x=>x.Source=="RuTracker")&&knabenGames.All(x=>(x.Source is "RuTracker" or "The Pirate Bay")&&x.Via=="Knaben"&&ReleaseQuality.Downloadable(x)&&GameReleaseSources.WindowsRelease(x.Title)),"observed Knaben PC/Games results survive parsing and keep valid hashes");
+        var portalIndex=KnabenSource.Parse(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory,"Fixtures","knaben-games-portal2.json")),detail.Item);
+        Check(portalIndex.Count>0&&portalIndex.All(x=>x.Source=="The Pirate Bay"&&ReleaseQuality.Downloadable(x))&&portalIndex.Any(x=>x.Title.Contains("DODI")),"the game index retains PC repacks while rejecting book, audio and unrelated results");
+        using(var gameSearchClient=new SourceClient(new Handler((request,ct)=>{
+            Check(request.RequestUri!.AbsoluteUri.Contains("/search/0/8/000/2/Portal%202")&&!request.RequestUri.AbsoluteUri.Contains("%E2%84%A2"),"the RuTor source searches the clean Steam title in the games category");
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK){Content=new ByteArrayContent(rutorGames)});
+        })))
+        {
+            var provider=GameReleaseSources.Create(gameSearchClient,GameCatalog.Item(620,"Portal 2™"),[]).First();
+            var result=await ReleaseSearch.RunAsync([provider],timeout:TimeSpan.FromSeconds(2));
+            Check(result.Items.Length==gameRows.Count&&result.Sources.Single().State==SourceState.Ready,"the actual game provider publishes parsed releases through the search coordinator");
+        }
         SourceEntry Release(string title,int? seeds=100,long size=5_000_000_000)=>new("id-"+title,title,"Fixture","","magnet:?xt=urn:btih:"+new string('b',40),null,size,seeds);
         Check(GameReleaseInfo.Kind(Release("Portal 2 (2011) PC RePack by xatab [RUS/ENG]"))=="Репак"&&GameReleaseInfo.Group(Release("Portal 2 (2011) PC RePack by xatab [RUS/ENG]"))=="xatab"&&GameReleaseInfo.Russian(Release("Portal 2 (2011) PC RePack by xatab [RUS/ENG]"))&&!GameReleaseInfo.Russian(Release("Portal 2 (2011) PC [ENG]"))&&GameReleaseInfo.Kind(Release("Portal 2 (2011) PC GOG"))=="Лицензия"&&GameReleaseInfo.Kind(Release("Portal 2 (2011) PC"))=="Игра","a release row names its kind, author and language from its own title");
         Check(GameReleaseInfo.Version(Release("Portal 2 v1.2.3 RePack"))=="v1.2.3"&&GameReleaseInfo.Version(Release("Portal 2 Build 12345"))=="Build 12345"&&GameReleaseInfo.Version(Release("Portal 2 (2011)"))==null&&GameReleaseInfo.Group(Release("Portal 2 [FitGirl Repack]"))=="FitGirl"&&GameReleaseInfo.Group(Release("Portal 2 RePack by SomeoneNew"))=="SomeoneNew"&&GameReleaseInfo.WithDlc(Release("Portal 2 + All DLCs")),"versions, repack authors and bundled add-ons are read from the title only");

@@ -7,7 +7,7 @@ using System.Text.RegularExpressions;
 
 namespace Kachalka;
 
-// RuTracker entries are read from Knaben's public index. No RuTracker login is needed.
+// RuTracker video and verified PC game categories are read from Knaben's public index.
 public static class KnabenSource
 {
     const int MaxResponseBytes=2_000_000;
@@ -29,7 +29,7 @@ public static class KnabenSource
 
     public static async Task<IReadOnlyList<SourceEntry>> Search(MediaItem item,CancellationToken ct)
     {
-        var queries=new[]{item.OriginalTitle}.Concat(MediaIdentity.Queries(item))
+        var queries=(item.Section=="Игры"?GameReleaseSources.Queries(item):new[]{item.OriginalTitle}.Concat(MediaIdentity.Queries(item)))
             .Where(query=>!string.IsNullOrWhiteSpace(query))
             .Select(query=>query!.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -37,11 +37,14 @@ public static class KnabenSource
             .ToArray();
         if(queries.Length==0)return [];
         var entries=new List<SourceEntry>();
+        Exception? last=null;var answered=false;
         foreach(var query in queries)
         {
-            try{entries.AddRange(await SearchQuery(query,item,ct));}
-            catch(Exception) when(!ct.IsCancellationRequested){/* Keep releases from the other title. */}
+            try{entries.AddRange(await SearchQuery(query,item,ct));answered=true;}
+            catch(Exception error) when(!ct.IsCancellationRequested){last=error;/* Keep releases from the other title. */}
         }
+        ct.ThrowIfCancellationRequested();
+        if(!answered&&last!=null)throw last;
         return entries
             .DistinctBy(entry=>entry.Id)
             .OrderByDescending(entry=>entry.Seeds??-1)
@@ -61,7 +64,7 @@ public static class KnabenSource
         {
             Content=new StringContent(JsonSerializer.Serialize(new
             {
-                query,
+                query=item.Section=="Игры"?"\""+query.Replace("\"","")+"\"":query,
                 search_field="title",
                 search_type="100%",
                 order_by="seeders",
@@ -96,8 +99,9 @@ public static class KnabenSource
         {
             if(row.ValueKind!=JsonValueKind.Object)continue;
             var tracker=String(row,"tracker")?.Trim();
-            if(!string.Equals(tracker,"RuTracker",StringComparison.OrdinalIgnoreCase)&&
-               !string.Equals(tracker,"RuTracker.org",StringComparison.OrdinalIgnoreCase))continue;
+            var source=string.Equals(tracker,"RuTracker",StringComparison.OrdinalIgnoreCase)||string.Equals(tracker,"RuTracker.org",StringComparison.OrdinalIgnoreCase)?"RuTracker":
+                item.Section=="Игры"&&string.Equals(tracker,"The Pirate Bay",StringComparison.OrdinalIgnoreCase)?"The Pirate Bay":null;
+            if(source==null)continue;
             var title=String(row,"title")?.Trim();
             if(string.IsNullOrWhiteSpace(title)||title.Length>500||!(item.Section=="Игры"?Regex.IsMatch(String(row,"category")??"",@"(?i)(?:games?.*(?:pc|windows)|pc.*games?|windows.*games?|игры.*(?:pc|пк))"):VideoCategoryPattern.IsMatch(String(row,"category")??"")))continue;
             var hash=String(row,"hash");
@@ -110,10 +114,10 @@ public static class KnabenSource
             if(hash==null)continue;
             hash=hash.ToUpperInvariant();
             var magnetUrl="magnet:?xt=urn:btih:"+hash+"&dn="+Uri.EscapeDataString(title)+"&tr="+Uri.EscapeDataString("udp://tracker.opentrackr.org:1337/announce");
-            var page=SecurePage(String(row,"details"));
+            var page=SecurePage(String(row,"details"),source);
             var size=Long(row,"bytes");
             var seeds=Count(row,"seeders");
-            var entry=new SourceEntry("RuTracker:"+hash,title,"RuTracker",page,magnetUrl,null,size,seeds){Via="Knaben",Leechers=Count(row,"leechers")};
+            var entry=new SourceEntry(source+":"+hash,title,source,page,magnetUrl,null,size,seeds){Via="Knaben",Leechers=Count(row,"leechers")};
             if(item.Section=="Игры"?!GameReleaseSources.Matches(item,entry):!LiveCatalog.Matches(item,entry))continue;
             if(item.Section=="Фильмы"&&item.Year>0&&!Regex.IsMatch(title,@"(?<!\d)"+item.Year+@"(?!\d)"))continue;
             entries.Add(entry);
@@ -125,9 +129,9 @@ public static class KnabenSource
     static long? Long(JsonElement row,string name)=>row.TryGetProperty(name,out var value)&&value.ValueKind==JsonValueKind.Number&&value.TryGetInt64(out var number)&&number>0?number:null;
     static int? Count(JsonElement row,string name)=>row.TryGetProperty(name,out var value)&&value.ValueKind==JsonValueKind.Number&&value.TryGetInt32(out var number)&&number>=0?number:null;
 
-    static string SecurePage(string? value)
+    static string SecurePage(string? value,string source)
     {
         if(!Uri.TryCreate(value,UriKind.Absolute,out var uri)||uri.Scheme!="https"||!string.IsNullOrEmpty(uri.UserInfo))return "";
-        return uri.Host is "rutracker.org" or "www.rutracker.org" or "knaben.org" or "knaben.eu"?uri.AbsoluteUri:"";
+        return ((uri.Host is "rutracker.org" or "www.rutracker.org" or "knaben.org" or "knaben.eu")||source=="The Pirate Bay"&&(uri.Host is "thepiratebay.org" or "www.thepiratebay.org"))?uri.AbsoluteUri:"";
     }
 }

@@ -24,9 +24,10 @@ public partial class MainWindow
         public void Release(string id){if(held.TryRemove(id,out var pending))pending.TrySetResult();}
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken ct)
         {
-            var id=Uri.UnescapeDataString(request.RequestUri!.Query.Split("id=")[1]);Counts.AddOrUpdate(id,1,(_,count)=>count+1);Tokens[id]=ct;
+            var query=request.RequestUri!.Query.TrimStart('?').Split('&').Select(part=>part.Split('=',2)).ToDictionary(part=>part[0],part=>part.Length>1?Uri.UnescapeDataString(part[1]):"");
+            var id=query["id"];var language=query.GetValueOrDefault("language","ru");Counts.AddOrUpdate(id,1,(_,count)=>count+1);Tokens[id]=ct;
             if(held.TryGetValue(id,out var pending))await pending.Task.WaitAsync(ct);
-            return new(HttpStatusCode.OK){Content=new StringContent(JsonSerializer.Serialize(new{id,backdrop=new{url="https://image.tmdb.org/t/p/w1280/fixture.jpg",source="TMDB",tmdbId=1}}))};
+            return new(HttpStatusCode.OK){Content=new StringContent(JsonSerializer.Serialize(new{id,backdrop=new{url="https://image.tmdb.org/t/p/w1280/fixture_"+language+".jpg",source="TMDB",tmdbId=1}}))};
         }
     }
     sealed class CoverViewportFixture(byte[] bytes):IAsyncDisposable
@@ -114,11 +115,21 @@ public partial class MainWindow
             if(secondLookup.IsCompleted||handler.Tokens[shared].IsCancellationRequested)throw new Exception("One canceled banner canceled another banner's shared lookup.");
             handler.Release(shared);if(await secondLookup==null)throw new Exception("The remaining feature subscriber did not receive its poster URL.");
             if(await FeaturePosterUrl(shared,CancellationToken.None,client)==null||handler.Counts[shared]!=1)throw new Exception("A completed feature lookup was not cached.");
+            var originalLanguage=AppLanguage.Current;
+            try
+            {
+                AppLanguage.Set(originalLanguage=="en"?"ru":"en");
+                var other=await FeaturePosterUrl(shared,CancellationToken.None,client);
+                if(other==null||other!=await FeaturePosterUrl(shared,CancellationToken.None,client)||handler.Counts[shared]!=2)throw new Exception("Localized backdrops did not share their own cache.");
+                AppLanguage.Set(originalLanguage);
+                if(await FeaturePosterUrl(shared,CancellationToken.None,client)==other||handler.Counts[shared]!=2)throw new Exception("Backdrop cache crossed interface languages.");
+            }
+            finally{AppLanguage.Set(originalLanguage);}
             handler.Hold(canceled);using var canceledSubscriber=new CancellationTokenSource();var abandoned=FeaturePosterUrl(canceled,canceledSubscriber.Token,client);
             await Until(()=>handler.Counts.GetValueOrDefault(canceled)>0,"Cancelable feature lookup did not start.");canceledSubscriber.Cancel();
             try{await abandoned;throw new Exception("An abandoned lookup completed despite cancellation.");}catch(OperationCanceledException){}
             await Until(()=>handler.Tokens[canceled].IsCancellationRequested,"The last feature subscriber did not cancel its underlying request.");
-            if(featurePosters.ContainsKey(canceled))throw new Exception("An offscreen canceled lookup poisoned the completed feature cache.");
+            if(featurePosters.ContainsKey(AppLanguage.Current+"|"+canceled))throw new Exception("An offscreen canceled lookup poisoned the completed feature cache.");
             var returned=FeaturePosterUrl(canceled,CancellationToken.None,client);handler.Release(canceled);
             if(await returned==null||handler.Counts[canceled]!=2)throw new Exception("Returning to a canceled feature did not start a fresh successful lookup.");
         }
@@ -225,11 +236,50 @@ public partial class MainWindow
         if(decodeThread==uiThread||disk.Downloaded||disk.Image==0)throw new Exception("A synchronous disk-cache hit decoded on the native UI thread.");
 
         await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.Background);var before=coverViewport!.SweepCount;
-        for(var tick=0;tick<256;tick++)coverViewport.Schedule();await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.Background);
+        for(var tick=0;tick<256;tick++)coverViewport.Schedule();await Until(()=>coverViewport.SweepCount>before,"Coalesced viewport sweep did not run.");
         if(coverViewport.SweepCount-before!=1)throw new Exception("Repeated viewport notifications were not coalesced into one background sweep.");
-        Body.Children.Clear();await Task.Delay(30);
+        // Warm-cache bursts yield to native input and stay within a small per-frame budget.
+        var applied=0;using(var batch=new UiWorkQueue<int>(Dispatcher,2))
+        {
+            for(var index=0;index<32;index++){var key=index;batch.Set(key,()=>applied++);batch.Set(key,()=>applied++);}
+            if(applied!=0||batch.Pending!=32)throw new Exception("Poster burst was synchronous or retained duplicate keys.");
+            await Dispatcher.InvokeAsync(()=>{if(applied!=0)throw new Exception("Poster work ran before queued native input.");},DispatcherPriority.Input);
+            await Until(()=>applied==32,"Bounded poster burst did not finish.");
+            if(batch.MaxBatch>2||batch.Batches<16)throw new Exception("Poster burst exceeded the per-frame budget.");
+            batch.Set(33,()=>throw new Exception("Disposed poster queue still ran."));batch.Dispose();
+        }
+        // The real three catalog templates reserve artwork/title/meta space before any image arrives.
+        foreach(var category in new[]{"Фильмы","Сериалы","Игры"})
+        {
+            Body.Children.Clear();StopCoverViewport();
+            var firstId=category=="Фильмы"?40:category=="Сериалы"?50:60;
+            var cards=Enumerable.Range(firstId,8).Select(id=>Card(id,url+id+".png") with{Section=category}).ToArray();
+            foreach(var id in Enumerable.Range(firstId,8))fixture.Hold(id);
+            var data=new CatalogRow(cards,8);
+            var row=new ContentControl{Content=data,ContentTemplate=(DataTemplate)FindResource(category=="Игры"?"GameRow":"MediaRow"),Width=900,VerticalAlignment=VerticalAlignment.Top};
+            Body.Children.Add(row);
+            await Until(()=>VisualElements<Border>(row).Count(x=>x.Name==(category=="Игры"?"GameCardArt":"CardPoster")&&x.ActualHeight>0)==8,"Catalog placeholder slots were not laid out.");
+            var posters=VisualElements<Image>(row).ToArray();
+            if(posters.Any(x=>x.Source!=null))throw new Exception("Controlled poster arrived before release.");
+            var bounds=posters.Select(x=>VisualTreeHelper.GetParent(x) as FrameworkElement).Select(x=>x!.TransformToAncestor(row).TransformBounds(new Rect(new Point(),x.RenderSize))).ToArray();
+            var originalButtons=VisualElements<Button>(row).Where(x=>x.Tag is MediaItem).ToArray();
+            foreach(var id in Enumerable.Range(firstId,8))fixture.Release(id);
+            await Until(()=>posters.All(x=>x.Source!=null),"Real catalog slots did not fill with decoded posters.");
+            var after=posters.Select(x=>VisualTreeHelper.GetParent(x) as FrameworkElement).Select(x=>x!.TransformToAncestor(row).TransformBounds(new Rect(new Point(),x.RenderSize))).ToArray();
+            if(!bounds.Zip(after).All(pair=>Math.Abs(pair.First.X-pair.Second.X)<.5&&Math.Abs(pair.First.Y-pair.Second.Y)<.5&&Math.Abs(pair.First.Width-pair.Second.Width)<.5&&Math.Abs(pair.First.Height-pair.Second.Height)<.5))throw new Exception("Poster arrival shifted the catalog grid.");
+            var retained=posters[0].Source;
+            posters[0].DataContext=cards[0] with{Kinopoisk="8.5"};
+            if(!ReferenceEquals(posters[0].Source,retained))throw new Exception("Refreshing same-URL poster metadata erased a decoded image.");
+            for(var update=0;update<12;update++)cards[1].SetScores((7+update*.01).ToString(System.Globalization.CultureInfo.InvariantCulture),"8.0","драма");
+            await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.Background);
+            if(posters.Any(image=>image.Source==null))throw new Exception("Rating updates flashed an existing poster back to its placeholder.");
+            data.Update(cards.Select((card,index)=>index==3?card with{Title="Обновлённое название"}:card).ToArray());UpdateLayout();
+            var buttons=VisualElements<Button>(row).Where(x=>x.Tag is MediaItem).ToArray();
+            if(!Enumerable.Range(0,8).Where(index=>index!=3).All(index=>ReferenceEquals(originalButtons[index],buttons[index])))throw new Exception("Changing one card recreated its neighbouring placeholders.");
+        }
+        Body.Children.Clear();await Task.Delay(50);
         if(coverViewport.TrackedCount!=0)throw new Exception("Unloaded posters retain viewport scroll subscriptions.");
-        await File.WriteAllTextAsync(Path.Combine(output,"checks.json"),JsonSerializer.Serialize(new{VisiblePosters=true,NearestRowPrefetched=true,OffscreenNetworkAvoided=true,ScrollStartsRequests=true,ScrollAwayCancels=true,EmptyPosterContainerAnchored=true,DecodedPosterOwnBounds=true,CollapsedPosterAvoidsNetwork=true,LayoutPositionStartsRequest=true,OwnedWindowPosters=true,OwnedWindowObserverCleanup=true,UnloadingCancels=true,RecycledContextRejectsLateResponse=true,HiddenFeaturePosterAnchored=true,SharedFeatureLookup=true,IndependentFeatureSubscriberCancellation=true,CanceledFeatureLookupCanRetry=true,FrozenBoundedDecode=true,MemoryCacheNoRefetch=true,DiskCacheNoRefetch=true,DiskCacheWorker=true,CoalescedViewportSweep=true,UnloadedObserverCleanup=true}));
+        await File.WriteAllTextAsync(Path.Combine(output,"checks.json"),JsonSerializer.Serialize(new{VisiblePosters=true,NearestRowPrefetched=true,OffscreenNetworkAvoided=true,ScrollStartsRequests=true,ScrollAwayCancels=true,EmptyPosterContainerAnchored=true,DecodedPosterOwnBounds=true,CollapsedPosterAvoidsNetwork=true,LayoutPositionStartsRequest=true,OwnedWindowPosters=true,OwnedWindowObserverCleanup=true,UnloadingCancels=true,RecycledContextRejectsLateResponse=true,HiddenFeaturePosterAnchored=true,SharedFeatureLookup=true,IndependentFeatureSubscriberCancellation=true,CanceledFeatureLookupCanRetry=true,FrozenBoundedDecode=true,MemoryCacheNoRefetch=true,DiskCacheNoRefetch=true,DiskCacheWorker=true,CoalescedViewportSweep=true,BoundedPosterBatches=true,NativeInputBeforePosterBurst=true,StableMovieSeriesGameSlots=true,IncrementalCardContainers=true,UnloadedObserverCleanup=true}));
         StopCoverViewport();Close();
     }
 }

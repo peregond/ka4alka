@@ -7,18 +7,19 @@ public static class ReleaseRecommendation
     public const int MinimumSeeds=20;
     public sealed record Choice(SourceEntry Entry,string Reason);
 
-    public static Choice? Pick(IReadOnlyList<SourceEntry> releases,int minimumHeight=720)
+    public static Choice? Pick(IReadOnlyList<SourceEntry> releases,int minimumHeight=720,string preferredLanguage="ru")
     {
         var candidates=releases.Where(x=>ReleaseQuality.Downloadable(x)&&!ReleaseQuality.Poor(x,minimumHeight)&&x.Seeds>=MinimumSeeds&&x.Quality is "Full HD" or "4K").ToArray();
         if(candidates.Length==0)return null;
-        // Same default order as the table: Russian audio first, then the most seeded.
-        var best=RussianAudio.Order(candidates).First();
-        return new(best,Reason(best,candidates));
+        // Language preference matches the table; seed and quality safeguards still apply.
+        var best=SearchLanguage.AudioOrder(candidates,preferredLanguage).First();
+        return new(best,Reason(best,candidates,preferredLanguage));
     }
-    static string Reason(SourceEntry best,SourceEntry[] candidates)
+    static string Reason(SourceEntry best,SourceEntry[] candidates,string preferredLanguage)
     {
         var parts=new List<string>();
-        if(RussianAudio.Rank(best)==3)parts.Add("русская озвучка");
+        if(preferredLanguage=="en"&&SearchLanguage.EnglishAudioRank(best)==3)parts.Add("английская озвучка");
+        else if(RussianAudio.Rank(best)==3)parts.Add("русская озвучка");
         if(best.Seeds==candidates.Max(x=>x.Seeds))parts.Add("больше всего отдающих");
         else if(best.Seeds>=100)parts.Add("много отдающих");
         var sizes=candidates.Where(x=>x.Size.HasValue).Select(x=>x.Size!.Value).OrderBy(x=>x).ToArray();

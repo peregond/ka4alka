@@ -1,11 +1,11 @@
 export type AppRelease = { version: string; installerUrl: string; zipUrl: string; releaseUrl: string; installerSize: number };
 
 const fallback: AppRelease = {
-  version: "0.40.4",
-  installerUrl: "https://github.com/peregond/ka4alka/releases/download/v0.40.4/Kachalka-Setup-0.40.4.exe",
-  zipUrl: "https://github.com/peregond/ka4alka/releases/download/v0.40.4/Kachalka-win-x64.zip",
-  releaseUrl: "https://github.com/peregond/ka4alka/releases/tag/v0.40.4",
-  installerSize: 96761839,
+  version: "0.43.4",
+  installerUrl: "https://github.com/peregond/ka4alka/releases/download/v0.43.4/Kachalka-Setup-0.43.4.exe",
+  zipUrl: "https://github.com/peregond/ka4alka/releases/download/v0.43.4/Kachalka-win-x64.zip",
+  releaseUrl: "https://github.com/peregond/ka4alka/releases/tag/v0.43.4",
+  installerSize: 72898428,
 };
 let cached = fallback;
 let expires = 0;

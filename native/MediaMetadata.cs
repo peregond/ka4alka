@@ -12,6 +12,7 @@ public static class MediaMetadata
 
     public static MediaItem Merge(MediaItem prior,MediaItem fresh)=>prior with
     {
+        English=fresh.English??prior.English,
         Description=HasDescription(fresh)?fresh.Description:HasDescription(prior)?prior.Description:null,
         OriginalTitle=string.IsNullOrWhiteSpace(fresh.OriginalTitle)?prior.OriginalTitle:fresh.OriginalTitle,
         ImageUrl=string.IsNullOrWhiteSpace(fresh.ImageUrl)?prior.ImageUrl:fresh.ImageUrl,

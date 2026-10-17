@@ -18,9 +18,9 @@ public partial class MainWindow
         label.SetResourceReference(TextBlock.ForegroundProperty,"Accent");content.Children.Add(label);
         // A calm breathing line instead of a running bar; the release rows below breathe the same way.
         var progress=new Border{Name="ReleaseLoadingPulse",Height=3,CornerRadius=new(1.5)};progress.SetResourceReference(Border.BackgroundProperty,"Accent");
-        AutomationProperties.SetName(progress,"Поиск раздач: прогресс");content.Children.Add(Breathe(progress));
+        AutomationProperties.SetName(progress,AppLanguage.T("Поиск раздач: прогресс"));content.Children.Add(Breathe(progress));
         releaseLoadingIndicator=new Border{Child=content,Width=108,Margin=new(10,5,0,5),VerticalAlignment=VerticalAlignment.Center,Visibility=Visibility.Collapsed};
-        AutomationProperties.SetName(releaseLoadingIndicator,"Поиск раздач");target.Children.Add(releaseLoadingIndicator);
+        AutomationProperties.SetName(releaseLoadingIndicator,AppLanguage.T("Поиск раздач"));target.Children.Add(releaseLoadingIndicator);
         RefreshReleaseLoadingIndicator();
     }
     void RefreshReleaseLoadingIndicator()

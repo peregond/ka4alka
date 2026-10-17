@@ -86,12 +86,15 @@ public static class WheelScroll
         DispatcherOperation? immediate;
         double position,target,velocity;
         long lastTick;
-        TimeSpan lastFrame;
+        readonly DispatcherTimer frames;
         bool rendering;
         public bool Running=>rendering||immediate?.Status==DispatcherOperationStatus.Pending;
         public Motion(ScrollViewer viewer)
         {
             this.viewer=viewer;
+            // A permanent CompositionTarget.Rendering listener can keep Render work ahead of
+            // native input. Schedule motion alongside input, and let WPF render only dirty frames.
+            frames=new DispatcherTimer(DispatcherPriority.Input,viewer.Dispatcher){Interval=TimeSpan.FromMilliseconds(16)};frames.Tick+=Tick;
             viewer.Unloaded+=(_,_)=>Stop();
         }
         public void Move(double distance)
@@ -105,7 +108,7 @@ public static class WheelScroll
                 target=Math.Clamp((pending?target:viewer.VerticalOffset)+distance,0,viewer.ScrollableHeight);
                 if(Math.Abs(target-viewer.VerticalOffset)<.1){Stop();return;}
                 if(pending)return;
-                immediate=viewer.Dispatcher.BeginInvoke(DispatcherPriority.Render,new Action(()=>
+                immediate=viewer.Dispatcher.BeginInvoke(DispatcherPriority.Input,new Action(()=>
                 {
                     immediate=null;
                     if(viewer.IsLoaded&&viewer.IsVisible)viewer.ScrollToVerticalOffset(Math.Clamp(target,0,viewer.ScrollableHeight));
@@ -119,13 +122,12 @@ public static class WheelScroll
             target=next;
             if(Math.Abs(target-position)<.1){Stop();return;}
             if(rendering)return;
-            lastTick=Stopwatch.GetTimestamp();lastFrame=TimeSpan.MinValue;
-            rendering=true;CompositionTarget.Rendering+=Tick;
+            lastTick=Stopwatch.GetTimestamp();
+            rendering=true;frames.Start();
         }
         void Tick(object? sender,EventArgs e)
         {
             if(!viewer.IsLoaded||!viewer.IsVisible){Stop();return;}
-            if(e is RenderingEventArgs frame){if(frame.RenderingTime==lastFrame)return;lastFrame=frame.RenderingTime;}
             var seconds=Stopwatch.GetElapsedTime(lastTick).TotalSeconds;lastTick=Stopwatch.GetTimestamp();
             target=Math.Clamp(target,0,viewer.ScrollableHeight);
             // Keep the fractional position between frames; virtualizing panels may
@@ -135,7 +137,7 @@ public static class WheelScroll
             viewer.ScrollToVerticalOffset(position);
             if(Math.Abs(target-next.Position)<.25&&Math.Abs(velocity)<4){viewer.ScrollToVerticalOffset(target);Stop();}
         }
-        void StopRendering(){if(rendering){CompositionTarget.Rendering-=Tick;rendering=false;}velocity=0;}
+        void StopRendering(){if(rendering){frames.Stop();rendering=false;}velocity=0;}
         public void Stop(){StopRendering();immediate?.Abort();immediate=null;}
     }
 }

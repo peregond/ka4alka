@@ -50,9 +50,13 @@ if(args.Contains("--probe-public"))
 if(args.Contains("--verify-cinema-source")){await CinemaSourceTests.Run();return;}
 if(args.Contains("--diagnose-cinema-source")){await CinemaSourceTests.Diagnostics();return;}
 if(args.Contains("--probe-portraits")){await PortraitSourceProbe.Run(root);return;}
-if(args.Contains("--performance-only")){await PerformanceResourcesTests.Run();await CoverCachePerformanceTests.Run(root);await UnifiedSearchTests.Run();await ReleaseSearchTests.Run();return;}
+if(args.Contains("--featured-only")){FeaturedCatalogTests.Run();return;}
+if(args.Contains("--performance-only")){FeaturedCatalogTests.Run();ReleaseQualityTests.Run();await CatalogBatchTests.Run();FeatureSummaryTests.Run();await PerformanceResourcesTests.Run();await CoverCachePerformanceTests.Run(root);await UnifiedSearchTests.Run();await ReleaseSearchTests.Run();return;}
 if(args.Contains("--home-availability-only")){HiddenCatalogTests.Run();await UXReliabilityTests.Run(root);return;}
+if(args.Contains("--missing-files-only")){await MissingDownloadFilesTests.Run(root);return;}
+if(args.Contains("--language-only")){LanguageResourceTests.Run();SearchLanguageTests.Run();await UnifiedSearchTests.Run();return;}
 if(args.Contains("--games-only")){await GameCatalogTests.Run(root);return;}
+if(args.Contains("--probe-game-releases")){await GameReleaseProbe.Run(root);return;}
 if(args.Contains("--metadata-only")){await MediaMetadataTests.Run();return;}
 if(args.Contains("--imdb-suggestions-only")){await ImdbSuggestionTests.Run();return;}
 if(args.Contains("--portraits-only")){await CinemaPortraitTests.Run();return;}
@@ -66,6 +70,7 @@ await CacheStorageTests.Run(root);
 if(args.Contains("--cache-only"))return;
 DownloadTests.Run();await ImdbSuggestionTests.Run();
 DownloadFolderTests.Run();
+LanguageResourceTests.Run();SearchLanguageTests.Run();
 await GameCatalogTests.Run(root);
 ReleaseQualityTests.Run();
 ReleaseAudioTests.Run();
@@ -90,6 +95,7 @@ await ReleaseSearchTests.Run();
 await ReleaseFreshnessTests.Run(root);
 await BugReportTests.Run(root);
 await MediaMetadataTests.Run();
+FeatureSummaryTests.Run();
 await ZonaMovieMetadataTests.Run();
 await CinemaPortraitTests.Run();
 await PersonProfileLoadingTests.Run();
@@ -103,6 +109,7 @@ DownloadDiagnosticsTests.Run();
 DownloadSpaceTests.Run(root);
 await DownloadReliabilityTests.Run(root);
 await DownloadDeletionTests.Run(root);
+await MissingDownloadFilesTests.Run(root);
 await DownloadLanTests.Run(root);
 await CoverCachePerformanceTests.Run(root);
 await MagnetDiscoveryTests.Run(root);

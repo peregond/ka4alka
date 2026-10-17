@@ -34,6 +34,10 @@ static class ReleaseQualityTests
               new[]{"btmh:"+v1,"btmh:"+v1Base32,"btih:"+v2}.All(hash=>!ReleaseQuality.Downloadable(Row("Film 4K") with{TorrentUrl="magnet:?xt=urn:"+hash})),"magnet quality evidence accepts matching v1 and v2 hash formats and rejects swapped prefixes");
         var archive=Row("Archive film 1080p") with{Source="Internet Archive",TorrentUrl=null,PageUrl="https://archive.org/details/quality-film"};
         Check(ReleaseQuality.HasResolution([archive],1080)&&!ReleaseQuality.HasResolution([archive with{PageUrl="https://archive.org.attacker.example/details/quality-film"}],1080)&&!ReleaseQuality.HasResolution([archive with{PageUrl="https://archive.org/details/"}],1080),"resolvable Internet Archive entries retain quality evidence only for a valid archive item URL");
+        var mutableEvidence=new[]{Row("Film 720p")};item.SetReleaseQuality(mutableEvidence);
+        mutableEvidence[0]=Row("Film 2160p");item.SetReleaseQuality(mutableEvidence);
+        Check(item.HasReleaseResolution(2160)&&!item.HasReleaseResolution(720),"memoized quality still observes evidence arrays changed by the caller");
+        item.SetReleaseQuality([Row("Film 720p"),Row("Film 2160p")]);
         var copied=item with{Title="Копия"};copied.SetReleaseQuality([Row("Film 1080p")]);
         Check(item.HasReleaseResolution(720)&&item.HasReleaseResolution(2160)&&!item.HasReleaseResolution(1080)&&copied.HasReleaseResolution(1080),"copying metadata does not let quality updates mutate another movie card");
         item.SetReleaseQuality([Row("Film HDCAM 2160p")]);

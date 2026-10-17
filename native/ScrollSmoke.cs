@@ -8,6 +8,16 @@ namespace Kachalka;
 
 public partial class MainWindow
 {
+    public async Task WheelInputSmokeTest(string output)
+    {
+        System.IO.Directory.CreateDirectory(output);metadataLifetime.Cancel();liveRequest?.Cancel();catalogRefreshTimer.Stop();searchDelay.Stop();refresh.Stop();CancelCatalogQualityCheck();ResetDiscoveryData();
+        section="Фильмы";current=null;activePerson=null;submittedQuery="";Search.Text="";favoritesOnly=false;livePage=1;ResetCatalogFilters();catalogCollection="popular";
+        prefs.HidePoorQuality=false;prefs.CatalogQualityHeight=0;prefs.HiddenGenres=[];prefs.HiddenTitles=[];
+        liveItems=Enumerable.Range(1,40).Select(id=>new MediaItem(-997000-id,"Проверка прокрутки "+id,section,"драма",2026,"7.0","7.0","#526B69")).ToArray();
+        liveLoading=false;liveKey=CurrentCatalogKey;Render();await Task.Delay(150);UpdateLayout();
+        var checks=await CheckWheelScrolling();
+        await System.IO.File.WriteAllTextAsync(System.IO.Path.Combine(output,"checks.json"),System.Text.Json.JsonSerializer.Serialize(checks));Close();
+    }
     async Task<object> CheckWheelScrolling()
     {
         var previous=WheelScroll.SmoothOverride;
@@ -44,12 +54,19 @@ public partial class MainWindow
         var viewer=FindVisual<ScrollViewer>(list,_=>true)??throw new Exception("Wheel scroll: fixture viewer missing.");
         viewer.ScrollToVerticalOffset(200);await Settle();var start=viewer.VerticalOffset;
         var frames=new List<double>();
-        ScrollChangedEventHandler record=(_,_)=>frames.Add(viewer.VerticalOffset);
+        var stamps=new List<long>();
+        ScrollChangedEventHandler record=(_,_)=>{frames.Add(viewer.VerticalOffset);stamps.Add(System.Diagnostics.Stopwatch.GetTimestamp());};
         viewer.ScrollChanged+=record;
         Wheel(list,-30);await Settle();
         viewer.ScrollChanged-=record;
         if(WheelScroll.SmoothingEnabled)
             Check(frames.Distinct().Count()>=3&&frames.Any(offset=>offset>start+.05&&offset<start+step/4-.05),"smooth wheel did not produce intermediate native scroll frames");
+        // A frame that waits a quarter of a second for the UI thread is felt as a hitch; the gap between frames of one gesture must stay far below that.
+        if(WheelScroll.SmoothingEnabled&&stamps.Count>=3)
+        {
+            var gap=stamps.Zip(stamps.Skip(1),(x,y)=>System.Diagnostics.Stopwatch.GetElapsedTime(x,y).TotalMilliseconds).Max();
+            Check(gap<250,$"smooth wheel stalled for {gap:0} ms between frames");
+        }
         Check(Math.Abs(viewer.VerticalOffset-start-step/4)<2,"precision wheel delta was rounded or amplified");
         viewer.ScrollToVerticalOffset(200);await Settle();start=viewer.VerticalOffset;
         Wheel(list,-120);Wheel(list,-120);Wheel(list,-120);await Settle();

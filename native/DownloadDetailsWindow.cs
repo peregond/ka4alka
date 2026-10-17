@@ -20,7 +20,7 @@ public partial class MainWindow
         downloads.Update();
         var window=new Window
         {
-            Title="Файлы · "+item.DisplayName,Owner=this,ShowInTaskbar=false,
+            Title=AppLanguage.T("Файлы · "+item.DisplayName),Owner=this,ShowInTaskbar=false,
             Width=Math.Clamp(ActualWidth-30,320,760),Height=Math.Clamp(ActualHeight-30,280,600),
             MinWidth=320,MinHeight=280,WindowStartupLocation=WindowStartupLocation.CenterOwner,
             UseLayoutRounding=true
@@ -50,11 +50,11 @@ public partial class MainWindow
         summary.Children.Add(status);summary.Children.Add(bytes);summary.Children.Add(network);summary.Children.Add(totalProgress);
         DockPanel.SetDock(totals,Dock.Top);panel.Children.Add(totals);
 
-        var filter=new TextBox{Height=36,Padding=new(36,7,10,7),Margin=new(0,0,0,10),ToolTip="Найти серию или файл по названию и папке · Ctrl+F"};
+        var filter=new TextBox{Height=36,Padding=new(36,7,10,7),Margin=new(0,0,0,10),ToolTip=AppLanguage.T("Найти серию или файл по названию и папке · Ctrl+F")};
         filter.SetResourceReference(Control.ForegroundProperty,"Text");
         filter.SetResourceReference(Control.BackgroundProperty,"Panel");
         filter.SetResourceReference(Control.BorderBrushProperty,"EdgeSoft");
-        AutomationProperties.SetName(filter,"Найти файл в раздаче");
+        AutomationProperties.SetName(filter,AppLanguage.T("Найти файл в раздаче"));
         var searchHost=new Grid();searchHost.Children.Add(filter);
         var magnifier=new System.Windows.Shapes.Path{Data=(Geometry)FindResource("IconSearch"),Width=15,Height=15,Stretch=Stretch.Uniform,StrokeThickness=1.6,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,StrokeLineJoin=PenLineJoin.Round,HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center,Margin=new(12,0,0,10),IsHitTestVisible=false};
         magnifier.SetResourceReference(Shape.StrokeProperty,"Muted");searchHost.Children.Add(magnifier);
@@ -66,7 +66,7 @@ public partial class MainWindow
 
         var footer=new DockPanel{LastChildFill=false,Margin=new(0,10,0,0)};
         DockPanel.SetDock(footer,Dock.Bottom);panel.Children.Add(footer);
-        var close=Button("Закрыть",()=>window.Close());close.Style=(Style)FindResource("QuietButton");AutomationProperties.SetName(close,"Закрыть");
+        var close=Button("Закрыть",()=>window.Close());close.Style=(Style)FindResource("QuietButton");AutomationProperties.SetName(close,AppLanguage.T("Закрыть"));
         close.Margin=new(0);close.Padding=new(12,6,12,6);close.MinHeight=34;close.IsCancel=true;
         DockPanel.SetDock(close,Dock.Right);footer.Children.Add(close);
         var folder=ActionButton("Папка","IconFolder",()=>OpenFolder(new Button{Tag=item},new RoutedEventArgs()));
@@ -91,7 +91,7 @@ public partial class MainWindow
         itemStyle.Setters.Add(new Setter(UIElement.FocusableProperty,true));
         itemStyle.Setters.Add(new Setter(Control.TemplateProperty,new ControlTemplate(typeof(ListBoxItem)){VisualTree=new FrameworkElementFactory(typeof(ContentPresenter))}));
         list.ItemContainerStyle=itemStyle;
-        AutomationProperties.SetName(list,"Файлы загрузки");
+        AutomationProperties.SetName(list,AppLanguage.T("Файлы загрузки"));
         var content=new Grid();content.Children.Add(list);
         var empty=Text("",13,true);empty.TextAlignment=TextAlignment.Center;
         empty.HorizontalAlignment=HorizontalAlignment.Center;empty.VerticalAlignment=VerticalAlignment.Center;
@@ -101,7 +101,7 @@ public partial class MainWindow
         void EmptyState()
         {
             placeholder.Visibility=filter.Text.Length==0?Visibility.Visible:Visibility.Collapsed;
-            empty.Text=rows.Count==0?"Файлы появятся после получения метаданных раздачи.":"По этому запросу файлов нет.";
+            empty.Text=AppLanguage.T(rows.Count==0?"Файлы появятся после получения метаданных раздачи.":"По этому запросу файлов нет.");
             empty.Visibility=view.IsEmpty?Visibility.Visible:Visibility.Collapsed;
         }
         void Refresh()
@@ -124,10 +124,10 @@ public partial class MainWindow
             }
             while(rows.Count>current.Length)rows.RemoveAt(rows.Count-1);
             var completed=current.Count(file=>file.Progress>=100);
-            status.Text=current.Length==0?item.Status:$"Готово файлов: {completed} из {current.Length}";
+            status.Text=AppLanguage.T(current.Length==0?item.Status:$"Готово файлов: {completed} из {current.Length}");
             var size=current.Sum(file=>(decimal)Math.Max(0,file.Size));
             var received=current.Sum(file=>(decimal)Math.Max(0,file.Size)*(decimal)(double.IsFinite(file.Progress)?Math.Clamp(file.Progress,0,100):0)/100);
-            bytes.Text=size==0?"Состав и размеры файлов появятся вместе с метаданными.":$"Скачано {DownloadService.FormatBytes((long)Math.Min(received,long.MaxValue))} из {DownloadService.FormatBytes((long)Math.Min(size,long.MaxValue))}";
+            bytes.Text=AppLanguage.T(size==0?"Состав и размеры файлов появятся вместе с метаданными.":$"Скачано {DownloadService.FormatBytes((long)Math.Min(received,long.MaxValue))} из {DownloadService.FormatBytes((long)Math.Min(size,long.MaxValue))}");
             network.Text=string.Join("\n",new[]{item.PeersText,item.Hint}.Where(s=>!string.IsNullOrWhiteSpace(s)));
             status.ToolTip=string.Join("\n",new[]{item.Status,network.Text}.Where(s=>!string.IsNullOrWhiteSpace(s)));
             totalProgress.IsIndeterminate=item.Indeterminate;

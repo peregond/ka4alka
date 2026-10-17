@@ -1,5 +1,5 @@
 // This module runs on the server. Credentials never enter public JSON or image URLs.
-export type BackdropIdentity = { section: "movies" | "series"; title: string; originalTitle?: string | null; year: number; imdbId?: string | null };
+export type BackdropIdentity = { section: "movies" | "series"; title: string; originalTitle?: string | null; year: number; imdbId?: string | null; language?: "ru" | "en" };
 type Row = { id?: number; title?: string; original_title?: string; name?: string; original_name?: string; release_date?: string; first_air_date?: string; backdrop_path?: string };
 export type Backdrop = { url: string; tmdbId: number; source: "TMDB" };
 const normalize = (value: string) => value.normalize("NFKC").toLowerCase().replaceAll("ё", "е").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
@@ -15,11 +15,11 @@ export function matchTitle(rows: Row[], item: BackdropIdentity): Row | null {
     [row.title, row.original_title, row.name, row.original_name].some(name => name && names.includes(normalize(name))));
   return matches.length === 1 ? matches[0] : null;
 }
-export function selectBackdrop(rows: Record<string, unknown>[]): string | null {
-  const candidates = rows.filter(row => imageUrl(row.file_path) && typeof row.width === "number" && typeof row.height === "number" &&
+export function selectBackdrop(rows: Record<string, unknown>[], language: "ru" | "en" = "ru"): string | null {
+  const candidates = rows.filter(row => (language !== "en" || row.iso_639_1 == null || row.iso_639_1 === "en") && imageUrl(row.file_path) && typeof row.width === "number" && typeof row.height === "number" &&
     row.width >= 780 && row.height > 0 && row.width / row.height >= 1.6 && row.width / row.height <= 2.5);
   // Prefer text-free artwork, then Russian, then English; votes break ties.
-  const languageRank = (row: Record<string, unknown>) => row.iso_639_1 == null ? 3 : row.iso_639_1 === "ru" ? 2 : row.iso_639_1 === "en" ? 1 : 0;
+  const languageRank = (row: Record<string, unknown>) => row.iso_639_1 == null ? 3 : row.iso_639_1 === language ? 2 : row.iso_639_1 === "en" ? 1 : 0;
   candidates.sort((a, b) => languageRank(b) - languageRank(a) || Number(b.vote_count ?? 0) - Number(a.vote_count ?? 0));
   return candidates.length ? imageUrl(candidates[0].file_path) : null;
 }
@@ -42,23 +42,11 @@ export async function fetchBackdrop(item: BackdropIdentity, token: string, reque
     return JSON.parse(new TextDecoder().decode(bytes));
   }
   const type = item.section === "movies" ? "movie" : "tv";
-  let selected: Row | null = null;
-  if (/^tt\d{7,10}$/.test(item.imdbId ?? "")) {
-    const result = await read(`find/${item.imdbId}?external_source=imdb_id`);
-    const rows: Row[] = result[type === "movie" ? "movie_results" : "tv_results"] ?? [];
-    // An explicit identity never falls back to an unrelated title search.
-    selected = rows.length === 1 && Number.isSafeInteger(rows[0].id) && (rows[0].id ?? 0) > 0 ? rows[0] : null;
-  } else {
-    for (const query of [...new Set([item.originalTitle, item.title].filter((name): name is string => !!name))]) {
-      const result = await read(`search/${type}?query=${encodeURIComponent(query)}&language=ru-RU&include_adult=false&${type === "movie" ? "year" : "first_air_date_year"}=${item.year}`);
-      selected = matchTitle(Array.isArray(result.results) ? result.results : [], item);
-      if (selected) break;
-    }
-  }
-  if (!selected) return null;
-  const images = await read(`${type}/${selected.id}/images?include_image_language=null,ru,en`);
-  const url = selectBackdrop(Array.isArray(images.backdrops) ? images.backdrops : []);
-  return url ? { url, tmdbId: selected.id!, source: "TMDB" } : null;
+  const selectedId = await resolveTmdbId(item, read);
+  if (!selectedId) return null;
+  const images = await read(`${type}/${selectedId}/images?include_image_language=null,ru,en`);
+  const url = selectBackdrop(Array.isArray(images.backdrops) ? images.backdrops : [], item.language);
+  return url ? { url, tmdbId: selectedId, source: "TMDB" } : null;
 }
 
 // Coalesce concurrent banner requests. Successful matches last a week; no artwork lasts six hours.
@@ -67,7 +55,7 @@ export function backdropCache(lookup: (item: BackdropIdentity) => Promise<Backdr
   const pending = new Map<string, Promise<Backdrop | null>>();
   let retryAfter = 0;
   return async (id: string, item: BackdropIdentity) => {
-    const key = JSON.stringify([id, item.section, item.title, item.originalTitle, item.year, item.imdbId]);
+    const key = JSON.stringify([id, item.section, item.title, item.originalTitle, item.year, item.imdbId, item.language ?? "ru"]);
     const cached = saved.get(key); if (cached && cached.expires > now()) return cached.value;
     const running = pending.get(key); if (running) return running;
     if (retryAfter > now() || pending.size >= 4) throw new Error("Backdrop lookup is temporarily unavailable");
@@ -81,4 +69,23 @@ export function backdropCache(lookup: (item: BackdropIdentity) => Promise<Backdr
     });
     pending.set(key, task); return task;
   };
+}
+
+export async function resolveTmdbId(item: BackdropIdentity, read: (path: string) => Promise<any>): Promise<number | null> {
+  const type = item.section === "movies" ? "movie" : "tv";
+  let selected: Row | null = null;
+  if (/^tt\d{7,10}$/.test(item.imdbId ?? "")) {
+    const result = await read(`find/${item.imdbId}?external_source=imdb_id`);
+    const rows: Row[] = result[type === "movie" ? "movie_results" : "tv_results"] ?? [];
+    // An explicit identity never falls back to an unrelated title search.
+    selected = rows.length === 1 && Number.isSafeInteger(rows[0].id) && (rows[0].id ?? 0) > 0 ? rows[0] : null;
+  } else {
+    for (const query of [...new Set([item.originalTitle, item.title].filter((name): name is string => !!name))]) {
+      const result = await read(`search/${type}?query=${encodeURIComponent(query)}&language=ru-RU&include_adult=false&${type === "movie" ? "year" : "first_air_date_year"}=${item.year}`);
+      selected = matchTitle(Array.isArray(result.results) ? result.results : [], item);
+      if (selected) break;
+    }
+  }
+  return selected?.id ?? null;
+
 }

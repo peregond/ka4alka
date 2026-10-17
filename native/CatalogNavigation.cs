@@ -1,5 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 
@@ -19,6 +21,35 @@ public partial class MainWindow
     CatalogScrollPosition? navigationPendingPosition;
     DispatcherOperation? navigationRestore;
     bool navigationApplying,navigationResetRequested;
+    int navigationRestoreAttempts;
+    double? navigationExpectedOffset;
+    DateTime navigationUserScrollUntil;
+    DispatcherTimer? navigationCaptureTimer;
+    void CatalogUserScroll()
+    {
+        navigationUserScrollUntil=DateTime.UtcNow.AddMilliseconds(300);
+        navigationRestore?.Abort();navigationRestore=null;navigationPendingPosition=null;navigationExpectedOffset=null;
+        QueueCatalogPositionCapture();
+    }
+    void CatalogUserWheel(object sender,MouseWheelEventArgs args){if(args.Delta!=0&&navigationScroll?.ScrollableHeight>0)CatalogUserScroll();}
+    void CatalogUserTouch(object? sender,TouchEventArgs args)=>CatalogUserScroll();
+    void CatalogUserKey(object sender,KeyEventArgs args)
+    {if(args.Key is Key.Up or Key.Down or Key.PageUp or Key.PageDown or Key.Home or Key.End)CatalogUserScroll();}
+    void CatalogUserMouse(object sender,MouseButtonEventArgs args)
+    {
+        for(var node=args.OriginalSource as DependencyObject;node is Visual&&node!=navigationScroll;node=VisualTreeHelper.GetParent(node))
+            if(node is ScrollBar){CatalogUserScroll();break;}
+    }
+    void QueueCatalogPositionCapture()
+    {
+        if(navigationCaptureTimer==null)
+        {
+            navigationCaptureTimer=new DispatcherTimer(DispatcherPriority.Background){Interval=TimeSpan.FromMilliseconds(150)};
+            navigationCaptureTimer.Tick+=(_,_)=>{navigationCaptureTimer.Stop();RememberCatalogPosition();};
+        }
+        navigationCaptureTimer.Stop();navigationCaptureTimer.Start();
+    }
+
 
     void ResetCatalogNavigationPosition()=>navigationResetRequested=true;
     void CancelCatalogPositionRestoreForUserJump()
@@ -26,7 +57,7 @@ public partial class MainWindow
         // An explicit jump takes precedence over a previous render's restore.
         // Discard its stored position as well, so an intervening extent event
         // cannot schedule the same obsolete anchor again.
-        navigationRestore?.Abort();navigationRestore=null;navigationPendingPosition=null;
+        navigationRestore?.Abort();navigationRestore=null;navigationPendingPosition=null;navigationExpectedOffset=null;navigationCaptureTimer?.Stop();
         catalogPositions.Remove(navigationRoute);
     }
 
@@ -35,6 +66,7 @@ public partial class MainWindow
         if(activePerson is {} person)
             return "person|"+PeopleSearchIdentity(person)+"|origin:"+personOrigin?.Id;
         if(current is {} item)return "detail|"+item.Section+"|"+item.Id;
+        if(section=="Актуальное")return "featured|"+featuredCollectionId;
         if(section=="Сохранённое")return "saved|"+savedCategory+"|"+savedPage;
         if(section is "Фильмы" or "Сериалы")
             return "catalog|"+section+"|"+CurrentCatalogKey+"|page:"+livePage+"|category:"+searchCategory+
@@ -46,9 +78,11 @@ public partial class MainWindow
 
     void BeginCatalogNavigationRender()
     {
+        navigationCaptureTimer?.Stop();
         RememberCatalogPosition();
+        navigationExpectedOffset=null;
         navigationRestore?.Abort();navigationRestore=null;
-        if(navigationScroll!=null){navigationScroll.ScrollChanged-=CatalogNavigationScrolled;navigationScroll.Loaded-=CatalogNavigationLoaded;}
+        if(navigationScroll!=null){navigationScroll.ScrollChanged-=CatalogNavigationScrolled;navigationScroll.Loaded-=CatalogNavigationLoaded;navigationScroll.RemoveHandler(Mouse.PreviewMouseWheelEvent,new MouseWheelEventHandler(CatalogUserWheel));navigationScroll.PreviewTouchDown-=CatalogUserTouch;navigationScroll.PreviewKeyDown-=CatalogUserKey;navigationScroll.PreviewMouseDown-=CatalogUserMouse;}
         navigationScroll=null;navigationPendingPosition=null;
     }
 
@@ -68,6 +102,8 @@ public partial class MainWindow
         if(navigationScroll==null)return;
         navigationScroll.ScrollChanged+=CatalogNavigationScrolled;
         navigationScroll.Loaded+=CatalogNavigationLoaded;
+        navigationScroll.AddHandler(Mouse.PreviewMouseWheelEvent,new MouseWheelEventHandler(CatalogUserWheel),true);navigationScroll.PreviewTouchDown+=CatalogUserTouch;navigationScroll.PreviewKeyDown+=CatalogUserKey;navigationScroll.PreviewMouseDown+=CatalogUserMouse;
+        navigationRestoreAttempts=0;
         if(catalogPositions.TryGetValue(next,out var saved))navigationPendingPosition=saved;
         ScheduleCatalogPositionRestore();
     }
@@ -90,21 +126,26 @@ public partial class MainWindow
     CatalogScrollPosition? CaptureCatalogReflow()=>navigationPendingPosition??CaptureCatalogPosition();
     void RestoreCatalogReflow(CatalogScrollPosition? saved)
     {
-        if(saved==null||navigationScroll==null)return;
-        navigationPendingPosition=saved;ScheduleCatalogPositionRestore();
+        if(saved==null||navigationScroll==null||WheelScroll.IsMoving(navigationScroll)||DateTime.UtcNow<navigationUserScrollUntil)return;
+        navigationRestoreAttempts=0;navigationPendingPosition=saved;ScheduleCatalogPositionRestore();
     }
     void CatalogNavigationLoaded(object sender,RoutedEventArgs args)=>ScheduleCatalogPositionRestore();
 
     void CatalogNavigationScrolled(object sender,ScrollChangedEventArgs args)
     {
         if(navigationApplying||!ReferenceEquals(sender,navigationScroll)||!ReferenceEquals(args.OriginalSource,navigationScroll))return;
-        if(navigationPendingPosition!=null){ScheduleCatalogPositionRestore();return;}
+        if(WheelScroll.IsMoving(navigationScroll!)||DateTime.UtcNow<navigationUserScrollUntil){QueueCatalogPositionCapture();return;}
+        if(navigationPendingPosition!=null)
+        {
+            if(args.VerticalChange!=0&&args.ExtentHeightChange==0&&args.ViewportHeightChange==0&&navigationExpectedOffset is {} expected&&Math.Abs(navigationScroll!.VerticalOffset-expected)>1.1){CatalogUserScroll();return;}
+            ScheduleCatalogPositionRestore();return;
+        }
         // Regional/quality results can insert a shelf above the current row.
         // Use the snapshot from before layout changed instead of its new Y.
         if(args.ExtentHeightChange!=0&&args.VerticalChange==0&&
             catalogPositions.TryGetValue(navigationRoute,out var previous)&&previous.Offset>0&&previous.ItemId!=null)
-        {navigationPendingPosition=previous;ScheduleCatalogPositionRestore();return;}
-        RememberCatalogPosition();
+        {navigationRestoreAttempts=0;navigationPendingPosition=previous;ScheduleCatalogPositionRestore();return;}
+        QueueCatalogPositionCapture();
     }
 
     void RememberCatalogPosition()
@@ -149,7 +190,7 @@ public partial class MainWindow
             if(navigationPendingPosition is not {} saved){RememberCatalogPosition();return;}
             if(!TryCatalogRestoreTarget(scroll,route,saved,out var target))return;
             navigationApplying=true;
-            try{scroll.ScrollToVerticalOffset(target);}
+            try{navigationExpectedOffset=target;scroll.ScrollToVerticalOffset(target);}
             finally{navigationApplying=false;}
             // WPF applies the scroll command on a following layout. Keep the
             // title anchor until that command and the new extent have settled;
@@ -159,8 +200,8 @@ public partial class MainWindow
                 navigationRestore=null;
                 if(closed||!ReferenceEquals(navigationScroll,scroll)||navigationRoute!=route||!ReferenceEquals(navigationPendingPosition,saved))return;
                 if(!TryCatalogRestoreTarget(scroll,route,saved,out var settledTarget))return;
-                if(Math.Abs(scroll.VerticalOffset-settledTarget)>.5){ScheduleCatalogPositionRestore();return;}
-                navigationPendingPosition=null;RememberCatalogPosition();
+                if(Math.Abs(scroll.VerticalOffset-settledTarget)>1.1&&++navigationRestoreAttempts<6){ScheduleCatalogPositionRestore();return;}
+                navigationPendingPosition=null;navigationExpectedOffset=null;RememberCatalogPosition();
             }));
         }));
     }

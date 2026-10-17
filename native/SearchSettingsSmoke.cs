@@ -65,6 +65,11 @@ public partial class MainWindow
             section="Фильмы";lastCatalogSection="Фильмы";current=null;Render();Width=510;await Settle();
             var windowCount=Application.Current.Windows.Count;
             Search.Text="Интерстелла";Search.Text="Интерстеллар";
+            // A double click inside the field selects the whole query, not only the word under the pointer.
+            Search.Text="Тёмный рыцарь";Search.Select(2,0);
+            Check(SearchDoubleClick(2),"A double click is taken over by the search field.");
+            Check(Search.SelectedText=="Тёмный рыцарь","A double click in the search field selects the whole query.");
+            Search.Text="Интерстеллар";
             SettingsButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));submittedQuery=Search.Text.Trim();searchCategory="";liveKey=CurrentCatalogKey;Render();await Task.Delay(450);await Settle();
             Check(section=="Настройки"&&SearchBar.Visibility==Visibility.Collapsed,"Settings did not open as a page.");
             Check(Application.Current.Windows.Count==windowCount,"Settings opened another window.");
@@ -79,6 +84,16 @@ public partial class MainWindow
             var actualFolder=Path.Combine(folder,"Ka4alka");
             Check(Directory.Exists(actualFolder)&&FindVisual<TextBlock>(Body,t=>t.Name=="SettingsFolder")?.Text==actualFolder&&Preferences.Load().Folder==actualFolder,"Settings did not create and show saved Ka4alka download folder.");
             Width=Math.Min(1220,MaxWidth-24);Height=Math.Min(900,MaxHeight-24);await Settle();Shot("settings-light");
+            // On a wide window the cards have a list of sections on the left, and the entry of the card on screen is marked.
+            var minimumWidth=MinWidth;MaxWidth=Math.Max(MaxWidth,1800);MinWidth=1500;Width=1500;Height=Math.Min(900,MaxHeight-24);await Settle();
+            var sectionList=FindVisual<StackPanel>(Body,panel=>panel.Name=="SettingsSections")??throw new Exception("Settings section list missing.");
+            var entries=sectionList.Children.OfType<Button>().ToArray();
+            var settingsPage=FindVisual<ScrollViewer>(Body,_=>true)??throw new Exception("Settings scroll viewer missing.");
+            Check(sectionList.Visibility==Visibility.Visible&&entries.Length>=8,$"A wide settings page shows the list of sections on the left (entries {entries.Length}, window {ActualWidth:0}).");Shot("settings-wide");
+            settingsPage.ScrollToHome();await Settle();Check(entries[0].FontWeight==FontWeights.SemiBold,"The first entry is marked at the top of the page.");
+            settingsPage.ScrollToEnd();await Settle();Check(entries[^1].FontWeight==FontWeights.SemiBold&&entries[0].FontWeight!=FontWeights.SemiBold,"The entry of the last card is marked at the end of the page.");
+            settingsPage.ScrollToHome();await Settle();
+            MinWidth=minimumWidth;Width=Math.Min(1220,MaxWidth-24);Height=Math.Min(900,MaxHeight-24);await Settle();
             var dark=FindVisual<Button>(Body,b=>AutomationProperties.GetName(b)=="Тёмная тема")??throw new Exception("Dark theme action missing.");
             dark.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await Settle();Shot("settings-dark");
             Width=510;Height=820;await Settle();Shot("settings-small");

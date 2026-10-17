@@ -20,21 +20,45 @@ jobs:
           node-version: '24'
           cache: npm
           cache-dependency-path: web-index/package-lock.json
-      - name: Install locked dependencies
+      - name: Verify source integrity regression
         working-directory: web-index
-        run: npm run install:ci
-      - name: Verify title lookup and release search
-        working-directory: web-index
-        run: |
-          node tests/title-lookup.mjs
-          node tests/release-performance.mjs
-          node tests/title-identity.mjs
-          node node_modules/typescript/bin/tsc --noEmit --incremental false
-      - name: Build for Sites
-        working-directory: web-index
-        run: npm run build
+        run: node tests/source-integrity.mjs
       - name: Package the exact committed source
         run: node scripts/prepare-sites-source.mjs "$RUNNER_TEMP/sites-source"
+      - name: Verify the actual publication archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate="$RUNNER_TEMP/sites-candidate"
+          export SITES_CANDIDATE="$candidate"
+          python3 - <<'PY'
+          import json, os, zipfile, hashlib
+          from pathlib import Path
+          folder = Path(os.environ['RUNNER_TEMP']) / 'sites-source'
+          manifest = json.loads((folder / 'source-manifest.json').read_text())
+          archive = folder / manifest['archive']
+          assert hashlib.sha256(archive.read_bytes()).hexdigest() == manifest['archiveSha256']
+          with zipfile.ZipFile(archive) as source:
+              source.extractall(os.environ['SITES_CANDIDATE'])
+          PY
+          cd "$candidate"
+          node scripts/verify-source.mjs "$RUNNER_TEMP/sites-source/source-manifest.json"
+          npm run install:ci
+          node tests/title-lookup.mjs
+          node tests/localized-media.mjs
+          node tests/tmdb-backdrop.mjs
+          node tests/release-performance.mjs
+          node tests/title-identity.mjs
+          node tests/source-integrity.mjs
+          node tests/site-language.mjs
+          node tests/app-screenshots.mjs
+          node node_modules/typescript/bin/tsc --noEmit --incremental false
+      - name: Build the identical verified source in the repository checkout
+        working-directory: web-index
+        run: |
+          node scripts/verify-source.mjs "$RUNNER_TEMP/sites-source/source-manifest.json"
+          npm run install:ci
+          npm run build
       - uses: actions/upload-artifact@v4
         with:
           name: sites-source-${{ github.sha }}

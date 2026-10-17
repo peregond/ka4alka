@@ -9,6 +9,7 @@ public static class InstallerScreen {
  [StructLayout(LayoutKind.Sequential)] public struct Rect {public int Left,Top,Right,Bottom;}
  [DllImport("user32.dll")] public static extern IntPtr GetDlgItem(IntPtr dialog,int id);
  [DllImport("user32.dll")] public static extern bool IsWindowEnabled(IntPtr window);
+ [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr window);
  [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr window);
  [DllImport("user32.dll",EntryPoint="GetWindowLongW")] public static extern int GetWindowStyle(IntPtr window,int index);
  [DllImport("user32.dll",CharSet=CharSet.Unicode)] public static extern int GetWindowText(IntPtr window,StringBuilder text,int length);
@@ -90,7 +91,16 @@ try {
  try{$bitmap.Save((Join-Path $Output 'installer-finish.png'),[System.Drawing.Imaging.ImageFormat]::Png)}finally{$bitmap.Dispose()}
  $finishHandle=[InstallerScreen]::GetDlgItem($process.MainWindowHandle,1)
  if($finishHandle -eq [IntPtr]::Zero -or -not[InstallerScreen]::IsWindowEnabled($finishHandle)){throw 'Installer Finish button is unavailable'}
- [InstallerScreen]::SendMessage($finishHandle,0x00F5,[IntPtr]::Zero,[IntPtr]::Zero) | Out-Null
- if(-not $process.WaitForExit(15000)-or $process.ExitCode -ne 0){throw 'Interactive installer did not finish cleanly'}
+ # BM_CLICK can fail on an inactive dialog (documented Win32 behavior).
+ # Activate the real installer and use its accessible Invoke action when available.
+ [InstallerScreen]::SetForegroundWindow($process.MainWindowHandle) | Out-Null
+ $invoke=$null
+ if($finish.TryGetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern,[ref]$invoke)){
+  ([System.Windows.Automation.InvokePattern]$invoke).Invoke()
+ } else {
+  [InstallerScreen]::SendMessage($finishHandle,0x00F5,[IntPtr]::Zero,[IntPtr]::Zero) | Out-Null
+ }
+ if(-not $process.WaitForExit(15000)){throw 'Interactive installer did not exit after Finish'}
+ if($process.ExitCode -ne 0){throw ('Interactive installer exited with code '+$process.ExitCode)}
  'PASS: interactive EXE finish page has readable folder/firewall/startup guidance and an optional launch checkbox'
 } finally {if(-not $process.HasExited){$process.Kill($true)};$process.Dispose()}

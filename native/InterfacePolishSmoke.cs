@@ -34,6 +34,18 @@ public partial class MainWindow
         {
             MaxWidth=1800;MaxHeight=1000;MinWidth=width;MinHeight=height;Width=width;Height=height;await Settle();
         }
+        async Task WaitForPosterRealization()
+        {
+            var deadline=DateTime.UtcNow.AddSeconds(3);
+            while(DateTime.UtcNow<deadline)
+            {
+                UpdateLayout();
+                var posters=VisualElements<Border>(Body).Count(element=>element.Name=="CardPoster"&&element.IsVisible);
+                var titles=VisualElements<TextBlock>(Body).Count(element=>element.Name=="CardTitleText"&&element.IsVisible);
+                if(posters>0&&posters==titles)return;
+                await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ContextIdle);await Task.Delay(40);
+            }
+        }
         void CheckCards(string stage)
         {
             var posters=VisualElements<Border>(Body).Where(element=>element.Name=="CardPoster"&&element.IsVisible).ToArray();
@@ -51,7 +63,7 @@ public partial class MainWindow
                 prefs.Light=light;ApplyTheme();Render();await Settle();SearchSubmitButton.Focus();await Settle();
                 Check(InterfacePalette.For(light).All(pair=>pair.Value.IsFrozen&&ReferenceEquals(FindResource(pair.Key),pair.Value)),"Theme reuses its frozen palette: "+(light?"light":"dark"));
                 Check(SearchShortcutHint.IsVisible&&SearchPlaceholder.Margin.Right>=70,"Wide idle search shows its keyboard hint with reserved text space: "+(light?"light":"dark"));
-                CheckCards(light?"light":"dark");Shot("interface-"+(light?"light":"dark"));
+                await WaitForPosterRealization();CheckCards(light?"light":"dark");Shot("interface-"+(light?"light":"dark"));
             }
             // A RenderTargetBitmap can capture a viewport larger than the actual
             // GitHub runner desktop. Native input cannot reach that viewport:
@@ -123,6 +135,8 @@ public partial class MainWindow
             await ClickWithMouse(reset);await Settle();
             Check(CatalogSelection.IsDefault&&prefs.CatalogQualityHeight==0&&Search.Text=="Интерстеллар"&&submittedQuery==Search.Text&&prefs.HidePoorQuality==originalHide,"Native filter reset clears selected filters while preserving query and poor-quality preference.");
             Check(!VisualElements<Button>(FilterControls).Any(button=>button.Name.StartsWith("ActiveFilter_",StringComparison.Ordinal)),"Removing all selected filters also removes their chip row.");
+            Check(!VisualElements<Button>(FilterControls).Any(button=>button.Name=="ResetActiveCatalogFilters"),"Reset all is hidden while no filter is applied.");
+            Check(RefreshCatalogButton.IsVisible&&RefreshCatalogButton.TransformToAncestor(HeaderActions).Transform(new Point()).X<ThemeButton.TransformToAncestor(HeaderActions).Transform(new Point()).X,"The catalog refresh button sits to the left of the theme switch.");
             Search.Clear();searchDelay.Stop();submittedQuery="";searchCategory="";CancelPeopleSearch();liveKey=CurrentCatalogKey;Render();await Settle();
             await Size(510,720);Render();await Settle();CheckCards("narrow");Shot("interface-narrow-dark");
             prefs.Light=true;ApplyTheme();Render();await Settle();Shot("interface-narrow-light");
@@ -141,9 +155,9 @@ public partial class MainWindow
             catalogGenre="drama";catalogCountry="russia";catalogYear=2026;catalogRating=8;catalogRegion="native";catalogOrder="По рейтингу";prefs.CatalogQualityHeight=2160;
             liveKey=CurrentCatalogKey;Render();await Settle();
             var chipsScroll=activeCatalogFilterScroll??throw new Exception("Compact selected-filter scroller is missing.");
-            var compactReset=FindVisual<Button>(chipsScroll,button=>button.Name=="ResetActiveCatalogFilters")??throw new Exception("Compact filter reset is missing.");
-            var resetBounds=compactReset.TransformToAncestor(chipsScroll).TransformBounds(new Rect(new Point(),compactReset.RenderSize));
-            Check(compactReset.IsVisible&&resetBounds.Top>=-1&&resetBounds.Bottom<=chipsScroll.ActualHeight+1,"Reset is visible at the start of the compact selected-filter viewport.");
+            var compactReset=FindVisual<Button>(FilterControls,button=>button.Name=="ResetActiveCatalogFilters")??throw new Exception("Compact filter reset is missing.");
+            var resetBounds=compactReset.TransformToAncestor(FilterControls).TransformBounds(new Rect(new Point(),compactReset.RenderSize));
+            Check(compactReset.IsVisible&&resetBounds.Top>=-1&&resetBounds.Bottom<=FilterControls.ActualHeight+1,"Reset is visible in the compact filter toolbar beside refresh.");
             Check(chipsScroll.MaxHeight==68&&chipsScroll.ActualHeight<=69&&Body.ActualHeight>40,$"Many selected filters preserve catalog space at 360×360 DIP (max {chipsScroll.MaxHeight}, chips {chipsScroll.ActualHeight}, body {Body.ActualHeight}, header {HeaderArea.ActualHeight}, page header {PageHeader.ActualHeight}, window {ActualWidth}x{ActualHeight}).");
             Check(chipsScroll.ScrollableHeight>0,"Many selected filters expose a real compact scrolling range.");
             var compactChips=VisualElements<Button>(chipsScroll).Where(button=>button.Name.StartsWith("ActiveFilter_",StringComparison.Ordinal)).ToArray();

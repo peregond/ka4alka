@@ -17,7 +17,10 @@ public partial class MainWindow
         public int Index;
         public required Border Frame;
         public required Image Poster;
-        public required TextBlock Eyebrow,Title,People;
+        public required TextBlock Eyebrow,Title,People,Summary;
+        public Func<MediaItem,int,string>? EyebrowText;
+        public required Grid SummarySlot;
+        public CancellationTokenSource? SummaryRequest;
         public required WrapPanel Meta;
         public required StackPanel Dots;
         public required Button About,Favorite,Previous,Next;
@@ -28,7 +31,8 @@ public partial class MainWindow
     FeatureCarouselView? carousel;
     bool scrollToReleasesAfterOpen;
 
-    FrameworkElement BuildFeatureCarousel(MediaItem[] slides)
+    // eyebrowText: the line above the title, given the slide and its position; without it the usual "in the spotlight" wording is used.
+    FrameworkElement BuildFeatureCarousel(MediaItem[] slides,Func<MediaItem,int,string>? eyebrowText=null)
     {
         slides=slides.Take(5).ToArray();
         var frame=new Border{Name="FeatureFrame",CornerRadius=new(22),MinHeight=232};
@@ -64,13 +68,15 @@ public partial class MainWindow
         var eyebrow=new TextBlock{FontSize=13,FontWeight=FontWeights.SemiBold,Foreground=(Brush)FindResource("BannerText"),VerticalAlignment=VerticalAlignment.Center};eyebrowRow.Children.Add(eyebrow);content.Children.Add(eyebrowRow);
         var title=new TextBlock{Name="FeatureTitle",FontSize=44,FontWeight=FontWeights.ExtraBold,LineHeight=46,LineStackingStrategy=LineStackingStrategy.BlockLineHeight,Foreground=(Brush)FindResource("BannerText"),TextWrapping=TextWrapping.Wrap,TextTrimming=TextTrimming.CharacterEllipsis,MaxHeight=108,Margin=new(0,0,0,14)};content.Children.Add(title);
         var meta=new WrapPanel{Margin=new(0,0,0,10)};content.Children.Add(meta);
+        var summarySlot=new Grid{Name="FeatureSummarySlot",Height=60,Margin=new(0,0,0,14),Visibility=Visibility.Collapsed};content.Children.Add(summarySlot);
+        var summary=new TextBlock{Name="FeatureSummary",FontSize=15,LineHeight=20,LineStackingStrategy=LineStackingStrategy.BlockLineHeight,TextWrapping=TextWrapping.Wrap,TextTrimming=TextTrimming.CharacterEllipsis,Foreground=(Brush)FindResource("BannerText"),Opacity=.9};summarySlot.Children.Add(summary);
         var people=new TextBlock{FontSize=14,Foreground=(Brush)FindResource("BannerMuted"),TextTrimming=TextTrimming.CharacterEllipsis,Margin=new(0,0,0,18)};content.Children.Add(people);
-        var actions=new StackPanel{Orientation=Orientation.Horizontal,Margin=new(0,4,0,0)};content.Children.Add(actions);
+        var actions=new WrapPanel{Orientation=Orientation.Horizontal,Margin=new(0,4,0,0)};content.Children.Add(actions);
         Button Action(string text,string icon,bool primary)
         {
             var button=new Button{Style=(Style)FindResource(primary?"PrimaryButton":typeof(Button)),Height=52,MinHeight=52,Margin=new(0,0,10,0),Padding=new(22,0,22,0),FontSize=15};
             if(!primary){button.SetResourceReference(Control.BackgroundProperty,"BannerAction");button.SetResourceReference(Control.BorderBrushProperty,"BannerEdge");button.Foreground=(Brush)FindResource("BannerText");}
-            button.Content=IconLabel(text,icon,18);AutomationProperties.SetName(button,text);return button;
+            button.Content=IconLabel(text,icon,18);AutomationProperties.SetName(button,AppLanguage.T(text));return button;
         }
         var aboutAction=Action("Подробнее","IconInfo",false);
         var favorite=new Button{Style=(Style)FindResource("IconButton"),Width=52,Height=52,Margin=new(0)};favorite.SetResourceReference(Control.BackgroundProperty,"BannerAction");favorite.SetResourceReference(Control.BorderBrushProperty,"BannerEdge");favorite.Foreground=(Brush)FindResource("BannerText");
@@ -81,15 +87,15 @@ public partial class MainWindow
         Button Arrow(string icon,string name)
         {
             var button=new Button{Style=(Style)FindResource("RoundIconButton"),Width=40,Height=40,Margin=new(6,0,0,0)};button.Foreground=(Brush)FindResource("BannerText");
-            button.Content=IconLabel("",icon,16);AutomationProperties.SetName(button,name);button.ToolTip=name;return button;
+            button.Content=IconLabel("",icon,16);AutomationProperties.SetName(button,AppLanguage.T(name));button.ToolTip=name;return button;
         }
         var games=section=="Игры";
         var previous=Arrow("IconChevronLeft",games?"Предыдущая игра":"Предыдущий фильм");var next=Arrow("IconChevron",games?"Следующая игра":"Следующий фильм");controls.Children.Add(previous);controls.Children.Add(next);
         if(slides.Length<2){dots.Visibility=Visibility.Collapsed;previous.Visibility=Visibility.Collapsed;next.Visibility=Visibility.Collapsed;}
 
-        var view=new FeatureCarouselView{Slides=slides,Frame=frame,Poster=image,Eyebrow=eyebrow,Title=title,People=people,Meta=meta,Dots=dots,About=aboutAction,Favorite=favorite,Previous=previous,Next=next,LiteCover=liteCover,PosterHost=posterHost};
+        var view=new FeatureCarouselView{Slides=slides,Frame=frame,Poster=image,Eyebrow=eyebrow,Title=title,People=people,Summary=summary,SummarySlot=summarySlot,Meta=meta,Dots=dots,About=aboutAction,Favorite=favorite,Previous=previous,Next=next,LiteCover=liteCover,PosterHost=posterHost};
         frame.ContextMenu=new ContextMenu();frame.ContextMenuOpening+=(_,_)=>{if(view.Bound!=null)frame.ContextMenu=CatalogPersonalMenu(view.Bound);};
-        carousel=view;
+        view.EyebrowText=eyebrowText;carousel=view;
         previous.Click+=(_,_)=>ShowFeatureSlide(view,(view.Index+view.Slides.Length-1)%view.Slides.Length);
         next.Click+=(_,_)=>ShowFeatureSlide(view,(view.Index+1)%view.Slides.Length);
         aboutAction.Click+=OpenCard;
@@ -98,12 +104,13 @@ public partial class MainWindow
             if(view.Bound==null)return;ToggleSaved(view.Bound);UpdateFeatureFavorite(view);UpdateSavedCount();
         };
         frame.Unloaded+=(_,_)=>DetachFeatureWatch(view);
-        frame.Loaded+=(_,_)=>{if(view.Watch==null&&view.Bound!=null)ShowFeatureSlide(view,view.Index);};
+        frame.Loaded+=(_,_)=>{if(view.Bound is {} bound){if(view.Watch==null)ShowFeatureSlide(view,view.Index);else StartFeatureSummary(view,bound);}};
         ShowFeatureSlide(view,0);
         return frame;
     }
     void DetachFeatureWatch(FeatureCarouselView view)
     {
+        var request=view.SummaryRequest;view.SummaryRequest=null;request?.Cancel();
         if(view.Bound!=null&&view.Watch!=null)view.Bound.PropertyChanged-=view.Watch;view.Watch=null;
     }
     void ShowFeatureSlide(FeatureCarouselView view,int index)
@@ -113,22 +120,24 @@ public partial class MainWindow
         var item=view.Slides[index];
         DetachFeatureWatch(view);view.Bound=item;
         view.Poster.DataContext=item;if(view.LiteCover.Tag is Image lite)lite.DataContext=item;
-        view.Eyebrow.Text=index==0?"В центре внимания":item.Section=="Игры"?"Стоит поиграть":"Стоит посмотреть";
-        view.Title.Text=item.Title;view.Title.ToolTip=item.Title;
+        view.Eyebrow.Text=view.EyebrowText?.Invoke(item,index)??AppLanguage.T(index==0?"В центре внимания":item.Section=="Игры"?"Стоит поиграть":"Стоит посмотреть");
+        view.Title.Text=item.DisplayTitle;view.Title.ToolTip=item.DisplayTitle;
         view.About.Tag=item;view.Frame.Tag=item;
-        AutomationProperties.SetName(view.About,"Подробнее: "+item.Title);
+        AutomationProperties.SetName(view.About,AppLanguage.T("Подробнее: "+item.DisplayTitle));
         RebuildFeatureMeta(view,item);UpdateFeaturePeople(view,item);UpdateFeatureFavorite(view);UpdateFeatureDots(view);
-        view.Watch=(_,e)=>{if(e.PropertyName is null or nameof(MediaItem.PosterQuality)or nameof(MediaItem.CardRating)or nameof(MediaItem.CardGenre)){RebuildFeatureMeta(view,item);}};
+        view.Watch=(_,e)=>{if(e.PropertyName is null or nameof(MediaItem.DisplayTitle) or nameof(MediaItem.DisplayDescription) or nameof(MediaItem.DisplayPeople)){view.Title.Text=item.DisplayTitle;view.Title.ToolTip=item.DisplayTitle;UpdateFeaturePeople(view,item);UpdateFeatureSummary(view,item);}
+            if(e.PropertyName is null or nameof(MediaItem.PosterQuality)or nameof(MediaItem.CardRating)or nameof(MediaItem.CardGenre)){RebuildFeatureMeta(view,item);}};
         item.PropertyChanged+=view.Watch;
+        StartFeatureSummary(view,item);
     }
     void RebuildFeatureMeta(FeatureCarouselView view,MediaItem item)
     {
         view.Meta.Children.Clear();
         TextBlock Label(string text,bool bold=false)
         {
-            var label=new TextBlock{Text=text,FontSize=14,FontWeight=bold?FontWeights.Bold:FontWeights.Normal,Foreground=(Brush)FindResource("BannerMuted"),VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,12,4)};return label;
+            var label=new TextBlock{Text=AppLanguage.T(text),FontSize=14,FontWeight=bold?FontWeights.Bold:FontWeights.Normal,Foreground=(Brush)FindResource("BannerMuted"),VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,12,4)};return label;
         }
-        Border Badge(string text)=>new(){BorderBrush=(Brush)FindResource("BannerBadgeEdge"),BorderThickness=new(1),CornerRadius=new(6),Padding=new(6,2,6,2),Margin=new(0,0,8,4),VerticalAlignment=VerticalAlignment.Center,Child=new TextBlock{Text=text,FontSize=11,FontWeight=FontWeights.Bold,Foreground=(Brush)FindResource("BannerText")}};
+        Border Badge(string text)=>new(){BorderBrush=(Brush)FindResource("BannerBadgeEdge"),BorderThickness=new(1),CornerRadius=new(6),Padding=new(6,2,6,2),Margin=new(0,0,8,4),VerticalAlignment=VerticalAlignment.Center,Child=new TextBlock{Text=AppLanguage.T(text),FontSize=11,FontWeight=FontWeights.Bold,Foreground=(Brush)FindResource("BannerText")}};
         if(item.Section=="Игры")
         {
             // The list row already knows the year, genre, price and reviews; the store details add the score, the studio and the exact price.
@@ -137,7 +146,7 @@ public partial class MainWindow
             if(game?.Review is {} reviewed){percent=reviewed.Percent;count=reviewed.Count;tone=reviewed.Tone;verdict=reviewed.Label;}
             else if(store is {HasReview:true}){percent=store.ReviewPercent;count=store.ReviewCount;tone=store.ReviewTone;verdict=store.ReviewLabel;}
             if(percent>0&&tone.Length>0)view.Meta.Children.Add(GameReviewChip(percent,tone,verdict,count));
-            if(game is {Metacritic:>0})view.Meta.Children.Add(new TextBlock{Text="Metacritic "+game.Metacritic,FontSize=14,FontWeight=FontWeights.Bold,Foreground=(Brush)FindResource("BannerText"),VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,12,4),ToolTip="Оценка критиков на Metacritic"});
+            if(game is {Metacritic:>0})view.Meta.Children.Add(new TextBlock{Text="Metacritic "+game.Metacritic,FontSize=14,FontWeight=FontWeights.Bold,Foreground=(Brush)FindResource("BannerText"),VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,12,4),ToolTip=AppLanguage.T("Оценка критиков на Metacritic")});
             view.Meta.Children.Add(Label("Игра"));
             if(store is {Soon:true,Released.Length:>0})view.Meta.Children.Add(Label("Выйдет "+store.SoonLabel));
             else if(info.Year>0)view.Meta.Children.Add(Label(info.Year.ToString()));
@@ -160,7 +169,7 @@ public partial class MainWindow
         if(qualities.Count==0&&item.PosterQuality.Length>0)qualities.Add(item.PosterQuality);
         foreach(var quality in qualities)
         {
-            var badge=new Border{BorderBrush=(Brush)FindResource("BannerBadgeEdge"),BorderThickness=new(1),CornerRadius=new(6),Padding=new(6,2,6,2),Margin=new(0,0,8,4),VerticalAlignment=VerticalAlignment.Center,Child=new TextBlock{Text=quality,FontSize=11,FontWeight=FontWeights.Bold,Foreground=(Brush)FindResource("BannerText")}};
+            var badge=new Border{BorderBrush=(Brush)FindResource("BannerBadgeEdge"),BorderThickness=new(1),CornerRadius=new(6),Padding=new(6,2,6,2),Margin=new(0,0,8,4),VerticalAlignment=VerticalAlignment.Center,Child=new TextBlock{Text=AppLanguage.T(quality),FontSize=11,FontWeight=FontWeights.Bold,Foreground=(Brush)FindResource("BannerText")}};
             view.Meta.Children.Add(badge);
         }
     }
@@ -170,11 +179,11 @@ public partial class MainWindow
         {
             // A game's studio comes with its details, which the games home loads for the banner slides.
             var studio=gameDetails.TryGetValue(item.Id,out var game)?game.Developers:"";
-            view.People.Text=studio.Length>0?"Разработчик "+studio:"";view.People.Visibility=studio.Length>0&&!featureCompactText?Visibility.Visible:Visibility.Collapsed;return;
+            view.People.Text=AppLanguage.T(studio.Length>0?"Разработчик "+studio:"");view.People.Visibility=studio.Length>0&&!featureCompactText?Visibility.Visible:Visibility.Collapsed;return;
         }
         // Only credits that the item already carries; no extra requests are made for the banner.
-        var director=item.People.Where(x=>x.Role=="Режиссёры").Select(x=>x.Name).Take(1).ToArray();
-        var cast=item.People.Where(x=>x.Role=="Актёры").Select(x=>x.Name).Take(2).ToArray();
+        var director=item.DisplayPeople.Where(x=>x.Role=="Режиссёры").Select(x=>x.Name).Take(1).ToArray();
+        var cast=item.DisplayPeople.Where(x=>x.Role=="Актёры").Select(x=>x.Name).Take(2).ToArray();
         var parts=new List<string>();
         if(director.Length>0)parts.Add("Режиссёр "+director[0]);
         if(cast.Length>0)parts.Add("В ролях "+string.Join(", ",cast));
@@ -184,7 +193,7 @@ public partial class MainWindow
     {
         var saved=view.Bound!=null&&IsSaved(view.Bound);
         view.Favorite.Content=IconLabel("",saved?"IconHeartFilled":"IconHeart",20);
-        var name=saved?"Сохранено":"Сохранить";view.Favorite.ToolTip=name;AutomationProperties.SetName(view.Favorite,name);
+        var name=saved?"Сохранено":"Сохранить";view.Favorite.ToolTip=name;AutomationProperties.SetName(view.Favorite,AppLanguage.T(name));
     }
     void UpdateFeatureDots(FeatureCarouselView view)
     {

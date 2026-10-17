@@ -10,7 +10,7 @@ on:
       version:
         description: Published release matching the reviewed screenshots
         required: true
-        default: '0.42.0'
+        default: '0.43.4'
 permissions:
   contents: write
 concurrency:
@@ -34,7 +34,9 @@ jobs:
           if not re.fullmatch(r'\d+\.\d+\.\d+', version):
               raise SystemExit('Invalid release version')
           tag = 'v' + version
-          folder = Path('distribution/assets') / '.'.join(version.split('.')[:2])
+          folder = Path('distribution/assets') / version
+          if not folder.exists():
+              folder = Path('distribution/assets') / '.'.join(version.split('.')[:2])
           info = json.loads((folder / ('capture-' + version + '.json')).read_text())
           if info['Version'] != version:
               raise SystemExit('Screenshot version mismatch')
@@ -46,13 +48,12 @@ jobs:
           if digest and digest != 'sha256:' + info['ReleaseArchiveSha256']:
               raise SystemExit('Screenshots do not match the published archive')
           notes = Path('distribution/RELEASE-NOTES-' + version + '.md')
-          files = {
-              'catalog-dark': 'catalog-dark', 'catalog-light': 'catalog-light',
-              'series-dark': 'series-dark', 'detail-dark': 'detail-dark',
-              'downloads-dark': 'downloads-dark', 'settings-dark': 'settings-dark',
-              'games-dark': 'games-dark', 'games-light': 'games-light',
-              'game-detail-dark': 'game-detail-dark'
-          }
+          files = {}
+          for capture in info['Captures']:
+              source = capture['File'].removesuffix('.png')
+              if not re.fullmatch(r'(?:ru/|en/)?[a-z0-9-]+', source):
+                  raise SystemExit('Invalid screenshot path')
+              files[source.replace('/', '-')] = source
           with tempfile.TemporaryDirectory() as tmp:
               uploads = []
               for target, source in files.items():
@@ -68,7 +69,7 @@ jobs:
                       bundle.write(folder / (source + '.png'), 'screenshots/' + source + '.png')
                   bundle.write(folder / ('capture-' + version + '.json'), 'capture-info.json')
                   bundle.write('distribution/LANDING-COPY.md', 'LANDING-COPY.md')
-                  landing_readme = Path('distribution/README.md').read_text().replace('assets/' + '.'.join(version.split('.')[:2]) + '/capture-' + version + '.json', 'capture-info.json').replace('assets/' + '.'.join(version.split('.')[:2]) + '/', 'screenshots/')
+                  landing_readme = Path('distribution/README.md').read_text().replace('assets/' + folder.name + '/capture-' + version + '.json', 'capture-info.json').replace('assets/' + folder.name + '/', 'screenshots/')
                   bundle.writestr('README.md', landing_readme)
                   bundle.write('native/Assets/logo.png', 'logo.png')
               uploads.append(str(landing))

@@ -20,9 +20,10 @@ public partial class MainWindow
     readonly ConditionalWeakTable<Image,CoverRequest> coverRequests=new();
     readonly Dictionary<Window,CoverViewport> coverViewports=[];
     CoverViewport? coverViewport;
+    UiWorkQueue<Image>? posterPresentation;
     sealed class CoverRequest
     {
-        public DownloadItem? Subject;
+        public INotifyPropertyChanged? Subject;
         public EventHandler<PropertyChangedEventArgs>? Changed;
         public object? Context;
         public string? Url;
@@ -32,8 +33,12 @@ public partial class MainWindow
         public object? RatingsContext;
         public CancellationTokenSource? RatingsRequest;
         public DateTime RetryAfterUtc;
+        public Border? Shimmer;
+        public bool ShimmerLooked;
         public DateTime NextCacheTouchUtc;
         public Exception? LastFailure;
+        public int PresentationVersion;
+        public bool PresentationPending;
     }
     IReadOnlyList<SourceEntry> sourceResults=[];
     string sourceQuery="",sourceCategory="Фильмы";
@@ -60,9 +65,9 @@ public partial class MainWindow
     async Task FindSources()
     {
         sourceRequest?.Cancel();sourceRequest?.Dispose();sourceRequest=new();var token=sourceRequest.Token;searching=true;Render();
-        try{var items=sourceIndex==0?await sourceClient.SearchArchive(sourceQuery,sourceCategory,sourcePage,token):await sourceClient.SearchTorznab(sourceConfigs[sourceIndex-1],sourceQuery,token);if(!token.IsCancellationRequested){sourceResults=items;Status.Text=$"Источник ответил: {items.Count} записей";}}
-        catch(OperationCanceledException){Status.Text="Поиск отменён или источник не ответил вовремя.";}
-        catch(Exception){Status.Text="Не удалось получить ответ. Проверь соединение, адрес источника и API-ключ.";}
+        try{var items=sourceIndex==0?await sourceClient.SearchArchive(sourceQuery,sourceCategory,sourcePage,token):await sourceClient.SearchTorznab(sourceConfigs[sourceIndex-1],sourceQuery,token);if(!token.IsCancellationRequested){sourceResults=items;Status.Text=AppLanguage.T($"Источник ответил: {items.Count} записей");}}
+        catch(OperationCanceledException){Status.Text=AppLanguage.T("Поиск отменён или источник не ответил вовремя.");}
+        catch(Exception){Status.Text=AppLanguage.T("Не удалось получить ответ. Проверь соединение, адрес источника и API-ключ.");}
         finally{searching=false;if(!closed&&section=="Источники")Render();}
     }
     // The recommended-release card's button: the same release, kept apart from the list rows that are tagged with a SourceEntry.
@@ -73,13 +78,13 @@ public partial class MainWindow
         var button=(Button)sender;var item=button.Tag as SourceEntry??((RecommendedDownload)button.Tag).Entry;var media=current?.Cinema==true||current?.Section=="Игры"?current:null;
         if(media?.Cinema==true)media=DownloadMetadata.EnrichMedia(media,prefs.LiveFavorites.Concat(liveItems).Concat(catalogIndex.Recent(media.Section,200)).Append(media));
         button.IsEnabled=false;
-        try{if(!EnsureDownloadFolder()){Status.Text="Папка для загрузок не выбрана. Её можно выбрать в настройках.";return;}
-            Status.Text="Проверяем раздачу…";using var timeout=CancellationTokenSource.CreateLinkedTokenSource(reliabilityCancellation.Token);timeout.CancelAfter(TimeSpan.FromSeconds(30));var source=await sourceClient.TorrentFile(item,timeout.Token);
+        try{if(!EnsureDownloadFolder()){Status.Text=AppLanguage.T("Папка для загрузок не выбрана. Её можно выбрать в настройках.");return;}
+            Status.Text=AppLanguage.T("Проверяем раздачу…");using var timeout=CancellationTokenSource.CreateLinkedTokenSource(reliabilityCancellation.Token);timeout.CancelAfter(TimeSpan.FromSeconds(30));var source=await sourceClient.TorrentFile(item,timeout.Token);
             if(closing||closed)return;
             if(media?.Cinema==true&&cardMetadata.TryGetValue(media.Id,out var metadata)&&metadata.IsCompletedSuccessfully)media=DownloadMetadata.EnrichMedia(media,[metadata.Result]);
-            var added=await downloads.Add(source,prefs.Folder,media,item.ImageUrl,item);if(closing||closed)return;section="Загрузки";current=null;Render();Status.Text=added.LowSpacePaused?added.SpacePauseMessage:item.Seeds==0?"Раздача добавлена, но источник показывает: отдают 0. Ждём участников.":"Раздача добавлена. Ищем участников.";
+            var added=await downloads.Add(source,prefs.Folder,media,item.ImageUrl,item);if(closing||closed)return;section="Загрузки";current=null;Render();Status.Text=AppLanguage.T(added.LowSpacePaused?added.SpacePauseMessage:item.Seeds==0?"Раздача добавлена, но источник показывает: отдают 0. Ждём участников.":"Раздача добавлена. Ищем участников.");
         }catch(Exception)when(closing||closed){}
-        catch(Exception error){var message=error is HttpRequestException?"Не удалось получить раздачу из источника.":error.Message;Status.Text=message;MessageBox.Show(this,message,"Не удалось начать загрузку",MessageBoxButton.OK,MessageBoxImage.Warning);}finally{if(!closing&&!closed)button.IsEnabled=true;}
+        catch(Exception error){var message=error is HttpRequestException?"Не удалось получить раздачу из источника.":error.Message;Status.Text=AppLanguage.T(message);LocalizedDialog.Show(this,message,AppLanguage.T("Не удалось начать загрузку"),MessageBoxButton.OK,MessageBoxImage.Warning);}finally{if(!closing&&!closed)button.IsEnabled=true;}
     }
     void SourcePage(object sender,RoutedEventArgs e){var item=(SourceEntry)((Button)sender).Tag;if(string.IsNullOrEmpty(item.PageUrl))return;System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(SourceClient.WebUri(item.PageUrl).AbsoluteUri){UseShellExecute=true});}
     // Posters keep their 280 px decode up to a 150 % Windows scale; higher scales decode a little wider so they stay sharp.
@@ -134,13 +139,13 @@ public partial class MainWindow
         {
             CancelCover(state);state.Context=item;state.Url=null;state.RetryAfterUtc=default;return;
         }
-        if(state.Request!=null||image.Source!=null||DateTime.UtcNow<state.RetryAfterUtc)return;
+        if(state.Request!=null||state.PresentationPending||image.Source!=null||DateTime.UtcNow<state.RetryAfterUtc)return;
         var decodeWidth=item is MediaItem or DownloadItem?PosterDecodeWidth:100;
         var memoryKey=url+"|"+decodeWidth;
         var slots=prefs.LiteMode?liteCoverSlots:coverSlots;
         if(coverCache.TryGetValue(memoryKey,out var cached))
         {
-            image.Source=cached;
+            QueuePoster(image,state,item,url,cached);
             if(item is MediaItem or DownloadItem&&DateTime.UtcNow>=state.NextCacheTouchUtc)
             {
                 state.NextCacheTouchUtc=DateTime.UtcNow.AddMinutes(10);var path=CoverPath(url);
@@ -166,7 +171,7 @@ public partial class MainWindow
             },token);
             token.ThrowIfCancellationRequested();
             coverCache.Put(memoryKey,bitmap);
-            if(!closing&&!closed&&image.IsLoaded&&ReferenceEquals(image.DataContext,item)&&CoverUrl(image.DataContext)==url&&ReferenceEquals(state.Request,request)&&CoverViewportFor(image)?.Measure(image).Near==true){image.Source=bitmap;FadeInCover(image);}
+            if(!closing&&!closed&&image.IsLoaded&&ReferenceEquals(image.DataContext,item)&&CoverUrl(image.DataContext)==url&&ReferenceEquals(state.Request,request))QueuePoster(image,state,item,url,bitmap);
 
         }
         catch(Exception error)
@@ -190,15 +195,29 @@ public partial class MainWindow
     {
         if(url.StartsWith("//",StringComparison.Ordinal))url="https:"+url;
         var proxied=ZonaPoster.ViaSite(url);
+        if(EnglishMedia.PosterUrl(url) is {} poster)proxied="api/backdrop-image?size=w500&file="+Uri.EscapeDataString("/"+new Uri(poster).Segments.Last());
         if(proxied==null)return await sourceClient.Read(SourceClient.WebUri(url),max,ct);
         using var direct=CancellationTokenSource.CreateLinkedTokenSource(ct);direct.CancelAfter(TimeSpan.FromSeconds(8));
         try{return await sourceClient.Read(SourceClient.WebUri(url),max,direct.Token);}
         catch(Exception) when(!ct.IsCancellationRequested){}
         return await onlineIndex.ReadSite(proxied,max,ct);
     }
-    static string? CoverUrl(object? item)=>item switch{SourceEntry source=>source.ImageUrl,MediaItem media=>media.ImageUrl,DownloadItem download=>download.ImageUrl,_=>null};
+    static string? CoverUrl(object? item)=>item switch{SourceEntry source=>source.ImageUrl,MediaItem media=>media.DisplayImageUrl,DownloadItem download=>download.ImageUrl,_=>null};
     static string CoverPath(string url)=>Path.Combine(Preferences.DataDir,"covers",Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(url)))+".img");
-    static void CancelCover(CoverRequest state){var request=state.Request;state.Request=null;request?.Cancel();}
+    void QueuePoster(Image image,CoverRequest state,object? item,string url,BitmapImage bitmap)
+    {
+        state.PresentationPending=true;var version=++state.PresentationVersion;
+        posterPresentation??=new(Dispatcher,prefs.LiteMode?1:2);
+        posterPresentation.Set(image,()=>
+        {
+            if(version!=state.PresentationVersion)return;
+            state.PresentationPending=false;
+            if(!closing&&!closed&&image.IsLoaded&&ReferenceEquals(image.DataContext,item)&&CoverUrl(image.DataContext)==url&&CoverViewportFor(image)?.Measure(image).Near==true)
+                image.Source=bitmap;
+            SyncPosterShimmer(image,state);
+        });
+    }
+    static void CancelCover(CoverRequest state){state.PresentationVersion++;state.PresentationPending=false;var request=state.Request;state.Request=null;request?.Cancel();}
     static void CancelFeatureCover(CoverRequest state){var request=state.FeatureRequest;state.FeatureRequest=null;if(request!=null){state.FeatureAttempted=false;request.Cancel();}}
     CoverViewport? CoverViewportFor(Image image,bool create=false)
     {
@@ -217,6 +236,7 @@ public partial class MainWindow
     }
     void StopCoverViewport()
     {
+        posterPresentation?.Dispose();posterPresentation=null;
         foreach(var pair in coverViewports.ToArray()){pair.Key.Closed-=CoverHostClosed;pair.Value.Dispose();}
         coverViewports.Clear();coverViewport=null;
     }
@@ -227,7 +247,7 @@ public partial class MainWindow
             var created=new CoverRequest();
             created.Changed=(sender,args)=>
             {
-                if((args.PropertyName is null or "" or nameof(DownloadItem.ImageUrl))&&key.IsLoaded&&ReferenceEquals(key.DataContext,sender))SourceCover(key,new RoutedEventArgs());
+                if((args.PropertyName==nameof(MediaItem.DisplayImageUrl)||(sender is DownloadItem&&(args.PropertyName is null or "" or nameof(DownloadItem.ImageUrl))))&&key.IsLoaded&&ReferenceEquals(key.DataContext,sender))SourceCover(key,new RoutedEventArgs());
             };
             key.Unloaded+=(_,_)=>
             {
@@ -236,7 +256,7 @@ public partial class MainWindow
             };
             return created;
         });
-        var subject=image.DataContext as DownloadItem;
+        var subject=image.DataContext as INotifyPropertyChanged;
         if(!ReferenceEquals(state.Subject,subject))
         {
             if(state.Subject!=null)PropertyChangedEventManager.RemoveHandler(state.Subject,state.Changed!,string.Empty);
@@ -247,15 +267,17 @@ public partial class MainWindow
     }
     void SourceCoverChanged(object sender,DependencyPropertyChangedEventArgs e)
     {
-        var image=(Image)sender;var state=ObserveDownloadCover(image);CancelCover(state);CancelFeatureCover(state);CancelCoverRatings(state);state.Context=null;state.Url=null;state.RetryAfterUtc=default;state.NextCacheTouchUtc=default;state.FeatureAttempted=false;state.RatingsContext=null;image.Source=null;
+        var image=(Image)sender;var state=ObserveDownloadCover(image);
+        var url=CoverUrl(e.NewValue);var keep=image.Tag?.ToString()!="FeaturePoster"&&url!=null&&state.Url==url&&image.Source!=null;
+        CancelCover(state);CancelFeatureCover(state);CancelCoverRatings(state);state.Context=e.NewValue;state.Url=url;state.RetryAfterUtc=default;state.NextCacheTouchUtc=default;state.FeatureAttempted=false;state.RatingsContext=null;if(!keep)image.Source=null;
         if(image.IsLoaded)SourceCover(image,new RoutedEventArgs());
     }
     void AddIndexer()
     {
-        var w=new Window{ShowInTaskbar=false,Title="Torznab-источник",Owner=this,Width=560,SizeToContent=SizeToContent.Height,WindowStartupLocation=WindowStartupLocation.CenterOwner};var p=new StackPanel{Margin=new(24)};w.Content=p;
+        var w=new Window{ShowInTaskbar=false,Title=AppLanguage.T("Torznab-источник"),Owner=this,Width=560,SizeToContent=SizeToContent.Height,WindowStartupLocation=WindowStartupLocation.CenterOwner};var p=new StackPanel{Margin=new(24)};w.Content=p;
         p.Children.Add(Text("Подключить индексатор",22));p.Children.Add(Text("Вставь Torznab URL из Jackett, Prowlarr или другого совместимого сервиса. Ключ хранится только до закрытия приложения.",12,true));
         TextBox Field(string label){p.Children.Add(Text(label,12));var box=new TextBox{Margin=new(0,0,0,12)};p.Children.Add(box);return box;}
         var name=Field("Название");var endpoint=Field("Torznab URL");p.Children.Add(Text("API-ключ",12));var key=new PasswordBox{Margin=new(0,0,0,15),Padding=new(10)};p.Children.Add(key);var error=Text("",12);
-        p.Children.Add(Button("Подключить",()=>{try{SourceClient.WebUri(endpoint.Text.Trim());if(string.IsNullOrWhiteSpace(name.Text))throw new FormatException("Введи название источника.");sourceConfigs.Add(new(name.Text.Trim(),endpoint.Text.Trim(),key.Password));sourceIndex=sourceConfigs.Count;sourceResults=[];w.Close();Render();}catch(Exception ex){error.Text=ex.Message;}}));p.Children.Add(error);w.ShowDialog();
+        p.Children.Add(Button("Подключить",()=>{try{SourceClient.WebUri(endpoint.Text.Trim());if(string.IsNullOrWhiteSpace(name.Text))throw new FormatException("Введи название источника.");sourceConfigs.Add(new(name.Text.Trim(),endpoint.Text.Trim(),key.Password));sourceIndex=sourceConfigs.Count;sourceResults=[];w.Close();Render();}catch(Exception ex){error.Text=AppLanguage.T(ex.Message);}}));p.Children.Add(error);w.ShowDialog();
     }
 }

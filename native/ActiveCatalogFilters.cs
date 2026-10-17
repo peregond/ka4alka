@@ -22,13 +22,20 @@ public partial class MainWindow
         if(prefs.CatalogQualityHeight>0)filters.Add(new("quality",prefs.CatalogQualityHeight switch{2160=>"Качество · 4K",1080=>"Качество · Full HD",_=>"Качество · HD Ready"},()=>{prefs.CatalogQualityHeight=0;prefs.Save();}));
         return filters.ToArray();
     }
+    void ResetAllCatalogFilters()=>ChangeCatalogFilter(()=>{favoritesOnly=false;searchCategory="";ResetCatalogFilters();prefs.CatalogQualityHeight=0;prefs.Save();});
+    Button AddCatalogResetButton()
+    {
+        var reset=ActionButton("Сбросить всё","IconReset",ResetAllCatalogFilters,"PillButton");
+        reset.Name="ResetActiveCatalogFilters";reset.ToolTip=AppLanguage.T("Сбросить фильтры, подборку и сортировку. Поиск и скрытие плохого качества сохранятся.");
+        AutomationProperties.SetName(reset,AppLanguage.T("Сбросить выбранные фильтры"));return reset;
+    }
     void RenderActiveCatalogFilters()
     {
         activeCatalogFilterScroll=null;
         if(PeopleOnlySearch)return;
         var filters=ActiveCatalogFilters();if(filters.Length==0)return;
         var row=new WrapPanel{Name="ActiveCatalogFilters"};
-        AutomationProperties.SetName(row,"Выбранные фильтры");
+        AutomationProperties.SetName(row,AppLanguage.T("Выбранные фильтры"));
         foreach(var filter in filters)
         {
             var button=Button(filter.Label+" ×",()=>ChangeCatalogFilter(filter.Clear));
@@ -38,14 +45,9 @@ public partial class MainWindow
             var close=new TextBlock{Text="×",Margin=new(6,0,0,0),VerticalAlignment=VerticalAlignment.Center};Grid.SetColumn(close,1);label.Children.Add(close);button.Content=label;button.MaxWidth=190;
             button.SetResourceReference(Control.BackgroundProperty,"AccentSoft");
             button.Margin=new(0,0,6,4);button.Padding=new(10,5,10,5);button.MinHeight=28;button.FontSize=11;
-            button.ToolTip="Снять фильтр: "+filter.Label;
-            AutomationProperties.SetName(button,"Снять фильтр: "+filter.Label);row.Children.Add(button);
+            button.ToolTip=AppLanguage.T("Снять фильтр: "+filter.Label);
+            AutomationProperties.SetName(button,AppLanguage.T("Снять фильтр: "+filter.Label));row.Children.Add(button);
         }
-        var reset=Button("Сбросить всё",()=>ChangeCatalogFilter(()=>{ResetCatalogFilters();prefs.CatalogQualityHeight=0;prefs.Save();}));
-        reset.Name="ResetActiveCatalogFilters";reset.Style=(Style)FindResource("QuietButton");
-        reset.Margin=new(0,0,0,4);reset.Padding=new(9,5,9,5);reset.MinHeight=28;reset.FontSize=11;
-        reset.ToolTip="Сбросить выбранные фильтры. Поиск и настройка скрытия плохого качества сохранятся.";
-        AutomationProperties.SetName(reset,"Сбросить выбранные фильтры");row.Children.Insert(0,reset);
         activeCatalogFilterScroll=new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=row,Margin=new(0,7,0,0),MaxHeight=compactHeight?68:double.PositiveInfinity,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};
         FilterControls.Children.Add(activeCatalogFilterScroll);
     }

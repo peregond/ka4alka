@@ -32,7 +32,7 @@ public partial class MainWindow
                 : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         var picker=new OpenFolderDialog
         {
-            Title="Выберите папку — внутри будет создана Ka4alka для загрузок",
+            Title=AppLanguage.T("Выберите папку — внутри будет создана Ka4alka для загрузок"),
             InitialDirectory=initialDirectory
         };
         if(picker.ShowDialog(this)!=true)return false;
@@ -44,7 +44,7 @@ public partial class MainWindow
         }
         catch(Exception error)
         {
-            MessageBox.Show(this,"Не удалось сохранить папку загрузок: "+error.Message,"Качалка",MessageBoxButton.OK,MessageBoxImage.Error);
+            LocalizedDialog.Show(this,AppLanguage.T("Не удалось сохранить папку загрузок: "+error.Message),AppLanguage.T("Качалка"),MessageBoxButton.OK,MessageBoxImage.Error);
             return false;
         }
     }

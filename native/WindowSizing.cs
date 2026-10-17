@@ -36,6 +36,7 @@ public partial class MainWindow
     double activeScaleX,activeScaleY;
     bool sizingQueued,compactWidth,compactHeight,tinyWidth,veryCompactHeight,compactSearch,layoutInitialized;
     ListBox? catalogList;
+    System.Collections.ObjectModel.ObservableCollection<CatalogRow>? catalogRows;
     IReadOnlyList<MediaItem> catalogDisplay=[];
     int catalogColumns;
 
@@ -53,7 +54,7 @@ public partial class MainWindow
         LocationChanged+=(_,_)=>QueueMonitorFit();
         StateChanged+=(_,_)=>QueueMonitorFit();
         SizeChanged+=(_,_)=>ApplyCompactLayout();
-        Body.SizeChanged+=(_,_)=>{UpdateCatalogColumns();UpdateDetailLayout();UpdateGameDetailLayout();UpdateFilterRail();UpdateDiscoveryLayout();};
+        Body.SizeChanged+=(_,_)=>{UpdateCatalogColumns();UpdateDetailLayout();UpdateGameDetailLayout();UpdateFilterRail();UpdateDiscoveryLayout();ResizeFeaturedShelves();};
     }
     IntPtr WindowMessage(IntPtr hwnd,int message,IntPtr wParam,IntPtr lParam,ref bool handled)
     {
@@ -129,7 +130,7 @@ public partial class MainWindow
         // threshold is expressed in those units: 200 % on a 1080p laptop leaves roughly 960 x 520.
         var gutter=narrow?(tiny?16d:24d):ActualWidth<1180?24d:32d;
         FitDownloadsToolbar();
-        ThemeButton.Visibility=ActualWidth>0&&ActualWidth<480?Visibility.Collapsed:Visibility.Visible;
+        ThemeButton.Visibility=RefreshCatalogButton.Visibility=ActualWidth>0&&ActualWidth<480?Visibility.Collapsed:Visibility.Visible;
         if(activeCatalogFilterScroll!=null)activeCatalogFilterScroll.MaxHeight=shortView?68:double.PositiveInfinity;
         if(layoutInitialized&&narrow==compactWidth&&tiny==tinyWidth&&shortView==compactHeight&&veryShort==veryCompactHeight&&narrowSearch==compactSearch&&gutter==contentGutter){UpdateFilterRail();UpdateDownloadsWidget();return;}
         layoutInitialized=true;compactWidth=narrow;tinyWidth=tiny;compactHeight=shortView;veryCompactHeight=veryShort;compactSearch=narrowSearch;contentGutter=gutter;
@@ -153,7 +154,7 @@ public partial class MainWindow
         var control=tiny?40d:shortView?44d:48d;
         AddTorrentButton.Content=IconLabel(tiny?"":narrow?"Добавить":"Добавить торрент","IconMagnet",18);
         AddTorrentButton.Padding=new Thickness(tiny?0:narrow?14:18,0,tiny?0:narrow?14:18,0);AddTorrentButton.MinHeight=control;AddTorrentButton.Height=control;AddTorrentButton.MinWidth=tiny?control:0;AddTorrentButton.Margin=new Thickness(0,0,tiny?8:12,0);
-        BackButton.Width=control;BackButton.Height=control;BackButton.Margin=new Thickness(0,0,tiny?8:12,0);ThemeButton.Width=control;ThemeButton.Height=control;
+        BackButton.Width=control;BackButton.Height=control;BackButton.Margin=new Thickness(0,0,tiny?8:12,0);ThemeButton.Width=control;ThemeButton.Height=control;RefreshCatalogButton.Width=control;RefreshCatalogButton.Height=control;
         // The top band is the window's caption (drag, snap, window buttons), so the header starts below it.
         HeaderArea.Margin=new Thickness(gutter,CaptionBand+(veryShort?2:shortView?6:10),gutter,veryShort?6:shortView?8:20);
         if(ReferenceEquals(FiltersPanel.Parent,HeaderArea))FiltersPanel.Margin=new Thickness(0,shortView?6:12,0,0);
@@ -161,7 +162,7 @@ public partial class MainWindow
         SearchBar.Margin=new Thickness(0,0,tiny?8:12,0);SearchBar.Height=control;Search.MinHeight=control;
         Search.Padding=new Thickness(narrowSearch?12:48,0,narrowSearch?72:110,0);
         SearchMagnifier.Visibility=narrowSearch?Visibility.Collapsed:Visibility.Visible;
-        SearchPlaceholder.Text=narrowSearch?"Поиск":section=="Игры"?"Найти игру для Windows":"Найти фильм, сериал или человека";SearchPlaceholder.Margin=new Thickness(narrowSearch?12:48,0,narrowSearch?72:110,0);
+        SearchPlaceholder.Text=AppLanguage.T(narrowSearch?"Поиск":section=="Игры"?"Найти игру для Windows":"Найти фильм, сериал или человека");SearchPlaceholder.Margin=new Thickness(narrowSearch?12:48,0,narrowSearch?72:110,0);
         foreach(var subtitle in PageHeader.Children.OfType<TextBlock>().Where(x=>Equals(x.Tag,"CatalogSubtitle")))subtitle.Visibility=shortView?Visibility.Collapsed:Visibility.Visible;
         RenderNavSelection();
         UpdateSavedCount();UpdateDownloadsWidget();
@@ -184,8 +185,15 @@ public partial class MainWindow
         foreach(var button in inlineCatalogFilters.Children.OfType<Button>().Concat(catalogToolbar?.Children.OfType<StackPanel>().SelectMany(x=>x.Children.OfType<Button>())??[]))
         {
             if(ReferenceEquals(button,catalogRefreshButton))continue;
+            if(button.Name=="ResetActiveCatalogFilters"&&button.Content is StackPanel resetContent)
+            {
+                var iconOnly=width<560;
+                foreach(var label in resetContent.Children.OfType<TextBlock>())label.Visibility=iconOnly?Visibility.Collapsed:Visibility.Visible;
+                foreach(var icon in resetContent.Children.OfType<System.Windows.Shapes.Path>())icon.Margin=new(0,0,iconOnly?0:10,0);
+                button.Width=iconOnly?(shortChip?36:40):double.NaN;
+            }
             button.HorizontalContentAlignment=HorizontalAlignment.Center;button.MinHeight=shortChip?36:40;button.FontSize=compact?13:14;
-            button.Padding=new(compact?12:16,0,compact?12:16,0);button.Margin=new(0,0,8,8);
+            button.Padding=button.Name=="ResetActiveCatalogFilters"&&width<560?new(0):new(compact?12:16,0,compact?12:16,0);button.Margin=new(0,0,8,8);
         }
         if(catalogRefreshButton!=null){catalogRefreshButton.Padding=new(0);catalogRefreshButton.Width=shortChip?36:40;catalogRefreshButton.MinHeight=shortChip?36:40;catalogRefreshButton.Margin=new(8,0,0,8);}
         UpdateCatalogFilterOverflow();UpdateDiscoveryLayout();
@@ -193,7 +201,13 @@ public partial class MainWindow
     void UpdateCatalogFilterOverflow()
     {
         if(inlineCatalogFilterScroll==null||inlineCatalogFilters==null||catalogToolbar==null||catalogFilterBack==null||catalogFilterForward==null)return;
-        var overflow=inlineCatalogFilterScroll.ViewportWidth>0&&inlineCatalogFilterScroll.ScrollableWidth>1;
+        // Decide from the space without arrows. Their own visibility must not
+        // change the answer, especially when they consume a tiny viewport.
+        var available=inlineCatalogFilterScroll.ActualWidth;
+        foreach(var arrow in new[]{catalogFilterBack,catalogFilterForward})
+            if(arrow.Visibility==Visibility.Visible)available+=arrow.ActualWidth+arrow.Margin.Left+arrow.Margin.Right;
+        if(available<=0)return;
+        var overflow=inlineCatalogFilters.DesiredSize.Width>available+1;
         var visibility=overflow?Visibility.Visible:Visibility.Collapsed;
         catalogFilterBack.Visibility=visibility;catalogFilterForward.Visibility=visibility;
         catalogFilterBack.IsEnabled=inlineCatalogFilterScroll.HorizontalOffset>1;
@@ -216,7 +230,7 @@ public partial class MainWindow
         UpdateCatalogColumns(true);
     }
     // Games, and the saved games tab, lay out wide capsules instead of portrait posters.
-    bool GameGrid=>section=="Игры"||section=="Сохранённое"&&savedCategory=="Игры";
+    bool GameGrid=>section=="Игры"||section=="Сохранённое"&&savedCategory=="Игры"||section=="Актуальное"&&FeaturedGameGrid;
     void UpdateCatalogColumns(bool force=false)
     {
         // The games home has shelves but no list, so it still follows the window width.
@@ -226,7 +240,7 @@ public partial class MainWindow
         if(!force&&columns==catalogColumns)return;
         var position=CaptureCatalogReflow();
         catalogColumns=columns;
-        if(catalogList!=null){catalogList.ItemsSource=catalogDisplay.Chunk(columns).Select(x=>new CatalogRow(x,columns)).ToArray();ApplyPosterDownloads(catalogDisplay);}
+        if(catalogList!=null){catalogRows=new(catalogDisplay.Chunk(columns).Select(x=>new CatalogRow(x,columns)));catalogList.ItemsSource=catalogRows;ApplyPosterDownloads(catalogDisplay);}
         UpdateDiscoveryLayout();
         RestoreCatalogReflow(position);
     }

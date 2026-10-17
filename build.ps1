@@ -8,7 +8,7 @@ $sdk=Join-Path $PSScriptRoot '.tools/dotnet/dotnet.exe'
 if(-not(Test-Path -LiteralPath $sdk)){$sdk='dotnet'}
 if($Test){& $sdk run --project tests/Kachalka.Tests.csproj -c Release; if($LASTEXITCODE -ne 0){throw 'Integration tests failed'}}
 $publishPath=Join-Path $PSScriptRoot $OutputDir
-& $sdk publish native/Kachalka.csproj -c Release -r win-x64 --self-contained true -o $publishPath -p:DebugType=None -p:DebugSymbols=false
+& $sdk publish native/Kachalka.csproj -c Release -r win-x64 --self-contained true -o $publishPath -p:DebugType=None -p:DebugSymbols=false -p:PublishReadyToRun=true
 if($LASTEXITCODE -ne 0){throw 'Publish failed'}
 & $sdk publish updater/Kachalka.Updater.csproj -c Release -r win-x64 --self-contained true -o (Join-Path $PSScriptRoot '.tools/updater-publish') -p:DebugType=None -p:DebugSymbols=false
 if($LASTEXITCODE -ne 0){throw 'Updater publish failed'}

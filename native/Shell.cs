@@ -40,13 +40,13 @@ public partial class MainWindow
     // Pages call this instead of adding their own button.
     void SetBack(string label,Action action)
     {
-        headerBackAction=action;BackButton.Visibility=Visibility.Visible;BackButton.ToolTip=label;
-        System.Windows.Automation.AutomationProperties.SetName(BackButton,label);
+        headerBackAction=action;BackButton.Visibility=Visibility.Visible;BackButton.ToolTip=AppLanguage.T(label);
+        System.Windows.Automation.AutomationProperties.SetName(BackButton,AppLanguage.T(label));
     }
     void ClearBack(){headerBackAction=null;BackButton.Visibility=Visibility.Collapsed;}
 
     // Each catalogue section keeps its own icon: a film strip, a television and a gamepad.
-    static string NavIcon(string section)=>section switch{"Фильмы"=>"IconFilm","Игры"=>"IconGame",_=>"IconTv"};
+    static string NavIcon(string section)=>section switch{"Актуальное"=>"IconStar","Фильмы"=>"IconFilm","Игры"=>"IconGame",_=>"IconTv"};
 
     // Navigation entry content: 20 px icon, label and an optional trailing badge.
     // badge: 0 none, 1 plain counter (Saved), 2 accent pill (active downloads).
@@ -57,7 +57,7 @@ public partial class MainWindow
         var icon=new Path{Data=(Geometry)FindResource(geometry),Width=20,Height=20,Stretch=Stretch.Uniform,StrokeThickness=1.8,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,StrokeLineJoin=PenLineJoin.Round,Tag="NavIcon",VerticalAlignment=VerticalAlignment.Center,HorizontalAlignment=narrow?HorizontalAlignment.Center:HorizontalAlignment.Left,Margin=new(0,0,narrow?0:12,0)};
         icon.SetBinding(Shape.StrokeProperty,new Binding("Foreground"){RelativeSource=new RelativeSource(RelativeSourceMode.FindAncestor,typeof(Button),1)});
         grid.Children.Add(icon);
-        if(!narrow&&label.Length>0){var text=new TextBlock{Text=label,VerticalAlignment=VerticalAlignment.Center,TextTrimming=TextTrimming.CharacterEllipsis};Grid.SetColumn(text,1);grid.Children.Add(text);}
+        if(!narrow&&label.Length>0){var text=new TextBlock{Text=AppLanguage.T(label),VerticalAlignment=VerticalAlignment.Center,TextTrimming=TextTrimming.CharacterEllipsis};Grid.SetColumn(text,1);grid.Children.Add(text);}
         if(badge>0)
         {
             var value=new TextBlock{VerticalAlignment=VerticalAlignment.Center,HorizontalAlignment=HorizontalAlignment.Center};
@@ -82,7 +82,7 @@ public partial class MainWindow
     void SetNavBadge(Button button,string text)
     {
         if(button.Content is not Grid {Tag:Border frame})return;
-        var value=(TextBlock)frame.Child;value.Text=text;
+        var value=(TextBlock)frame.Child;value.Text=AppLanguage.T(text);
         var wanted=text.Length>0&&text!="0"&&(frame.Background!=null||!compactWidth);
         frame.Visibility=wanted?Visibility.Visible:Visibility.Collapsed;
     }
@@ -93,8 +93,21 @@ public partial class MainWindow
         button.FontWeight=selected?FontWeights.SemiBold:FontWeights.Medium;
         if(button.Content is Grid grid&&grid.Children.OfType<Path>().FirstOrDefault(x=>Equals(x.Tag,"NavIcon")) is {} icon)
         {
-            if(selected){BindingOperations.ClearBinding(icon,Shape.StrokeProperty);icon.SetResourceReference(Shape.StrokeProperty,"Accent");}
-            else{icon.ClearValue(Shape.StrokeProperty);icon.SetBinding(Shape.StrokeProperty,new Binding("Foreground"){RelativeSource=new RelativeSource(RelativeSourceMode.FindAncestor,typeof(Button),1)});}
+            // The section being shown has a solid icon (star, heart, film strip, television, gamepad), not just an accent outline.
+            var solid=button.Tag?.ToString() is "Актуальное" or "Фильмы" or "Сериалы" or "Игры"||ReferenceEquals(button,SavedButton);
+            if(selected)
+            {
+                BindingOperations.ClearBinding(icon,Shape.StrokeProperty);
+                // Film strip and gamepad keep their inner details visible as ink lines on the accent fill.
+                var details=button.Tag?.ToString() is "Фильмы" or "Игры";
+                icon.SetResourceReference(Shape.StrokeProperty,solid&&details?"AccentInk":"Accent");
+                if(solid){icon.SetResourceReference(Shape.FillProperty,"Accent");icon.StrokeThickness=2;}
+            }
+            else
+            {
+                icon.ClearValue(Shape.StrokeProperty);icon.SetBinding(Shape.StrokeProperty,new Binding("Foreground"){RelativeSource=new RelativeSource(RelativeSourceMode.FindAncestor,typeof(Button),1)});
+                icon.ClearValue(Shape.FillProperty);icon.StrokeThickness=1.8;
+            }
         }
     }
     void UpdateSavedCount(){SetNavBadge(SavedButton,prefs.LiveFavorites.Select(x=>x.Id).Distinct().Count().ToString());}
@@ -113,15 +126,15 @@ public partial class MainWindow
         var host=DownloadsWidgetContent;
         // The header (title, "Все" and both speeds) is one button: the widget takes
         // the place of the Downloads navigation button while it is shown.
-        widgetOpen=new Button{Name="DownloadsWidgetOpen",Style=(Style)FindResource("QuietButton"),MinHeight=0,Padding=new(6,4,6,4),Margin=new(-6,-4,-6,8),HorizontalContentAlignment=HorizontalAlignment.Stretch,ToolTip="Открыть загрузки"};
-        System.Windows.Automation.AutomationProperties.SetName(widgetOpen,"Открыть загрузки");widgetOpen.Click+=ShowDownloads;
+        widgetOpen=new Button{Name="DownloadsWidgetOpen",Style=(Style)FindResource("QuietButton"),MinHeight=0,Padding=new(6,4,6,4),Margin=new(-6,-4,-6,8),HorizontalContentAlignment=HorizontalAlignment.Stretch,ToolTip=AppLanguage.T("Открыть загрузки")};
+        System.Windows.Automation.AutomationProperties.SetName(widgetOpen,AppLanguage.T("Открыть загрузки"));widgetOpen.Click+=ShowDownloads;
         var header=new StackPanel();
         var head=new DockPanel{Margin=new(0,0,0,8)};
-        var allRow=new StackPanel{Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center};allRow.Children.Add(new TextBlock{Text="Все",VerticalAlignment=VerticalAlignment.Center,FontSize=12,FontWeight=FontWeights.SemiBold});
+        var allRow=new StackPanel{Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center};allRow.Children.Add(new TextBlock{Text=AppLanguage.T("Все"),VerticalAlignment=VerticalAlignment.Center,FontSize=12,FontWeight=FontWeights.SemiBold});
         allRow.Children.Add(new Path{Data=(Geometry)FindResource("IconChevron"),Width=12,Height=12,Stretch=Stretch.Uniform,StrokeThickness=1.8,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,StrokeLineJoin=PenLineJoin.Round,Margin=new(2,0,0,0),VerticalAlignment=VerticalAlignment.Center});
         ((TextBlock)allRow.Children[0]).SetResourceReference(TextBlock.ForegroundProperty,"Muted");((Path)allRow.Children[1]).SetResourceReference(Shape.StrokeProperty,"Muted");
         widgetAll=allRow;DockPanel.SetDock(allRow,Dock.Right);head.Children.Add(allRow);
-        widgetHeading=new TextBlock{Text="Загрузки",FontSize=14,FontWeight=FontWeights.Bold,VerticalAlignment=VerticalAlignment.Center};widgetHeading.SetResourceReference(TextBlock.ForegroundProperty,"Text");
+        widgetHeading=new TextBlock{Text=AppLanguage.T("Загрузки"),FontSize=14,FontWeight=FontWeights.Bold,VerticalAlignment=VerticalAlignment.Center};widgetHeading.SetResourceReference(TextBlock.ForegroundProperty,"Text");
         // The same active-download count as on the Downloads button, which the widget replaces.
         var badgeText=new TextBlock{FontSize=12,FontWeight=FontWeights.Bold,VerticalAlignment=VerticalAlignment.Center,HorizontalAlignment=HorizontalAlignment.Center};badgeText.SetResourceReference(TextBlock.ForegroundProperty,"Accent");
         widgetBadge=new Border{Name="DownloadsWidgetCount",Child=badgeText,CornerRadius=new(11),Height=22,MinWidth=22,Padding=new(7,0,7,0),Margin=new(8,0,0,0),VerticalAlignment=VerticalAlignment.Center,Visibility=Visibility.Collapsed,IsHitTestVisible=false};widgetBadge.SetResourceReference(Border.BackgroundProperty,"AccentSoft");
@@ -158,8 +171,8 @@ public partial class MainWindow
         DownloadsWidget.Visibility=Visibility.Visible;
         if(widgetBadge is {Child:TextBlock count}){count.Text=active.ToString();widgetBadge.Visibility=active>0?Visibility.Visible:Visibility.Collapsed;}
         long down=0,up=0;foreach(var item in items){down+=Math.Max(0,item.DownloadRate);up+=Math.Max(0,item.UploadRate);}
-        widgetDown!.Text="↓ "+DownloadService.FormatBytes(down)+"/с";widgetUp!.Text="↑ "+DownloadService.FormatBytes(up)+"/с";
-        widgetHeading!.Text=onDownloads?"Скорость сейчас":"Загрузки";widgetHeading.FontWeight=onDownloads?FontWeights.Medium:FontWeights.Bold;widgetHeading.FontSize=onDownloads?12:14;
+        widgetDown!.Text=AppLanguage.T("↓ "+DownloadService.FormatBytes(down)+"/с");widgetUp!.Text=AppLanguage.T("↑ "+DownloadService.FormatBytes(up)+"/с");
+        widgetHeading!.Text=AppLanguage.T(onDownloads?"Скорость сейчас":"Загрузки");widgetHeading.FontWeight=onDownloads?FontWeights.Medium:FontWeights.Bold;widgetHeading.FontSize=onDownloads?12:14;
         widgetAll!.Visibility=onDownloads?Visibility.Collapsed:Visibility.Visible;
         var shown=onDownloads?0:rows;widgetRowsHost!.Visibility=shown>0?Visibility.Visible:Visibility.Collapsed;
         var top=shown==0?[]:items.OrderBy(WidgetRank).ThenByDescending(x=>x.AddedUtc).Take(shown).ToArray();

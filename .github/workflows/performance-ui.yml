@@ -34,18 +34,26 @@ jobs:
           dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --performance-only
           dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --home-availability-only
           dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --games-only
+          dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --missing-files-only
+          dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --language-only
       - name: Verify actual WPF viewport loading and responsive person profiles
         shell: pwsh
         run: |
-          foreach ($mode in @('cover-viewport','person-performance','startup-performance','home-availability','games')) {
+          foreach ($mode in @('shimmer','featured','search-downloads','feature-summary','release-freshness','cover-viewport','catalog-loading','wheel-input','poster-actions','person-performance','startup-performance','home-availability','games','catalog-navigation','interface-polish','language','queue-virtualization')) {
             $env:KACHALKA_DATA=Join-Path $PWD "test-output/performance/$mode/profile"
             $folder=Join-Path $env:KACHALKA_DATA 'downloads'
             New-Item -ItemType Directory -Force $folder | Out-Null
             @{Folder=$folder;FolderConfigured=$true;AutoResumeDownloads=$false;CheckForUpdates=$false;AutoUpdate=$false;LiteMode=$false;LiteModeConfigured=$true} | ConvertTo-Json | Set-Content (Join-Path $env:KACHALKA_DATA 'settings.json') -Encoding utf8NoBOM
             $output=Join-Path $PWD "test-output/performance/$mode/render"
             $app=Start-Process (Join-Path $PWD 'native/bin/Release/net10.0-windows/Kachalka.exe') -ArgumentList @("--$mode-smoke-test",('"'+$output+'"')) -PassThru
-            if(-not $app.WaitForExit(120000)){$app.Kill($true);throw "$mode timed out"}
-            if(Test-Path (Join-Path $output 'error.txt')){throw (Get-Content (Join-Path $output 'error.txt') -Raw)}
+            $deadline=if($mode -eq 'search-downloads'){60000}else{120000}
+            if(-not $app.WaitForExit($deadline)){$app.Kill($true);throw "$mode timed out"}
+            if(Test-Path (Join-Path $output 'error.txt')){
+              $errorText=Get-Content (Join-Path $output 'error.txt') -Raw
+              $message=(($errorText -split "`r?`n") | Select-Object -First 6) -join ' | '
+              Write-Output ('::error title='+$mode+'::'+$message.Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A'))
+              throw $errorText
+            }
             if($app.ExitCode -ne 0 -or -not(Test-Path (Join-Path $output 'checks.json'))){throw "$mode checks missing"}
             Get-Content (Join-Path $output 'checks.json')
           }

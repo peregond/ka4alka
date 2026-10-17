@@ -8,6 +8,14 @@ using System.Windows.Media;
 namespace Kachalka;
 public record MediaItem(int Id, string Title, string Section, string Genre, int Year, string Kinopoisk, string Imdb, string Color) : INotifyPropertyChanged
 {
+    EnglishMedia? english;
+    [JsonIgnore] public EnglishMedia? English {get=>english;init=>english=value;}
+    [JsonIgnore] public string DisplayTitle=>AppLanguage.Current=="en"?(english?.Title??(SearchLanguage.LatinTitle(OriginalTitle??"")?OriginalTitle!:Title)):Title;
+    [JsonIgnore] public string? DisplayImageUrl=>AppLanguage.Current=="en"&&Cinema?english?.Poster:ImageUrl;
+    [JsonIgnore] public string? DisplayDescription=>AppLanguage.Current=="en"&&Cinema?english?.Description:Description;
+    [JsonIgnore] public CinemaPerson[] DisplayPeople=>AppLanguage.Current=="en"&&Cinema?english?.People??[]:People;
+    [JsonIgnore] public string DisplayCountry=>AppLanguage.Current=="en"&&Cinema?string.Join(", ",english?.Countries??[]):Country;
+    public void SetEnglish(EnglishMedia? value){if(Equals(english,value))return;var prior=DisplayImageUrl;english=value;Notify(nameof(DisplayTitle),nameof(DisplayDescription),nameof(DisplayPeople),nameof(DisplayCountry),nameof(AllGenres),nameof(CardGenre),nameof(CardMeta));if(prior!=DisplayImageUrl)Notify(nameof(DisplayImageUrl));}
     public string? PageUrl {get;init;}
     public string? OnlineId {get;init;}
     public string? ImageUrl {get;init;}
@@ -43,16 +51,16 @@ public record MediaItem(int Id, string Title, string Section, string Genre, int 
         percent=complete||percent<0?-1:Math.Clamp(percent,0,100);
         if(complete==downloaded&&Math.Abs(percent-downloadPercent)<.5)return;
         downloaded=complete;downloadPercent=percent;
-        PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(DownloadPercent)));PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(HasDownloadProgress)));PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(IsDownloaded)));
+        Raise(new PropertyChangedEventArgs(nameof(DownloadPercent)));Raise(new PropertyChangedEventArgs(nameof(HasDownloadProgress)));Raise(new PropertyChangedEventArgs(nameof(IsDownloaded)));
     }
     // Under a poster's title: the year and the first genre. The film page lists every genre.
     // A game from a catalog list only knows "Windows" as its genre, which says nothing under every card: its year and genre show once the store details are known.
     // A game that is not out yet shows when it will be instead.
     [JsonIgnore] public string CardMeta=>Store is {Soon:true,Released.Length:>0}?Store.SoonLabel:string.Join(" · ",new[]{Year>0?Year.ToString():"",Section=="Игры"&&AllGenres=="Windows"?"":AllGenres.Split(", ")[0]}.Where(x=>x.Length>0));
-    [JsonIgnore] public string AllGenres=>InlineMetadata(liveGenre??Genre);
+    [JsonIgnore] public string AllGenres=>InlineMetadata(AppLanguage.Current=="en"&&Cinema&&english!=null?string.Join(", ",english.Genres):liveGenre??Genre);
     [JsonIgnore] public string CardRatingSource => KpAvailable?"Кинопоиск":ImdbAvailable?"IMDb":"Оценка пока недоступна";
     static string InlineMetadata(string? value)=>string.Join(", ",(value??"").Split(',').Select(part=>Regex.Replace(part,@"\s+"," ").Trim()).Where(part=>part.Length>0));
-    [JsonIgnore] public string CardGenre {get{var value=InlineMetadata(liveGenre??Genre);return value.Length==0?Section=="Сериалы"?"Сериал":Section=="Игры"?"Игра для Windows":"Фильм":value;}}
+    [JsonIgnore] public string CardGenre {get{var value=InlineMetadata(AppLanguage.Current=="en"&&Cinema&&english!=null?string.Join(", ",english.Genres):liveGenre??Genre);return value.Length==0?Section=="Сериалы"?"Сериал":Section=="Игры"?"Игра для Windows":"Фильм":value;}}
     string bestQuality="";
     [JsonIgnore] public string BestQuality=>bestQuality;
     [JsonIgnore] public bool HasQuality=>bestQuality.Length>0;
@@ -60,29 +68,79 @@ public record MediaItem(int Id, string Title, string Section, string Genre, int 
     [JsonIgnore] public string PosterQuality=>posterQuality;
     [JsonIgnore] public bool HasPosterQuality=>posterQuality.Length>0;
     [JsonIgnore] public string Scores => liveScores ?? (Cinema ? $"КП {Kinopoisk}   IMDb {Imdb}" : Section);
-    public event PropertyChangedEventHandler? PropertyChanged;
+    // Record clones must not copy a previous card's WPF/view subscriptions. Otherwise each
+    // metadata merge can carry old listeners into a new model and multiply invalidations.
+    sealed class BindingListeners
+    {
+        public event PropertyChangedEventHandler? Changed;
+        public void Raise(MediaItem sender,PropertyChangedEventArgs args)=>Changed?.Invoke(sender,args);
+    }
+    static readonly ConditionalWeakTable<MediaItem,BindingListeners> bindingListeners=new();
+    public event PropertyChangedEventHandler? PropertyChanged
+    {
+        add{if(value!=null)bindingListeners.GetValue(this,_=>new()).Changed+=value;}
+        remove{if(bindingListeners.TryGetValue(this,out var listeners))listeners.Changed-=value;}
+    }
+    void Raise(PropertyChangedEventArgs args){if(bindingListeners.TryGetValue(this,out var listeners))listeners.Raise(this,args);}
+    bool savedForUi;
+    [JsonIgnore] public bool SavedForUi=>savedForUi;
+    public void SetSavedForUi(bool saved){if(savedForUi==saved)return;savedForUi=saved;Raise(new PropertyChangedEventArgs(nameof(SavedForUi)));}
     [JsonIgnore] public bool OnlyPoorQuality {get;private set;}
     HashSet<int> releaseResolutions=[];
+    SourceEntry[]? qualityRows;
+    int qualityMinimum;
     [JsonIgnore] public IReadOnlySet<int> ReleaseResolutions=>releaseResolutions;
     public bool HasReleaseResolution(int height)=>releaseResolutions.Contains(ReleaseQuality.CatalogHeight(height));
     public void SetReleaseQuality(IEnumerable<SourceEntry> entries,int minimum=720)
     {
-        var rows=entries.ToArray();
+        var rows=entries as SourceEntry[]??entries.ToArray();
+        // A card can belong to several shelves. Repaint badges only for new evidence,
+        // rather than parsing all torrent titles again for every filter/layout pass.
+        if(qualityRows!=null&&qualityMinimum==minimum&&rows.SequenceEqual(qualityRows))return;
+        qualityRows=rows.ToArray();qualityMinimum=minimum;
         var value=ReleaseQuality.OnlyPoor(rows,minimum);
         var available=rows.Where(ReleaseQuality.Downloadable).ToArray();
         releaseResolutions=available.Where(x=>!ReleaseQuality.IsScreen(x)).Select(x=>ReleaseQuality.CatalogHeight(ReleaseQuality.Height(x)??0)).Where(x=>x!=0).ToHashSet();
         var height=available.Where(x=>!ReleaseQuality.Poor(x,720)).Select(x=>ReleaseQuality.Height(x)??0).DefaultIfEmpty(0).Max();
         var quality=height>=2160?"4K":height>=1080?"Full HD":height>=720?"HD Ready":"";
         var label=quality.Length>0?quality:available.Length>0&&available.All(ReleaseQuality.IsScreen)?"Экранка":value?"SD":"";
-        if(label!=posterQuality){posterQuality=label;PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(PosterQuality)));PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(HasPosterQuality)));}
-        if(value!=OnlyPoorQuality){OnlyPoorQuality=value;PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(OnlyPoorQuality)));}
-        if(quality!=bestQuality){bestQuality=quality;PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(BestQuality)));PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(nameof(HasQuality)));}
+        if(label!=posterQuality){posterQuality=label;Raise(new PropertyChangedEventArgs(nameof(PosterQuality)));Raise(new PropertyChangedEventArgs(nameof(HasPosterQuality)));}
+        if(value!=OnlyPoorQuality){OnlyPoorQuality=value;Raise(new PropertyChangedEventArgs(nameof(OnlyPoorQuality)));}
+        if(quality!=bestQuality){bestQuality=quality;Raise(new PropertyChangedEventArgs(nameof(BestQuality)));Raise(new PropertyChangedEventArgs(nameof(HasQuality)));}
     }
-    public void SetScores(string kp,string imdb,string? genre=null){if(!string.IsNullOrWhiteSpace(genre))liveGenre=genre;liveKp=kp;liveImdb=imdb;liveScores=$"КП {kp}   IMDb {imdb}";PropertyChanged?.Invoke(this,new PropertyChangedEventArgs(null));}
+    void Notify(params string[] names){foreach(var name in names)Raise(new PropertyChangedEventArgs(name));}
+    public void SetScores(string kp,string imdb,string? genre=null)
+    {
+        var kpChanged=kp!=(liveKp??Kinopoisk);var imdbChanged=imdb!=(liveImdb??Imdb);
+        var genreChanged=!string.IsNullOrWhiteSpace(genre)&&InlineMetadata(genre)!=InlineMetadata(liveGenre??Genre);
+        if(!kpChanged&&!imdbChanged&&!genreChanged)return;
+        if(genreChanged){liveGenre=genre;Notify(nameof(AllGenres),nameof(CardGenre),nameof(CardMeta));}
+        liveKp=kp;liveImdb=imdb;liveScores=$"КП {kp}   IMDb {imdb}";
+        if(kpChanged)Notify(nameof(KpDisplay),nameof(KpAvailable));
+        if(imdbChanged)Notify(nameof(ImdbDisplay),nameof(ImdbAvailable));
+        if(kpChanged||imdbChanged)Notify(nameof(CardRating),nameof(HasCardRating),nameof(CardRatingSource),nameof(Scores));
+    }
     [JsonIgnore] public string Subtitle => Cinema ? string.Join(" · ",new[]{Section=="Сериалы"?"Сериал":Section=="Игры"?"Игра для Windows":"Фильм",Year>0?Year.ToString():null,InlineMetadata(Genre)}.Where(x=>!string.IsNullOrWhiteSpace(x))) : "Демонстрационный каталог";
     [JsonIgnore] public Brush Cover { get { var b = new LinearGradientBrush((Color)ColorConverter.ConvertFromString(Color), (Color)ColorConverter.ConvertFromString("#20262E"), 75); b.Freeze(); return b; } }
 }
-public record CatalogRow(MediaItem[] Items,int Columns);
+public record CatalogRow
+{
+    public MediaItem[] Items {get;private set;}
+    public int Columns {get;}
+    public System.Collections.ObjectModel.ObservableCollection<MediaItem> Cells {get;}
+    public CatalogRow(MediaItem[] items,int columns){Items=items;Columns=columns;Cells=new(items);}
+    public bool Update(MediaItem[] items)
+    {
+        var changed=false;
+        for(var index=0;index<items.Length;index++)
+        {
+            if(index>=Cells.Count){Cells.Add(items[index]);changed=true;}
+            else if(!ReferenceEquals(Cells[index],items[index])){Cells[index]=items[index];changed=true;}
+        }
+        while(Cells.Count>items.Length){Cells.RemoveAt(Cells.Count-1);changed=true;}
+        Items=items;return changed;
+    }
+}
 public record Release(int Id,string Quality,string Type,string Voice,string Subs,string Format,string Codec,string Hdr,double Size,int Seeds,string Source);
 public static class Catalog
 {
@@ -111,6 +169,7 @@ public class Preferences
     public string Folder { get;set; }=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),"Downloads","Ka4alka");
     public bool FolderConfigured {get;set;}
     public bool Light {get;set;}=false;
+    public string UiLanguage {get;set;}="ru";
     public bool LiteMode {get;set;}
     public bool LiteModeConfigured {get;set;}
     public bool LanEnabled {get;set;}
@@ -142,6 +201,7 @@ public class Preferences
             if(!prefs.QualityFilterConfigured){prefs.HidePoorQuality=true;prefs.QualityFilterConfigured=true;}
             prefs.HiddenGenres??=[];prefs.HiddenTitles??=[];prefs.HiddenTitles=prefs.HiddenTitles.Where(row=>row!=null&&row.Title is {Length:<=300}&&row.Identity is {Length:<=500}).Take(1000).ToList();
             prefs.CatalogQualityHeight=ReleaseQuality.CatalogHeight(prefs.CatalogQualityHeight);
+            prefs.UiLanguage=AppLanguage.Normalize(prefs.UiLanguage);
             prefs.HomeCountry=CatalogRegions.HomeCountry(prefs.HomeCountry);
             return prefs;
         }
@@ -216,16 +276,20 @@ public class DownloadItem : INotifyPropertyChanged
     public DateTime LastStartedUtc {get;set;}
     public bool Busy {get;set;}
     public bool Paused {get;set;}=true;
+    public bool HasCompletedDownload {get;set;}
+    public bool FilesMissing {get;set;}
+    public string MissingFilesMessage {get;set;}="";
     public bool LowSpacePaused {get;set;}
     public string SpacePauseMessage {get;set;}="";
     public bool SpaceCheckFailed {get;set;}
-    [JsonIgnore] public bool Completed=>Progress>=100;
-    public string Action => Paused?"Продолжить":"Пауза";
+    [JsonIgnore] public bool Completed=>Progress>=100&&!FilesMissing;
+    public string Action => FilesMissing?"Скачать заново":Paused?"Продолжить":"Пауза";
     // Presentation helpers for the status pill, widget and queue rows. They only read state the engine already reports.
     [JsonIgnore] public DownloadStatusKind StatusKind
     {
         get
         {
+            if(FilesMissing)return DownloadStatusKind.Error;
             if(Status.StartsWith("Ошибка",StringComparison.Ordinal)||Status.StartsWith("Не удалось",StringComparison.Ordinal)||Status.StartsWith("Недостаточно места",StringComparison.Ordinal)||Status.StartsWith("Папка недоступна",StringComparison.Ordinal)||LowSpacePaused)return DownloadStatusKind.Error;
             if(Paused)return DownloadStatusKind.Paused;
             if(Completed)return DownloadStatusKind.Seeding;

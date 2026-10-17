@@ -10,6 +10,8 @@ concurrency:
   group: windows-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 jobs:
+  game-releases:
+    uses: ./.github/workflows/game-search.yml
   title-metadata:
     runs-on: ubuntu-latest
     timeout-minutes: 10
