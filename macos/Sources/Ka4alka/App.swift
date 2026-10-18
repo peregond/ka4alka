@@ -24,7 +24,7 @@ import SwiftUI
                     if ProcessInfo.processInfo.arguments.contains("--smoke-test") { await MacSmoke.run(model: model) }
                     else if model.settings?.checkForUpdates == true { await updater.check(autoDownload: model.settings?.autoUpdate == true) }
                 }
-                .onOpenURL { url in model.magnet = url.isFileURL ? url.path : url.absoluteString; model.addTorrent = true }
+                .onOpenURL { url in Task { await model.openURL(url) } }
         }
         .defaultSize(width: 1280, height: 820)
         .windowToolbarStyle(.unified)

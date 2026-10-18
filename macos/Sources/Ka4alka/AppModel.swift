@@ -75,7 +75,19 @@ struct CatalogFilter: Equatable {
     func open(_ person: Person) { self.person = nil; routes.append(.person(person)); error = nil }
     func openCollection(_ id: String) { list = nil; routes.append(.collection(id)); error = nil }
     func back() { if routes.count > 1 { routes.removeLast(); error = nil } }
+    func openURL(_ url: URL) async {
+        if url.scheme == "kachalka" {
+            do { let card = try await bridge.call("openLink", ["url": .string(url.absoluteString)], as: MediaCard.self); open(card) }
+            catch { self.error = error.localizedDescription }
+        } else { magnet = url.isFileURL ? url.path : url.absoluteString; addTorrent = true }
+    }
+    func share(_ card: MediaCard) async {
+        do { let result = try await bridge.call("share", ["id": .string(card.id)]); let link = result["url"].string
+            guard !link.isEmpty else { return }; NSPasteboard.general.clearContents(); NSPasteboard.general.setString(link, forType: .string); toast = tr("Ссылка скопирована", "Link copied")
+        } catch { self.error = error.localizedDescription }
+    }
     func submit() {
+        if query.hasPrefix("kachalka://"), let url = URL(string: query) { Task { await openURL(url) }; return }
         submittedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines); filter = CatalogFilter(); page = 1
         let target: Section = section == .games ? .games : .movies
         section = target; routes = [.section(target)]; revision += 1

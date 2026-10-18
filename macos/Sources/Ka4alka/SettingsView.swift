@@ -5,6 +5,8 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject var model: AppModel
     @EnvironmentObject var updater: MacUpdater
+    @State private var cacheBytes: Double = 0
+    @State private var clearingCache = false
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var sourceName = ""
     @State private var sourceEndpoint = ""
@@ -63,12 +65,29 @@ struct SettingsView: View {
                     Button(tr("Добавить", "Add")) { Task { do { _ = try await model.bridge.call("sourceAdd", ["name": .string(sourceName), "endpoint": .string(sourceEndpoint), "apiKey": .string(sourceKey)]); sourceName = ""; sourceEndpoint = ""; sourceKey = ""; await loadSources() } catch { model.error = error.localizedDescription } } }.disabled(sourceName.isEmpty || sourceEndpoint.isEmpty)
                 }
             }
+            SwiftUI.Section(tr("Кэш", "Cache")) {
+                Text(byteText(cacheBytes)).foregroundStyle(.secondary)
+                Button(tr("Очистить кэш", "Clear cache")) {
+                    clearingCache = true
+                    Task {
+                        do { let result = try await model.bridge.call("clearCache"); cacheBytes = result["bytes"].number; ImageStore.shared.clear() }
+                        catch { model.error = error.localizedDescription }
+                        clearingCache = false
+                    }
+                }.disabled(clearingCache)
+                Text(tr("Настройки, сохранённое и загруженные файлы останутся на месте.", "Settings, saved titles and downloaded files are preserved.")).font(.caption).foregroundStyle(.secondary)
+            }
+            SwiftUI.Section(tr("Данные о фильмах", "Movie metadata")) {
+                Link("The Movie Database (TMDB)", destination: URL(string: "https://www.themoviedb.org/")!)
+                Text("This product uses the TMDB API but is not endorsed or certified by TMDB.").font(.caption).foregroundStyle(.secondary)
+                Link("TheTVDB", destination: URL(string: "https://thetvdb.com/")!)
+            }
             SwiftUI.Section(tr("Помощь и диагностика", "Help and diagnostics")) {
                 HStack { Link(tr("Новости в Telegram", "News on Telegram"), destination: URL(string: "https://t.me/ka4alkacc")!); Link(tr("Сообщить об ошибке", "Report a bug"), destination: URL(string: "https://t.me/+6sT2ocaKvLxlNmRi")!) }
                 Button(tr("Скопировать логи", "Copy logs")) { Task { await model.logs() } }
                 Text(tr("Личные пути и ключи удаляются из диагностического отчёта.", "Private paths and credentials are removed from diagnostic reports.")).font(.caption).foregroundStyle(.secondary)
             }
-        }.formStyle(.grouped).task { await loadSources(); if model.settings?.lanEnabled == true { await model.lan("discover") } }
+        }.formStyle(.grouped).task { await loadSources(); if let usage = try? await model.bridge.call("cacheUsage") { cacheBytes = usage["bytes"].number }; if model.settings?.lanEnabled == true { await model.lan("discover") } }
     }
     private func setting(_ label: String, key: String, value: Bool) -> some View { Toggle(label, isOn: Binding(get: { value }, set: { next in Task { await model.set(key, .bool(next)) } })) }
     private func loadSources() async { let result = try? await model.bridge.call("sources"); customSources = result?["items"].array ?? [] }

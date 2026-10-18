@@ -27,7 +27,7 @@ struct DetailView: View {
                         VStack(alignment: .leading, spacing: 12) {
                             Text(item.title).font(.largeTitle.bold()).lineLimit(3)
                             Text([item.year > 0 ? String(item.year) : "", item.genre, item.rating == "—" ? "" : "★ " + item.rating].filter { !$0.isEmpty }.joined(separator: " · ")).foregroundStyle(.white.opacity(0.8))
-                            HStack { Button { Task { await model.save(item) } } label: { Label(model.isSaved(item) ? tr("Сохранено", "Saved") : tr("Сохранить", "Save"), systemImage: model.isSaved(item) ? "heart.fill" : "heart") }; Button { Task { await model.hide(item); model.back() } } label: { Label(tr("Не интересно", "Not interested"), systemImage: "eye.slash") } }.buttonStyle(.bordered)
+                            HStack { Button { Task { await model.save(item) } } label: { Label(model.isSaved(item) ? tr("Сохранено", "Saved") : tr("Сохранить", "Save"), systemImage: model.isSaved(item) ? "heart.fill" : "heart") }; Button { Task { await model.hide(item); model.back() } } label: { Label(tr("Не интересно", "Not interested"), systemImage: "eye.slash") } ; Button { Task { await model.share(item) } } label: { Label(tr("Поделиться", "Share"), systemImage: "square.and.arrow.up") } }.buttonStyle(.bordered)
                         }.frame(maxWidth: .infinity, alignment: .leading)
                     }.padding(24).foregroundStyle(.white)
                 }.frame(height: 320).clipShape(RoundedRectangle(cornerRadius: 18))
@@ -60,7 +60,7 @@ struct DetailView: View {
                 Toggle(tr("Без плохого качества", "Hide low quality"), isOn: Binding(get: { model.settings?.hidePoorQuality ?? true }, set: { next in Task { await model.set("hidePoorQuality", .bool(next)); await model.loadReleases(card) } })).toggleStyle(.button)
                 if !studio.isEmpty || !audio.isEmpty || !quality.isEmpty || !language.isEmpty { Button(tr("Сбросить", "Reset")) { studio = ""; audio = ""; quality = ""; language = "" } }
             } }.scrollIndicators(.hidden)
-            if !model.sources.isEmpty { Text(model.sources.map { $0.name + " · " + $0.state }.joined(separator: "    ")).font(.caption).foregroundStyle(.secondary).lineLimit(3) }
+            if !model.sources.isEmpty { Text(model.sources.map { $0.name + " · " + sourceState($0.state) }.joined(separator: "    ")).font(.caption).foregroundStyle(.secondary).lineLimit(3) }
             if visibleReleases.isEmpty { if model.releasesLoading { ProgressView(tr("Ищем раздачи…", "Searching for releases…")).padding(.vertical, 24) } else { ContentUnavailableView(tr("Раздачи не найдены", "No releases found"), systemImage: "tray", description: Text(tr("Попробуй сбросить фильтры или повторить поиск позже.", "Reset filters or try again later."))) } }
             LazyVStack(spacing: 8) {
                 ForEach(visibleReleases) { release in
@@ -116,5 +116,16 @@ struct ReleaseListRow: View {
                 Label(tr("Скачать", "Download"), systemImage: "arrow.down")
             }.disabled(!release.downloadable)
         }.padding(14).background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+func sourceState(_ state: String) -> String {
+    switch state {
+    case "Ready": return tr("Найдено", "Found")
+    case "Empty": return tr("Нет результатов", "No results")
+    case "Loading": return tr("Поиск…", "Searching…")
+    case "Failed": return tr("Недоступен", "Unavailable")
+    case "TimedOut": return tr("Нет ответа", "Timed out")
+    default: return tr(state)
     }
 }

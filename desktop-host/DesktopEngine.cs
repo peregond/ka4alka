@@ -80,6 +80,17 @@ sealed class DesktopEngine:IAsyncDisposable
                 var award=awards.All.FirstOrDefault(x=>x.Id==S(p,"award"));
                 var entries=(award?.Entries??[]).Concat(awards.NomineesOf(S(p,"award"))).Where(x=>I(p,"year")==0||x.Year==I(p,"year")).DistinctBy(x=>(x.Year,x.ImdbId)).ToArray();
                 return new{years=(award?.Entries??[]).Concat(awards.NomineesOf(S(p,"award"))).Select(x=>x.Year).Distinct().OrderDescending(),items=Remember(entries.Select(entry=>AwardsCatalog.Item(entry)).ToArray()),winners=Remember((award?.Entries??[]).Where(x=>I(p,"year")==0||x.Year==I(p,"year")).Select(entry=>AwardsCatalog.Item(entry))),nominees=Remember(awards.NomineesOf(S(p,"award")).Where(x=>(I(p,"year")==0||x.Year==I(p,"year"))&&!(award?.Entries??[]).Any(winner=>winner.Year==x.Year&&winner.ImdbId==x.ImdbId)).Select(entry=>AwardsCatalog.Item(entry)))};
+            case "share":
+                var sharedCard=Card(S(p,"id"));return new{url=ShareLink.Create(sharedCard)};
+            case "openLink":
+                var targetCard=ShareLink.Parse(S(p,"url"))??throw new ArgumentException("Invalid Ka4alka link.");
+                var linked=DownloadMetadata.Card(new(){MediaTitle=targetCard.Title.Length>0?targetCard.Title:targetCard.Slug,MediaSection=targetCard.Section,MediaPageUrl=targetCard.PageUrl,MediaYear=targetCard.Year})??throw new ArgumentException("Invalid shared card.");
+                var enriched=DownloadMetadata.EnrichMedia(linked,new[]{shared.Find(linked)}.OfType<MediaItem>().Concat(prefs.LiveFavorites).Concat(index.Recent(linked.Section,200)).Concat(BundledCatalog.Search(linked.Section,linked.Title)));
+                return Remember([enriched])[0];
+            case "cacheUsage":return await Task.Run(()=>CacheFiles.Current.UsageAsync(ct),ct);
+            case "clearCache":
+                var usage=await Task.Run(()=>CacheFiles.Current.MaintainAsync(clear:true,ct:ct),ct);
+                index.ClearReleaseMemory();await index.ClearMemoryAsync();await shared.ClearMemoryAsync();groups.Clear();return usage;
             case "saved":return new{items=Remember(prefs.LiveFavorites),hasNext=false};
             case "save":
                 var saved=Card(S(p,"id"));if(IsSaved(saved)){prefs.LiveFavorites.RemoveAll(item=>MediaIdentity.Same(item,saved));prefs.Favorites.Remove(saved.Id);}else{prefs.LiveFavorites.Add(saved);prefs.Favorites.Add(saved.Id);}prefs.Save();Event("personal",Settings());return CardDto(saved);
