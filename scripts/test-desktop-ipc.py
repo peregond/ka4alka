@@ -31,7 +31,8 @@ try:
  assert call('setSettings',dict(uiLanguage='en'))['uiLanguage']=='en'
  assert call('downloads')['items']==[]
  assert 'text' in call('logs')
- call('shutdown');p.stdin.close();p.wait(timeout=15);assert p.returncode==0
+ call('shutdown');p.stdin.close();p.wait(timeout=15)
+ assert p.returncode==0, f'engine shutdown exited {p.returncode}: {p.stderr.read()[-4000:]}'
  print(f'Bootstrap: {bootstrap_ms} ms; engine stays lazy')
  print('PASS: packaged shared-engine protocol, lazy startup, 40-card pagination, featured, save/hide, settings, logs and graceful EOF shutdown')
 finally:

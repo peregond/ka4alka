@@ -13,6 +13,7 @@ if(OperatingSystem.IsMacOS()&&root.StartsWith("/var/",StringComparison.Ordinal))
     root=Path.Combine(new DirectoryInfo("/var").ResolveLinkTarget(true)!.FullName,root[5..]);
 Environment.SetEnvironmentVariable("KACHALKA_DATA",Path.Combine(root,"state"));
 try {
+ EngineLoopTests.Run();
  await ReleaseSearchTests.Run();
  await MediaMetadataTests.Run();
  await MissingDownloadFilesTests.Run(root);
