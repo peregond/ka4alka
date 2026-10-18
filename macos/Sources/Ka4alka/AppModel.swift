@@ -113,9 +113,9 @@ struct CatalogFilter: Equatable {
         do { let result = try await bridge.call("featured", as: FeaturedResult.self); if !Task.isCancelled { curated = result.groups } }
         catch is CancellationError {} catch { if !Task.isCancelled { self.error = error.localizedDescription } }
     }
-    func loadCollection(_ id: String) async {
+    func loadCollection(_ id: String, page: Int = 1) async {
         loading = true; list = nil; defer { loading = false }
-        do { let result = try await bridge.call("featured", ["id": .string(id)], as: CatalogResult.self); if route == .collection(id), !Task.isCancelled { list = result } }
+        do { let result = try await bridge.call("featured", ["id": .string(id), "page": .number(Double(page))], as: CatalogResult.self); if route == .collection(id), !Task.isCancelled { list = result } }
         catch is CancellationError {} catch { if !Task.isCancelled { self.error = error.localizedDescription } }
     }
     func loadSaved() async {
@@ -153,7 +153,7 @@ struct CatalogFilter: Equatable {
         let panel = NSOpenPanel(); panel.canChooseFiles = false; panel.canChooseDirectories = true; panel.canCreateDirectories = true; panel.allowsMultipleSelection = false
         panel.message = tr("В выбранной папке будет создана папка Ka4alka для загрузок.", "A Ka4alka download folder will be created inside the selected folder.")
         guard await panel.begin() == .OK, let folder = panel.url else { return }
-        do { settings = try await bridge.call("folder", ["path": .string(folder.path)], as: AppSettings.self); folderRequired = false } catch { self.error = error.localizedDescription }
+        do { settings = try await bridge.call("folder", ["path": .string(folder.resolvingSymlinksInPath().path)], as: AppSettings.self); folderRequired = false } catch { self.error = error.localizedDescription }
     }
     func add(_ release: ReleaseRow? = nil, card: MediaCard? = nil) async {
         if settings?.folderConfigured != true { await chooseFolder(); guard settings?.folderConfigured == true else { return } }

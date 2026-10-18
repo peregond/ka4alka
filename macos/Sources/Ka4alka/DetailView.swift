@@ -35,6 +35,15 @@ struct DetailView: View {
                 else if model.detail == nil { ProgressView(tr("Загружаем описание…", "Loading description…")).controlSize(.small) }
                 if let game = detail?.game {
                     Label(tr("Раздачи для Windows не запускаются в macOS без совместимого ПО.", "Windows releases do not run directly on macOS."), systemImage: "desktopcomputer").font(.callout).foregroundStyle(.secondary)
+                    HStack {
+                        if let address = game.steamUrl, let url = URL(string: address) { Link("Steam", destination: url) }
+                        if let address = game.steamDbUrl, let url = URL(string: address) { Link("SteamDB", destination: url) }
+                        if game.metacritic > 0 { Text("Metacritic \(game.metacritic)").font(.callout.weight(.semibold)) }
+                        if let review = game.review { Text("Steam \(review.percent)% · \(review.count)").font(.callout) }
+                        if game.discount > 0 { Text("−\(game.discount)%").foregroundStyle(.green) }
+                    }
+                    if !game.releaseDate.isEmpty { Text(game.releaseDate).font(.callout).foregroundStyle(.secondary) }
+                    if game.russian != "Unknown" && game.russian != "Absent" { Label(game.russian == "Voiced" ? tr("Русская озвучка", "Russian audio") : tr("Русский интерфейс", "Russian interface"), systemImage: "text.bubble").font(.callout) }
                     Text([game.developers, game.publishers, game.price].filter { !$0.isEmpty }.joined(separator: " · ")).font(.callout)
                     if !game.gallery.isEmpty { ScrollView(.horizontal) { LazyHStack { ForEach(game.gallery) { shot in Artwork(address: shot.thumb, width: 640).frame(width: 280, height: 157).clipShape(RoundedRectangle(cornerRadius: 9)).onTapGesture { if let url = URL(string: shot.full) { NSWorkspace.shared.open(url) } } } } }.scrollIndicators(.hidden) }
                     if !game.requirements.isEmpty { DisclosureGroup(tr("Системные требования", "System requirements")) { Text(game.requirements).font(.callout).frame(maxWidth: .infinity, alignment: .leading).padding(.top, 8) } }

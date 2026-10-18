@@ -6,7 +6,12 @@ using Kachalka;
 using MonoTorrent;
 using MonoTorrent.Client;
 var root=Path.Combine(Path.GetTempPath(),"kachalka-portable-"+Guid.NewGuid().ToString("N"));
-Directory.CreateDirectory(root);Environment.SetEnvironmentVariable("KACHALKA_DATA",Path.Combine(root,"state"));
+Directory.CreateDirectory(root);
+// macOS exposes /var through a system symlink; the deletion tests intentionally
+// reject symlink ancestors, so use the canonical physical temporary directory.
+if(OperatingSystem.IsMacOS()&&root.StartsWith("/var/",StringComparison.Ordinal))
+    root=Path.Combine(new DirectoryInfo("/var").ResolveLinkTarget(true)!.FullName,root[5..]);
+Environment.SetEnvironmentVariable("KACHALKA_DATA",Path.Combine(root,"state"));
 try {
  await MissingDownloadFilesTests.Run(root);
  var upper=Path.Combine(root,"CaseFolder");var lower=Path.Combine(root,"casefolder");

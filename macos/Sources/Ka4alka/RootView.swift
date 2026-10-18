@@ -65,6 +65,7 @@ struct RootView: View {
     @ViewBuilder private var content: some View {
         switch model.route {
         case .section(.featured): FeaturedView()
+        case .section(.games) where model.submittedQuery.isEmpty && model.filter == CatalogFilter() && model.page == 1: GameHomeView()
         case .section(.movies), .section(.series), .section(.games): CatalogView()
         case .section(.saved): CatalogView(saved: true)
         case .section(.downloads): DownloadsView(store: model.transfers)

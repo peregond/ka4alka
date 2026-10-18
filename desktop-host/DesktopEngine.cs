@@ -23,7 +23,7 @@ sealed class DesktopEngine:IAsyncDisposable
     LanService? lan;Task? ticker;Task? warming;bool shuttingDown;
     public DesktopEngine()
     {
-        AppLanguage.Set(prefs.UiLanguage);PerformanceBudget.LiteMode=prefs.LiteMode;
+        AppLanguage.Set(prefs.UiLanguage);prefs.LiteMode=PerformanceBudget.DefaultLiteMode(prefs.LiteModeConfigured,prefs.LiteMode);PerformanceBudget.LiteMode=prefs.LiteMode;
         online=new(source,relays:new IndexRelays(source));source.TorrentRelay=online.RelayTorrent;
         shared=new(source);awards=new(source);
         downloads=new(null,prefs.MaxDownloadKbps,prefs.MaxUploadKbps);
@@ -63,6 +63,11 @@ sealed class DesktopEngine:IAsyncDisposable
         {
             case "bootstrap":
                 warming??=Warm();return new{protocol=1,version=typeof(DesktopEngine).Assembly.GetName().Version?.ToString(3),settings=Settings(),genres=CatalogChoices.Genres.Select(Choice),countries=CatalogChoices.Countries.Select(Choice),gameGenres=GameGenres.All.Select(x=>new{key=x.Key,label=AppLanguage.T(x.Name)}),engineCreated=downloads.EngineCreated};
+            case "gameShelves":return new{items=GameShelves.Home.Select(spec=>new{id=spec.Key,title=AppLanguage.T(spec.Title)})};
+            case "gameShelf":
+                var shelf=GameShelves.Home.Single(x=>x.Key==S(p,"id"));
+                var shelfPage=await new GameCatalog(source,prefs.UiLanguage).Browse(new("",shelf.Sort,shelf.Genre,Math.Clamp(I(p,"page",1),1,500)),ct);
+                return new{items=Remember(shelfPage.Items.Where(Visible)),hasNext=shelfPage.HasNext,title=AppLanguage.T(shelf.Title)};
             case "catalog":return await Catalog(p,ct);
             case "featured":return await Featured(p,ct);
             case "artwork":
@@ -157,7 +162,7 @@ sealed class DesktopEngine:IAsyncDisposable
         var section=S(p,"section","movies");var page=Math.Clamp(I(p,"page",1),1,500);var query=S(p,"query");
         if(section=="games")
         {
-            var result=await new GameCatalog(source,prefs.UiLanguage).Browse(new(query,S(p,"sort","popular"),S(p,"genre"),page),ct);
+            var result=await new GameCatalog(source,prefs.UiLanguage).Browse(new(query,S(p,"sort","popular"),S(p,"genre")=="all"?"":S(p,"genre"),page),ct);
             return new{items=Remember(result.Items.Where(Visible)),hasNext=result.HasNext,offline=false};
         }
         await BundledCatalog.EnsureLoadedAsync(ct);var category=section=="series"?"Сериалы":"Фильмы";
@@ -178,7 +183,7 @@ sealed class DesktopEngine:IAsyncDisposable
         var remote=await online.BrowsePage(category,page,ct);return new{items=Remember(remote.Items.Where(Visible)),hasNext=remote.HasNext,offline=false};
     }
     static double Rating(MediaItem item)=>double.TryParse(item.CardRating.Replace(',','.'),System.Globalization.NumberStyles.Any,System.Globalization.CultureInfo.InvariantCulture,out var value)?value:0;
-    bool Visible(MediaItem item)=>!HiddenCatalog.Hidden(item,prefs,CatalogChoices.Genres)&&(!prefs.HidePoorQuality||!item.OnlyPoorQuality);
+    bool Visible(MediaItem item)=>!HiddenCatalog.Hidden(item,prefs,CatalogChoices.Genres)&&!ReleaseAvailability.Hidden(index.RememberedReleases(item),DateTime.UtcNow)&&(!prefs.HidePoorQuality||!item.OnlyPoorQuality);
     async Task<object> Featured(JsonElement p,CancellationToken ct)
     {
         await BundledCatalog.EnsureLoadedAsync(ct);await awards.RestoreAsync(ct);
@@ -189,6 +194,12 @@ sealed class DesktopEngine:IAsyncDisposable
         }
         if(S(p,"id").Length>0)
         {
+            if(S(p,"id").StartsWith("game-",StringComparison.Ordinal))
+            {
+                var spec=GameShelves.Home.Single(x=>x.Key==S(p,"id")[5..]);
+                var result=await new GameCatalog(source,prefs.UiLanguage).Browse(new("",spec.Sort,spec.Genre,Math.Clamp(I(p,"page",1),1,500)),ct);
+                return new{title=AppLanguage.T(spec.Title),description="",items=Remember(result.Items.Where(Visible)),hasNext=result.HasNext};
+            }
             var group=groups[S(p,"id")];return new{title=group.Collection.Label,description=group.Collection.Summary,items=Remember(group.Items.Where(Visible)),hasNext=false};
         }
         return new{groups=groups.Values.Select(group=>new{id=group.Collection.Id,title=group.Collection.Label,description=group.Collection.Summary,layout=group.Collection.Layout,items=Remember(group.Items.Where(Visible).Take(10)),count=group.Items.Length}).Where(group=>group.items.Length>0).Take(18)};
@@ -210,7 +221,7 @@ sealed class DesktopEngine:IAsyncDisposable
             }
             if(backdrop==null)try{var id=OnlineIndexClient.IdFor(item);if(id!=null)backdrop=FeatureBackdrop.FromResponse(await online.ReadSite("api/backdrop?id="+Uri.EscapeDataString(id),128*1024,ct),id);}catch(Exception)when(!ct.IsCancellationRequested){}
         }
-        Remember([item]);return new{item=CardDto(item),backdrop,people=item.DisplayPeople,awards=item.Awards,game=game==null?null:new{game.Requirements,game.Developers,game.Publishers,game.Price,game.Metacritic,gallery=game.Gallery,game.Traits,platform="Windows"}};
+        Remember([item]);return new{item=CardDto(item),backdrop,people=item.DisplayPeople,awards=item.Awards,game=game==null?null:new{game.Requirements,game.Developers,game.Publishers,game.Price,game.Metacritic,gallery=game.Gallery,game.Traits,game.OriginalPrice,game.Discount,game.ReleaseDate,game.Age,game.Review,russian=game.Russian.ToString(),steamUrl=item.PageUrl,steamDbUrl=GameCatalog.TryId(item.PageUrl,out var steamId)?"https://steamdb.info/app/"+steamId:null,platform="Windows"}};
     }
     async Task<object> Releases(string request,MediaItem item,CancellationToken ct)
     {
@@ -302,7 +313,7 @@ sealed class DesktopEngine:IAsyncDisposable
     string Key(MediaItem item)=>(item.Section=="Игры"?"games":item.Section=="Сериалы"?"series":"movies")+":"+(item.OnlineId??item.ImdbId??item.Id.ToString());
     CardView[] Remember(IEnumerable<MediaItem> items)=>items.Select(item=>{var key=Key(item);if(cards.Count>6000)cards.Remove(cards.Keys.First());cards[key]=item;return CardDto(item);}).ToArray();
     bool IsSaved(MediaItem item)=>prefs.LiveFavorites.Any(x=>MediaIdentity.Same(x,item));
-    CardView CardDto(MediaItem item)=>new(Key(item),item.DisplayTitle,item.Section=="Игры"?"games":item.Section=="Сериалы"?"series":"movies",item.Year,item.CardRating,item.DisplayImageUrl??(prefs.UiLanguage=="en"?null:item.ImageUrl),item.DisplayDescription??"",item.CardGenre,item.HasPosterQuality?item.PosterQuality:null,IsSaved(item),item.Section=="Игры"?"Windows":null);
+    CardView CardDto(MediaItem item)=>new(Key(item),item.DisplayTitle,item.Section=="Игры"?"games":item.Section=="Сериалы"?"series":"movies",item.Year,item.CardRating,item.DisplayImageUrl??(prefs.UiLanguage=="en"?null:item.ImageUrl),item.DisplayDescription??"",item.CardGenre,item.HasPosterQuality?item.PosterQuality:null,IsSaved(item),item.Section=="Игры"?"Windows":null,item.Store);
     MediaItem Card(string id)=>cards.GetValueOrDefault(id)??throw new KeyNotFoundException("Карточка устарела. Обнови страницу.");
     DownloadItem Download(string id)=>downloads.Items.Single(item=>item.Id==id);
     static string S(JsonElement p,string key,string fallback="")=>p.TryGetProperty(key,out var value)&&value.ValueKind==JsonValueKind.String?value.GetString()??fallback:fallback;
@@ -319,4 +330,4 @@ sealed class DesktopEngine:IAsyncDisposable
         await downloads.Close();prefs.Save();source.Dispose();lifetime.Dispose();
     }
 }
-sealed record CardView(string id,string title,string section,int year,string rating,string? poster,string description,string genre,string? quality,bool saved,string? platform);
+sealed record CardView(string id,string title,string section,int year,string rating,string? poster,string description,string genre,string? quality,bool saved,string? platform,GameStoreInfo? store);

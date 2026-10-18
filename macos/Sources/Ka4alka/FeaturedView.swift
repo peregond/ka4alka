@@ -47,6 +47,7 @@ struct CollectionView: View {
     var id: String
     @State private var award: AwardPage?
     @State private var year = 0
+    @State private var page = 1
     private var isAward: Bool { id.hasPrefix("award-") }
     var body: some View {
         ScrollView {
@@ -60,8 +61,11 @@ struct CollectionView: View {
                     if award.winners == nil { PosterGrid(items: award.items) }
                 } else if let list = model.list { if list.items.isEmpty { ContentUnavailableView(tr("Подборка пока недоступна", "Collection unavailable"), systemImage: "rectangle.stack") } else { PosterGrid(items: list.items, wide: list.items.allSatisfy { $0.section == "games" } && id != "top-rated") } }
                 else { SkeletonGrid() }
+                if id.hasPrefix("game-"), let list = model.list {
+                    HStack { Spacer(); Button(tr("Назад", "Previous")) { page = max(1, page - 1) }.disabled(page == 1); Text(String(page)); Button(tr("Далее", "Next")) { page += 1 }.disabled(!list.hasNext); Spacer() }
+                }
             }.padding(24)
-        }.task(id: id) { await model.loadCollection(id); if isAward { await loadAwards() } }.task(id: year) { if isAward { await loadAwards() } }
+        }.task(id: id + String(page)) { await model.loadCollection(id, page: page); if isAward { await loadAwards() } }.task(id: year) { if isAward { await loadAwards() } }
     }
     private func loadAwards() async { do { let value = try await model.bridge.call("awards", ["award": .string(String(id.dropFirst(6))), "year": .number(Double(year))], as: AwardPage.self); if !Task.isCancelled { award = value } } catch is CancellationError {} catch { if !Task.isCancelled { model.error = error.localizedDescription } } }
 }

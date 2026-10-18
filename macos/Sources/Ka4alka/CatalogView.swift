@@ -15,6 +15,14 @@ struct PosterCard: View {
                 VStack { HStack { Spacer(); Button { Task { await model.save(card) } } label: { Image(systemName: model.isSaved(card) ? "heart.fill" : "heart") }.help(tr("Сохранить", "Save")); Button { Task { await model.hide(card) } } label: { Image(systemName: "eye.slash") }.help(tr("Не интересно", "Not interested")) }.buttonStyle(.bordered).controlSize(.small); Spacer() }.padding(7).opacity(hovered ? 1 : 0)
             }.clipShape(RoundedRectangle(cornerRadius: 12)).onHover { hovered = $0 }
             Button { model.open(card) } label: { Text(card.title).font(.body.weight(.semibold)).lineLimit(2).frame(maxWidth: .infinity, minHeight: 36, alignment: .topLeading) }.buttonStyle(.plain)
+            if let store = card.store {
+                HStack(spacing: 7) {
+                    if store.discount > 0 { Text("−\(store.discount)%").foregroundStyle(.green) }
+                    Text(store.free ? tr("Бесплатно", "Free") : store.price).font(.caption.weight(.semibold))
+                    Spacer()
+                    if store.reviewPercent > 0 { Text("👍 \(store.reviewPercent)%").font(.caption).foregroundStyle(.secondary) }
+                }
+            }
             Text([card.year > 0 ? String(card.year) : "", card.genre].filter { !$0.isEmpty }.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary).lineLimit(1)
         }.contextMenu {
             Button(model.isSaved(card) ? tr("Удалить из сохранённого", "Remove from Saved") : tr("Сохранить", "Save")) { Task { await model.save(card) } }

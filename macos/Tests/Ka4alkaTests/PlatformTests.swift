@@ -41,7 +41,7 @@ final class MacInstallationTests: XCTestCase {
     func testVerifiedApplicationReplacement() throws {
         guard let sourcePath = ProcessInfo.processInfo.environment["KACHALKA_TEST_APP"] else { throw XCTSkip("A signed packaged application is required") }
         let files = FileManager.default; let source = URL(fileURLWithPath: sourcePath)
-        let directory = files.temporaryDirectory.appendingPathComponent("kachalka-installer-" + UUID().uuidString)
+        let directory = files.temporaryDirectory.resolvingSymlinksInPath().appendingPathComponent("kachalka-installer-" + UUID().uuidString)
         try files.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? files.removeItem(at: directory) }
         let installed = directory.appendingPathComponent("installed/Ka4alka.app")
