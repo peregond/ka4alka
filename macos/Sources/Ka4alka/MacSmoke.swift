@@ -2,6 +2,20 @@ import AppKit
 import Foundation
 
 @MainActor enum MacSmoke {
+    static func close(model: AppModel) async {
+        guard let index = CommandLine.arguments.firstIndex(of: "--close-smoke-test"), CommandLine.arguments.count > index + 1 else { return }
+        let directory = URL(fileURLWithPath: CommandLine.arguments[index + 1])
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try await Task.sleep(for: .milliseconds(300))
+            guard model.connected, let window = NSApp.windows.first(where: { $0.isVisible && $0.contentView != nil }) else { throw UpdateError("Native close test has no connected window") }
+            try JSONEncoder().encode(["connected": true, "nativeWindowClose": true]).write(to: directory.appendingPathComponent("checks.json"))
+            window.performClose(nil)
+        } catch {
+            try? error.localizedDescription.write(to: directory.appendingPathComponent("error.txt"), atomically: true, encoding: .utf8)
+            requestApplicationQuit()
+        }
+    }
     static func run(model: AppModel) async {
         guard let index = CommandLine.arguments.firstIndex(of: "--smoke-test"), CommandLine.arguments.count > index + 1 else { return }
         let root = URL(fileURLWithPath: CommandLine.arguments[index + 1]); try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)

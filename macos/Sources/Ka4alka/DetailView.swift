@@ -7,13 +7,29 @@ struct DetailView: View {
     @State private var studio = ""
     @State private var audio = ""
     @State private var quality = ""
-    @State private var releaseSort = "seeds"
+    @State private var releaseSort = "recommended"
+    @State private var season = 0
+    @State private var episode = 0
+    @State private var codec = ""
+    @State private var source = ""
+    @State private var subtitles = false
     @State private var language = ""
     private var detail: DetailResult? { model.detail?.item.id == card.id ? model.detail : nil }
     private var item: MediaCard { detail?.item ?? card }
     private var visibleReleases: [ReleaseRow] {
-        let rows = model.releases.filter { (studio.isEmpty || $0.studios.contains(studio)) && (audio.isEmpty || $0.audioTypes.contains(audio)) && (quality.isEmpty || $0.quality == quality) && (language.isEmpty || $0.title.localizedCaseInsensitiveContains(language)) }
-        return releaseSort == "size" ? rows.sorted { ($0.size ?? 0) < ($1.size ?? 0) } : rows.sorted { ($0.seeds ?? -1) > ($1.seeds ?? -1) }
+        let rows = model.releases.filter { release in
+            (studio.isEmpty || release.studios.contains(studio) || release.gameGroup == studio) &&
+            (audio.isEmpty || release.audioTypes.contains(audio)) &&
+            (quality.isEmpty || release.quality == quality) &&
+            (language.isEmpty || (language == "ENG" ? release.englishAudio : release.russianAudio)) &&
+            (season == 0 || release.multipleSeasons || release.season == season) &&
+            (episode == 0 || release.multipleEpisodes || release.episode == episode) &&
+            (codec.isEmpty || release.codec == codec) && (source.isEmpty || release.source == source) &&
+            (!subtitles || release.subs != "Не указано")
+        }
+        if releaseSort == "size" { return rows.sorted { ($0.size ?? Double.greatestFiniteMagnitude) < ($1.size ?? Double.greatestFiniteMagnitude) } }
+        if releaseSort == "seeds" { return rows.sorted { ($0.seeds ?? -1) > ($1.seeds ?? -1) } }
+        return rows.sorted { $0.recommended && !$1.recommended }
     }
     var body: some View {
         ScrollView {
@@ -61,13 +77,22 @@ struct DetailView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack { Text(tr("Выбрать раздачу", "Choose a release")).font(.title2.bold()); if model.releasesLoading { ProgressView().controlSize(.small) }; Spacer(); Button { Task { await model.loadReleases(card) } } label: { Image(systemName: "arrow.clockwise") } }
             ScrollView(.horizontal) { HStack {
-                releaseMenu(tr("Студия", "Studio"), value: $studio, options: Array(Set(model.releases.flatMap(\.studios))).sorted())
+                releaseMenu(tr("Студия", "Studio"), value: $studio, options: Array(Set(model.releases.flatMap(\.studios) + model.releases.compactMap(\.gameGroup))).sorted())
                 releaseMenu(tr("Озвучка", "Audio"), value: $audio, options: Array(Set(model.releases.flatMap(\.audioTypes))).sorted())
-                releaseMenu(tr("Качество", "Quality"), value: $quality, options: ["HD Ready", "Full HD", "4K"])
-                Menu { Button(tr("Больше отдающих", "Most seeders")) { releaseSort = "seeds" }; Button(tr("Меньше размер", "Smallest size")) { releaseSort = "size" } } label: { Text(tr("Порядок", "Sort")) }
+                if card.section != "games" {
+                    releaseMenu(tr("Качество", "Quality"), value: $quality, options: ["HD Ready", "Full HD", "4K"])
+                    releaseMenu(tr("Видео", "Video"), value: $codec, options: Array(Set(model.releases.map(\.codec))).filter { $0 != "Не указано" }.sorted())
+                    Toggle(tr("С субтитрами", "With subtitles"), isOn: $subtitles).toggleStyle(.button)
+                }
+                if card.section == "series" {
+                    Menu { Button(tr("Все сезоны", "All seasons")) { season = 0 }; ForEach(Array(Set(model.releases.compactMap(\.season))).sorted(), id: \.self) { value in Button(String(value)) { season = value } } } label: { Text(season == 0 ? tr("Сезон", "Season") : "S\(season)") }
+                    Menu { Button(tr("Все серии", "All episodes")) { episode = 0 }; ForEach(Array(Set(model.releases.compactMap(\.episode))).sorted(), id: \.self) { value in Button(String(value)) { episode = value } } } label: { Text(episode == 0 ? tr("Серия", "Episode") : "E\(episode)") }
+                }
+                releaseMenu(tr("Источник", "Source"), value: $source, options: Array(Set(model.releases.map(\.source))).sorted())
+                Menu { Button(tr("Рекомендуемые", "Recommended")) { releaseSort = "recommended" }; Button(tr("Больше отдающих", "Most seeders")) { releaseSort = "seeds" }; Button(tr("Меньше размер", "Smallest size")) { releaseSort = "size" } } label: { Text(tr("Порядок", "Sort")) }
                 Menu { Button(tr("Все языки", "All languages")) { language = "" }; Button("English") { language = "ENG" }; Button(tr("Русский", "Russian")) { language = "RUS" } } label: { Text(language.isEmpty ? tr("Язык", "Language") : language) }
                 Toggle(tr("Без плохого качества", "Hide low quality"), isOn: Binding(get: { model.settings?.hidePoorQuality ?? true }, set: { next in Task { await model.set("hidePoorQuality", .bool(next)); await model.loadReleases(card) } })).toggleStyle(.button)
-                if !studio.isEmpty || !audio.isEmpty || !quality.isEmpty || !language.isEmpty { Button(tr("Сбросить", "Reset")) { studio = ""; audio = ""; quality = ""; language = "" } }
+                if !studio.isEmpty || !audio.isEmpty || !quality.isEmpty || !language.isEmpty || !codec.isEmpty || !source.isEmpty || season != 0 || episode != 0 || subtitles { Button(tr("Сбросить", "Reset")) { studio = ""; audio = ""; quality = ""; language = ""; codec = ""; source = ""; season = 0; episode = 0; subtitles = false } }
             } }.scrollIndicators(.hidden)
             if !model.sources.isEmpty { Text(model.sources.map { $0.name + " · " + sourceState($0.state) }.joined(separator: "    ")).font(.caption).foregroundStyle(.secondary).lineLimit(3) }
             if visibleReleases.isEmpty { if model.releasesLoading { ProgressView(tr("Ищем раздачи…", "Searching for releases…")).padding(.vertical, 24) } else { ContentUnavailableView(tr("Раздачи не найдены", "No releases found"), systemImage: "tray", description: Text(tr("Попробуй сбросить фильтры или повторить поиск позже.", "Reset filters or try again later."))) } }
@@ -96,7 +121,8 @@ struct ReleaseListRow: View {
     var release: ReleaseRow
     var card: MediaCard
     private var metadata: String {
-        [release.source, release.poor ? tr("Экранка", "Low quality") : release.quality,
+        if card.section == "games" { return [release.source, release.gameKind, release.gameGroup, release.gameVersion, release.size.map(byteText)].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ") }
+        return [release.source, release.poor ? tr("Экранка", "Low quality") : release.quality,
          release.audio, release.size.map(byteText) ?? ""].filter { !$0.isEmpty }.joined(separator: " · ")
     }
     private var peers: String {
@@ -107,6 +133,7 @@ struct ReleaseListRow: View {
     var body: some View {
         HStack(spacing: 14) {
             VStack(alignment: .leading, spacing: 6) {
+                if release.recommended { Label(tr("Рекомендуем", "Recommended"), systemImage: "checkmark.seal").font(.caption.weight(.semibold)).foregroundStyle(model.accent) }
                 Text(release.title).font(.callout.weight(.medium)).lineLimit(3)
                 Text(metadata).font(.caption).foregroundStyle(.secondary)
                 Text(peers)

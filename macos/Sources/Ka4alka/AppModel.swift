@@ -146,8 +146,18 @@ struct CatalogFilter: Equatable {
     }
     func unhide(_ id: String) async { do { settings = try await bridge.call("unhide", ["id": .string(id)], as: AppSettings.self); hiddenCards.removeAll(); cache.removeAll(); curated = []; revision += 1 } catch { self.error = error.localizedDescription } }
     func set(_ key: String, _ value: JSONValue) async {
-        do { settings = try await bridge.call("setSettings", [key: value], as: AppSettings.self); if let settings { UserDefaults.standard.set(settings.uiLanguage, forKey: "UiLanguage"); ImageStore.shared.setLite(settings.liteMode) }; cache.removeAll(); curated = []; revision += 1 }
-        catch { self.error = error.localizedDescription }
+        do {
+            settings = try await bridge.call("setSettings", [key: value], as: AppSettings.self)
+            if let settings {
+                UserDefaults.standard.set(settings.uiLanguage, forKey: "UiLanguage")
+                ImageStore.shared.setLite(settings.liteMode)
+            }
+            if key == "uiLanguage" {
+                let localized = try await bridge.call("bootstrap", as: Bootstrap.self)
+                genres = localized.genres; countries = localized.countries; gameGenres = localized.gameGenres
+            }
+            cache.removeAll(); curated = []; revision += 1
+        } catch { self.error = error.localizedDescription }
     }
     func chooseFolder() async {
         let panel = NSOpenPanel(); panel.canChooseFiles = false; panel.canChooseDirectories = true; panel.canCreateDirectories = true; panel.allowsMultipleSelection = false

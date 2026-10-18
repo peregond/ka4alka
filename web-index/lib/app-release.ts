@@ -1,4 +1,4 @@
-export type AppRelease = { version: string; installerUrl: string; zipUrl: string; releaseUrl: string; installerSize: number };
+export type AppRelease = { version: string; installerUrl: string; zipUrl: string; releaseUrl: string; installerSize: number; mac?: { arm64: string; x64: string; arm64Zip: string; x64Zip: string } };
 
 const fallback: AppRelease = {
   version: "0.43.4",
@@ -40,7 +40,11 @@ export async function getLatestRelease(): Promise<AppRelease> {
       const installerUrl = releaseAssetUrl(installer?.browser_download_url, tag);
       const zipUrl = releaseAssetUrl(zip?.browser_download_url, tag);
       if (!installerUrl || !zipUrl || !Number.isSafeInteger(installer.size) || installer.size <= 0) throw new Error("Missing Windows assets");
-      cached = { version: tag.slice(1), installerUrl, zipUrl, installerSize: installer.size, releaseUrl: `https://github.com/peregond/ka4alka/releases/tag/${tag}` };
+      const macAsset = (name: string) => releaseAssetUrl(release.assets.find((asset: { name?: string }) => asset.name === name)?.browser_download_url, tag);
+      const arm64 = macAsset("Kachalka-macos-arm64.dmg"), x64 = macAsset("Kachalka-macos-x64.dmg");
+      const arm64Zip = macAsset("Kachalka-macos-arm64.zip"), x64Zip = macAsset("Kachalka-macos-x64.zip");
+      const mac = arm64 && x64 && arm64Zip && x64Zip ? { arm64, x64, arm64Zip, x64Zip } : undefined;
+      cached = { mac, version: tag.slice(1), installerUrl, zipUrl, installerSize: installer.size, releaseUrl: `https://github.com/peregond/ka4alka/releases/tag/${tag}` };
       expires = Date.now() + 30 * 60_000;
     } catch { expires = Date.now() + 5 * 60_000; }
     return cached;

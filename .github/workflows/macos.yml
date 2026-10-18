@@ -62,8 +62,26 @@ jobs:
           test ! -f "$output/error.txt" || { cat "$output/error.txt"; exit 1; }
           test -f "$output/checks.json"
           cat "$output/checks.json"
+      - name: Verify closing the native window saves state and exits
+        env:
+          KACHALKA_DATA: ${{ github.workspace }}/test-output/macos/profile
+        run: |
+          app="$PWD/dist/macos-${{ matrix.arch }}/Ka4alka.app/Contents/MacOS/Ka4alka"
+          output="$PWD/test-output/macos/close"
+          "$app" --close-smoke-test "$output" &
+          process=$!
+          for ((attempt=0;attempt<40;attempt++)); do
+            if ! kill -0 "$process" 2>/dev/null; then break; fi
+            sleep 1
+          done
+          if kill -0 "$process" 2>/dev/null; then kill "$process"; echo 'Native window close timed out'; exit 1; fi
+          wait "$process"
+          test ! -f "$output/error.txt" || { cat "$output/error.txt"; exit 1; }
+          test -f "$output/checks.json"
       - name: Verify shared queue, magnet transfers and deleted-file recovery
         run: dotnet run --project desktop-core-tests/Kachalka.DesktopCoreTests.csproj -c Release
+      - name: Verify mutual TLS device pairing and download requests
+        run: dotnet run --project lan-tests/Kachalka.LanTests.csproj -c Release
       - name: Verify packaged pipe protocol without creating an idle torrent engine
         run: python3 scripts/test-desktop-ipc.py "$PWD/dist/macos-${{ matrix.arch }}/Ka4alka.app/Contents/Resources/engine/Kachalka.Engine"
       - name: Verify native models and signed updater
@@ -79,3 +97,4 @@ jobs:
             dist/macos-${{ matrix.arch }}/Kachalka-macos-*.zip
             dist/macos-${{ matrix.arch }}/Kachalka-macos-*.dmg
             test-output/macos/render/
+            test-output/macos/close/

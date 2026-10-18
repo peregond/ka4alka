@@ -28,6 +28,7 @@ jobs:
           path: ~/.nuget/packages
           key: portable-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
       - run: dotnet run --project desktop-core-tests/Kachalka.DesktopCoreTests.csproj -c Release
+      - run: dotnet run --project lan-tests/Kachalka.LanTests.csproj -c Release
       - run: dotnet run --project mac-update-tests/Kachalka.MacUpdateTests.csproj -c Release
       - run: dotnet build release-tools/Kachalka.ReleaseTools.csproj -c Release
       - run: dotnet build desktop-host/Kachalka.DesktopHost.csproj -c Release

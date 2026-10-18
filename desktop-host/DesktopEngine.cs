@@ -55,9 +55,9 @@ sealed class DesktopEngine:IAsyncDisposable
     }
     async Task Dispatch(string id,string method,JsonElement args,CancellationTokenSource request)
     {
-        try{Reply(id,await Handle(id,method,args,request.Token));}
-        catch(OperationCanceledException){Write(new{id,error=new{code="cancelled",message="Cancelled"}});}
-        catch(Exception error){ErrorLog.Write(error);Write(new{id,error=new{code="failed",message=AppLanguage.T(error.Message)}});}
+        try{var result=await Handle(id,method,args,request.Token);if(!shuttingDown||method=="shutdown")Reply(id,result);}
+        catch(OperationCanceledException){if(!shuttingDown)Write(new{id,error=new{code="cancelled",message="Cancelled"}});}
+        catch(Exception error){ErrorLog.Write(error);if(!shuttingDown)Write(new{id,error=new{code="failed",message=AppLanguage.T(error.Message)}});}
         finally{requests.Remove(id);request.Dispose();}
     }
     async Task<object> Handle(string request,string method,JsonElement p,CancellationToken ct)
@@ -151,7 +151,7 @@ sealed class DesktopEngine:IAsyncDisposable
                     var destination=Path.Combine(Preferences.DataDir,"updates",Guid.NewGuid().ToString("N"));
                     return await Task.Run(()=>updater.PrepareAsync(Convert.FromBase64String(S(p,"manifest")),Convert.FromBase64String(S(p,"signature")),S(p,"architecture"),S(p,"installed"),destination,new Progress<MacUpdateProgress>(value=>Event("updateProgress",value)),ct),ct);
                 }
-            case "shutdown":shuttingDown=true;await downloads.Close();return new{};
+            case "shutdown":shuttingDown=true;lifetime.Cancel();foreach(var pending in requests.Values.ToArray())pending.Cancel();await downloads.Close();return new{};
             default:throw new ArgumentException("Unknown desktop command: "+method);
         }
     }
@@ -187,7 +187,7 @@ sealed class DesktopEngine:IAsyncDisposable
         var local=await Task.Run(()=>shared.All.Where(item=>item.Section==category&&Visible(item)&&selection.Matches(item)).ToArray(),ct);
         if(local.Length>0)
         {
-            IEnumerable<MediaItem> rows=local;rows=selection.Order=="rating"?rows.OrderByDescending(item=>Rating(item)):rows.OrderByDescending(item=>item.Year);
+            IEnumerable<MediaItem> rows=local;rows=selection.Order=="rating"?rows.OrderByDescending(item=>Rating(item)):selection.Order=="date"?rows.OrderByDescending(item=>item.Year):rows;
             var offset=(page-1)*CatalogPaging.Size;var data=rows.Skip(offset).Take(CatalogPaging.Size).ToArray();return new{items=Remember(data),hasNext=offset+data.Length<local.Length,offline=false};
         }
         var remote=await online.BrowsePage(category,page,ct);return new{items=Remember(remote.Items.Where(Visible)),hasNext=remote.HasNext,offline=false};
@@ -252,16 +252,21 @@ sealed class DesktopEngine:IAsyncDisposable
     {
         var providers=item.Section=="Игры"?GameReleaseSources.Create(source,item,configuredSources):NativeReleaseSources.Create(source,item);
         var sources=providers.ToList();if(item.Section!="Игры")sources.AddRange(configuredSources.Select(config=>new ReleaseSource(config.Name,t=>source.SearchTorznab(config,item.OriginalTitle??item.Title,t,item.Section=="Сериалы"?5000:2000))));if(item.Section!="Игры"&&OnlineIndexClient.IdFor(item)!=null)sources.Insert(0,new("Онлайн-индекс",t=>online.Releases(item,t,true)));
-        var result=await ReleaseSearch.RunAsync(sources,new Progress<ReleaseSearchUpdate>(update=>Event("releases",new{request,items=ReleaseDtos(update.Items),complete=update.Complete,sources=update.Sources.Select(x=>new{x.Name,state=x.State.ToString()})})),ct);
+        var result=await ReleaseSearch.RunAsync(sources,new Progress<ReleaseSearchUpdate>(update=>Event("releases",new{request,items=ReleaseDtos(update.Items,item.Section=="Игры"),complete=update.Complete,sources=update.Sources.Select(x=>new{x.Name,state=x.State.ToString()})})),ct);
         item.SetReleaseQuality(result.Items,prefs.MinimumReleaseHeight);
-        await index.CacheReleasesAsync(item,result.Items,result.Sources,ct);return new{items=ReleaseDtos(result.Items),complete=true,sources=result.Sources.Select(x=>new{x.Name,state=x.State.ToString()})};
+        await index.CacheReleasesAsync(item,result.Items,result.Sources,ct);return new{items=ReleaseDtos(result.Items,item.Section=="Игры"),complete=true,sources=result.Sources.Select(x=>new{x.Name,state=x.State.ToString()})};
     }
-    object[] ReleaseDtos(IEnumerable<SourceEntry> items)=>SearchLanguage.AudioOrder(items,prefs.UiLanguage).Where(x=>!prefs.HidePoorQuality||!ReleaseQuality.Poor(x,prefs.MinimumReleaseHeight)).Select(entry=>
+    object[] ReleaseDtos(IEnumerable<SourceEntry> items,bool games=false)
     {
+        var rows=items.ToArray();
+        var choice=games?GameReleaseRecommendation.Pick(rows,prefs.UiLanguage):ReleaseRecommendation.Pick(rows,prefs.MinimumReleaseHeight,prefs.UiLanguage);
+        return SearchLanguage.AudioOrder(rows,prefs.UiLanguage).Where(x=>games||!prefs.HidePoorQuality||!ReleaseQuality.Poor(x,prefs.MinimumReleaseHeight)).Select(entry=>
+        {
         var key=Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(entry.Source+"|"+entry.Id+"|"+entry.TorrentUrl)))[..24];
         if(releases.Count>3000)releases.Remove(releases.Keys.First());releases[key]=entry;
-        return (object)new{id=key,title=entry.Title,source=entry.Source,size=entry.Size,seeds=entry.Seeds,leechers=entry.Leechers,quality=entry.Quality,type=entry.Type,audio=entry.Voice,studios=ReleaseAudio.StudioNames(entry),audioTypes=ReleaseAudio.TypeNames(entry),codec=entry.Codec,subs=entry.Subs,hdr=entry.Hdr,poor=ReleaseQuality.Poor(entry,prefs.MinimumReleaseHeight),downloadable=ReleaseAvailability.Downloadable(entry)};
-    }).ToArray();
+        return (object)new{id=key,title=entry.Title,source=entry.Source,size=entry.Size,seeds=entry.Seeds,leechers=entry.Leechers,quality=entry.Quality,type=entry.Type,audio=entry.Voice,studios=ReleaseAudio.StudioNames(entry),audioTypes=ReleaseAudio.TypeNames(entry),codec=entry.Codec,subs=entry.Subs,hdr=entry.Hdr,poor=ReleaseQuality.Poor(entry,prefs.MinimumReleaseHeight),downloadable=ReleaseAvailability.Downloadable(entry),recommended=choice?.Entry==entry,season=entry.Series.Season,episode=entry.Series.Episode,multipleSeasons=entry.Series.MultipleSeasons,multipleEpisodes=entry.Series.MultipleEpisodes,englishAudio=SearchLanguage.EnglishAudioRank(entry)>=2,russianAudio=RussianAudio.Rank(entry)>=2,gameKind=games?GameReleaseInfo.Kind(entry):null,gameGroup=games?GameReleaseInfo.Group(entry):null,gameVersion=games?GameReleaseInfo.Version(entry):null};
+        }).ToArray();
+    }
     object Downloads()=>new{items=downloads.Items.OrderByDescending(x=>x.AddedUtc).Select(item=>new{id=item.Id,title=item.DisplayName,releaseTitle=item.Name,poster=item.ImageUrl,progress=item.Progress,status=AppLanguage.T(item.Status),hint=AppLanguage.T(item.Hint),paused=item.Paused,complete=item.Completed,missing=item.FilesMissing,lowSpace=item.LowSpacePaused,downloadRate=item.DownloadRate,uploadRate=item.UploadRate,totalBytes=item.TotalBytes,addedUtc=item.AddedUtc,folder=item.Folder,mediaId=DownloadMetadata.Card(item) is {} media?Remember([media])[0].id:null,canUpdateRelease=item.CanUpdateRelease,peers=item.PeersText,files=item.Files.Count})};
     object Settings()=>new{prefs.Folder,prefs.FolderConfigured,prefs.UiLanguage,prefs.Light,prefs.LiteMode,prefs.AutoResumeDownloads,prefs.AutoRecoverDownloads,prefs.NotifyDownloads,prefs.CheckForUpdates,prefs.AutoUpdate,prefs.HidePoorQuality,prefs.MinimumReleaseHeight,prefs.MaxDownloadKbps,prefs.MaxUploadKbps,prefs.LanEnabled,prefs.DownloadSort,hidden=prefs.HiddenTitles.Select(x=>new{id=x.Identity,title=x.Title}),hiddenGenres=prefs.HiddenGenres,savedIds=prefs.LiveFavorites.Select(Key)};
     async Task<object> SetSettings(JsonElement p,CancellationToken ct)
@@ -377,7 +382,7 @@ sealed class DesktopEngine:IAsyncDisposable
     static int I(JsonElement p,string key,int fallback=0)=>p.TryGetProperty(key,out var value)&&value.TryGetInt32(out var result)?result:fallback;
     static bool B(JsonElement p,string key)=>p.TryGetProperty(key,out var value)&&value.ValueKind==JsonValueKind.True;
     void Reply(string id,object result)=>Write(new{id,result});
-    void Event(string kind,object data)=>Write(new{ @event=kind,data});
+    void Event(string kind,object data){if(!shuttingDown)Write(new{ @event=kind,data});}
     void Write(object value)=>Console.Out.WriteLine(JsonSerializer.Serialize(value,Json));
     public async ValueTask DisposeAsync()
     {

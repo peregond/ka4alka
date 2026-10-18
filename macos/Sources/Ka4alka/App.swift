@@ -21,7 +21,8 @@ import SwiftUI
                     if model.settings != nil, let path = environment["KACHALKA_UPDATE_HEALTH_PATH"], let token = environment["KACHALKA_UPDATE_HEALTH_TOKEN"] {
                         try? JSONEncoder().encode(["token": token, "version": model.version]).write(to: URL(fileURLWithPath: path), options: .atomic)
                     }
-                    if ProcessInfo.processInfo.arguments.contains("--smoke-test") { await MacSmoke.run(model: model) }
+                    if ProcessInfo.processInfo.arguments.contains("--close-smoke-test") { await MacSmoke.close(model: model) }
+                    else if ProcessInfo.processInfo.arguments.contains("--smoke-test") { await MacSmoke.run(model: model) }
                     else { await updater.restore(); if model.settings?.checkForUpdates == true { await updater.check(autoDownload: model.settings?.autoUpdate == true) } }
                 }
                 .onChange(of: model.settings?.light) { _, light in NSApp.appearance = NSAppearance(named: light == true ? .aqua : .darkAqua) }
@@ -42,6 +43,7 @@ import SwiftUI
     weak var model: AppModel?
     weak var updater: MacUpdater?
     var quitting = false
+    var cleanupComplete = false
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.appearance = NSAppearance(named: .darkAqua)
         NSApp.setActivationPolicy(.regular)
@@ -49,16 +51,22 @@ import SwiftUI
     }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard !quitting, let model else { return .terminateNow }; quitting = true
+        if cleanupComplete { return .terminateNow }
+        guard !quitting, let model else { return model == nil ? .terminateNow : .terminateCancel }
+        quitting = true
         Task {
             await model.bridge.shutdown()
             if let updater, updater.ready, !updater.installing, model.settings?.autoUpdate == true {
                 do { try updater.install(terminate: false) }
-                catch { model.error = error.localizedDescription; quitting = false; sender.reply(toApplicationShouldTerminate: false); return }
+                catch { model.error = error.localizedDescription; quitting = false; return }
             }
-            sender.reply(toApplicationShouldTerminate: true)
+            cleanupComplete = true
+            requestApplicationQuit()
         }
-        return .terminateLater
+        // Do not enter AppKit's nested terminateLater event loop while Swift's
+        // main executor is still running the caller. Finish cleanup first, then
+        // issue a fresh native quit that can return terminateNow immediately.
+        return .terminateCancel
     }
 }
 
