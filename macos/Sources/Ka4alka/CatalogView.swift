@@ -45,6 +45,10 @@ struct PosterGrid: View {
 struct CatalogView: View {
     @EnvironmentObject private var model: AppModel
     var saved = false
+    private var showsSpotlight: Bool {
+        !saved && (model.section == .movies || model.section == .series)
+            && model.page == 1 && model.submittedQuery.isEmpty && !model.filter.active
+    }
     var body: some View {
         VStack(spacing: 0) {
             HStack {
@@ -59,12 +63,27 @@ struct CatalogView: View {
                 VStack(alignment: .leading, spacing: 18) {
                     if let result = model.list {
                         if result.items.isEmpty { ContentUnavailableView.search(text: model.submittedQuery) }
-                        else { PosterGrid(items: result.items, wide: model.section == .games && !saved) }
+                        else {
+                            if showsSpotlight {
+                                CatalogSpotlightView(items: Array(model.visible(result.items).prefix(5)))
+                                    .id(model.section.rawValue)
+                                    .settingsLayoutProbe("catalog.banner." + model.section.rawValue)
+                                Text(model.section == .series ? tr("Все сериалы", "All series") : tr("Все фильмы", "All movies"))
+                                    .font(.title2.bold()).padding(.top, 4)
+                            }
+                            PosterGrid(items: result.items, wide: model.section == .games && !saved)
+                        }
                         if !saved, model.submittedQuery.isEmpty {
                             HStack { Spacer(); Button(tr("Назад", "Previous")) { model.page = max(1, model.page - 1); model.browseAnchor = nil }.disabled(model.page <= 1); Text(String(model.page)).monospacedDigit().padding(.horizontal, 12); Button(tr("Далее", "Next")) { model.page += 1; model.browseAnchor = nil }.disabled(!result.hasNext); Spacer() }.padding(.vertical, 18)
                         }
                         if result.offline == true { Label(tr("Показаны сохранённые результаты. Часть источников недоступна.", "Showing cached results. Some sources are unavailable."), systemImage: "wifi.slash").font(.caption).foregroundStyle(.secondary) }
-                    } else { SkeletonGrid(wide: model.section == .games) }
+                    } else {
+                        if showsSpotlight {
+                            HeroPlaceholder().frame(height: 300)
+                                .frame(height: CatalogSpotlightView.reservedHeight, alignment: .top)
+                        }
+                        SkeletonGrid(wide: model.section == .games)
+                    }
                 }.padding(.horizontal, 22).padding(.bottom, 22)
             }.scrollPosition(id: Binding(get: { model.browseAnchor }, set: { model.browseAnchor = $0 }))
         }.task(id: saved ? "saved-\(model.revision)" : model.requestKey) { if saved { await model.loadSaved() } else { await model.loadCatalog() } }

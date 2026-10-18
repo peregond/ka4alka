@@ -9,12 +9,32 @@ struct RootView: View {
     var body: some View {
         NavigationSplitView {
             VStack(spacing: 0) {
-                HStack(spacing: 10) { Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 34, height: 34); Text(tr("Качалка", "Ka4alka")).font(.title2.bold()); Spacer() }.padding(18)
+                HStack(spacing: 10) {
+                    Image(nsImage: NSApp.applicationIconImage)
+                        .resizable().interpolation(.high).frame(width: 32, height: 32)
+                        .accessibilityHidden(true)
+                    Text(tr("Качалка", "Ka4alka")).font(.title3.weight(.semibold))
+                    Spacer(minLength: 0)
+                }.padding(.horizontal, 18).padding(.top, 18).padding(.bottom, 20)
                 List {
-                    ForEach(Section.allCases.filter { $0 != .downloads && $0 != .settings }) { entry in sidebar(entry) }
+                    SwiftUI.Section(tr("Медиатека", "Library")) {
+                        ForEach(Section.allCases.filter { $0 != .downloads && $0 != .settings }) { entry in sidebar(entry) }
+                    }
                     SwiftUI.Section { sidebar(.downloads); sidebar(.settings) }
                 }.listStyle(.sidebar)
-                HStack { Text(model.version).font(.caption).foregroundStyle(.secondary); Spacer(); if updater.available { Button { Task { await updater.primaryAction() } } label: { Label(updater.buttonTitle, systemImage: "arrow.triangle.2.circlepath") }.buttonStyle(.borderless) } }.padding(14)
+                VStack(alignment: .leading, spacing: 12) {
+                    Divider()
+                    if updater.available {
+                        Button { Task { await updater.primaryAction() } } label: {
+                            Label(updater.ready ? tr("Обновить", "Update") : tr("Скачать", "Download"), systemImage: "arrow.triangle.2.circlepath")
+                                .frame(maxWidth: .infinity)
+                        }.buttonStyle(.borderedProminent).controlSize(.large)
+                            .disabled(updater.busy)
+                            .help(updater.buttonTitle).accessibilityLabel(updater.buttonTitle)
+                    }
+                    Text(tr("Версия", "Version") + " " + model.version)
+                        .font(.caption).foregroundStyle(.secondary)
+                }.padding(.horizontal, 16).padding(.bottom, 16)
             }.navigationSplitViewColumnWidth(min: 170, ideal: 200, max: 240)
         } detail: {
             VStack(spacing: 0) {
@@ -28,14 +48,13 @@ struct RootView: View {
                 }
                 if let toast = model.toast { HStack { Text(toast).font(.caption); Spacer(); Button { model.toast = nil } label: { Image(systemName: "xmark") }.buttonStyle(.plain) }.padding(10).background(.quaternary) }
             }.background(Color(nsColor: .windowBackgroundColor))
+                .navigationTitle(navigationTitle)
                 .toolbar {
-                    ToolbarItem(placement: .navigation) { Button { model.back() } label: { Image(systemName: "chevron.left") }.disabled(model.routes.count < 2).help(tr("Назад", "Back")) }
-                    ToolbarItem(placement: .principal) {
-                        HStack(spacing: 7) { Image(systemName: "magnifyingglass").foregroundStyle(.secondary); TextField(tr("Найти фильм, сериал или человека", "Find a movie, series or person"), text: $model.query).textFieldStyle(.plain).focused($searchFocused).onSubmit { model.submit() }; if !model.query.isEmpty { Button { model.query = ""; if !model.submittedQuery.isEmpty { model.submit() } } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }.buttonStyle(.plain) } }.padding(8).background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 9)).frame(minWidth: 240, idealWidth: 440, maxWidth: 700)
-                    }
+                    ToolbarItem(placement: .navigation) { Button { model.back() } label: { Image(systemName: "chevron.left") }.disabled(model.routes.count < 2).help(tr("Назад", "Back")).accessibilityLabel(tr("Назад", "Back")) }
+                    ToolbarItem(placement: .principal) { searchField }
                     ToolbarItemGroup(placement: .primaryAction) {
-                        Button { model.addTorrent = true } label: { Image(systemName: "plus") }.help(tr("Добавить торрент", "Add torrent"))
-                        Button { Task { await model.set("light", .bool(!(model.settings?.light ?? false))) } } label: { Image(systemName: model.settings?.light == true ? "sun.max.fill" : "moon.fill") }.help(tr("Сменить тему", "Change appearance"))
+                        Button { model.addTorrent = true } label: { Image(systemName: "plus") }.help(tr("Добавить торрент", "Add torrent")).accessibilityLabel(tr("Добавить торрент", "Add torrent"))
+                        Button { Task { await model.set("light", .bool(!(model.settings?.light ?? false))) } } label: { Image(systemName: model.settings?.light == true ? "sun.max" : "moon") }.help(tr("Сменить тему", "Change appearance")).accessibilityLabel(tr("Сменить тему", "Change appearance"))
                     }
                 }
                 .onReceive(NotificationCenter.default.publisher(for: Notification.Name("Ka4alkaFocusSearch"))) { _ in searchFocused = true }
@@ -57,9 +76,48 @@ struct RootView: View {
         } message: { Text((model.pairingPrompt?.name ?? "") + "\n\n" + (model.pairingPrompt?.code ?? "") + "\n\n" + tr("Сверь код на обоих компьютерах.", "Verify the code on both computers.")) }
         .dropDestination(for: URL.self) { urls, _ in guard let url = urls.first else { return false }; model.magnet = url.isFileURL ? url.path : url.absoluteString; model.addTorrent = true; return true }
     }
+    private var navigationTitle: String {
+        switch model.route {
+        case .section(let section): return section.title
+        case .detail(let card): return card.title
+        case .person(let person): return person.name
+        case .collection: return tr("Подборка", "Collection")
+        }
+    }
+    private var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass").foregroundStyle(.secondary).accessibilityHidden(true)
+            TextField(tr("Найти фильм, сериал или игру", "Find a movie, series or game"), text: $model.query)
+                .textFieldStyle(.plain).focused($searchFocused).onSubmit { model.submit() }
+                .accessibilityLabel(tr("Поиск в медиатеке", "Search library"))
+                .accessibilityIdentifier("library-search")
+            if !model.query.isEmpty {
+                Button { model.query = ""; if !model.submittedQuery.isEmpty { model.submit() } } label: {
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                }.buttonStyle(.plain).help(tr("Очистить поиск", "Clear search"))
+                    .accessibilityLabel(tr("Очистить поиск", "Clear search"))
+            }
+        }.padding(.horizontal, 11).padding(.vertical, 8)
+            .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 11))
+            .overlay { RoundedRectangle(cornerRadius: 11).strokeBorder(Color.primary.opacity(0.06), lineWidth: 1) }
+            .frame(minWidth: 220, idealWidth: 440, maxWidth: 700)
+    }
     private func sidebar(_ entry: Section) -> some View {
-        Button { model.select(entry) } label: { HStack { Label(entry.title, systemImage: entry.icon).foregroundStyle(.primary); Spacer(); if entry == .downloads { DownloadBadge(store: model.transfers) } }.padding(.vertical, 5).contentShape(Rectangle()) }.buttonStyle(.plain)
-            .listRowBackground(model.section == entry ? model.accent.opacity(0.15) : Color.clear)
+        let selected = model.section == entry
+        return Button { model.select(entry) } label: {
+            HStack(spacing: 10) {
+                Image(systemName: entry.icon).font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(selected ? model.accent : Color.secondary)
+                    .frame(width: 22).accessibilityHidden(true)
+                Text(entry.title).font(.body.weight(selected ? .semibold : .regular)).foregroundStyle(.primary)
+                Spacer(minLength: 4)
+                if entry == .downloads { DownloadBadge(store: model.transfers) }
+            }.padding(.horizontal, 8).padding(.vertical, 9).contentShape(RoundedRectangle(cornerRadius: 9))
+        }.buttonStyle(.plain)
+            .listRowInsets(EdgeInsets(top: 2, leading: 8, bottom: 2, trailing: 8))
+            .listRowBackground(RoundedRectangle(cornerRadius: 9).fill(selected ? model.accent.opacity(0.15) : Color.clear))
+            .accessibilityLabel(entry.title)
+            .accessibilityAddTraits(selected ? .isSelected : [])
             .accessibilityIdentifier("nav-" + entry.rawValue)
     }
     @ViewBuilder private var content: some View {

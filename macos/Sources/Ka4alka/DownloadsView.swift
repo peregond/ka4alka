@@ -106,11 +106,19 @@ struct SpeedLimitsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text(tr("Ограничения скорости", "Speed limits")).font(.headline)
-            LabeledContent(tr("Загрузка, КБ/с", "Download, KB/s")) { TextField("0", value: $down, format: .number).frame(width: 100).onSubmit { apply() } }
-            LabeledContent(tr("Отдача, КБ/с", "Upload, KB/s")) { TextField("0", value: $up, format: .number).frame(width: 100).onSubmit { apply() } }
+            limitRow(tr("Загрузка, КБ/с", "Download, KB/s"), value: $down)
+            limitRow(tr("Отдача, КБ/с", "Upload, KB/s"), value: $up)
             Text(tr("0 — без ограничений", "0 means unlimited")).font(.caption).foregroundStyle(.secondary)
             Button(tr("Применить", "Apply")) { apply() }.buttonStyle(.borderedProminent)
-        }.task { down = model.settings?.maxDownloadKbps ?? 0; up = model.settings?.maxUploadKbps ?? 0 }
+        }.frame(maxWidth: .infinity, alignment: .leading).task { down = model.settings?.maxDownloadKbps ?? 0; up = model.settings?.maxUploadKbps ?? 0 }
+    }
+    private func limitRow(_ title: String, value: Binding<Int>) -> some View {
+        HStack(spacing: 16) {
+            Text(title).fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+            TextField(title, value: value, format: .number).labelsHidden().textFieldStyle(.roundedBorder)
+                .font(.body.monospacedDigit()).frame(width: 110).onSubmit { apply() }
+        }
     }
     private func apply() { Task { await model.set("maxDownloadKbps", .number(Double(max(0, down)))); await model.set("maxUploadKbps", .number(Double(max(0, up)))) } }
 }
