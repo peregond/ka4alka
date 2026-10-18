@@ -7,6 +7,7 @@ struct RootView: View {
     @EnvironmentObject private var updater: MacUpdater
     @FocusState private var searchFocused: Bool
     var body: some View {
+        GeometryReader { window in
         NavigationSplitView {
             VStack(spacing: 0) {
                 HStack(spacing: 10) {
@@ -51,10 +52,15 @@ struct RootView: View {
                 .navigationTitle(navigationTitle)
                 .toolbar {
                     ToolbarItem(placement: .navigation) { Button { model.back() } label: { Image(systemName: "chevron.left") }.disabled(model.routes.count < 2).help(tr("Назад", "Back")).accessibilityLabel(tr("Назад", "Back")) }
-                    ToolbarItem(placement: .principal) { searchField }
+                    ToolbarItem(placement: .principal) {
+                        // Keep room for the sidebar, native title and utility buttons.
+                        searchField(width: max(160, min(650, window.size.width - 600)))
+                    }
                     ToolbarItemGroup(placement: .primaryAction) {
                         Button { model.addTorrent = true } label: { Image(systemName: "plus") }.help(tr("Добавить торрент", "Add torrent")).accessibilityLabel(tr("Добавить торрент", "Add torrent"))
+                            .settingsLayoutProbe("toolbar.add")
                         Button { Task { await model.set("light", .bool(!(model.settings?.light ?? false))) } } label: { Image(systemName: model.settings?.light == true ? "sun.max" : "moon") }.help(tr("Сменить тему", "Change appearance")).accessibilityLabel(tr("Сменить тему", "Change appearance"))
+                            .settingsLayoutProbe("toolbar.appearance")
                     }
                 }
                 .onReceive(NotificationCenter.default.publisher(for: Notification.Name("Ka4alkaFocusSearch"))) { _ in searchFocused = true }
@@ -75,6 +81,7 @@ struct RootView: View {
             Button(tr("Отмена", "Cancel"), role: .cancel) { Task { await model.approvePairing(false) } }
         } message: { Text((model.pairingPrompt?.name ?? "") + "\n\n" + (model.pairingPrompt?.code ?? "") + "\n\n" + tr("Сверь код на обоих компьютерах.", "Verify the code on both computers.")) }
         .dropDestination(for: URL.self) { urls, _ in guard let url = urls.first else { return false }; model.magnet = url.isFileURL ? url.path : url.absoluteString; model.addTorrent = true; return true }
+        }
     }
     private var navigationTitle: String {
         switch model.route {
@@ -84,11 +91,12 @@ struct RootView: View {
         case .collection: return tr("Подборка", "Collection")
         }
     }
-    private var searchField: some View {
+    private func searchField(width: CGFloat) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass").foregroundStyle(.secondary).accessibilityHidden(true)
             TextField(tr("Найти фильм, сериал или игру", "Find a movie, series or game"), text: $model.query)
                 .textFieldStyle(.plain).focused($searchFocused).onSubmit { model.submit() }
+                .frame(minWidth: 0)
                 .accessibilityLabel(tr("Поиск в медиатеке", "Search library"))
                 .accessibilityIdentifier("library-search")
             if !model.query.isEmpty {
@@ -100,7 +108,10 @@ struct RootView: View {
         }.padding(.horizontal, 11).padding(.vertical, 8)
             .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 11))
             .overlay { RoundedRectangle(cornerRadius: 11).strokeBorder(Color.primary.opacity(0.06), lineWidth: 1) }
-            .frame(minWidth: 220, idealWidth: 440, maxWidth: 700)
+            // AppKit otherwise uses this principal item's ideal width even in a
+            // compact window and sends the entire search and actions to overflow.
+            .frame(width: width)
+            .settingsLayoutProbe("toolbar.search")
     }
     private func sidebar(_ entry: Section) -> some View {
         let selected = model.section == entry

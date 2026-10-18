@@ -32,12 +32,41 @@ import Foundation
             guard let png = bitmap.representation(using: .png, properties: [:]) else { throw UpdateError("Could not encode the native screenshot") }
             try png.write(to: root.appendingPathComponent(name + ".png"))
         }
+        func settingsScrollView() throws -> NSScrollView {
+            guard let content = NSApp.windows.first(where: { $0.contentView != nil && $0.isVisible })?.contentView else { throw UpdateError("Settings window is missing") }
+            func scrollViews(_ view: NSView) -> [NSScrollView] {
+                (view as? NSScrollView).map { [$0] } ?? view.subviews.flatMap(scrollViews)
+            }
+            guard let scroll = scrollViews(content).filter({ $0.bounds.width > 300 && ($0.documentView?.bounds.height ?? 0) > $0.contentView.bounds.height + 10 }).max(by: { ($0.documentView?.bounds.height ?? 0) < ($1.documentView?.bounds.height ?? 0) }) else { throw UpdateError("The settings page must scroll to expose all sections") }
+            return scroll
+        }
         func settingsLayout(_ name: String, bottom: Bool) throws {
             let frames = SettingsLayoutMeasurements.frames
-            let report = frames.mapValues { frame in
+            var report = frames.mapValues { frame in
                 ["x": Double(frame.minX), "y": Double(frame.minY), "width": Double(frame.width), "height": Double(frame.height)]
             }
+            let scroll = try settingsScrollView()
+            let insets = scroll.contentInsets
+            report["native.contentInsets"] = ["top": Double(insets.top), "left": Double(insets.left), "bottom": Double(insets.bottom), "right": Double(insets.right)]
+            for (name, frame) in [("native.clipBounds", scroll.contentView.bounds), ("native.scrollBounds", scroll.bounds), ("native.documentBounds", scroll.documentView?.bounds ?? .zero)] {
+                report[name] = ["x": Double(frame.minX), "y": Double(frame.minY), "width": Double(frame.width), "height": Double(frame.height)]
+            }
+            report["native.state"] = ["documentFlipped": scroll.documentView?.isFlipped == true ? 1 : 0, "automaticallyAdjustsContentInsets": scroll.automaticallyAdjustsContentInsets ? 1 : 0]
+            for (id, frame) in SettingsLayoutMeasurements.nativeFrames {
+                report["native.frame." + id] = ["x": Double(frame.minX), "y": Double(frame.minY), "width": Double(frame.width), "height": Double(frame.height)]
+            }
+            for (id, frame) in SettingsLayoutMeasurements.nativeVisibleFrames {
+                report["native.visible." + id] = ["x": Double(frame.minX), "y": Double(frame.minY), "width": Double(frame.width), "height": Double(frame.height)]
+            }
+            report["native.attached"] = SettingsLayoutMeasurements.nativeAttached.mapValues { $0 ? 1 : 0 }
             try JSONEncoder().encode(report).write(to: root.appendingPathComponent(name + "-layout.json"))
+            guard let window = NSApp.windows.first(where: { $0.isVisible }) else { throw UpdateError("The settings window is missing") }
+            for id in ["toolbar.search", "toolbar.add", "toolbar.appearance"] {
+                guard SettingsLayoutMeasurements.nativeAttached[id] == true, let frame = SettingsLayoutMeasurements.nativeFrames[id], let visible = SettingsLayoutMeasurements.nativeVisibleFrames[id] else { throw UpdateError(name + ": missing native control " + id) }
+                try check(frame.width > 12 && frame.height > 12 && frame.minX >= -2 && frame.maxX <= window.frame.width + 2 && frame.minY >= -2 && frame.maxY <= window.frame.height + 2, name + ": " + id + " fits the native window")
+                let shown = frame.intersection(visible)
+                try check(!shown.isNull && shown.width * shown.height >= frame.width * frame.height * 0.9, name + ": " + id + " is visible and not clipped by its native host")
+            }
             guard let viewport = frames["viewport"] else { throw UpdateError("Settings viewport was not measured") }
             let ids = ["appearance", "downloads", "updates", "ignored", "lan", "sources", "cache", "metadata", "help"]
             let cards = try ids.map { id -> CGRect in
@@ -51,26 +80,31 @@ import Foundation
                 let help = cards[cards.count - 1]
                 try check(help.maxY <= viewport.maxY + 3 && help.intersection(viewport).height >= min(help.height, viewport.height) * 0.8, name + ": final settings section is reachable by scrolling")
             } else {
+                guard let header = frames["header"] else { throw UpdateError("Settings header was not measured") }
+                try check(header.minY >= viewport.minY - 2 && header.maxY <= viewport.maxY + 2 && header.minX >= viewport.minX - 2 && header.maxX <= viewport.maxX + 2, name + ": the full settings header is visible below the toolbar")
                 let appearance = cards[0]
                 try check(appearance.minY >= viewport.minY - 2 && appearance.minY < viewport.maxY && appearance.intersection(viewport).height > 30, name + ": first settings section is visible below the toolbar")
             }
         }
         func scrollSettings(toBottom: Bool) async throws {
-            guard let content = NSApp.windows.first(where: { $0.contentView != nil && $0.isVisible })?.contentView else { throw UpdateError("Settings window is missing") }
-            func scrollViews(_ view: NSView) -> [NSScrollView] {
-                (view as? NSScrollView).map { [$0] } ?? view.subviews.flatMap(scrollViews)
-            }
-            guard let scroll = scrollViews(content).filter({ $0.bounds.width > 300 && ($0.documentView?.bounds.height ?? 0) > $0.contentView.bounds.height + 10 }).max(by: { ($0.documentView?.bounds.height ?? 0) < ($1.documentView?.bounds.height ?? 0) }), let document = scroll.documentView else { throw UpdateError("The settings page must scroll to expose all sections") }
-            let low = document.bounds.minY
-            let high = max(low, document.bounds.maxY - scroll.contentView.bounds.height)
+            let scroll = try settingsScrollView()
+            guard let document = scroll.documentView else { throw UpdateError("The settings scroll document is missing") }
+            // Unified toolbars give the scroll view a top inset. Its natural
+            // leading origin is negative; forcing zero scrolls the header
+            // underneath the toolbar even though the user never scrolled.
+            let insets = scroll.contentInsets
+            let low = document.bounds.minY - (document.isFlipped ? insets.top : insets.bottom)
+            let high = max(low, document.bounds.maxY - scroll.contentView.bounds.height + (document.isFlipped ? insets.bottom : insets.top))
             let y = toBottom == document.isFlipped ? high : low
-            scroll.contentView.scroll(to: NSPoint(x: document.bounds.minX, y: y))
+            scroll.contentView.scroll(to: NSPoint(x: document.bounds.minX - insets.left, y: y))
             scroll.reflectScrolledClipView(scroll.contentView)
             try await Task.sleep(for: .milliseconds(150))
         }
         func settingsScenarios() async throws {
             stage("settings-layout")
             model.select(.settings)
+            try await shot("settings-natural-top-ru")
+            try settingsLayout("settings-natural-top-ru", bottom: false)
             for language in ["ru", "en"] {
                 await model.set("uiLanguage", .string(language))
                 for light in [false, true] {

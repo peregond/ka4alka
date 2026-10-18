@@ -16,7 +16,7 @@ struct SettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
-                header
+                header.settingsLayoutProbe("header")
                 appearance
                 downloads
                 updates

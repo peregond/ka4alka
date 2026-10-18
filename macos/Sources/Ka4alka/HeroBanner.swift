@@ -149,7 +149,7 @@ private struct HeroBackground: View {
     var body: some View {
         ZStack {
             LinearGradient(colors: [Color(red: 0.04, green: 0.23, blue: 0.27), Color(red: 0.08, green: 0.09, blue: 0.18)], startPoint: .topTrailing, endPoint: .bottomLeading)
-            if !lite, !reduceTransparency {
+            if image == nil, !lite, !reduceTransparency {
                 Artwork(address: poster, width: 180).blur(radius: 26, opaque: true).opacity(0.55)
             }
             if let image { Image(nsImage: image).resizable().scaledToFill().transition(.opacity) }
