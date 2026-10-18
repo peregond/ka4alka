@@ -53,6 +53,6 @@ with sync_playwright() as p:
    response=request.get(base+'/download?format='+kind,max_redirects=0);assert response.status==302,(kind,response.status)
    assert response.headers['location'].startswith('https://github.com/peregond/ka4alka/releases/download/') and filename in response.headers['location']
    assert 'no-store' in response.headers['cache-control']
-  choice=request.get(base+'/download?format=mac');assert choice.status==200 and 'mac-arm64' in choice.text() and 'mac-x64' in choice.text()
+  choice=request.get(base+'/download?format=mac');assert choice.status==200 and 'Kachalka-macos-arm64.dmg' in choice.text() and 'Kachalka-macos-x64.dmg' in choice.text()
   print('PASS explicit package redirects and Mac architecture chooser',flush=True)
  finally:browser.close()
