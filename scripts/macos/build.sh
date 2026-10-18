@@ -32,6 +32,14 @@ PY
 # Developer identity has not been configured; it is not Apple notarization.
 find "$bundle/Contents/Resources/engine" -type f \( -name '*.dylib' -o -name 'Kachalka.Engine' -o -name 'createdump' \) -print0 | while IFS= read -r -d '' file; do codesign --force --sign - "$file"; done
 codesign --force --sign - "$bundle"
+# The installed bundle, ZIP and signed component catalog must describe identical
+# permissions (codesign may create resource files with a restrictive umask).
+python3 - "$bundle" <<'PY'
+import os,sys
+from pathlib import Path
+for file in Path(sys.argv[1]).rglob('*'):
+    if file.is_file(): file.chmod(0o755 if os.access(file,os.X_OK) else 0o644)
+PY
 codesign --verify --deep --strict "$bundle"
 python3 scripts/macos/package.py "$bundle" "$output/Kachalka-macos-$arch.zip"
 if [[ "${KACHALKA_SKIP_DMG:-0}" != 1 ]]; then

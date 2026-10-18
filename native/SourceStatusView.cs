@@ -40,7 +40,7 @@ public partial class MainWindow
         pendingDetailRefreshId=id;
         if(detailRefreshTimer==null)
         {
-            detailRefreshTimer=new DispatcherTimer(DispatcherPriority.Background){Interval=TimeSpan.FromMilliseconds(80)};
+            detailRefreshTimer=new DispatcherTimer(DispatcherPriority.Background,Dispatcher){Interval=TimeSpan.FromMilliseconds(80)};
             detailRefreshTimer.Tick+=(_,_)=>
             {
                 detailRefreshTimer.Stop();

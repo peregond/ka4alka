@@ -14,6 +14,15 @@ if(OperatingSystem.IsMacOS()&&root.StartsWith("/var/",StringComparison.Ordinal))
 Environment.SetEnvironmentVariable("KACHALKA_DATA",Path.Combine(root,"state"));
 try {
  await MissingDownloadFilesTests.Run(root);
+ if(OperatingSystem.IsMacOS())
+ {
+   var sparse=Path.Combine(root,"allocation.bin");
+   using(var file=new FileStream(sparse,FileMode.CreateNew)){file.SetLength(2*1024*1024);file.WriteByte(1);file.Flush(true);}
+   var item=new DownloadItem{Folder=root,Files=[new("allocation.bin",sparse,sparse+".!mt",2*1024*1024,0)]};
+   var check=new DownloadSpace().Check(item,[]);
+   if(check.Error!=null||check.OwnRemainingBytes<1024*1024)throw new Exception("APFS sparse length incorrectly consumed the remaining disk reservation: "+check.Error);
+   Console.WriteLine("PASS: APFS reservations credit allocated blocks instead of sparse logical length");
+ }
  var upper=Path.Combine(root,"CaseFolder");var lower=Path.Combine(root,"casefolder");
  Directory.CreateDirectory(upper);Directory.CreateDirectory(lower);
  if(!OperatingSystem.IsWindows()) {
@@ -41,6 +50,7 @@ try {
  try{await service.Add(magnet,Path.Combine(root,"same-torrent"));throw new Exception("same torrent via magnet accepted");}catch(InvalidOperationException){Console.WriteLine("PASS: magnet and .torrent share duplicate identity");}
  Check(service.Items.Count==1,"duplicate did not alter queue");
  var map=(Dictionary<string,TorrentManager>)typeof(DownloadService).GetField("managers",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(service)!;
+ Check(map.Count==1,"new torrent has an active manager: "+service.Items[0].Status+" · "+service.Items[0].SpacePauseMessage);
  var manager=map.Values.Single();
  var engine=(ClientEngine)typeof(DownloadService).GetField("engine",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(service)!;
  Check(engine.Settings.MaximumDownloadRate==1024*1024&&engine.Settings.MaximumUploadRate==512*1024,"configured limits applied on engine creation");

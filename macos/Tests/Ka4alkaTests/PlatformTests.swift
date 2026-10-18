@@ -1,3 +1,5 @@
+import AppKit
+import Darwin
 import XCTest
 import Security
 @testable import Ka4alka
@@ -61,6 +63,21 @@ final class MacInstallationTests: XCTestCase {
         try files.createDirectory(at: installed.deletingLastPathComponent(), withIntermediateDirectories: true)
         try files.createDirectory(at: candidate.deletingLastPathComponent(), withIntermediateDirectories: true)
         try files.copyItem(at: source, to: installed); try files.copyItem(at: source, to: candidate)
+        let jobFile = try makeJob(installed: installed, candidate: candidate, directory: directory)
+        // A corrupted candidate must never replace the installed application.
+        let artwork = candidate.appendingPathComponent("Contents/Resources/en.json")
+        let original = try Data(contentsOf: artwork); try Data("tampered".utf8).write(to: artwork)
+        XCTAssertThrowsError(try MacUpdateInstaller.apply(jobFile, reopen: false))
+        XCTAssertTrue(files.fileExists(atPath: installed.appendingPathComponent("Contents/MacOS/Ka4alka").path))
+        try original.write(to: artwork)
+        try MacUpdateInstaller.apply(jobFile, reopen: false)
+        XCTAssertFalse(files.fileExists(atPath: candidate.path))
+        XCTAssertEqual(Bundle(url: installed)?.bundleIdentifier, "org.ka4alka.app")
+        XCTAssertFalse(try files.contentsOfDirectory(atPath: installed.deletingLastPathComponent().path).contains(where: { $0.hasPrefix("Ka4alka-previous") }))
+        try runTool("/usr/bin/codesign", ["--verify", "--deep", "--strict", installed.path])
+    }
+    private func makeJob(installed: URL, candidate: URL, directory: URL) throws -> URL {
+        let files = FileManager.default
         let version = try XCTUnwrap(Bundle(url: candidate)?.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String)
         let key = try XCTUnwrap(SecKeyCreateRandomKey([kSecAttrKeyType: kSecAttrKeyTypeRSA, kSecAttrKeySizeInBits: 2048] as CFDictionary, nil))
         let der = try XCTUnwrap(SecKeyCopyExternalRepresentation(try XCTUnwrap(SecKeyCopyPublicKey(key)), nil)) as Data
@@ -84,18 +101,54 @@ final class MacInstallationTests: XCTestCase {
         let signature = try XCTUnwrap(SecKeyCreateSignature(key, .rsaSignatureMessagePKCS1v15SHA256, bytes as CFData, nil)) as Data
         let manifestFile = directory.appendingPathComponent("manifest.json"); try bytes.write(to: manifestFile)
         let signatureFile = directory.appendingPathComponent("manifest.sig"); try signature.write(to: signatureFile)
-        let job = MacUpdateJob(installed: installed.path, application: candidate.path, catalog: catalog.path, manifest: manifestFile.path, signature: signatureFile.path, publicKey: pem, parent: 0, architecture: "arm64")
+        let job = MacUpdateJob(installed: installed.path, application: candidate.path, catalog: catalog.path, manifest: manifestFile.path, signature: signatureFile.path, publicKey: pem, parent: 0, architecture: MacUpdater.architecture)
         let jobFile = directory.appendingPathComponent("job.json"); try JSONEncoder().encode(job).write(to: jobFile)
-        // A corrupted candidate must never replace the installed application.
-        let artwork = candidate.appendingPathComponent("Contents/Resources/en.json")
-        let original = try Data(contentsOf: artwork); try Data("tampered".utf8).write(to: artwork)
-        XCTAssertThrowsError(try MacUpdateInstaller.apply(jobFile, reopen: false))
+        return jobFile
+    }
+    func testSuccessfulStartupAndRollback() throws {
+        guard let sourcePath = ProcessInfo.processInfo.environment["KACHALKA_TEST_APP"] else { throw XCTSkip("A signed packaged application is required") }
+        let files = FileManager.default
+        let directory = files.temporaryDirectory.resolvingSymlinksInPath().appendingPathComponent("kachalka-launch-check-" + UUID().uuidString)
+        try files.createDirectory(at: directory, withIntermediateDirectories: true)
+        let installed = directory.appendingPathComponent("installed/Ka4alka.app")
+        let candidate = directory.appendingPathComponent("candidate/Ka4alka.app")
+        let source = URL(fileURLWithPath: sourcePath)
+        try files.createDirectory(at: installed.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try files.createDirectory(at: candidate.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try files.copyItem(at: source, to: installed); try files.copyItem(at: source, to: candidate)
+        let profile = directory.appendingPathComponent("profile")
+        try files.createDirectory(at: profile, withIntermediateDirectories: true)
+        let settings: [String: JSONValue] = ["Folder": .string(profile.path), "FolderConfigured": true, "CheckForUpdates": false, "AutoUpdate": false, "AutoResumeDownloads": false]
+        try JSONEncoder().encode(settings).write(to: profile.appendingPathComponent("settings.json"))
+        let previous = ProcessInfo.processInfo.environment["KACHALKA_DATA"]
+        setenv("KACHALKA_DATA", profile.path, 1)
+        defer {
+            if let previous { setenv("KACHALKA_DATA", previous, 1) } else { unsetenv("KACHALKA_DATA") }
+            // Only test-owned copies, never a user's installed application.
+            for _ in 0..<30 {
+                let owned = NSRunningApplication.runningApplications(withBundleIdentifier: "org.ka4alka.app").filter { $0.bundleURL?.standardizedFileURL == installed.standardizedFileURL }
+                for app in owned { app.forceTerminate() }
+                if owned.isEmpty { break }
+                RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+            }
+            try? files.removeItem(at: directory)
+        }
+        let healthy = try makeJob(installed: installed, candidate: candidate, directory: directory)
+        let child = try XCTUnwrap(MacUpdateInstaller.apply(healthy))
         XCTAssertTrue(files.fileExists(atPath: installed.appendingPathComponent("Contents/MacOS/Ka4alka").path))
-        try original.write(to: artwork)
-        try MacUpdateInstaller.apply(jobFile, reopen: false)
-        XCTAssertFalse(files.fileExists(atPath: candidate.path))
-        XCTAssertEqual(Bundle(url: installed)?.bundleIdentifier, "org.ka4alka.app")
-        XCTAssertFalse(try files.contentsOfDirectory(atPath: installed.deletingLastPathComponent().path).contains(where: { $0.hasPrefix("Ka4alka-previous") }))
+        kill(child, SIGTERM)
+        for _ in 0..<30 { if kill(child, 0) != 0 { break }; Thread.sleep(forTimeInterval: 0.1) }
+        try files.copyItem(at: source, to: candidate)
+        let engine = "Contents/Resources/engine/Kachalka.Engine.dll"
+        let originalHash = try sha256File(installed.appendingPathComponent(engine))
+        // The publisher signature and Apple code signature are valid, but the
+        // deliberately invalid shared engine cannot complete a real bootstrap.
+        try Data("invalid engine fixture".utf8).write(to: candidate.appendingPathComponent(engine))
+        try runTool("/usr/bin/codesign", ["--force", "--sign", "-", candidate.path])
+        let broken = try makeJob(installed: installed, candidate: candidate, directory: directory)
+        XCTAssertThrowsError(try MacUpdateInstaller.apply(broken))
+        XCTAssertEqual(try sha256File(installed.appendingPathComponent(engine)), originalHash)
         try runTool("/usr/bin/codesign", ["--verify", "--deep", "--strict", installed.path])
     }
+
 }
