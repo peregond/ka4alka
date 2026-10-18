@@ -21,6 +21,7 @@ sealed class DesktopEngine:IAsyncDisposable
     readonly Dictionary<Guid,TaskCompletionSource<bool>> pairing=[];
     readonly List<Task> running=[];
     readonly SharedAsyncWork<EnglishMedia?> englishWork=new();
+    readonly SharedAsyncWork<MediaMetadataResult> detailWork=new();
     readonly SemaphoreSlim metadataSlots;
     readonly Dictionary<string,DateTime> localizedAttempts=[];
     LanService? lan;Task? ticker;Task? warming;Task? reliability;bool? lastNetwork;string? lastDownloadEvent;bool shuttingDown;
@@ -193,7 +194,14 @@ sealed class DesktopEngine:IAsyncDisposable
         var remote=await online.BrowsePage(category,page,ct);return new{items=Remember(remote.Items.Where(Visible)),hasNext=remote.HasNext,offline=false};
     }
     static double Rating(MediaItem item)=>double.TryParse(item.CardRating.Replace(',','.'),System.Globalization.NumberStyles.Any,System.Globalization.CultureInfo.InvariantCulture,out var value)?value:0;
-    bool Visible(MediaItem item)=>!HiddenCatalog.Hidden(item,prefs,CatalogChoices.Genres)&&!ReleaseAvailability.Hidden(index.RememberedReleases(item),DateTime.UtcNow)&&(!prefs.HidePoorQuality||!item.OnlyPoorQuality);
+    bool Visible(MediaItem item)
+    {
+        var known=index.RememberedReleases(item);
+        return !HiddenCatalog.Hidden(item,prefs,CatalogChoices.Genres)&&!ReleaseAvailability.Hidden(known,DateTime.UtcNow)&&(!prefs.HidePoorQuality||known==null||!ReleaseQuality.OnlyPoor(known.Items,prefs.MinimumReleaseHeight));
+    }
+    void ApplyKnownQuality(MediaItem item)=>item.SetReleaseQuality(index.RememberedReleases(item)?.Items??[],prefs.MinimumReleaseHeight);
+    async Task<MediaItem> Metadata(MediaItem item,CancellationToken ct)=>
+        (await detailWork.Run(Key(item),token=>MediaMetadata.Load(item,t=>ImdbSuggestions.IsImdbOnly(item)?online.Title(item,t):online.Detail(item,t),t=>new LiveCatalog(source).Detail(item,t),ct:token),ct)).Item;
     async Task<object> Featured(JsonElement p,CancellationToken ct)
     {
         await BundledCatalog.EnsureLoadedAsync(ct);await awards.RestoreAsync(ct);
@@ -220,7 +228,7 @@ sealed class DesktopEngine:IAsyncDisposable
         if(item.Section=="Игры"){game=await new GameCatalog(source,prefs.UiLanguage).Detail(item,ct);item=game.Item;backdrop=GameCatalog.HeroImage(item);}
         else
         {
-            var result=await MediaMetadata.Load(item,t=>ImdbSuggestions.IsImdbOnly(item)?online.Title(item,t):online.Detail(item,t),t=>new LiveCatalog(source).Detail(item,t),ct:ct);item=result.Item;
+            item=await Metadata(item,ct);
             if(prefs.UiLanguage=="en")
             {
                 await Localize(item,ct);backdrop=item.English?.Backdrop;
@@ -250,11 +258,27 @@ sealed class DesktopEngine:IAsyncDisposable
     }
     async Task<object> Releases(string request,MediaItem item,CancellationToken ct)
     {
-        var providers=item.Section=="Игры"?GameReleaseSources.Create(source,item,configuredSources):NativeReleaseSources.Create(source,item);
+        item=MediaIdentity.Enrich(item);
+        var cached=await Task.Run(()=>index.CachedReleaseSnapshot(item),ct);
+        var saved=cached?.Items??[];
+        // Russian sources start immediately. As in WPF, only sources needing
+        // the original title briefly join the already running metadata lookup.
+        var metadata=item.Cinema&&string.IsNullOrWhiteSpace(item.OriginalTitle)&&item.Title.Any(c=>c is >= '\u0400' and <= '\u04FF')?Metadata(item,ct):null;
+        Task<MediaItem> Resolved(CancellationToken token){token.ThrowIfCancellationRequested();return Task.FromResult(metadata?.IsCompletedSuccessfully==true?metadata.Result:item);}
+        async Task<MediaItem> Aliases(CancellationToken token)
+        {
+            if(metadata==null)return item;
+            try{return await metadata.WaitAsync(TimeSpan.FromSeconds(8),token);}
+            catch(TimeoutException){return item;}
+        }
+        var providers=item.Section=="Игры"?GameReleaseSources.Create(source,item,configuredSources):NativeReleaseSources.Create(source,Resolved,item.Section=="Сериалы",Aliases);
         var sources=providers.ToList();if(item.Section!="Игры")sources.AddRange(configuredSources.Select(config=>new ReleaseSource(config.Name,t=>source.SearchTorznab(config,item.OriginalTitle??item.Title,t,item.Section=="Сериалы"?5000:2000))));if(item.Section!="Игры"&&OnlineIndexClient.IdFor(item)!=null)sources.Insert(0,new("Онлайн-индекс",t=>online.Releases(item,t,true)));
-        var result=await ReleaseSearch.RunAsync(sources,new Progress<ReleaseSearchUpdate>(update=>Event("releases",new{request,items=ReleaseDtos(update.Items,item.Section=="Игры"),complete=update.Complete,sources=update.Sources.Select(x=>new{x.Name,state=x.State.ToString()})})),ct);
-        item.SetReleaseQuality(result.Items,prefs.MinimumReleaseHeight);
-        await index.CacheReleasesAsync(item,result.Items,result.Sources,ct);return new{items=ReleaseDtos(result.Items,item.Section=="Игры"),complete=true,sources=result.Sources.Select(x=>new{x.Name,state=x.State.ToString()})};
+        var result=await ReleaseSearch.RunAsync(sources,new Progress<ReleaseSearchUpdate>(update=>Event("releases",new{request,items=ReleaseDtos(ReleaseSearch.WithSaved(update.Items,saved),item.Section=="Игры"),complete=update.Complete,sources=update.Sources.Select(x=>new{x.Name,state=x.State.ToString()})})),ct);
+        var combined=ReleaseSearch.WithSaved(result.Items,saved);
+        item.SetReleaseQuality(combined,prefs.MinimumReleaseHeight);
+        if(result.Items.Length>0||ReleaseAvailability.ConfirmedEmpty(result.Items,result.Sources))
+            await index.CacheReleasesAsync(item,result.Items.Length==0?[]:combined,result.Sources,ct);
+        return new{items=ReleaseDtos(combined,item.Section=="Игры"),complete=true,sources=result.Sources.Select(x=>new{x.Name,state=x.State.ToString()})};
     }
     object[] ReleaseDtos(IEnumerable<SourceEntry> items,bool games=false)
     {
@@ -375,7 +399,11 @@ sealed class DesktopEngine:IAsyncDisposable
     string Key(MediaItem item)=>(item.Section=="Игры"?"games":item.Section=="Сериалы"?"series":"movies")+":"+(item.OnlineId??item.ImdbId??item.Id.ToString());
     CardView[] Remember(IEnumerable<MediaItem> items)=>items.Select(item=>{var key=Key(item);if(cards.Count>6000)cards.Remove(cards.Keys.First());cards[key]=item;return CardDto(item);}).ToArray();
     bool IsSaved(MediaItem item)=>prefs.LiveFavorites.Any(x=>MediaIdentity.Same(x,item));
-    CardView CardDto(MediaItem item)=>new(Key(item),item.DisplayTitle,item.Section=="Игры"?"games":item.Section=="Сериалы"?"series":"movies",item.Year,item.CardRating,item.DisplayImageUrl??(prefs.UiLanguage=="en"?null:item.ImageUrl),item.DisplayDescription??"",item.CardGenre,item.HasPosterQuality?item.PosterQuality:null,IsSaved(item),item.Section=="Игры"?"Windows":null,item.Store);
+    CardView CardDto(MediaItem item)
+    {
+        ApplyKnownQuality(item);
+        return new(Key(item),item.DisplayTitle,item.Section=="Игры"?"games":item.Section=="Сериалы"?"series":"movies",item.Year,item.CardRating,item.DisplayImageUrl??(prefs.UiLanguage=="en"?null:item.ImageUrl),item.DisplayDescription??"",item.CardGenre,item.HasPosterQuality?item.PosterQuality:null,IsSaved(item),item.Section=="Игры"?"Windows":null,item.Store);
+    }
     MediaItem Card(string id)=>cards.GetValueOrDefault(id)??throw new KeyNotFoundException("Карточка устарела. Обнови страницу.");
     DownloadItem Download(string id)=>downloads.Items.Single(item=>item.Id==id);
     static string S(JsonElement p,string key,string fallback="")=>p.TryGetProperty(key,out var value)&&value.ValueKind==JsonValueKind.String?value.GetString()??fallback:fallback;
