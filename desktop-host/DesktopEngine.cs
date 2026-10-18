@@ -20,10 +20,13 @@ sealed class DesktopEngine:IAsyncDisposable
     readonly List<SourceConfig> configuredSources=[];
     readonly Dictionary<Guid,TaskCompletionSource<bool>> pairing=[];
     readonly List<Task> running=[];
+    readonly SharedAsyncWork<EnglishMedia?> englishWork=new();
+    readonly SemaphoreSlim metadataSlots;
+    readonly Dictionary<string,DateTime> localizedAttempts=[];
     LanService? lan;Task? ticker;Task? warming;bool shuttingDown;
     public DesktopEngine()
     {
-        AppLanguage.Set(prefs.UiLanguage);prefs.LiteMode=PerformanceBudget.DefaultLiteMode(prefs.LiteModeConfigured,prefs.LiteMode);PerformanceBudget.LiteMode=prefs.LiteMode;
+        AppLanguage.Set(prefs.UiLanguage);prefs.LiteMode=PerformanceBudget.DefaultLiteMode(prefs.LiteModeConfigured,prefs.LiteMode);PerformanceBudget.LiteMode=prefs.LiteMode;metadataSlots=new(PerformanceBudget.Constrained?1:3);
         online=new(source,relays:new IndexRelays(source));source.TorrentRelay=online.RelayTorrent;
         shared=new(source);awards=new(source);
         downloads=new(null,prefs.MaxDownloadKbps,prefs.MaxUploadKbps);
@@ -74,6 +77,8 @@ sealed class DesktopEngine:IAsyncDisposable
                 var artCard=Card(S(p,"id"));var artId=OnlineIndexClient.IdFor(artCard);
                 if(artCard.Section=="Игры")return new{url=GameCatalog.HeroImage(artCard)};
                 return new{url=artId==null?null:FeatureBackdrop.FromResponse(await online.ReadSite("api/backdrop?id="+Uri.EscapeDataString(artId)+"&language="+prefs.UiLanguage,128*1024,ct),artId)};
+            case "localizedCard":
+                var localized=Card(S(p,"id"));await Localize(localized,ct);return CardDto(localized);
             case "detail":return await Detail(Card(S(p,"id")),ct);
             case "releases":return await Releases(request,Card(S(p,"id")),ct);
             case "person":
@@ -213,15 +218,30 @@ sealed class DesktopEngine:IAsyncDisposable
             var result=await MediaMetadata.Load(item,t=>ImdbSuggestions.IsImdbOnly(item)?online.Title(item,t):online.Detail(item,t),t=>new LiveCatalog(source).Detail(item,t),ct:ct);item=result.Item;
             if(prefs.UiLanguage=="en")
             {
-                try
-                {
-                    var id=OnlineIndexClient.IdFor(item)??item.ImdbId;
-                    if(id!=null){var kind=item.Section=="Сериалы"?"series":"movies";var bytes=await online.ReadSite("api/localized-media?language=en&id="+Uri.EscapeDataString(id)+"&section="+kind,2*1024*1024,ct,restSites:false);var english=EnglishMedia.Parse(bytes,id,kind);item=item with{English=english};backdrop=english?.Backdrop;}
-                }catch(Exception) when(!ct.IsCancellationRequested){}
+                await Localize(item,ct);backdrop=item.English?.Backdrop;
             }
             if(backdrop==null)try{var id=OnlineIndexClient.IdFor(item);if(id!=null)backdrop=FeatureBackdrop.FromResponse(await online.ReadSite("api/backdrop?id="+Uri.EscapeDataString(id),128*1024,ct),id);}catch(Exception)when(!ct.IsCancellationRequested){}
         }
         Remember([item]);return new{item=CardDto(item),backdrop,people=item.DisplayPeople,awards=item.Awards,game=game==null?null:new{game.Requirements,game.Developers,game.Publishers,game.Price,game.Metacritic,gallery=game.Gallery,game.Traits,game.OriginalPrice,game.Discount,game.ReleaseDate,game.Age,game.Review,russian=game.Russian.ToString(),steamUrl=item.PageUrl,steamDbUrl=GameCatalog.TryId(item.PageUrl,out var steamId)?"https://steamdb.info/app/"+steamId:null,platform="Windows"}};
+    }
+    async Task Localize(MediaItem item,CancellationToken ct)
+    {
+        if(prefs.UiLanguage!="en"||!item.Cinema||item.English!=null)return;
+        var key=Key(item);
+        if(localizedAttempts.TryGetValue(key,out var attempt)&&attempt>DateTime.UtcNow.AddMinutes(-5))return;
+        try
+        {
+            var english=await englishWork.Run(key,async token=>
+            {
+                await metadataSlots.WaitAsync(token);
+                try{return await EnglishMedia.LoadAsync(online,item,false,token);}
+                finally{metadataSlots.Release();}
+            },ct);
+            if(localizedAttempts.Count>1000)localizedAttempts.Remove(localizedAttempts.Keys.First());
+            localizedAttempts[key]=DateTime.UtcNow;item.SetEnglish(english);
+        }
+        catch(OperationCanceledException)when(ct.IsCancellationRequested){throw;}
+        catch(Exception error){ErrorLog.Write(error);localizedAttempts[key]=DateTime.UtcNow;}
     }
     async Task<object> Releases(string request,MediaItem item,CancellationToken ct)
     {

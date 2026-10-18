@@ -3,19 +3,21 @@ import SwiftUI
 struct PosterCard: View {
     @EnvironmentObject private var model: AppModel
     var card: MediaCard; var wide = false; var rank: Int? = nil
+    @State private var localized: MediaCard?
+    private var item: MediaCard { model.settings?.uiLanguage == "en" ? localized ?? card : card }
     @State private var hovered = false
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
             ZStack(alignment: .topLeading) {
-                Button { model.open(card) } label: {
-                    GeometryReader { geo in Artwork(address: card.poster).frame(width: geo.size.width, height: geo.size.height) }.aspectRatio(wide ? 460.0 / 215 : 2.0 / 3, contentMode: .fit)
+                Button { model.open(item) } label: {
+                    GeometryReader { geo in Artwork(address: item.poster).frame(width: geo.size.width, height: geo.size.height) }.aspectRatio(wide ? 460.0 / 215 : 2.0 / 3, contentMode: .fit)
                 }.buttonStyle(.plain)
-                if let quality = card.quality { Text(quality).font(.caption2.bold()).padding(.horizontal, 7).padding(.vertical, 4).background(.black.opacity(0.65), in: Capsule()).foregroundStyle(.white).padding(8).allowsHitTesting(false) }
-                VStack { Spacer(); HStack { if card.rating != "—", !card.rating.isEmpty { Label(card.rating, systemImage: "star.fill").font(.caption.bold()).foregroundStyle(.yellow).padding(5).background(.black.opacity(0.75), in: RoundedRectangle(cornerRadius: 6)) }; Spacer(); if let rank { Text(String(rank)).font(.system(size: 40, weight: .heavy, design: .rounded)).foregroundStyle(.white.opacity(0.9)) } }.padding(8) }.allowsHitTesting(false)
+                if let quality = item.quality { Text(quality).font(.caption2.bold()).padding(.horizontal, 7).padding(.vertical, 4).background(.black.opacity(0.65), in: Capsule()).foregroundStyle(.white).padding(8).allowsHitTesting(false) }
+                VStack { Spacer(); HStack { if item.rating != "—", !item.rating.isEmpty { Label(item.rating, systemImage: "star.fill").font(.caption.bold()).foregroundStyle(.yellow).padding(5).background(.black.opacity(0.75), in: RoundedRectangle(cornerRadius: 6)) }; Spacer(); if let rank { Text(String(rank)).font(.system(size: 40, weight: .heavy, design: .rounded)).foregroundStyle(.white.opacity(0.9)) } }.padding(8) }.allowsHitTesting(false)
                 VStack { HStack { Spacer(); Button { Task { await model.save(card) } } label: { Image(systemName: model.isSaved(card) ? "heart.fill" : "heart") }.help(tr("Сохранить", "Save")); Button { Task { await model.hide(card) } } label: { Image(systemName: "eye.slash") }.help(tr("Не интересно", "Not interested")) }.buttonStyle(.bordered).controlSize(.small); Spacer() }.padding(7).opacity(hovered ? 1 : 0)
             }.clipShape(RoundedRectangle(cornerRadius: 12)).onHover { hovered = $0 }
-            Button { model.open(card) } label: { Text(card.title).font(.body.weight(.semibold)).lineLimit(2).frame(maxWidth: .infinity, minHeight: 36, alignment: .topLeading) }.buttonStyle(.plain)
-            if let store = card.store {
+            Button { model.open(item) } label: { Text(item.title).font(.body.weight(.semibold)).lineLimit(2).frame(maxWidth: .infinity, minHeight: 36, alignment: .topLeading) }.buttonStyle(.plain)
+            if let store = item.store {
                 HStack(spacing: 7) {
                     if store.discount > 0 { Text("−\(store.discount)%").foregroundStyle(.green) }
                     Text(store.free ? tr("Бесплатно", "Free") : store.price).font(.caption.weight(.semibold))
@@ -23,11 +25,16 @@ struct PosterCard: View {
                     if store.reviewPercent > 0 { Text("👍 \(store.reviewPercent)%").font(.caption).foregroundStyle(.secondary) }
                 }
             }
-            Text([card.year > 0 ? String(card.year) : "", card.genre].filter { !$0.isEmpty }.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            Text([item.year > 0 ? String(item.year) : "", item.genre].filter { !$0.isEmpty }.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary).lineLimit(1)
         }.contextMenu {
             Button(model.isSaved(card) ? tr("Удалить из сохранённого", "Remove from Saved") : tr("Сохранить", "Save")) { Task { await model.save(card) } }
             Button(tr("Не интересно", "Not interested")) { Task { await model.hide(card) } }
-        }.accessibilityElement(children: .contain).accessibilityLabel(card.title)
+        }.accessibilityElement(children: .contain).accessibilityLabel(item.title).task(id: card.id + (model.settings?.uiLanguage ?? "ru")) {
+            if model.settings?.uiLanguage == "en", card.section != "games" {
+                let result = try? await model.bridge.call("localizedCard", ["id": .string(card.id)], as: MediaCard.self)
+                if !Task.isCancelled { localized = result }
+            }
+        }
     }
 }
 struct PosterGrid: View {

@@ -33,15 +33,6 @@ jobs:
           key: nuget-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('**/*.csproj') }}
       - name: Build native application and self-contained shared engine
         run: bash scripts/macos/build.sh '${{ matrix.arch }}'
-      - name: Verify shared queue, magnet transfers and deleted-file recovery
-        run: dotnet run --project desktop-core-tests/Kachalka.DesktopCoreTests.csproj -c Release
-      - name: Verify packaged pipe protocol without creating an idle torrent engine
-        run: python3 scripts/test-desktop-ipc.py "$PWD/dist/macos-${{ matrix.arch }}/Ka4alka.app/Contents/Resources/engine/Kachalka.Engine"
-      - name: Verify native models and signed updater
-        env:
-          KACHALKA_TEST_APP: ${{ github.workspace }}/dist/macos-${{ matrix.arch }}/Ka4alka.app
-        working-directory: macos
-        run: swift test -c release --jobs 3
       - name: Run native app with the packaged engine
         env:
           KACHALKA_DATA: ${{ github.workspace }}/test-output/macos/profile
@@ -66,6 +57,15 @@ jobs:
           test ! -f "$output/error.txt" || { cat "$output/error.txt"; exit 1; }
           test -f "$output/checks.json"
           cat "$output/checks.json"
+      - name: Verify shared queue, magnet transfers and deleted-file recovery
+        run: dotnet run --project desktop-core-tests/Kachalka.DesktopCoreTests.csproj -c Release
+      - name: Verify packaged pipe protocol without creating an idle torrent engine
+        run: python3 scripts/test-desktop-ipc.py "$PWD/dist/macos-${{ matrix.arch }}/Ka4alka.app/Contents/Resources/engine/Kachalka.Engine"
+      - name: Verify native models and signed updater
+        env:
+          KACHALKA_TEST_APP: ${{ github.workspace }}/dist/macos-${{ matrix.arch }}/Ka4alka.app
+        working-directory: macos
+        run: swift test -c release --jobs 3
       - uses: actions/upload-artifact@v4
         if: always()
         with:
