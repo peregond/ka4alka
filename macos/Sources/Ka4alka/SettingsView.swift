@@ -41,7 +41,7 @@ struct SettingsView: View {
                 if model.settings?.hidden.isEmpty != false { Text(tr("Скрытых названий пока нет", "No hidden titles")).foregroundStyle(.secondary) }
                 ForEach(model.settings?.hidden ?? []) { hidden in HStack { Text(hidden.title); Spacer(); Button(tr("Вернуть", "Restore")) { Task { await model.unhide(hidden.id) } }.buttonStyle(.borderless) } }
                 DisclosureGroup(tr("Скрытые жанры", "Hidden genres")) {
-                    ForEach(model.genres) { genre in Toggle(genre.label, isOn: Binding(get: { model.settings?.hiddenGenres.contains(genre.key) ?? false }, set: { hidden in var values = Set(model.settings?.hiddenGenres ?? []); if hidden { values.insert(genre.key) } else { values.remove(genre.key) }; Task { await model.set("hiddenGenres", .array(values.sorted().map(JSONValue.string))) } })) }
+                    ForEach(model.genres) { genre in Toggle(genre.label, isOn: Binding(get: { model.settings?.hiddenGenres.contains(genre.key) ?? false }, set: { hidden in var values = Set(model.settings?.hiddenGenres ?? []); if hidden { values.insert(genre.key) } else { values.remove(genre.key) }; Task { await model.set("hiddenGenres", .array(values.sorted().map(JSONValue.string))) } })) } }
                 }
             }
             SwiftUI.Section(tr("Локальная сеть", "Local network")) {

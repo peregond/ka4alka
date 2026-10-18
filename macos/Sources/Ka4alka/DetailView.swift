@@ -9,7 +9,7 @@ struct DetailView: View {
     @State private var quality = ""
     @State private var releaseSort = "seeds"
     @State private var language = ""
-    private var detail: DetailResult? { model.detail?.item.id == card.id ? model.detail : model.detail }
+    private var detail: DetailResult? { model.detail?.item.id == card.id ? model.detail : nil }
     private var item: MediaCard { detail?.item ?? card }
     private var visibleReleases: [ReleaseRow] {
         let rows = model.releases.filter { (studio.isEmpty || $0.studios.contains(studio)) && (audio.isEmpty || $0.audioTypes.contains(audio)) && (quality.isEmpty || $0.quality == quality) && (language.isEmpty || $0.title.localizedCaseInsensitiveContains(language)) }
@@ -62,12 +62,11 @@ struct DetailView: View {
             } }.scrollIndicators(.hidden)
             if !model.sources.isEmpty { Text(model.sources.map { $0.name + " · " + $0.state }.joined(separator: "    ")).font(.caption).foregroundStyle(.secondary).lineLimit(3) }
             if visibleReleases.isEmpty { if model.releasesLoading { ProgressView(tr("Ищем раздачи…", "Searching for releases…")).padding(.vertical, 24) } else { ContentUnavailableView(tr("Раздачи не найдены", "No releases found"), systemImage: "tray", description: Text(tr("Попробуй сбросить фильтры или повторить поиск позже.", "Reset filters or try again later."))) } }
-            LazyVStack(spacing: 8) { ForEach(visibleReleases) { release in
-                HStack(alignment: .center, spacing: 14) {
-                    VStack(alignment: .leading, spacing: 6) { Text(release.title).font(.callout.weight(.medium)).lineLimit(3); Text([release.source, release.poor ? tr("Экранка", "Low quality") : release.quality, release.audio, release.size.map(byteText) ?? ""].filter { !$0.isEmpty }.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary); Text(tr("Отдают", "Seeders") + ": " + (release.seeds.map(String.init) ?? "—") + "   " + tr("Скачивают", "Leechers") + ": " + (release.leechers.map(String.init) ?? "—")).font(.caption.monospacedDigit()).foregroundStyle(.secondary) }.frame(maxWidth: .infinity, alignment: .leading)
-                    Menu { Button(tr("Скачать на этот Mac", "Download on this Mac")) { Task { await model.add(release, card: card) } }; if let devices = model.lanState?.devices { ForEach(devices.filter(\.paired)) { device in Button(tr("Скачать на ", "Download on ") + device.name) { Task { await model.lan("send", ["device": .string(device.id), "release": .string(release.id)]) } } } } label: { Label(tr("Скачать", "Download"), systemImage: "arrow.down") }.disabled(!release.downloadable)
-                }.padding(14).background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 12))
-            } }
+            LazyVStack(spacing: 8) {
+                ForEach(visibleReleases) { release in
+                    ReleaseListRow(release: release, card: card)
+                }
+            }
         }
     }
     private func releaseMenu(_ title: String, value: Binding<String>, options: [String]) -> some View { Menu { Button(tr("Все", "All")) { value.wrappedValue = "" }; ForEach(options, id: \.self) { option in Button(tr(option)) { value.wrappedValue = option } } } label: { Text(value.wrappedValue.isEmpty ? title : tr(value.wrappedValue)) } }
@@ -80,5 +79,37 @@ struct PersonView: View {
             HStack(alignment: .top, spacing: 22) { Artwork(address: person.photoUrl, width: 400).frame(width: 170, height: 215).clipShape(RoundedRectangle(cornerRadius: 14)); VStack(alignment: .leading, spacing: 14) { Text(person.name).font(.largeTitle.bold()); Text(tr(person.role)).foregroundStyle(.secondary); if let profile = model.person { Text(profile.description).textSelection(.enabled) } else { ProgressView(tr("Загружаем биографию…", "Loading biography…")) } }.frame(maxWidth: .infinity, alignment: .leading) }
             if let profile = model.person { Text(tr("Фильмография", "Filmography")).font(.title2.bold()); PosterGrid(items: profile.items) }
         }.padding(24) }.task(id: person.id) { await model.loadPerson(person) }
+    }
+}
+
+struct ReleaseListRow: View {
+    @EnvironmentObject private var model: AppModel
+    var release: ReleaseRow
+    var card: MediaCard
+    private var metadata: String {
+        [release.source, release.poor ? tr("Экранка", "Low quality") : release.quality,
+         release.audio, release.size.map(byteText) ?? ""].filter { !$0.isEmpty }.joined(separator: " · ")
+    }
+    var body: some View {
+        HStack(spacing: 14) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(release.title).font(.callout.weight(.medium)).lineLimit(3)
+                Text(metadata).font(.caption).foregroundStyle(.secondary)
+                Text(tr("Отдают", "Seeders") + ": " + (release.seeds.map(String.init) ?? "—") + "   " + tr("Скачивают", "Leechers") + ": " + (release.leechers.map(String.init) ?? "—"))
+                    .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+            }.frame(maxWidth: .infinity, alignment: .leading)
+            Menu {
+                Button(tr("Скачать на этот Mac", "Download on this Mac")) {
+                    Task { await model.add(release, card: card) }
+                }
+                ForEach((model.lanState?.devices ?? []).filter(\.paired)) { device in
+                    Button(tr("Скачать на ", "Download on ") + device.name) {
+                        Task { await model.lan("send", ["device": .string(device.id), "release": .string(release.id)]) }
+                    }
+                }
+            } label: {
+                Label(tr("Скачать", "Download"), systemImage: "arrow.down")
+            }.disabled(!release.downloadable)
+        }.padding(14).background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 12))
     }
 }

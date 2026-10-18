@@ -4,6 +4,8 @@ using System.Text;
 using System.Text.Json;
 using Kachalka;
 using Kachalka.Lan;
+using Kachalka.MacUpdates;
+using Kachalka.Updates;
 
 sealed class DesktopEngine:IAsyncDisposable
 {
@@ -42,7 +44,7 @@ sealed class DesktopEngine:IAsyncDisposable
                 var id=root.GetProperty("id").GetString()!;var method=root.GetProperty("method").GetString()!;
                 var args=root.TryGetProperty("params",out var parameters)?parameters.Clone():JsonSerializer.SerializeToElement(new{});
                 if(method=="cancel"){if(requests.TryGetValue(S(args,"id"),out var pending))pending.Cancel();Reply(id,new{});continue;}
-                var request=CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);request.CancelAfter(TimeSpan.FromSeconds(90));requests[id]=request;
+                var request=CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);request.CancelAfter(method=="prepareUpdate"?TimeSpan.FromMinutes(20):TimeSpan.FromSeconds(90));requests[id]=request;
                 var task=Dispatch(id,method,args,request);running.RemoveAll(task=>task.IsCompleted);running.Add(task);
             }
             catch(Exception error){Event("error",new{message=error.Message});}
@@ -117,6 +119,12 @@ sealed class DesktopEngine:IAsyncDisposable
             case "logs":return new{text=await DiagnosticReport.CreateAsync(prefs,downloads,ct)};
             case "refresh":online.RetryNow();await shared.RefreshAsync(ct,true);groups.Clear();return new{};
             case "lan":return await Lan(p,ct);
+            case "prepareUpdate":
+                using(var updater=new MacUpdateClient(UpdateTrust.PublicKey))
+                {
+                    var destination=Path.Combine(Preferences.DataDir,"updates",Guid.NewGuid().ToString("N"));
+                    return await Task.Run(()=>updater.PrepareAsync(Convert.FromBase64String(S(p,"manifest")),Convert.FromBase64String(S(p,"signature")),S(p,"architecture"),S(p,"installed"),destination,new Progress<MacUpdateProgress>(value=>Event("updateProgress",value)),ct),ct);
+                }
             case "shutdown":shuttingDown=true;await downloads.Close();return new{};
             default:throw new ArgumentException("Unknown desktop command: "+method);
         }
