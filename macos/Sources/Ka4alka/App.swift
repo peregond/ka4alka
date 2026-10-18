@@ -18,6 +18,10 @@ import SwiftUI
                     delegate.model = model; delegate.updater = updater; updater.engine = model.bridge; ImageStore.shared.engine = model.bridge
                     model.onUpdateProgress = { [weak updater] value in updater?.progress(value) }
                     await model.bootstrap()
+                    if let updateError = UserDefaults.standard.string(forKey: "Ka4alkaUpdateError") {
+                        UserDefaults.standard.removeObject(forKey: "Ka4alkaUpdateError")
+                        model.error = updateError
+                    }
                     let environment = ProcessInfo.processInfo.environment
                     if model.settings != nil, let path = environment["KACHALKA_UPDATE_HEALTH_PATH"], let token = environment["KACHALKA_UPDATE_HEALTH_TOKEN"] {
                         try? JSONEncoder().encode(["token": token, "version": model.version]).write(to: URL(fileURLWithPath: path), options: .atomic)
@@ -59,7 +63,12 @@ import SwiftUI
             await model.bridge.shutdown()
             if let updater, updater.ready, !updater.installing, model.settings?.autoUpdate == true {
                 do { try updater.install(terminate: false) }
-                catch { model.error = error.localizedDescription; quitting = false; return }
+                catch {
+                    // The engine has already saved and stopped. Complete quit
+                    // even if update preparation fails; show the reason on the
+                    // next launch instead of leaving an unresponsive window.
+                    UserDefaults.standard.set(error.localizedDescription, forKey: "Ka4alkaUpdateError")
+                }
             }
             cleanupComplete = true
             requestApplicationQuit()

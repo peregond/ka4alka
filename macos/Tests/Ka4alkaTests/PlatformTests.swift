@@ -145,6 +145,11 @@ final class MacInstallationTests: XCTestCase {
         // deliberately invalid shared engine cannot complete a real bootstrap.
         try Data("invalid engine fixture".utf8).write(to: candidate.appendingPathComponent(engine))
         try runTool("/usr/bin/codesign", ["--force", "--sign", "-", candidate.path])
+        for case let file as URL in try XCTUnwrap(files.enumerator(at: candidate, includingPropertiesForKeys: [.isRegularFileKey])) {
+            if try file.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true {
+                try files.setAttributes([.posixPermissions: files.isExecutableFile(atPath: file.path) ? 0o755 : 0o644], ofItemAtPath: file.path)
+            }
+        }
         let broken = try makeJob(installed: installed, candidate: candidate, directory: directory)
         XCTAssertThrowsError(try MacUpdateInstaller.apply(broken))
         XCTAssertEqual(try sha256File(installed.appendingPathComponent(engine)), originalHash)

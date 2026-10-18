@@ -17,11 +17,17 @@ try {
  if(OperatingSystem.IsMacOS())
  {
    var sparse=Path.Combine(root,"allocation.bin");
-   using(var file=new FileStream(sparse,FileMode.CreateNew)){file.SetLength(2*1024*1024);file.WriteByte(1);file.Flush(true);}
-   var item=new DownloadItem{Folder=root,Files=[new("allocation.bin",sparse,sparse+".!mt",2*1024*1024,0)]};
+   const long length=64*1024*1024;
+   using(var file=new FileStream(sparse,FileMode.CreateNew)){file.Seek(length-1,SeekOrigin.Begin);file.WriteByte(1);file.Flush(true);}
+   var item=new DownloadItem{Folder=root,Files=[new("allocation.bin",sparse,sparse+".!mt",length,0)]};
    var check=new DownloadSpace().Check(item,[]);
-   if(check.Error!=null||check.OwnRemainingBytes<1024*1024)throw new Exception("APFS sparse length incorrectly consumed the remaining disk reservation: "+check.Error);
-   Console.WriteLine("PASS: APFS reservations credit allocated blocks instead of sparse logical length");
+   var statInfo=new System.Diagnostics.ProcessStartInfo("/usr/bin/stat"){RedirectStandardOutput=true};
+   statInfo.ArgumentList.Add("-f");statInfo.ArgumentList.Add("%b");statInfo.ArgumentList.Add(sparse);
+   using var stat=System.Diagnostics.Process.Start(statInfo)!;
+   var blocks=long.Parse(await stat.StandardOutput.ReadToEndAsync());await stat.WaitForExitAsync();
+   var expected=Math.Max(0,length-blocks*512);
+   if(stat.ExitCode!=0||check.Error!=null||check.OwnRemainingBytes!=expected)throw new Exception($"Mac allocated-size query differs from filesystem: remaining={check.OwnRemainingBytes}, expected={expected}, blocks={blocks}, error={check.Error}");
+   Console.WriteLine($"PASS: Mac disk reservation matches physical blocks reported by stat (remaining={expected})");
  }
  var upper=Path.Combine(root,"CaseFolder");var lower=Path.Combine(root,"casefolder");
  Directory.CreateDirectory(upper);Directory.CreateDirectory(lower);
