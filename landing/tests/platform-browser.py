@@ -8,7 +8,7 @@ mac='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Versio
 windows='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/135.0.0.0 Safari/537.36'
 cases=[('mac',mac,'MacIntel',0,'macos','en-US',1440,None),('windows',windows,'Win32',0,'windows','ru-RU',1440,None),('mac-arm',mac,'MacIntel',0,'macos','es-ES',1440,'arm'),('iphone','Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Mobile','iPhone',5,'windows','en-US',390,None),('ipad',mac,'MacIntel',5,'windows','en-US',820,None),('android','Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Mobile','Linux armv8l',5,'windows','es-ES',360,None)]
 with sync_playwright() as p:
- browser=p.chromium.launch()
+ browser=p.chromium.launch(executable_path=os.environ.get("CHROMIUM_EXECUTABLE"))
  try:
   for name,ua,platform,touch,expected,locale,width,arch in cases:
    context=browser.new_context(user_agent=ua,locale=locale,viewport={'width':width,'height':1000},device_scale_factor=1)
