@@ -9,12 +9,38 @@ import SwiftUI
     static var nativeVisibleFrames: [String: CGRect] = [:]
     static var nativeAttached: [String: Bool] = [:]
     private static var owners: [String: UUID] = [:]
-    static func record(_ id: String, frame: CGRect, owner: UUID) { owners[id] = owner; frames[id] = frame }
+    private final class WeakView {
+        weak var view: NSView?
+        init(_ view: NSView) { self.view = view }
+    }
+    private static var nativeViews: [UUID: WeakView] = [:]
+    static func registerNative(_ view: NSView, owner: UUID) { nativeViews[owner] = WeakView(view) }
+    static func refreshNativeViews() {
+        nativeViews = nativeViews.filter { $0.value.view != nil }
+        nativeFrames.removeAll(); nativeVisibleFrames.removeAll(); nativeAttached.removeAll()
+        func measure(_ view: NSView) {
+            if let probe = view as? ToolbarMeasurementView { probe.measure() }
+            for child in view.subviews { measure(child) }
+        }
+        // Read the actual current window hierarchy after screenshot layout,
+        // rather than depending on SwiftUI/AppKit callback ordering on resize.
+        for window in NSApp.windows where window.isVisible {
+            if let content = window.contentView { measure(content.superview ?? content) }
+        }
+    }
+    static func record(_ id: String, frame: CGRect, owner: UUID) {
+        owners[id] = owner; frames[id] = frame
+        // AppKit can lay out a resized toolbar host before SwiftUI announces
+        // its replacement geometry owner. Measure again once ownership exists.
+        (nativeViews[owner]?.view as? ToolbarMeasurementView)?.measure()
+    }
     static func recordNative(_ id: String, frame: CGRect, visible: CGRect, attached: Bool, owner: UUID) {
         guard owners[id] == owner else { return }
+        if !attached && nativeAttached[id] == true { return }
         nativeFrames[id] = frame; nativeVisibleFrames[id] = visible; nativeAttached[id] = attached
     }
     static func remove(_ id: String, owner: UUID) {
+        nativeViews.removeValue(forKey: owner)
         guard owners[id] == owner else { return }
         owners.removeValue(forKey: id); frames.removeValue(forKey: id)
         nativeFrames.removeValue(forKey: id); nativeVisibleFrames.removeValue(forKey: id); nativeAttached.removeValue(forKey: id)
@@ -56,6 +82,7 @@ extension View {
     func makeNSView(context: Context) -> ToolbarMeasurementView { ToolbarMeasurementView(id: id, owner: owner) }
     func updateNSView(_ view: ToolbarMeasurementView, context: Context) {
         view.id = id; view.owner = owner
+        SettingsLayoutMeasurements.registerNative(view, owner: owner)
         DispatchQueue.main.async { [weak view] in view?.measure() }
     }
 }
@@ -63,7 +90,10 @@ extension View {
 @MainActor private final class ToolbarMeasurementView: NSView {
     var id: String
     var owner: UUID
-    init(id: String, owner: UUID) { self.id = id; self.owner = owner; super.init(frame: .zero) }
+    init(id: String, owner: UUID) {
+        self.id = id; self.owner = owner; super.init(frame: .zero)
+        SettingsLayoutMeasurements.registerNative(self, owner: owner)
+    }
     required init?(coder: NSCoder) { return nil }
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
     override func layout() { super.layout(); measure() }

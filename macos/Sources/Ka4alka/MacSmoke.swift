@@ -41,6 +41,7 @@ import Foundation
             return scroll
         }
         func settingsLayout(_ name: String, bottom: Bool) throws {
+            SettingsLayoutMeasurements.refreshNativeViews()
             let frames = SettingsLayoutMeasurements.frames
             var report = frames.mapValues { frame in
                 ["x": Double(frame.minX), "y": Double(frame.minY), "width": Double(frame.width), "height": Double(frame.height)]

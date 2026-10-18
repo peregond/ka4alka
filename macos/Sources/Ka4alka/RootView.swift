@@ -39,6 +39,13 @@ struct RootView: View {
             }.navigationSplitViewColumnWidth(min: 170, ideal: 200, max: 240)
         } detail: {
             VStack(spacing: 0) {
+                if window.size.width < 1000 {
+                    // A native principal toolbar item can move to overflow as
+                    // the window narrows. Keep search pinned below it instead.
+                    searchField().frame(maxWidth: .infinity)
+                        .padding(.horizontal, 18).padding(.vertical, 10)
+                    Divider()
+                }
                 if let error = model.error {
                     HStack { Image(systemName: "exclamationmark.triangle").foregroundStyle(.orange); Text(error).font(.callout).lineLimit(3); Spacer(); Button(tr("Повторить", "Retry")) { Task { await retry() } }; Button { model.error = nil } label: { Image(systemName: "xmark") }.buttonStyle(.plain) }.padding(12).background(Color.orange.opacity(0.08))
                 }
@@ -52,9 +59,10 @@ struct RootView: View {
                 .navigationTitle(navigationTitle)
                 .toolbar {
                     ToolbarItem(placement: .navigation) { Button { model.back() } label: { Image(systemName: "chevron.left") }.disabled(model.routes.count < 2).help(tr("Назад", "Back")).accessibilityLabel(tr("Назад", "Back")) }
-                    ToolbarItem(placement: .principal) {
-                        // Keep room for the sidebar, native title and utility buttons.
-                        searchField(width: max(160, min(650, window.size.width - 600)))
+                    if window.size.width >= 1000 {
+                        ToolbarItem(placement: .principal) {
+                            searchField(width: min(650, window.size.width - 600))
+                        }
                     }
                     ToolbarItemGroup(placement: .primaryAction) {
                         Button { model.addTorrent = true } label: { Image(systemName: "plus") }.help(tr("Добавить торрент", "Add torrent")).accessibilityLabel(tr("Добавить торрент", "Add torrent"))
@@ -91,7 +99,7 @@ struct RootView: View {
         case .collection: return tr("Подборка", "Collection")
         }
     }
-    private func searchField(width: CGFloat) -> some View {
+    private func searchField(width: CGFloat? = nil) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass").foregroundStyle(.secondary).accessibilityHidden(true)
             TextField(tr("Найти фильм, сериал или игру", "Find a movie, series or game"), text: $model.query)
@@ -108,8 +116,6 @@ struct RootView: View {
         }.padding(.horizontal, 11).padding(.vertical, 8)
             .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 11))
             .overlay { RoundedRectangle(cornerRadius: 11).strokeBorder(Color.primary.opacity(0.06), lineWidth: 1) }
-            // AppKit otherwise uses this principal item's ideal width even in a
-            // compact window and sends the entire search and actions to overflow.
             .frame(width: width)
             .settingsLayoutProbe("toolbar.search")
     }
