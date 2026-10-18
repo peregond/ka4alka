@@ -1,5 +1,13 @@
 name: Capture published application screenshots
 on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
+      publish_reviewed:
+        type: boolean
+        default: false
   workflow_dispatch:
     inputs:
       version:
@@ -103,6 +111,22 @@ jobs:
           })
           [ordered]@{Version=$env:RELEASE_VERSION;Language=$env:KACHALKA_SCREENSHOT_LANGUAGE;CaptureMethod=$info.CaptureMethod;ReleaseArchiveSha256=$env:RELEASE_ARCHIVE_SHA256;ReleaseDllSha256=$dllHash;Captures=$captures} | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $infoPath -Encoding utf8NoBOM
           Get-Content -LiteralPath $infoPath
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Publish verified platform gallery assets
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python -m pip install Pillow==11.3.0
+          if($LASTEXITCODE -ne 0){throw 'Image encoder install failed'}
+          $output='test-output/gallery-${{ matrix.language }}'
+          python scripts/screenshots/package-windows.py $env:RELEASE_VERSION '${{ matrix.language }}' 'test-output/documentation-${{ matrix.language }}' $output
+          if($LASTEXITCODE -ne 0){throw 'Screenshot verification failed'}
+          $files=@(Get-ChildItem $output -File | ForEach-Object {$_.FullName})
+          gh release upload ('v'+$env:RELEASE_VERSION) @files --clobber
+          if($LASTEXITCODE -ne 0){throw 'Screenshot upload failed'}
       - name: Save screenshots in a temporary documentation draft
         shell: pwsh
         env:

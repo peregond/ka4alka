@@ -102,3 +102,14 @@ jobs:
           }
           dotnet run --project release-tools/Kachalka.ReleaseTools.csproj -c Release -- --verify-mac $dir
           if($LASTEXITCODE -ne 0){throw 'Public Mac release signature or contents invalid'}
+
+  mac-screenshots:
+    needs: publish
+    uses: ./.github/workflows/macos-screenshots.yml
+    with:
+      version: ${{ inputs.version }}
+  windows-screenshots:
+    needs: publish
+    uses: ./.github/workflows/screenshots.yml
+    with:
+      version: ${{ inputs.version }}
