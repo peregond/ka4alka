@@ -82,7 +82,7 @@ public sealed class DownloadSpace
         var full=Path.GetFullPath(folder);
         if(!OperatingSystem.IsWindows())
         {
-            var root=DriveInfo.GetDrives().Where(d=>full.StartsWith(d.RootDirectory.FullName,StringComparison.Ordinal)).OrderByDescending(d=>d.RootDirectory.FullName.Length).First();
+            var root=DriveInfo.GetDrives().Where(d=>(full==Path.TrimEndingDirectorySeparator(d.RootDirectory.FullName)||full.StartsWith(Path.TrimEndingDirectorySeparator(d.RootDirectory.FullName)+Path.DirectorySeparatorChar,StringComparison.Ordinal))).OrderByDescending(d=>d.RootDirectory.FullName.Length).First();
             return new(root.Name,root.AvailableFreeSpace);
         }
         if(!GetDiskFreeSpaceEx(full,out var available,out _,out _))throw new Win32Exception(Marshal.GetLastWin32Error());

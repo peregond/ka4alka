@@ -21,7 +21,7 @@ struct MacComponentCatalog: Codable {
             guard path.path.hasPrefix(root), path.resolvingSymlinksInPath().path == path.path else { throw UpdateError("Symlink in application components") }
             let properties = try path.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
             let attributes = try FileManager.default.attributesOfItem(atPath: path.path)
-            guard properties.isRegularFile == true, properties.fileSize == file.size, (attributes[.posixPermissions] as? NSNumber)?.intValue == file.mode, try sha256File(path) == file.sha256 else { throw UpdateError("Component checksum or permissions mismatch") }
+            guard properties.isRegularFile == true, let actualSize = properties.fileSize, Int64(actualSize) == file.size, (attributes[.posixPermissions] as? NSNumber)?.intValue == file.mode, try sha256File(path) == file.sha256 else { throw UpdateError("Component checksum or permissions mismatch") }
         }
         for path in paths {
             var parent = path
