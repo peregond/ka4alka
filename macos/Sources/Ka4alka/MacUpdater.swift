@@ -130,7 +130,7 @@ struct MacUpdateJob: Codable {
 }
 // Runs from a temporary copy, after the app has saved its queue and exited.
 enum MacUpdateInstaller {
-    static func apply(_ jobURL: URL, reopen: Bool = true) throws {
+    @discardableResult static func apply(_ jobURL: URL, reopen: Bool = true) throws -> Int32? {
         let files = FileManager.default; let job = try JSONDecoder().decode(MacUpdateJob.self, from: Data(contentsOf: jobURL))
         let manifest = try MacManifest.validate(Data(contentsOf: URL(fileURLWithPath: job.manifest)), signature: Data(contentsOf: URL(fileURLWithPath: job.signature)), publicKey: job.publicKey)
         guard let package = manifest.packages[job.architecture], job.installed.hasSuffix("/Ka4alka.app") else { throw UpdateError("Invalid update job") }
@@ -145,6 +145,7 @@ enum MacUpdateInstaller {
         let backup = old.deletingLastPathComponent().appendingPathComponent("Ka4alka-previous-" + UUID().uuidString + ".app")
         try files.moveItem(at: old, to: backup)
         do { try files.moveItem(at: app, to: old) } catch { try? files.moveItem(at: backup, to: old); throw error }
+        var launched: Int32?
         do {
             if reopen {
                 let health = jobURL.deletingLastPathComponent().appendingPathComponent("health-" + UUID().uuidString)
@@ -152,7 +153,7 @@ enum MacUpdateInstaller {
                 let child = Process(); child.executableURL = old.appendingPathComponent("Contents/MacOS/Ka4alka")
                 var environment = ProcessInfo.processInfo.environment
                 environment["KACHALKA_UPDATE_HEALTH_PATH"] = health.path; environment["KACHALKA_UPDATE_HEALTH_TOKEN"] = token
-                child.environment = environment; try child.run()
+                child.environment = environment; try child.run(); launched = child.processIdentifier
                 var healthy = false
                 for _ in 0..<300 {
                     if let data = try? Data(contentsOf: health), let value = try? JSONDecoder().decode([String: String].self, from: data), value["token"] == token, value["version"] == manifest.version { healthy = true; break }
@@ -162,6 +163,7 @@ enum MacUpdateInstaller {
                 if !healthy { if child.isRunning { child.terminate(); child.waitUntilExit() }; throw UpdateError("The updated application failed its startup check; restored the previous version") }
             }
             try? files.removeItem(at: backup)
+            return launched
         } catch {
             try? files.removeItem(at: old); try files.moveItem(at: backup, to: old)
             if reopen { try? runTool("/usr/bin/open", ["-n", old.path]) }

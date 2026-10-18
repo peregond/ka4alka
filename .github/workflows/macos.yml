@@ -38,6 +38,8 @@ jobs:
       - name: Verify packaged pipe protocol without creating an idle torrent engine
         run: python3 scripts/test-desktop-ipc.py "$PWD/dist/macos-${{ matrix.arch }}/Ka4alka.app/Contents/Resources/engine/Kachalka.Engine"
       - name: Verify native models and signed updater
+        env:
+          KACHALKA_TEST_APP: ${{ github.workspace }}/dist/macos-${{ matrix.arch }}/Ka4alka.app
         working-directory: macos
         run: swift test -c release --jobs 3
       - name: Run native app with the packaged engine
