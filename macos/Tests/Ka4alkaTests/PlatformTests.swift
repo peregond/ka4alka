@@ -9,6 +9,18 @@ final class PlatformTests: XCTestCase {
         XCTAssertEqual(card.id, "series:series:yuzhnyi-park"); XCTAssertEqual(card.quality, "Full HD"); XCTAssertTrue(card.saved)
         XCTAssertEqual(try JSONDecoder().decode(MediaCard.self, from: JSONEncoder().encode(card)), card)
     }
+    func testChunkedPipeMessages() throws {
+        final class Received: @unchecked Sendable { var lines: [Data] = []; var errors: [String] = [] }
+        let received = Received()
+        let decoder = PipeMessageDecoder(limit: 128, onMessage: { received.lines.append($0) }, onError: { received.errors.append($0) })
+        let text = #"{"title":"Южный парк"}"#
+        let bytes = Data((text + "\n" + text + "\n").utf8)
+        for byte in bytes { XCTAssertTrue(decoder.consume(Data([byte]))) }
+        XCTAssertEqual(received.lines.count, 2)
+        XCTAssertEqual(String(data: received.lines[0], encoding: .utf8), text)
+        XCTAssertFalse(decoder.consume(Data(repeating: 65, count: 129)))
+        XCTAssertEqual(received.errors.count, 1)
+    }
     func testProtocolJSONTypes() throws {
         let value: JSONValue = .object(["id": "fixture", "result": .object(["count": 40, "ready": true])])
         let decoded = try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(value))

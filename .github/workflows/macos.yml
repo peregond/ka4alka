@@ -52,7 +52,12 @@ jobs:
             if ! kill -0 "$process" 2>/dev/null; then break; fi
             sleep 1
           done
-          if kill -0 "$process" 2>/dev/null; then kill "$process"; echo 'Native macOS smoke timed out'; exit 1; fi
+          if kill -0 "$process" 2>/dev/null; then
+            sample "$process" 3 -file "$output/native-sample.txt" || true
+            kill "$process"
+            test ! -f "$output/stage.txt" || cat "$output/stage.txt"
+            echo 'Native macOS smoke timed out'; exit 1
+          fi
           wait "$process"
           test ! -f "$output/error.txt" || { cat "$output/error.txt"; exit 1; }
           test -f "$output/checks.json"

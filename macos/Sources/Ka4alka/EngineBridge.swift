@@ -4,7 +4,7 @@ import Foundation
 @MainActor final class EngineBridge {
     private var process: Process?
     private var input: Pipe?
-    private var reader: Task<Void, Never>?
+    private var outputReader: FileHandle?
     private var pending: [String: CheckedContinuation<JSONValue, Error>] = [:]
     private var deadlines: [String: Task<Void, Never>] = [:]
     var onEvent: ((String, JSONValue) -> Void)?
@@ -23,14 +23,20 @@ import Foundation
         errors.fileHandleForReading.readabilityHandler = { handle in _ = handle.availableData }
         process.terminationHandler = { [weak self] _ in Task { @MainActor in self?.ended() } }
         try process.run(); self.input = input; self.process = process
-        reader = Task { [weak self] in
-            do {
-                for try await line in output.fileHandleForReading.bytes.lines {
-                    guard line.utf8.count <= 8 * 1024 * 1024 else { throw RPCError(code: "oversize", message: "IPC response exceeds limit") }
-                    self?.receive(Data(line.utf8))
-                }
-            } catch { self?.onFailure?(error.localizedDescription) }
+        // FileHandle.AsyncBytes may perform a blocking read on the caller's
+        // executor for pipes. Read available chunks on Foundation's I/O queue;
+        // only completed messages are delivered to the main actor.
+        let decoder = PipeMessageDecoder(onMessage: { [weak self] data in
+            Task { @MainActor in self?.receive(data) }
+        }, onError: { [weak self] message in
+            Task { @MainActor in self?.onFailure?(message) }
+        })
+        outputReader = output.fileHandleForReading
+        output.fileHandleForReading.readabilityHandler = { handle in
+            let data = handle.availableData
+            if data.isEmpty || !decoder.consume(data) { handle.readabilityHandler = nil }
         }
+
     }
     func call(_ method: String, _ parameters: [String: JSONValue] = [:]) async throws -> JSONValue {
         try start(); let id = UUID().uuidString
@@ -80,6 +86,31 @@ import Foundation
         let timeout = Task { try? await Task.sleep(for: .seconds(15)); if !Task.isCancelled { shutdown.cancel(); process.terminate() } }
         await shutdown.value; timeout.cancel()
         try? input?.fileHandleForWriting.close()
-        reader?.cancel()
+        outputReader?.readabilityHandler = nil
+    }
+}
+
+// One pipe can split a UTF-8 character, JSON string or newline at any byte.
+// Decode only complete lines and cap the buffered response before allocating
+// more unbounded data. This class never calls into AppKit synchronously.
+final class PipeMessageDecoder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var buffer = Data()
+    private let limit: Int
+    private let onMessage: @Sendable (Data) -> Void
+    private let onError: @Sendable (String) -> Void
+    init(limit: Int = 8 * 1024 * 1024, onMessage: @escaping @Sendable (Data) -> Void, onError: @escaping @Sendable (String) -> Void) {
+        self.limit = limit; self.onMessage = onMessage; self.onError = onError
+    }
+    @discardableResult func consume(_ data: Data) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        buffer.append(data)
+        while let newline = buffer.firstIndex(of: 10) {
+            let line = Data(buffer[..<newline]); buffer.removeSubrange(...newline)
+            guard line.count <= limit else { buffer.removeAll(); onError("IPC response exceeds limit"); return false }
+            if !line.isEmpty { onMessage(line) }
+        }
+        guard buffer.count <= limit else { buffer.removeAll(); onError("IPC response exceeds limit"); return false }
+        return true
     }
 }

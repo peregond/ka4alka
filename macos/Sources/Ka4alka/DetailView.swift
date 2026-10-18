@@ -118,7 +118,7 @@ struct ReleaseListRow: View {
                 }
                 ForEach((model.lanState?.devices ?? []).filter(\.paired)) { device in
                     Button(tr("Скачать на ", "Download on ") + device.name) {
-                        Task { await model.lan("send", ["device": .string(device.id), "release": .string(release.id)]) }
+                        Task { await model.lan("send", ["device": .string(device.id), "release": .string(release.id), "card": .string(card.id)]) }
                     }
                 }
             } label: {

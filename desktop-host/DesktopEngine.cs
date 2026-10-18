@@ -23,7 +23,7 @@ sealed class DesktopEngine:IAsyncDisposable
     readonly SharedAsyncWork<EnglishMedia?> englishWork=new();
     readonly SemaphoreSlim metadataSlots;
     readonly Dictionary<string,DateTime> localizedAttempts=[];
-    LanService? lan;Task? ticker;Task? warming;bool shuttingDown;
+    LanService? lan;Task? ticker;Task? warming;Task? reliability;bool? lastNetwork;string? lastDownloadEvent;bool shuttingDown;
     public DesktopEngine()
     {
         AppLanguage.Set(prefs.UiLanguage);prefs.LiteMode=PerformanceBudget.DefaultLiteMode(prefs.LiteModeConfigured,prefs.LiteMode);PerformanceBudget.LiteMode=prefs.LiteMode;metadataSlots=new(PerformanceBudget.Constrained?1:3);
@@ -257,7 +257,7 @@ sealed class DesktopEngine:IAsyncDisposable
         return (object)new{id=key,title=entry.Title,source=entry.Source,size=entry.Size,seeds=entry.Seeds,leechers=entry.Leechers,quality=entry.Quality,type=entry.Type,audio=entry.Voice,studios=ReleaseAudio.StudioNames(entry),audioTypes=ReleaseAudio.TypeNames(entry),codec=entry.Codec,subs=entry.Subs,hdr=entry.Hdr,poor=ReleaseQuality.Poor(entry,prefs.MinimumReleaseHeight),downloadable=ReleaseAvailability.Downloadable(entry)};
     }).ToArray();
     object Downloads()=>new{items=downloads.Items.OrderByDescending(x=>x.AddedUtc).Select(item=>new{id=item.Id,title=item.DisplayName,releaseTitle=item.Name,poster=item.ImageUrl,progress=item.Progress,status=AppLanguage.T(item.Status),hint=AppLanguage.T(item.Hint),paused=item.Paused,complete=item.Completed,missing=item.FilesMissing,lowSpace=item.LowSpacePaused,downloadRate=item.DownloadRate,uploadRate=item.UploadRate,totalBytes=item.TotalBytes,addedUtc=item.AddedUtc,folder=item.Folder,mediaId=DownloadMetadata.Card(item) is {} media?Remember([media])[0].id:null,canUpdateRelease=item.CanUpdateRelease,peers=item.PeersText,files=item.Files.Count})};
-    object Settings()=>new{prefs.Folder,prefs.FolderConfigured,prefs.UiLanguage,prefs.Light,prefs.LiteMode,prefs.AutoResumeDownloads,prefs.AutoRecoverDownloads,prefs.NotifyDownloads,prefs.CheckForUpdates,prefs.AutoUpdate,prefs.HidePoorQuality,prefs.MinimumReleaseHeight,prefs.MaxDownloadKbps,prefs.MaxUploadKbps,prefs.LanEnabled,hidden=prefs.HiddenTitles.Select(x=>new{id=x.Identity,title=x.Title}),hiddenGenres=prefs.HiddenGenres,savedIds=prefs.LiveFavorites.Select(Key)};
+    object Settings()=>new{prefs.Folder,prefs.FolderConfigured,prefs.UiLanguage,prefs.Light,prefs.LiteMode,prefs.AutoResumeDownloads,prefs.AutoRecoverDownloads,prefs.NotifyDownloads,prefs.CheckForUpdates,prefs.AutoUpdate,prefs.HidePoorQuality,prefs.MinimumReleaseHeight,prefs.MaxDownloadKbps,prefs.MaxUploadKbps,prefs.LanEnabled,prefs.DownloadSort,hidden=prefs.HiddenTitles.Select(x=>new{id=x.Identity,title=x.Title}),hiddenGenres=prefs.HiddenGenres,savedIds=prefs.LiveFavorites.Select(Key)};
     async Task<object> SetSettings(JsonElement p,CancellationToken ct)
     {
         if(p.TryGetProperty("uiLanguage",out var language)){prefs.UiLanguage=AppLanguage.Normalize(language.GetString());AppLanguage.Set(prefs.UiLanguage);groups.Clear();}
@@ -271,6 +271,7 @@ sealed class DesktopEngine:IAsyncDisposable
         if(p.TryGetProperty("autoUpdate",out var auto))prefs.AutoUpdate=auto.GetBoolean();
         if(p.TryGetProperty("maxDownloadKbps",out var down))prefs.MaxDownloadKbps=Math.Max(0,down.GetInt32());
         if(p.TryGetProperty("maxUploadKbps",out var up))prefs.MaxUploadKbps=Math.Max(0,up.GetInt32());
+        if(p.TryGetProperty("downloadSort",out var downloadSort)&&new[]{"newest","name","speed","size","progress"}.Contains(downloadSort.GetString()))prefs.DownloadSort=downloadSort.GetString()!;
         if(p.TryGetProperty("hiddenGenres",out var hidden))prefs.HiddenGenres=hidden.Deserialize<HashSet<string>>(Json)??[];
         if(p.TryGetProperty("lanEnabled",out var enabled)){prefs.LanEnabled=enabled.GetBoolean();if(prefs.LanEnabled)await EnsureLan(ct);else if(lan!=null){await lan.DisposeAsync();lan=null;}}
         await downloads.SetLimitsAsync(prefs.MaxDownloadKbps,prefs.MaxUploadKbps);prefs.Save();Event("personal",Settings());return Settings();
@@ -280,7 +281,7 @@ sealed class DesktopEngine:IAsyncDisposable
         if(lan!=null)return;lan=new(new LanServiceOptions{StateDirectory=Path.Combine(Preferences.DataDir,"lan"),DeviceName=Environment.MachineName});
         var receiver=new LanDownloadReceiver(downloads,prefs,Path.Combine(Preferences.DataDir,"lan-inbox"));
         var context=SynchronizationContext.Current!;
-        lan.ReceiveDownloadAsync=(request,token)=>OnOwner(()=>receiver.ReceiveAsync(request,token),context);
+        lan.ReceiveDownloadAsync=(request,token)=>OnOwner(()=>prefs.LanEnabled&&!shuttingDown?receiver.ReceiveAsync(request,token):Task.FromResult(new LanDownloadReceipt{RequestId=request.RequestId,Message="Receiving downloads is disabled."}),context);
         lan.ConfirmPairingAsync=async(request,token)=>
         {
             var approval=new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -302,7 +303,7 @@ sealed class DesktopEngine:IAsyncDisposable
             case "pair":await lan!.PairAsync(lan.Devices.Single(x=>x.Id.ToString()==S(p,"id")),ct);break;
             case "send":
                 var device=lan!.Devices.Single(x=>x.Id.ToString()==S(p,"device"));var entry=releases[S(p,"release")];var file=await source.TorrentFile(entry,ct);
-                var request=new LanDownloadRequest{Magnet=file.StartsWith("magnet:")?file:null,TorrentBytes=file.StartsWith("magnet:")?null:await File.ReadAllBytesAsync(file,ct),Title=entry.Title};
+                var request=await LanDownloadPayload.CreateAsync(file,S(p,"card").Length>0?Card(S(p,"card")):null,entry,ct);
                 var receipt=await lan.SendDownloadAsync(device,request,ct);if(!receipt.Accepted)throw new IOException(receipt.Message);break;
         }
         return new{name=lan!.Name,devices=lan.Devices};
@@ -325,9 +326,39 @@ sealed class DesktopEngine:IAsyncDisposable
         var result=await ReleaseSearch.RunAsync(media.Section=="Игры"?GameReleaseSources.Create(source,media,configuredSources):NativeReleaseSources.Create(source,media),ct:ct);
         return result.Items.FirstOrDefault(x=>x.Source==prior.Source&&(x.Id==prior.Id||x.PageUrl==prior.PageUrl))??prior;
     }
+    async Task Reliability()
+    {
+        try
+        {
+            var available=NetworkInterface.GetIsNetworkAvailable();
+            if(lastNetwork!=available)
+            {
+                lastNetwork=available;await downloads.RecoverConnectionsAsync(available,false,lifetime.Token,prefs.AutoRecoverDownloads);
+            }
+            await downloads.PollReliabilityAsync(lifetime.Token,prefs.AutoRecoverDownloads);
+        }
+        catch(OperationCanceledException)when(lifetime.IsCancellationRequested){}
+        catch(Exception error){ErrorLog.Write(error);}
+    }
     async Task Tick()
     {
-        try{using var timer=new PeriodicTimer(TimeSpan.FromSeconds(1));while(await timer.WaitForNextTickAsync(lifetime.Token)){downloads.SetNetworkAvailable(NetworkInterface.GetIsNetworkAvailable());if(downloads.EngineCreated){downloads.Update();Event("downloads",Downloads());}}}catch(OperationCanceledException){}catch(Exception error){ErrorLog.Write(error);}
+        try
+        {
+            using var timer=new PeriodicTimer(TimeSpan.FromSeconds(1));
+            while(await timer.WaitForNextTickAsync(lifetime.Token))
+            {
+                if(downloads.Items.Count==0)continue;
+                downloads.Update();
+                if(reliability==null||reliability.IsCompleted)reliability=Reliability();
+                var snapshot=JsonSerializer.Serialize(Downloads(),Json);
+                if(snapshot!=lastDownloadEvent)
+                {
+                    lastDownloadEvent=snapshot;
+                    Console.Out.WriteLine("{\"event\":\"downloads\",\"data\":"+snapshot+"}");
+                }
+            }
+        }
+        catch(OperationCanceledException){}catch(Exception error){ErrorLog.Write(error);}
     }
     object Choice(CatalogChoice item)=>new{key=item.Key,label=AppLanguage.T(item.Label)};
     string Key(MediaItem item)=>(item.Section=="Игры"?"games":item.Section=="Сериалы"?"series":"movies")+":"+(item.OnlineId??item.ImdbId??item.Id.ToString());
@@ -346,7 +377,7 @@ sealed class DesktopEngine:IAsyncDisposable
     {
         lifetime.Cancel();foreach(var pending in requests.Values.ToArray())pending.Cancel();
         if(lan!=null)await lan.DisposeAsync();
-        await Task.WhenAll(running.Concat(new[]{ticker,warming}.OfType<Task>()));
+        await Task.WhenAll(running.Concat(new[]{ticker,warming,reliability}.OfType<Task>()));
         await downloads.Close();prefs.Save();source.Dispose();lifetime.Dispose();
     }
 }

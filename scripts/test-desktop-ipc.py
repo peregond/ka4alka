@@ -19,7 +19,8 @@ def call(method,params=None):
    return msg['result']
  raise TimeoutError(method)
 try:
- boot=call('bootstrap');assert boot['engineCreated'] is False
+ started=time.monotonic();boot=call('bootstrap');bootstrap_ms=round((time.monotonic()-started)*1000);assert boot['engineCreated'] is False
+ assert boot['version']==__import__('xml.etree.ElementTree',fromlist=['parse']).parse('native/Kachalka.csproj').find('.//Version').text
  featured=call('featured');assert featured['groups']
  movies=call('catalog',dict(section='movies',page=1));assert len(movies['items'])==40
  card=movies['items'][0];call('save',dict(id=card['id']));assert any(c['id']==card['id'] for c in call('saved')['items'])
@@ -29,6 +30,7 @@ try:
  assert call('downloads')['items']==[]
  assert 'text' in call('logs')
  call('shutdown');p.stdin.close();p.wait(timeout=15);assert p.returncode==0
+ print(f'Bootstrap: {bootstrap_ms} ms; engine stays lazy')
  print('PASS: packaged shared-engine protocol, lazy startup, 40-card pagination, featured, save/hide, settings, logs and graceful EOF shutdown')
 finally:
  if p.poll() is None:p.kill();p.wait()

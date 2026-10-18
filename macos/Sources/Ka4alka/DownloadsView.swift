@@ -26,7 +26,7 @@ struct DownloadsView: View {
             Text(tr("Всего", "Total") + ": \(store.items.count)  ·  " + tr("Загружается", "Downloading") + ": \(store.items.filter { !$0.paused && !$0.complete }.count)  ·  " + tr("Раздаётся", "Seeding") + ": \(store.items.filter { !$0.paused && $0.complete }.count)").font(.caption).foregroundStyle(.secondary).padding(.horizontal, 22)
             if store.items.isEmpty { ContentUnavailableView(tr("Пока нет загрузок", "No downloads yet"), systemImage: "arrow.down.circle", description: Text(tr("Найди фильм, сериал или игру и выбери раздачу.", "Find a movie, series or game and choose a release."))) }
             else { List(ordered) { item in TransferRow(item: item).listRowSeparator(.hidden).listRowBackground(Color.clear).padding(.vertical, 4) }.listStyle(.inset) }
-        }.popover(isPresented: $showLimits) { SpeedLimitsView().padding(20).frame(width: 340) }
+        }.task { sort = model.settings?.downloadSort ?? "newest" }.onChange(of: sort) { _, value in Task { await model.set("downloadSort", .string(value)) } }.popover(isPresented: $showLimits) { SpeedLimitsView().padding(20).frame(width: 340) }
     }
 }
 struct TransferRow: View {
@@ -67,7 +67,7 @@ struct TransferRow: View {
     private func openCard() {
         guard let id = item.mediaId else { return }
         if let card = model.card(id) { model.open(card) }
-        else { model.open(MediaCard(id: id, title: item.title, section: "movies", year: 0, rating: "—", poster: item.poster, description: "", genre: "", quality: nil, saved: false, platform: nil)) }
+        else { model.open(MediaCard(id: id, title: item.title, section: id.hasPrefix("games:") ? "games" : id.hasPrefix("series:") ? "series" : "movies", year: 0, rating: "—", poster: item.poster, description: "", genre: "", quality: nil, saved: false, platform: nil)) }
     }
 }
 struct TransferFilesView: View {

@@ -37,7 +37,7 @@ struct HiddenTitle: Codable, Identifiable { var id: String; var title: String }
 struct AppSettings: Codable {
     var folder: String; var folderConfigured: Bool; var uiLanguage: String; var light: Bool; var liteMode: Bool
     var autoResumeDownloads: Bool; var autoRecoverDownloads: Bool; var notifyDownloads: Bool; var checkForUpdates: Bool; var autoUpdate: Bool
-    var hidePoorQuality: Bool; var minimumReleaseHeight: Int; var maxDownloadKbps: Int; var maxUploadKbps: Int; var lanEnabled: Bool
+    var hidePoorQuality: Bool; var minimumReleaseHeight: Int; var maxDownloadKbps: Int; var maxUploadKbps: Int; var lanEnabled: Bool; var downloadSort: String
     var hidden: [HiddenTitle]; var hiddenGenres: [String]; var savedIds: [String]
 }
 struct Bootstrap: Decodable { var version: String; var settings: AppSettings; var genres: [Choice]; var countries: [Choice]; var gameGenres: [Choice]; var engineCreated: Bool }
