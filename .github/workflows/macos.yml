@@ -1,0 +1,67 @@
+name: Verify native macOS application
+on:
+  push:
+    branches: [claude/quirky-hopper-1vlmj6]
+    paths: ['macos/**', 'desktop-core/**', 'desktop-host/**', 'native/**', 'update-core/**', 'scripts/macos/**', '.github/workflows/macos.yml']
+  workflow_dispatch:
+  workflow_call:
+permissions:
+  contents: read
+concurrency:
+  group: macos-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+jobs:
+  macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('**/*.csproj') }}
+      - name: Build native application and self-contained shared engine
+        run: bash scripts/macos/build.sh '${{ matrix.arch }}'
+      - name: Run native app with the packaged engine
+        env:
+          KACHALKA_DATA: ${{ github.workspace }}/test-output/macos/profile
+        run: |
+          mkdir -p "$KACHALKA_DATA/downloads"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          root=Path(os.environ['KACHALKA_DATA'])
+          (root/'settings.json').write_text(json.dumps(dict(Folder=str(root/'downloads'),FolderConfigured=True,AutoResumeDownloads=False,CheckForUpdates=False,AutoUpdate=False,UiLanguage='ru')))
+          PY
+          output="$PWD/test-output/macos/render"
+          app="$PWD/dist/macos-${{ matrix.arch }}/Ka4alka.app/Contents/MacOS/Ka4alka"
+          "$app" --smoke-test "$output" &
+          process=$!
+          for ((attempt=0;attempt<180;attempt++)); do
+            if ! kill -0 "$process" 2>/dev/null; then break; fi
+            sleep 1
+          done
+          if kill -0 "$process" 2>/dev/null; then kill "$process"; echo 'Native macOS smoke timed out'; exit 1; fi
+          wait "$process"
+          test ! -f "$output/error.txt" || { cat "$output/error.txt"; exit 1; }
+          test -f "$output/checks.json"
+          cat "$output/checks.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: macos-${{ matrix.arch }}-${{ github.sha }}
+          path: |
+            dist/macos-${{ matrix.arch }}/Kachalka-macos-*.zip
+            dist/macos-${{ matrix.arch }}/Kachalka-macos-*.dmg
+            test-output/macos/render/
