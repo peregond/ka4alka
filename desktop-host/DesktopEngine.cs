@@ -33,7 +33,7 @@ sealed class DesktopEngine:IAsyncDisposable
     {
         ticker=Tick();
         string? line;
-        while(!shuttingDown&&(line=await Console.In.ReadLineAsync())!=null)
+        while(!shuttingDown&&(line=await Task.Run(Console.ReadLine))!=null)
         {
             if(line.Length>2*1024*1024){Event("error",new{message="Request exceeds the IPC limit."});continue;}
             try

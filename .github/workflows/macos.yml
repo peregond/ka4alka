@@ -33,6 +33,9 @@ jobs:
           key: nuget-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('**/*.csproj') }}
       - name: Build native application and self-contained shared engine
         run: bash scripts/macos/build.sh '${{ matrix.arch }}'
+      - name: Verify native models and signed updater
+        working-directory: macos
+        run: swift test -c release --jobs 3
       - name: Run native app with the packaged engine
         env:
           KACHALKA_DATA: ${{ github.workspace }}/test-output/macos/profile
