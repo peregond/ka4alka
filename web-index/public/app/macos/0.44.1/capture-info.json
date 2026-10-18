@@ -1,0 +1,104 @@
+{
+  "Version": "0.44.1",
+  "Platform": "macos",
+  "CaptureMethod": "Native AppKit window pixels from verified published app",
+  "ReleaseArchiveSha256": "3d5bb83be9a2e56c89cfa4647dc9dfddf03cf1e80a76b5d55318c1659c0707f3",
+  "Captures": [
+    {
+      "File": "ru/catalog-dark.webp",
+      "Language": "ru",
+      "Width": 1024,
+      "Height": 681,
+      "Sha256": "e2c5bbf25e25734ab1955fbc30e0f7ffbf790e3b77c577fa2c4053b50e0a8024",
+      "SourceFile": "screenshots-macos-ru-catalog-dark.webp"
+    },
+    {
+      "File": "ru/series-dark.webp",
+      "Language": "ru",
+      "Width": 1024,
+      "Height": 681,
+      "Sha256": "d6bb85254f88c91649700cb16eef1e35ea004ec3b5bdb683ab825880acd7fdcf",
+      "SourceFile": "screenshots-macos-ru-series-dark.webp"
+    },
+    {
+      "File": "ru/games-dark.webp",
+      "Language": "ru",
+      "Width": 1024,
+      "Height": 681,
+      "Sha256": "4a242ce213ad98b2c69ed69425abee016a1590c570f03327a8bc622f58956f0f",
+      "SourceFile": "screenshots-macos-ru-games-dark.webp"
+    },
+    {
+      "File": "ru/downloads-dark.webp",
+      "Language": "ru",
+      "Width": 1024,
+      "Height": 681,
+      "Sha256": "9d31eef0d96a302219b3fefe06001cc4dc0874861d18057b5a6ae12263ae9fc8",
+      "SourceFile": "screenshots-macos-ru-downloads-dark.webp"
+    },
+    {
+      "File": "ru/settings-dark.webp",
+      "Language": "ru",
+      "Width": 1180,
+      "Height": 684,
+      "Sha256": "42633b5ac35611d1bad1d6a2be1a0a7174307d85cb60a53d0db149da633a8271",
+      "SourceFile": "screenshots-macos-ru-settings-dark.webp"
+    },
+    {
+      "File": "ru/settings-light.webp",
+      "Language": "ru",
+      "Width": 1180,
+      "Height": 684,
+      "Sha256": "2724b304e5d8b040964cf378b9d628c1dc62eebcc053d450f12d16f62cce2757",
+      "SourceFile": "screenshots-macos-ru-settings-light.webp"
+    },
+    {
+      "File": "en/catalog-dark.webp",
+      "Language": "en",
+      "Width": 1024,
+      "Height": 681,
+      "Sha256": "072f80451c1d49d728f0ba36365593b1e84304ea0c9a9cc143744b6fd9276b0c",
+      "SourceFile": "screenshots-macos-en-catalog-dark.webp"
+    },
+    {
+      "File": "en/series-dark.webp",
+      "Language": "en",
+      "Width": 1024,
+      "Height": 681,
+      "Sha256": "2489e15d8adb1065f9145b3dc54b23b0c11a2bf83fb591e2273cdb81a8a1f095",
+      "SourceFile": "screenshots-macos-en-series-dark.webp"
+    },
+    {
+      "File": "en/games-dark.webp",
+      "Language": "en",
+      "Width": 1024,
+      "Height": 681,
+      "Sha256": "b4fb0a4cc5897d717509da6d1df675cf7c8a1dcb876a185397474e0bea0017a1",
+      "SourceFile": "screenshots-macos-en-games-dark.webp"
+    },
+    {
+      "File": "en/downloads-dark.webp",
+      "Language": "en",
+      "Width": 1024,
+      "Height": 681,
+      "Sha256": "575f236862983303343fdcdbef1c312880dc5ce5a2e59bc36ea236e8737afca1",
+      "SourceFile": "screenshots-macos-en-downloads-dark.webp"
+    },
+    {
+      "File": "en/settings-dark.webp",
+      "Language": "en",
+      "Width": 1180,
+      "Height": 684,
+      "Sha256": "8960e128dd9c1e191c155be4cc88440ef6cb4a903602fcc18f5b3100bf293f7f",
+      "SourceFile": "screenshots-macos-en-settings-dark.webp"
+    },
+    {
+      "File": "en/settings-light.webp",
+      "Language": "en",
+      "Width": 1180,
+      "Height": 684,
+      "Sha256": "ed43b7a24eec584b56344049a5883244fa9b2fb7adac456729a4f36b69d09fcf",
+      "SourceFile": "screenshots-macos-en-settings-light.webp"
+    }
+  ]
+}

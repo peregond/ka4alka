@@ -1,11 +1,12 @@
-export type AppRelease = { version: string; installerUrl: string; zipUrl: string; releaseUrl: string; installerSize: number; mac?: { arm64: string; x64: string; arm64Zip: string; x64Zip: string } };
+export type AppRelease = { version: string; installerUrl: string; zipUrl: string; releaseUrl: string; installerSize: number; mac?: { arm64: string; x64: string; arm64Zip: string; x64Zip: string }; macScreenshots?: Record<string, string>; windowsScreenshots?: Record<string, string> };
 
 const fallback: AppRelease = {
-  version: "0.43.4",
-  installerUrl: "https://github.com/peregond/ka4alka/releases/download/v0.43.4/Kachalka-Setup-0.43.4.exe",
-  zipUrl: "https://github.com/peregond/ka4alka/releases/download/v0.43.4/Kachalka-win-x64.zip",
-  releaseUrl: "https://github.com/peregond/ka4alka/releases/tag/v0.43.4",
-  installerSize: 72898428,
+  version: "0.44.1",
+  installerUrl: "https://github.com/peregond/ka4alka/releases/download/v0.44.1/Kachalka-Setup-0.44.1.exe",
+  zipUrl: "https://github.com/peregond/ka4alka/releases/download/v0.44.1/Kachalka-win-x64.zip",
+  releaseUrl: "https://github.com/peregond/ka4alka/releases/tag/v0.44.1",
+  installerSize: 75465539,
+  mac: { arm64: "https://github.com/peregond/ka4alka/releases/download/v0.44.1/Kachalka-macos-arm64.dmg", x64: "https://github.com/peregond/ka4alka/releases/download/v0.44.1/Kachalka-macos-x64.dmg", arm64Zip: "https://github.com/peregond/ka4alka/releases/download/v0.44.1/Kachalka-macos-arm64.zip", x64Zip: "https://github.com/peregond/ka4alka/releases/download/v0.44.1/Kachalka-macos-x64.zip" },
 };
 let cached = fallback;
 let expires = 0;
@@ -44,8 +45,18 @@ export async function getLatestRelease(): Promise<AppRelease> {
       const arm64 = macAsset("Kachalka-macos-arm64.dmg"), x64 = macAsset("Kachalka-macos-x64.dmg");
       const arm64Zip = macAsset("Kachalka-macos-arm64.zip"), x64Zip = macAsset("Kachalka-macos-x64.zip");
       const mac = arm64 && x64 && arm64Zip && x64Zip ? { arm64, x64, arm64Zip, x64Zip } : undefined;
-      cached = { mac, version: tag.slice(1), installerUrl, zipUrl, installerSize: installer.size, releaseUrl: `https://github.com/peregond/ka4alka/releases/tag/${tag}` };
-      expires = Date.now() + 30 * 60_000;
+      const macScreenshots: Record<string, string> = {};
+      for (const language of ["ru", "en"]) for (const file of ["catalog-dark", "series-dark", "games-dark", "downloads-dark", "settings-dark", "settings-light"]) {
+        const url = macAsset(`screenshots-macos-${language}-${file}.webp`);
+        if (url) macScreenshots[`${language}/${file}.webp`] = url;
+      }
+      const windowsScreenshots: Record<string, string> = {};
+      for (const language of ["ru", "en"]) for (const file of ["catalog-dark", "series-dark", "games-dark", "detail-dark", "downloads-dark", "catalog-light"]) {
+        const url = macAsset(`screenshots-windows-${language}-${file}.webp`);
+        if (url) windowsScreenshots[`${language}/${file}.webp`] = url;
+      }
+      cached = { mac, windowsScreenshots: Object.keys(windowsScreenshots).length === 12 ? windowsScreenshots : undefined, macScreenshots: Object.keys(macScreenshots).length === 12 ? macScreenshots : undefined, version: tag.slice(1), installerUrl, zipUrl, installerSize: installer.size, releaseUrl: `https://github.com/peregond/ka4alka/releases/tag/${tag}` };
+      expires = Date.now() + 5 * 60_000;
     } catch { expires = Date.now() + 5 * 60_000; }
     return cached;
   })().finally(() => { pending = null; });

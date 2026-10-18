@@ -52,6 +52,7 @@ jobs:
           node tests/source-integrity.mjs
           node tests/site-language.mjs
           node tests/app-screenshots.mjs
+          node tests/site-platform.mjs
           node node_modules/typescript/bin/tsc --noEmit --incremental false
       - name: Build the identical verified source in the repository checkout
         working-directory: web-index
