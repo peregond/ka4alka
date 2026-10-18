@@ -1,4 +1,4 @@
-name: Prepare signed Windows release
+name: Prepare signed Windows and Mac release
 on:
   workflow_call:
     inputs:
@@ -29,6 +29,10 @@ concurrency:
   group: kachalka-release-0.43.14
   cancel-in-progress: false
 jobs:
+  macos:
+    uses: ./.github/workflows/macos.yml
+  portable:
+    uses: ./.github/workflows/portable-core.yml
   release:
     runs-on: windows-latest
     timeout-minutes: 25
@@ -283,11 +287,54 @@ jobs:
             test-output/published-upgrade/checks.txt
             test-output/published-upgrade/data/updates/*/result.txt
             test-output/windows-update/data/updates/*/result.txt
+  mac-assets:
+    needs: [release, macos, portable]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_VERSION: ${{ inputs.version || '0.44.0' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: macos-*-${{ github.sha }}
+          path: dist/mac-verified
+      - name: Sign and attach both Mac packages to the same draft
+        env:
+          KACHALKA_UPDATE_SIGNING_KEY_PEM: ${{ secrets.KACHALKA_UPDATE_SIGNING_KEY_PEM }}
+        run: |
+          release="$PWD/dist/mac-release"
+          mkdir -p "$release"
+          find dist/mac-verified -type f \( -name 'Kachalka-macos-*.zip' -o -name 'Kachalka-macos-*.dmg' \) -exec cp {} "$release/" \;
+          dotnet run --project release-tools/Kachalka.ReleaseTools.csproj -c Release -- --prepare-mac "$release" "$RELEASE_VERSION"
+          dotnet run --project release-tools/Kachalka.ReleaseTools.csproj -c Release -- --verify-mac "$release"
+          python3 - <<'PYTHON'
+          import json,os
+          from pathlib import Path
+          Path('dist/mac-release/platform-validation.json').write_text(json.dumps(dict(repository=os.environ['GITHUB_REPOSITORY'],commit=os.environ['GITHUB_SHA'],runId=os.environ['GITHUB_RUN_ID'],version=os.environ['RELEASE_VERSION'])))
+          PYTHON
+          gh release upload "v$RELEASE_VERSION" "$release"/* --clobber
+          readback="$PWD/dist/mac-readback"
+          mkdir -p "$readback"
+          gh release download "v$RELEASE_VERSION" --dir "$readback"
+          dotnet run --project release-tools/Kachalka.ReleaseTools.csproj -c Release -- --verify-mac "$readback"
+          python3 - <<'PYTHON'
+          import hashlib
+          from pathlib import Path
+          root=Path('dist/mac-readback')
+          (root/'SHA256SUMS.txt').write_text(''.join(hashlib.sha256(p.read_bytes()).hexdigest()+'  '+p.name+'\n' for p in sorted(root.iterdir()) if p.is_file() and p.name!='SHA256SUMS.txt'))
+          PYTHON
+          gh release upload "v$RELEASE_VERSION" "$readback/SHA256SUMS.txt" --clobber
   publish:
-    needs: release
+    needs: [release, mac-assets]
     if: ${{ inputs.publish }}
     permissions:
       contents: write
+      actions: read
     uses: ./.github/workflows/publish-release.yml
     with:
       version: ${{ inputs.version }}
