@@ -142,8 +142,9 @@ final class MacInstallationTests: XCTestCase {
         defer {
             if let previous { setenv("KACHALKA_DATA", previous, 1) } else { unsetenv("KACHALKA_DATA") }
             // Only test-owned copies, never a user's installed application.
+            RunLoop.current.run(until: Date().addingTimeInterval(0.5))
             for _ in 0..<30 {
-                let owned = NSRunningApplication.runningApplications(withBundleIdentifier: "org.ka4alka.app").filter { $0.bundleURL?.standardizedFileURL == installed.standardizedFileURL }
+                let owned = NSRunningApplication.runningApplications(withBundleIdentifier: "org.ka4alka.app").filter { $0.bundleURL?.resolvingSymlinksInPath().standardizedFileURL == installed.resolvingSymlinksInPath().standardizedFileURL }
                 for app in owned { app.forceTerminate() }
                 if owned.isEmpty { break }
                 RunLoop.current.run(until: Date().addingTimeInterval(0.1))
