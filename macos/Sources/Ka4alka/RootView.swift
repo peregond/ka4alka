@@ -58,7 +58,7 @@ struct RootView: View {
         .dropDestination(for: URL.self) { urls, _ in guard let url = urls.first else { return false }; model.magnet = url.isFileURL ? url.path : url.absoluteString; model.addTorrent = true; return true }
     }
     private func sidebar(_ entry: Section) -> some View {
-        Button { model.select(entry) } label: { HStack { Label(entry.title, systemImage: entry.icon); Spacer(); if entry == .downloads { DownloadBadge(store: model.transfers) } }.padding(.vertical, 5).contentShape(Rectangle()) }.buttonStyle(.plain)
+        Button { model.select(entry) } label: { HStack { Label(entry.title, systemImage: entry.icon).foregroundStyle(.primary); Spacer(); if entry == .downloads { DownloadBadge(store: model.transfers) } }.padding(.vertical, 5).contentShape(Rectangle()) }.buttonStyle(.plain)
             .listRowBackground(model.section == entry ? model.accent.opacity(0.15) : Color.clear)
             .accessibilityIdentifier("nav-" + entry.rawValue)
     }

@@ -71,7 +71,7 @@ struct DetailView: View {
                 if let awards = detail?.awards, !awards.isEmpty { DisclosureGroup(tr("Награды", "Awards")) { VStack(alignment: .leading, spacing: 8) { ForEach(awards) { award in Label("\(award.name) · \(award.year) · \(award.category)", systemImage: award.winner ? "trophy.fill" : "laurel.leading").font(.callout) } }.frame(maxWidth: .infinity, alignment: .leading).padding(.top, 8) } }
                 releaseSection
             }.padding(24)
-        }.task(id: card.id) { await model.loadDetail(card) }.background { Color.clear.task(id: card.id) { await model.loadReleases(card) } }
+        }.task(id: card.id + (model.settings?.uiLanguage ?? "ru")) { await model.loadDetail(card) }.background { Color.clear.task(id: card.id + (model.settings?.uiLanguage ?? "ru")) { await model.loadReleases(card) } }
     }
     private var releaseSection: some View {
         VStack(alignment: .leading, spacing: 14) {

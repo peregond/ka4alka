@@ -25,20 +25,28 @@ struct FeaturedHero: View {
     @EnvironmentObject private var model: AppModel
     var card: MediaCard
     @State private var backdrop: String?
+    @State private var localized: MediaCard?
+    private var item: MediaCard { model.settings?.uiLanguage == "en" ? localized ?? card : card }
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .bottomLeading) {
+                LinearGradient(colors: [model.accent.opacity(0.18), .black.opacity(0.7)], startPoint: .topTrailing, endPoint: .bottomLeading)
                 if let backdrop { Artwork(address: backdrop, width: 1280).frame(width: geo.size.width, height: 270) }
-                else { LinearGradient(colors: [model.accent.opacity(0.18), .black.opacity(0.7)], startPoint: .topTrailing, endPoint: .bottomLeading) }
                 LinearGradient(colors: [.black.opacity(0.1), .black.opacity(0.85)], startPoint: .top, endPoint: .bottom)
                 VStack(alignment: .leading, spacing: 10) {
-                    Text(card.title).font(.largeTitle.bold()).lineLimit(2)
-                    Text([card.year > 0 ? String(card.year) : "", card.genre].filter { !$0.isEmpty }.joined(separator: " · ")).foregroundStyle(.white.opacity(0.8))
-                    if !card.description.isEmpty { Text(card.description).font(.callout).lineLimit(3).frame(maxWidth: 600, alignment: .leading) }
-                    HStack { Button { model.open(card) } label: { Label(tr("Подробнее", "Details"), systemImage: "info.circle") }.buttonStyle(.borderedProminent); Button { Task { await model.save(card) } } label: { Image(systemName: model.isSaved(card) ? "heart.fill" : "heart") }.buttonStyle(.bordered) }
+                    Text(item.title).font(.largeTitle.bold()).lineLimit(2)
+                    Text([item.year > 0 ? String(item.year) : "", item.genre].filter { !$0.isEmpty }.joined(separator: " · ")).foregroundStyle(.white.opacity(0.8))
+                    if !item.description.isEmpty { Text(item.description).font(.callout).lineLimit(3).frame(maxWidth: 600, alignment: .leading) }
+                    HStack { Button { model.open(item) } label: { Label(tr("Подробнее", "Details"), systemImage: "info.circle") }.buttonStyle(.borderedProminent); Button { Task { await model.save(card) } } label: { Image(systemName: model.isSaved(card) ? "heart.fill" : "heart") }.buttonStyle(.bordered) }
                 }.foregroundStyle(.white).padding(24)
-            }.clipShape(RoundedRectangle(cornerRadius: 18)).contentShape(Rectangle()).onTapGesture { model.open(card) }
-        }.frame(height: 270).task(id: card.id) { let result = try? await model.bridge.call("artwork", ["id": .string(card.id)]); if !Task.isCancelled { let address = result?["url"].string ?? ""; backdrop = address.isEmpty ? nil : address } }
+            }.clipShape(RoundedRectangle(cornerRadius: 18)).contentShape(Rectangle()).onTapGesture { model.open(item) }
+        }.frame(height: 270).task(id: card.id + (model.settings?.uiLanguage ?? "ru")) { let result = try? await model.bridge.call("artwork", ["id": .string(card.id)]); if !Task.isCancelled { let address = result?["url"].string ?? ""; backdrop = address.isEmpty ? nil : address } }
+            .task(id: "localized-" + card.id + (model.settings?.uiLanguage ?? "ru")) {
+                if model.settings?.uiLanguage == "en", card.section != "games" {
+                    let result = try? await model.bridge.call("localizedCard", ["id": .string(card.id)], as: MediaCard.self)
+                    if !Task.isCancelled { localized = result }
+                }
+            }
     }
 }
 struct AwardPage: Decodable { var years: [Int]; var items: [MediaCard]; var winners: [MediaCard]?; var nominees: [MediaCard]? }

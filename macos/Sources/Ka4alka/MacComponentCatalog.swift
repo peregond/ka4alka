@@ -6,6 +6,13 @@ struct MacComponent: Codable {
 }
 struct MacComponentCatalog: Codable {
     var schemaVersion: Int; var version: String; var files: [MacComponent]
+    static func safePath(_ path: String) -> Bool {
+        let parts = path.split(separator: "/", omittingEmptySubsequences: false)
+        // Foundation text search can ignore control scalars. Inspect bytes for
+        // NUL and other controls instead of treating a pathname as display text.
+        return path.hasPrefix("Contents/") && path.utf8.allSatisfy { $0 >= 32 && $0 != 127 && $0 != 92 }
+            && !parts.contains { $0.isEmpty || $0 == "." || $0 == ".." || $0.contains(":") }
+    }
     static func validate(_ data: Data, package: MacPackage, version: String, application: URL) throws {
         let hash = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
         guard data.count == package.components.size, data.count <= 2 * 1024 * 1024, hash == package.components.sha256 else { throw UpdateError("Invalid component index checksum") }
@@ -14,8 +21,7 @@ struct MacComponentCatalog: Codable {
         var paths = Set<String>(); var size: Int64 = 0
         let root = application.standardizedFileURL.path + "/"
         for file in index.files {
-            let parts = file.path.split(separator: "/", omittingEmptySubsequences: false)
-            guard file.path.hasPrefix("Contents/"), !file.path.contains("\\"), !parts.contains(where: { $0.isEmpty || $0 == "." || $0 == ".." || $0.contains(":") || $0.contains("\0") }), paths.insert(file.path.lowercased()).inserted, file.size >= 0, file.size <= 512 * 1024 * 1024, file.packedSize >= 0, file.offset >= 0, file.offset <= package.size - file.packedSize, [0, 8].contains(file.method), [0o644, 0o755].contains(file.mode), file.sha256.range(of: #"^[a-f0-9]{64}$"#, options: .regularExpression) != nil else { throw UpdateError("Unsafe component path or size") }
+            guard safePath(file.path), paths.insert(file.path.lowercased()).inserted, file.size >= 0, file.size <= 512 * 1024 * 1024, file.packedSize >= 0, file.offset >= 0, file.offset <= package.size - file.packedSize, [0, 8].contains(file.method), [0o644, 0o755].contains(file.mode), file.sha256.range(of: #"^[a-f0-9]{64}$"#, options: .regularExpression) != nil else { throw UpdateError("Unsafe component path or size: \(file.path), mode \(file.mode)") }
             size += file.size; guard size <= 2 * 1024 * 1024 * 1024 else { throw UpdateError("Application exceeds size limit") }
             let path = application.appendingPathComponent(file.path).standardizedFileURL
             guard path.path.hasPrefix(root), path.resolvingSymlinksInPath().path == path.path else { throw UpdateError("Symlink in application components") }

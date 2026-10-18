@@ -5,6 +5,13 @@ import Security
 @testable import Ka4alka
 
 final class PlatformTests: XCTestCase {
+    func testLiteralComponentPaths() {
+        XCTAssertTrue(MacComponentCatalog.safePath("Contents/MacOS/Ka4alka"))
+        XCTAssertTrue(MacComponentCatalog.safePath("Contents/Resources/en.json"))
+        for path in ["Contents/../escape", "Contents//bad", "/Contents/bad", "Contents/x\0y", "Contents/x\ny", "Contents/x\\y", "Contents/x:y"] {
+            XCTAssertFalse(MacComponentCatalog.safePath(path), path.debugDescription)
+        }
+    }
     func testStableCardDecoding() throws {
         let data = Data(#"{"id":"series:series:yuzhnyi-park","title":"Южный парк","section":"series","year":1997,"rating":"8.2","poster":null,"description":"Описание","genre":"комедия","quality":"Full HD","saved":true,"platform":null}"#.utf8)
         let card = try JSONDecoder().decode(MediaCard.self, from: data)

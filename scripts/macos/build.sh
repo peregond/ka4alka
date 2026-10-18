@@ -13,6 +13,7 @@ bin_dir="$(cd macos && swift build -c release --arch "$swift_arch" --show-bin-pa
 cp "$bin_dir/Ka4alka" "$bundle/Contents/MacOS/Ka4alka"
 cp native/Localization/en.json "$bundle/Contents/Resources/en.json"
 cp update-core/update-public.pem "$bundle/Contents/Resources/update-public.pem"
+python3 scripts/macos/copy-notices.py "$bundle" "$rid"
 iconset="$output/AppIcon.iconset"
 mkdir -p "$iconset"
 for side in 16 32 128 256 512; do
