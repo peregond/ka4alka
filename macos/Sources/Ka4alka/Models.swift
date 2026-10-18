@@ -17,6 +17,7 @@ enum JSONValue: Codable, Sendable {
     }
     subscript(_ key: String) -> JSONValue { if case .object(let v) = self { return v[key] ?? .null }; return .null }
     var string: String { if case .string(let v) = self { return v }; return "" }
+    var number: Double { if case .number(let v) = self { return v }; return 0 }
     var bool: Bool { if case .bool(let v) = self { return v }; return false }
     var array: [JSONValue] { if case .array(let v) = self { return v }; return [] }
     func decode<T: Decodable>(_ type: T.Type = T.self) throws -> T { try JSONDecoder().decode(type, from: JSONEncoder().encode(self)) }

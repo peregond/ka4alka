@@ -18,6 +18,7 @@ struct CatalogFilter: Equatable {
 }
 @MainActor final class TransferStore: ObservableObject { @Published var items: [Transfer] = [] }
 @MainActor final class AppModel: ObservableObject {
+    var onUpdateProgress: ((JSONValue) -> Void)?
     let bridge = EngineBridge()
     let transfers = TransferStore()
     @Published var settings: AppSettings?
@@ -167,6 +168,7 @@ struct CatalogFilter: Equatable {
     func card(_ id: String) -> MediaCard? { ([list?.items ?? []] + curated.map(\.items) + [detail.map { [$0.item] } ?? []]).flatMap { $0 }.first { $0.id == id } }
     private func receive(_ event: String, _ data: JSONValue) {
         switch event {
+        case "updateProgress": onUpdateProgress?(data)
         case "downloads": if let value = try? data.decode(DownloadResult.self), value.items != transfers.items { transfers.items = value.items; NSApp.dockTile.badgeLabel = value.items.filter { !$0.paused && !$0.complete }.isEmpty ? nil : String(value.items.filter { !$0.paused && !$0.complete }.count) }
         case "personal": if let value = try? data.decode(AppSettings.self) { settings = value }
         case "releases": if case .detail(let card) = route, card.id == pendingReleaseCard, let result = try? data.decode(ReleaseResult.self) { releases = result.items; sources = result.sources; releasesLoading = !result.complete }

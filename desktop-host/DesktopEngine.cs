@@ -20,7 +20,7 @@ sealed class DesktopEngine:IAsyncDisposable
     readonly List<SourceConfig> configuredSources=[];
     readonly Dictionary<Guid,TaskCompletionSource<bool>> pairing=[];
     readonly List<Task> running=[];
-    LanService? lan;Task? ticker;bool shuttingDown;
+    LanService? lan;Task? ticker;Task? warming;bool shuttingDown;
     public DesktopEngine()
     {
         AppLanguage.Set(prefs.UiLanguage);PerformanceBudget.LiteMode=prefs.LiteMode;
@@ -62,7 +62,7 @@ sealed class DesktopEngine:IAsyncDisposable
         switch(method)
         {
             case "bootstrap":
-                _=Warm();return new{protocol=1,version=typeof(DesktopEngine).Assembly.GetName().Version?.ToString(3),settings=Settings(),genres=CatalogChoices.Genres.Select(Choice),countries=CatalogChoices.Countries.Select(Choice),gameGenres=GameGenres.All.Select(x=>new{key=x.Key,label=AppLanguage.T(x.Name)}),engineCreated=downloads.EngineCreated};
+                warming??=Warm();return new{protocol=1,version=typeof(DesktopEngine).Assembly.GetName().Version?.ToString(3),settings=Settings(),genres=CatalogChoices.Genres.Select(Choice),countries=CatalogChoices.Countries.Select(Choice),gameGenres=GameGenres.All.Select(x=>new{key=x.Key,label=AppLanguage.T(x.Name)}),engineCreated=downloads.EngineCreated};
             case "catalog":return await Catalog(p,ct);
             case "featured":return await Featured(p,ct);
             case "artwork":
@@ -268,8 +268,15 @@ sealed class DesktopEngine:IAsyncDisposable
     void SaveSources()
     {
         Directory.CreateDirectory(Preferences.DataDir);var path=Path.Combine(Preferences.DataDir,"sources.json");
-        File.WriteAllText(path,JsonSerializer.Serialize(configuredSources,Json));
-        if(!OperatingSystem.IsWindows())File.SetUnixFileMode(path,UnixFileMode.UserRead|UnixFileMode.UserWrite);
+        var temporary=path+"."+Guid.NewGuid().ToString("N")+".tmp";
+        try
+        {
+            var options=new FileStreamOptions{Mode=FileMode.CreateNew,Access=FileAccess.Write,Share=FileShare.None};
+            if(!OperatingSystem.IsWindows())options.UnixCreateMode=UnixFileMode.UserRead|UnixFileMode.UserWrite;
+            using(var stream=new FileStream(temporary,options))JsonSerializer.Serialize(stream,configuredSources,Json);
+            File.Move(temporary,path,true);
+        }
+        finally{File.Delete(temporary);}
     }
     async Task<SourceEntry> RefreshSourceEntry(SourceEntry prior,MediaItem media,CancellationToken ct)
     {
@@ -293,6 +300,12 @@ sealed class DesktopEngine:IAsyncDisposable
     void Reply(string id,object result)=>Write(new{id,result});
     void Event(string kind,object data)=>Write(new{ @event=kind,data});
     void Write(object value)=>Console.Out.WriteLine(JsonSerializer.Serialize(value,Json));
-    public async ValueTask DisposeAsync(){lifetime.Cancel();foreach(var pending in requests.Values)pending.Cancel();if(lan!=null)await lan.DisposeAsync();await downloads.Close();prefs.Save();source.Dispose();lifetime.Dispose();}
+    public async ValueTask DisposeAsync()
+    {
+        lifetime.Cancel();foreach(var pending in requests.Values.ToArray())pending.Cancel();
+        if(lan!=null)await lan.DisposeAsync();
+        await Task.WhenAll(running.Concat(new[]{ticker,warming}.OfType<Task>()));
+        await downloads.Close();prefs.Save();source.Dispose();lifetime.Dispose();
+    }
 }
 sealed record CardView(string id,string title,string section,int year,string rating,string? poster,string description,string genre,string? quality,bool saved,string? platform);

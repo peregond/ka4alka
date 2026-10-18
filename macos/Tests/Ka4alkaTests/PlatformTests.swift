@@ -19,7 +19,7 @@ final class PlatformTests: XCTestCase {
         let publicKey = try XCTUnwrap(SecKeyCopyPublicKey(key)); let der = try XCTUnwrap(SecKeyCopyExternalRepresentation(publicKey, nil)) as Data
         let pem = "-----BEGIN RSA PUBLIC KEY-----\n" + der.base64EncodedString() + "\n-----END RSA PUBLIC KEY-----"
         let version = "0.44.0"
-        let packages = Dictionary(uniqueKeysWithValues: ["arm64", "x64"].map { arch in (arch, MacPackage(url: "https://github.com/peregond/ka4alka/releases/download/v\(version)/Kachalka-macos-\(arch).zip", fileName: "Kachalka-macos-\(arch).zip", size: 4096, sha256: String(repeating: "a", count: 64))) })
+        let packages = Dictionary(uniqueKeysWithValues: ["arm64", "x64"].map { arch in (arch, MacPackage(url: "https://github.com/peregond/ka4alka/releases/download/v\(version)/Kachalka-macos-\(arch).zip", fileName: "Kachalka-macos-\(arch).zip", size: 4096, sha256: String(repeating: "a", count: 64), components: MacComponentIndex(url: "https://github.com/peregond/ka4alka/releases/download/v\(version)/macos-components-\(arch).json", size: 1024, sha256: String(repeating: "b", count: 64)))) })
         var manifest = MacManifest(schemaVersion: 1, appId: "kachalka", channel: "stable", version: version, platform: "macos", minimumMacOS: "14.0", packages: packages, releaseNotesUrl: "https://github.com/peregond/ka4alka/releases/tag/v" + version)
         func signed(_ value: MacManifest) throws -> (Data, Data) { let bytes = try JSONEncoder().encode(value); return (bytes, try XCTUnwrap(SecKeyCreateSignature(key, .rsaSignatureMessagePKCS1v15SHA256, bytes as CFData, nil)) as Data) }
         let (bytes, signature) = try signed(manifest)

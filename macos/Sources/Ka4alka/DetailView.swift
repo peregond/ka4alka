@@ -90,12 +90,17 @@ struct ReleaseListRow: View {
         [release.source, release.poor ? tr("Экранка", "Low quality") : release.quality,
          release.audio, release.size.map(byteText) ?? ""].filter { !$0.isEmpty }.joined(separator: " · ")
     }
+    private var peers: String {
+        let seeds = release.seeds.map { String($0) } ?? "—"
+        let leechers = release.leechers.map { String($0) } ?? "—"
+        return tr("Отдают", "Seeders") + ": " + seeds + "   " + tr("Скачивают", "Leechers") + ": " + leechers
+    }
     var body: some View {
         HStack(spacing: 14) {
             VStack(alignment: .leading, spacing: 6) {
                 Text(release.title).font(.callout.weight(.medium)).lineLimit(3)
                 Text(metadata).font(.caption).foregroundStyle(.secondary)
-                Text(tr("Отдают", "Seeders") + ": " + (release.seeds.map(String.init) ?? "—") + "   " + tr("Скачивают", "Leechers") + ": " + (release.leechers.map(String.init) ?? "—"))
+                Text(peers)
                     .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
             }.frame(maxWidth: .infinity, alignment: .leading)
             Menu {

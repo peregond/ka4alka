@@ -4,7 +4,12 @@ import Darwin
 import Foundation
 import Security
 
-struct MacPackage: Codable { var url: String; var fileName: String; var size: Int64; var sha256: String }
+struct MacComponentIndex: Codable { var url: String; var size: Int64; var sha256: String }
+struct MacPackage: Codable { var url: String; var fileName: String; var size: Int64; var sha256: String; var components: MacComponentIndex }
+struct PreparedMacUpdate: Codable {
+    var application: String; var catalogPath: String; var manifestPath: String; var signaturePath: String
+    var downloadedBytes: Int64; var packageBytes: Int64; var reusedFiles: Int; var fullPackage: Bool
+}
 struct MacManifest: Codable {
     var schemaVersion: Int; var appId: String; var channel: String; var version: String; var platform: String; var minimumMacOS: String; var packages: [String: MacPackage]; var releaseNotesUrl: String
     static func validate(_ data: Data, signature: Data, publicKey: String) throws -> MacManifest {
@@ -12,7 +17,7 @@ struct MacManifest: Codable {
         let value = try JSONDecoder().decode(MacManifest.self, from: data)
         guard value.schemaVersion == 1, value.appId == "kachalka", value.channel == "stable", value.platform == "macos", value.minimumMacOS == "14.0", value.version.range(of: #"^\d+\.\d+\.\d+$"#, options: .regularExpression) != nil, value.packages.count == 2, value.releaseNotesUrl == "https://github.com/peregond/ka4alka/releases/tag/v" + value.version else { throw UpdateError("Invalid update manifest") }
         for architecture in ["arm64", "x64"] {
-            guard let package = value.packages[architecture], package.fileName == "Kachalka-macos-\(architecture).zip", package.url == "https://github.com/peregond/ka4alka/releases/download/v\(value.version)/\(package.fileName)", package.size > 0, package.size <= 512 * 1024 * 1024, package.sha256.range(of: #"^[a-f0-9]{64}$"#, options: .regularExpression) != nil else { throw UpdateError("Invalid update package") }
+            guard let package = value.packages[architecture], package.fileName == "Kachalka-macos-\(architecture).zip", package.url == "https://github.com/peregond/ka4alka/releases/download/v\(value.version)/\(package.fileName)", package.size > 0, package.size <= 512 * 1024 * 1024, package.components.url == "https://github.com/peregond/ka4alka/releases/download/v\(value.version)/macos-components-\(architecture).json", package.components.size > 0, package.components.size <= 2 * 1024 * 1024, package.components.sha256.range(of: #"^[a-f0-9]{64}$"#, options: .regularExpression) != nil, package.sha256.range(of: #"^[a-f0-9]{64}$"#, options: .regularExpression) != nil else { throw UpdateError("Invalid update package") }
         }
         return value
     }
@@ -46,10 +51,13 @@ func sha256File(_ url: URL) throws -> String {
 @discardableResult func runTool(_ executable: String, _ args: [String]) throws -> String {
     let process = Process(); let pipe = Pipe(); process.executableURL = URL(fileURLWithPath: executable); process.arguments = args; process.standardOutput = pipe; process.standardError = pipe
     try process.run(); let data = pipe.fileHandleForReading.readDataToEndOfFile(); process.waitUntilExit()
-    guard process.terminationStatus == 0 else { throw UpdateError("\(URL(fileURLWithPath: executable).lastPathComponent) failed: " + String(data: data.suffix(2048), encoding: .utf8)!) }
+    guard process.terminationStatus == 0 else { throw UpdateError("\(URL(fileURLWithPath: executable).lastPathComponent) failed: " + (String(data: data.suffix(2048), encoding: .utf8) ?? "unknown error")) }
     return String(data: data, encoding: .utf8) ?? ""
 }
-struct MacUpdateJob: Codable { var installed: String; var archive: String; var manifest: String; var signature: String; var publicKey: String; var parent: Int32; var architecture: String }
+struct MacUpdateJob: Codable {
+    var installed: String; var application: String; var catalog: String; var manifest: String
+    var signature: String; var publicKey: String; var parent: Int32; var architecture: String
+}
 @MainActor final class MacUpdater: ObservableObject {
     @Published var statusText = ""
     @Published var busy = false
@@ -58,7 +66,9 @@ struct MacUpdateJob: Codable { var installed: String; var archive: String; var m
     private var manifest: MacManifest?
     private var manifestData: Data?
     private var signatureData: Data?
-    private var archive: URL?
+    private var prepared: PreparedMacUpdate?
+    var engine: EngineBridge?
+    private(set) var installing = false
     static let feed = URL(string: "https://github.com/peregond/ka4alka/releases/latest/download/macos-latest.json")!
     static var architecture: String {
 #if arch(arm64)
@@ -86,52 +96,77 @@ struct MacUpdateJob: Codable { var installed: String; var archive: String; var m
             if autoDownload, available { busy = false; await download() }
         } catch { statusText = error.localizedDescription }
     }
+    func progress(_ data: JSONValue) {
+        let total = data["total"].number
+        guard busy, total > 0 else { return }
+        let percent = min(100, Int(data["received"].number * 100 / total))
+        statusText = tr("Скачиваем обновление…", "Downloading update…") + " \(percent)%"
+    }
     func download() async {
-        guard !busy, let manifest, let package = manifest.packages[Self.architecture], let url = URL(string: package.url) else { return }
-        busy = true; statusText = tr("Скачиваем обновление…", "Downloading update…"); defer { busy = false }
+        guard !busy, manifest != nil, let manifestData, let signatureData, let engine else { return }
+        busy = true; statusText = tr("Проверяем компоненты…", "Checking components…"); defer { busy = false }
         do {
-            let (temporary, response) = try await URLSession.shared.download(from: url)
-            guard (response as? HTTPURLResponse)?.statusCode == 200, (try temporary.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0) == package.size else { throw UpdateError("Update package size mismatch") }
-            let hash = try await Task.detached(priority: .utility) { try sha256File(temporary) }.value
-            guard hash == package.sha256 else { throw UpdateError("Update package checksum mismatch") }
-            let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Kachalka/updates/" + UUID().uuidString)
-            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-            let path = directory.appendingPathComponent(package.fileName); try FileManager.default.moveItem(at: temporary, to: path)
-            try manifestData!.write(to: directory.appendingPathComponent("manifest.json"), options: .atomic); try signatureData!.write(to: directory.appendingPathComponent("manifest.sig"), options: .atomic)
-            archive = path; ready = true; statusText = tr("Обновление готово к установке", "Update ready to install")
+            prepared = try await engine.call("prepareUpdate", ["manifest": .string(manifestData.base64EncodedString()), "signature": .string(signatureData.base64EncodedString()), "architecture": .string(Self.architecture), "installed": .string(Bundle.main.bundlePath)], as: PreparedMacUpdate.self)
+            ready = true
+            statusText = tr("Обновление готово к установке", "Update ready to install")
+            if let prepared { statusText += " · " + byteText(Double(prepared.downloadedBytes)) + " · " + tr("Сохранено компонентов: ", "Reused components: ") + String(prepared.reusedFiles) }
         } catch { statusText = error.localizedDescription }
     }
-    func install() throws {
-        guard ready, let archive, let keyURL = Bundle.main.url(forResource: "update-public", withExtension: "pem"), let executable = Bundle.main.executableURL else { throw UpdateError("Update is not ready") }
-        let directory = archive.deletingLastPathComponent(); let helper = directory.appendingPathComponent("Ka4alkaUpdate")
-        try FileManager.default.copyItem(at: executable, to: helper); try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: helper.path)
-        let job = MacUpdateJob(installed: Bundle.main.bundlePath, archive: archive.path, manifest: directory.appendingPathComponent("manifest.json").path, signature: directory.appendingPathComponent("manifest.sig").path, publicKey: try String(contentsOf: keyURL), parent: getpid(), architecture: Self.architecture)
+    func install(terminate: Bool = true) throws {
+        guard !installing, ready, let prepared, let keyURL = Bundle.main.url(forResource: "update-public", withExtension: "pem"), let executable = Bundle.main.executableURL else { throw UpdateError("Update is not ready") }
+        let installed = URL(fileURLWithPath: Bundle.main.bundlePath)
+        guard FileManager.default.isWritableFile(atPath: installed.deletingLastPathComponent().path) else { throw UpdateError(tr("Перемести Качалку в доступную для записи папку Applications.", "Move Ka4alka to a writable Applications folder before updating.")) }
+        let directory = URL(fileURLWithPath: prepared.manifestPath).deletingLastPathComponent()
+        let helper = directory.appendingPathComponent("Ka4alkaUpdate-" + UUID().uuidString)
+        try FileManager.default.copyItem(at: executable, to: helper)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: helper.path)
+        let job = MacUpdateJob(installed: installed.path, application: prepared.application, catalog: prepared.catalogPath, manifest: prepared.manifestPath, signature: prepared.signaturePath, publicKey: try String(contentsOf: keyURL), parent: getpid(), architecture: Self.architecture)
         let jobURL = directory.appendingPathComponent("job.json"); try JSONEncoder().encode(job).write(to: jobURL, options: .atomic)
-        let process = Process(); process.executableURL = helper; process.arguments = ["--apply-update", jobURL.path]; try process.run(); NSApp.terminate(nil)
+        let process = Process(); process.executableURL = helper; process.arguments = ["--apply-update", jobURL.path]; try process.run()
+        installing = true
+        if terminate { NSApp.terminate(nil) }
     }
+
 }
 // Runs from a temporary copy, after the app has saved its queue and exited.
 enum MacUpdateInstaller {
     static func apply(_ jobURL: URL, reopen: Bool = true) throws {
         let files = FileManager.default; let job = try JSONDecoder().decode(MacUpdateJob.self, from: Data(contentsOf: jobURL))
         let manifest = try MacManifest.validate(Data(contentsOf: URL(fileURLWithPath: job.manifest)), signature: Data(contentsOf: URL(fileURLWithPath: job.signature)), publicKey: job.publicKey)
-        guard let package = manifest.packages[job.architecture], try sha256File(URL(fileURLWithPath: job.archive)) == package.sha256, job.installed.hasSuffix("/Ka4alka.app") else { throw UpdateError("Invalid update job") }
-        let old = URL(fileURLWithPath: job.installed); guard !old.resolvingSymlinksInPath().path.hasPrefix("/Volumes/") else { throw UpdateError("Move Ka4alka to Applications before updating") }
-        for _ in 0..<300 { if job.parent <= 0 || kill(job.parent, 0) != 0 { break }; Thread.sleep(forTimeInterval: 0.1) }
-        guard job.parent <= 0 || kill(job.parent, 0) != 0 else { throw UpdateError("The application did not exit") }
-        let listing = try runTool("/usr/bin/unzip", ["-Z1", job.archive]).split(separator: "\n")
-        guard listing.count > 0, listing.count <= 4000, listing.allSatisfy({ $0.hasPrefix("Ka4alka.app/") && !$0.split(separator: "/").contains("..") && !$0.contains("\\") }) else { throw UpdateError("Unsafe update archive layout") }
-        let staging = jobURL.deletingLastPathComponent().appendingPathComponent("staging")
-        try files.createDirectory(at: staging, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-        try runTool("/usr/bin/ditto", ["-x", "-k", job.archive, staging.path])
-        let app = staging.appendingPathComponent("Ka4alka.app")
+        guard let package = manifest.packages[job.architecture], job.installed.hasSuffix("/Ka4alka.app") else { throw UpdateError("Invalid update job") }
+        let old = URL(fileURLWithPath: job.installed)
+        guard files.isWritableFile(atPath: old.deletingLastPathComponent().path), try old.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink != true else { throw UpdateError("The application folder is not writable") }
+        let app = URL(fileURLWithPath: job.application)
+        try MacComponentCatalog.validate(Data(contentsOf: URL(fileURLWithPath: job.catalog)), package: package, version: manifest.version, application: app)
         guard let bundle = Bundle(url: app), bundle.bundleIdentifier == "org.ka4alka.app", bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String == manifest.version else { throw UpdateError("Unexpected application identity") }
         try runTool("/usr/bin/codesign", ["--verify", "--deep", "--strict", app.path])
+        for _ in 0..<300 { if job.parent <= 0 || kill(job.parent, 0) != 0 { break }; Thread.sleep(forTimeInterval: 0.1) }
+        guard job.parent <= 0 || kill(job.parent, 0) != 0 else { throw UpdateError("The application did not exit") }
         let backup = old.deletingLastPathComponent().appendingPathComponent("Ka4alka-previous-" + UUID().uuidString + ".app")
         try files.moveItem(at: old, to: backup)
         do { try files.moveItem(at: app, to: old) } catch { try? files.moveItem(at: backup, to: old); throw error }
-        if reopen { try runTool("/usr/bin/open", ["-n", old.path]) }
-        try? files.removeItem(at: backup)
+        do {
+            if reopen {
+                let health = jobURL.deletingLastPathComponent().appendingPathComponent("health-" + UUID().uuidString)
+                let token = UUID().uuidString
+                let child = Process(); child.executableURL = old.appendingPathComponent("Contents/MacOS/Ka4alka")
+                var environment = ProcessInfo.processInfo.environment
+                environment["KACHALKA_UPDATE_HEALTH_PATH"] = health.path; environment["KACHALKA_UPDATE_HEALTH_TOKEN"] = token
+                child.environment = environment; try child.run()
+                var healthy = false
+                for _ in 0..<300 {
+                    if let data = try? Data(contentsOf: health), let value = try? JSONDecoder().decode([String: String].self, from: data), value["token"] == token, value["version"] == manifest.version { healthy = true; break }
+                    if !child.isRunning { break }; Thread.sleep(forTimeInterval: 0.1)
+                }
+                try? files.removeItem(at: health)
+                if !healthy { if child.isRunning { child.terminate(); child.waitUntilExit() }; throw UpdateError("The updated application failed its startup check; restored the previous version") }
+            }
+            try? files.removeItem(at: backup)
+        } catch {
+            try? files.removeItem(at: old); try files.moveItem(at: backup, to: old)
+            if reopen { try? runTool("/usr/bin/open", ["-n", old.path]) }
+            throw error
+        }
     }
     static func run(_ path: String) -> Int32 { do { try apply(URL(fileURLWithPath: path)); return 0 } catch { try? error.localizedDescription.write(toFile: path + ".error.txt", atomically: true, encoding: .utf8); return 1 } }
 }

@@ -41,8 +41,9 @@ import Foundation
                 do {
                     try send(id: id, method: method, parameters: parameters)
                     deadlines[id] = Task { [weak self] in
-                        try? await Task.sleep(for: .seconds(95))
+                        try? await Task.sleep(for: .seconds(method == "prepareUpdate" ? 1200 : 95))
                         guard !Task.isCancelled else { return }
+                        try? self?.send(id: UUID().uuidString, method: "cancel", parameters: ["id": .string(id)])
                         self?.finish(id, .failure(RPCError(code: "timeout", message: tr("Источник не ответил вовремя.", "The source did not respond in time."))))
                     }
                 } catch { finish(id, .failure(error)) }
