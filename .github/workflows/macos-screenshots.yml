@@ -58,8 +58,11 @@ jobs:
           root=Path(os.environ['KACHALKA_DATA'])
           (root/'settings.json').write_text(json.dumps(dict(Folder=str(root/'downloads'),FolderConfigured=True,AutoResumeDownloads=False,CheckForUpdates=False,AutoUpdate=False,UiLanguage=os.environ['CAPTURE_LANGUAGE'])))
           PY
+            # The runner belongs to this capture job. Clear the prior language
+            # run's saved window size; never touch a real user's preferences.
+            defaults delete org.ka4alka.app >/dev/null 2>&1 || true
             output="$PWD/test-output/mac-capture/$language"
-            published/app/Ka4alka.app/Contents/MacOS/Ka4alka --smoke-test "$output" &
+            published/app/Ka4alka.app/Contents/MacOS/Ka4alka --smoke-test "$output" -ApplePersistenceIgnoreState YES &
             process=$!
             for ((attempt=0;attempt<240;attempt++)); do
               if ! kill -0 "$process" 2>/dev/null; then break; fi
