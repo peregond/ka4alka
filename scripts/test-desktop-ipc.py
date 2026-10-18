@@ -22,6 +22,8 @@ try:
  started=time.monotonic();boot=call('bootstrap');bootstrap_ms=round((time.monotonic()-started)*1000);assert boot['engineCreated'] is False
  assert boot['version']==__import__('xml.etree.ElementTree',fromlist=['parse']).parse('native/Kachalka.csproj').find('.//Version').text
  featured=call('featured');assert featured['groups']
+ for group in featured['groups']:
+  assert call('featured',dict(id=group['id']))['items']
  movies=call('catalog',dict(section='movies',page=1));assert len(movies['items'])==40
  card=movies['items'][0];call('save',dict(id=card['id']));assert any(c['id']==card['id'] for c in call('saved')['items'])
  call('hide',dict(id=card['id']));assert all(c['id']!=card['id'] for c in call('catalog',dict(section='movies',page=1))['items'])

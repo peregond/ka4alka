@@ -2,6 +2,12 @@ import AppKit
 import ImageIO
 import SwiftUI
 
+actor ArtworkDiagnostics {
+    static let shared = ArtworkDiagnostics()
+    private var errors: [String] = []
+    func record(_ host: String, _ message: String) { if errors.count < 20 { errors.append(host + ": " + message) } }
+    func snapshot() -> [String] { errors }
+}
 actor ImageSlots {
     private var active = 0
     private var waiters: [(UUID, CheckedContinuation<Void, Error>)] = []
@@ -24,7 +30,10 @@ actor ImageSlots {
 }
 @MainActor final class ImageStore {
     static let shared = ImageStore()
+    weak var engine: EngineBridge?
     private struct Request { var id: UUID; var task: Task<CGImage?, Never>; var subscribers: Set<UUID> }
+    private(set) var loadedCount = 0
+    private(set) var failedCount = 0
     private let cache = NSCache<NSString, NSImage>()
     private var inflight: [String: Request] = [:]
     private let slots = ImageSlots()
@@ -32,7 +41,7 @@ actor ImageSlots {
     init() {
         cache.totalCostLimit = 32 * 1024 * 1024
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 18; config.httpMaximumConnectionsPerHost = 3
+        config.timeoutIntervalForRequest = 8; config.httpMaximumConnectionsPerHost = 3
         config.urlCache = URLCache(memoryCapacity: 4 * 1024 * 1024, diskCapacity: 128 * 1024 * 1024, diskPath: "Ka4alkaArtwork")
         session = URLSession(configuration: config)
     }
@@ -53,28 +62,40 @@ actor ImageSlots {
             existing.subscribers.insert(subscriber); inflight[key] = existing; task = existing.task; requestID = existing.id
         } else {
             requestID = UUID()
-            task = Task.detached(priority: .utility) { [slots, session] () -> CGImage? in
+            task = Task.detached(priority: .utility) { [slots, session, engine] () -> CGImage? in
                 do { try await slots.acquire() } catch { return nil }
                 let result: CGImage?
                 do {
                     try Task.checkCancellation()
-                    let (bytes, response) = try await session.bytes(from: url)
-                    guard let response = response as? HTTPURLResponse, response.statusCode == 200, response.expectedContentLength <= 12 * 1024 * 1024 else { await slots.release(); return nil }
-                    var data = Data(); data.reserveCapacity(64 * 1024)
-                    for try await byte in bytes { data.append(byte); if data.count > 12 * 1024 * 1024 { throw URLError(.dataLengthExceedsMaximum) } }
+                    var data = Data()
+                    do {
+                        var request = URLRequest(url: url); request.setValue("Mozilla/5.0 Ka4alka/macOS", forHTTPHeaderField: "User-Agent")
+                        let (bytes, response) = try await session.bytes(for: request)
+                        guard let response = response as? HTTPURLResponse, response.statusCode == 200, response.expectedContentLength <= 12 * 1024 * 1024 else { throw URLError(.badServerResponse) }
+                        data.reserveCapacity(64 * 1024)
+                        for try await byte in bytes { data.append(byte); if data.count > 12 * 1024 * 1024 { throw URLError(.dataLengthExceedsMaximum) } }
+                    } catch {
+                        try Task.checkCancellation()
+                        guard let engine else { throw error }
+                        let fallback = try await engine.call("coverFallback", ["url": .string(url.absoluteString)])
+                        let path = URL(fileURLWithPath: fallback["path"].string)
+                        guard let size = try path.resourceValues(forKeys: [.fileSizeKey]).fileSize, size <= 2 * 1024 * 1024 else { throw URLError(.dataLengthExceedsMaximum) }
+                        data = try Data(contentsOf: path)
+                    }
                     try Task.checkCancellation()
                     result = await Task.detached(priority: .utility) {
                         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil as CGImage? }
                         return CGImageSourceCreateThumbnailAtIndex(source, 0, [kCGImageSourceCreateThumbnailFromImageAlways: true, kCGImageSourceThumbnailMaxPixelSize: width, kCGImageSourceCreateThumbnailWithTransform: true, kCGImageSourceShouldCacheImmediately: true] as CFDictionary)
                     }.value
-                } catch { result = nil }
+                } catch { await ArtworkDiagnostics.shared.record(url.host ?? "image", error.localizedDescription); result = nil }
                 await slots.release(); return result
             }
             inflight[key] = Request(id: requestID, task: task, subscribers: [subscriber])
         }
         return await withTaskCancellationHandler(operation: {
             let result = await task.value
-            guard !Task.isCancelled, let result else { unsubscribe(key, subscriber); return nil }
+            guard !Task.isCancelled, let result else { if !Task.isCancelled { failedCount += 1 }; unsubscribe(key, subscriber); return nil }
+            loadedCount += 1
             let image = NSImage(cgImage: result, size: NSSize(width: result.width, height: result.height))
             cache.setObject(image, forKey: key as NSString, cost: result.bytesPerRow * result.height)
             if inflight[key]?.id == requestID { inflight.removeValue(forKey: key) }

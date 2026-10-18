@@ -9,9 +9,10 @@ import Foundation
         func stage(_ name: String) { try? name.write(to: root.appendingPathComponent("stage.txt"), atomically: true, encoding: .utf8) }
         func check(_ value: Bool, _ text: String) throws { if !value { throw UpdateError(text) }; checks.append(text) }
         func shot(_ name: String) async throws {
-            try await Task.sleep(for: .milliseconds(350))
-            guard let window = NSApp.windows.first(where: { $0.contentView != nil && $0.isVisible }), let view = window.contentView else { throw UpdateError("The native application window is missing") }
-            view.layoutSubtreeIfNeeded()
+            try await Task.sleep(for: .milliseconds(800))
+            guard let window = NSApp.windows.first(where: { $0.contentView != nil && $0.isVisible }), let content = window.contentView else { throw UpdateError("The native application window is missing") }
+            let view = content.superview ?? content
+            window.makeKeyAndOrderFront(nil); view.layoutSubtreeIfNeeded()
             guard let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { throw UpdateError("Could not capture the native content view") }
             view.cacheDisplay(in: view.bounds, to: bitmap)
             guard let png = bitmap.representation(using: .png, properties: [:]) else { throw UpdateError("Could not encode the native screenshot") }
@@ -25,6 +26,7 @@ import Foundation
             try check(!model.curated.isEmpty, "Featured resolves real bundled catalog membership")
             try await shot("featured-ru")
             stage("movies"); model.select(.movies); await model.loadCatalog()
+            try await Task.sleep(for: .seconds(2))
             try check(model.list?.items.isEmpty == false, "Movie catalog loads from the shared snapshot")
             try await shot("movies-ru")
             if let first = model.list?.items.first {
@@ -47,8 +49,10 @@ import Foundation
             if let window = NSApp.windows.first(where: { $0.isVisible }) { window.setContentSize(NSSize(width: 800, height: 600)); try await shot("compact-en") }
             await model.set("light", .bool(true)); try await shot("light-en")
             await model.set("uiLanguage", .string("ru")); await model.set("light", .bool(false))
+            let artwork = JSONValue.object(["loaded": .number(Double(ImageStore.shared.loadedCount)), "failed": .number(Double(ImageStore.shared.failedCount)), "errors": .array(await ArtworkDiagnostics.shared.snapshot().map(JSONValue.string))])
+            try JSONEncoder().encode(artwork).write(to: root.appendingPathComponent("artwork.json"))
             let data = try JSONEncoder().encode(checks); try data.write(to: root.appendingPathComponent("checks.json"))
         } catch { try? error.localizedDescription.write(to: root.appendingPathComponent("error.txt"), atomically: true, encoding: .utf8) }
-        stage("shutdown"); NSApp.terminate(nil)
+        stage("shutdown"); requestApplicationQuit()
     }
 }

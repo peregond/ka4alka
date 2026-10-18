@@ -61,7 +61,7 @@ struct CollectionView: View {
                     if award.winners == nil { PosterGrid(items: award.items) }
                 } else if let list = model.list { if list.items.isEmpty { ContentUnavailableView(tr("Подборка пока недоступна", "Collection unavailable"), systemImage: "rectangle.stack") } else { PosterGrid(items: list.items, wide: list.items.allSatisfy { $0.section == "games" } && id != "top-rated") } }
                 else { SkeletonGrid() }
-                if id.hasPrefix("game-"), let list = model.list {
+                if id.hasPrefix("steam-shelf:"), let list = model.list {
                     HStack { Spacer(); Button(tr("Назад", "Previous")) { page = max(1, page - 1) }.disabled(page == 1); Text(String(page)); Button(tr("Далее", "Next")) { page += 1 }.disabled(!list.hasNext); Spacer() }
                 }
             }.padding(24)

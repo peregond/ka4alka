@@ -70,7 +70,7 @@ struct MacUpdateJob: Codable {
     var engine: EngineBridge?
     private(set) var installing = false
     static let feed = URL(string: "https://github.com/peregond/ka4alka/releases/latest/download/macos-latest.json")!
-    static var architecture: String {
+    nonisolated static var architecture: String {
 #if arch(arm64)
         return "arm64"
 #else
@@ -79,9 +79,28 @@ struct MacUpdateJob: Codable {
     }
     var buttonTitle: String { ready ? tr("Обновить и перезапустить", "Update and restart") : busy ? tr("Загрузка…", "Loading…") : available ? tr("Скачать обновление", "Download update") : tr("Проверить обновления", "Check for updates") }
     var installedVersion: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0.0" }
+    func restore() async {
+        guard !busy, !ready, let data = UserDefaults.standard.data(forKey: "Ka4alkaPreparedUpdate"), data.count < 16384 else { return }
+        do {
+            let prepared = try JSONDecoder().decode(PreparedMacUpdate.self, from: data)
+            guard let keyURL = Bundle.main.url(forResource: "update-public", withExtension: "pem") else { return }
+            let publicKey = try String(contentsOf: keyURL)
+            let restored = try await Task.detached(priority: .utility) {
+                let bytes = try Data(contentsOf: URL(fileURLWithPath: prepared.manifestPath))
+                let signature = try Data(contentsOf: URL(fileURLWithPath: prepared.signaturePath))
+                let manifest = try MacManifest.validate(bytes, signature: signature, publicKey: publicKey)
+                guard let package = manifest.packages[Self.architecture] else { throw UpdateError("Unsupported update architecture") }
+                try MacComponentCatalog.validate(Data(contentsOf: URL(fileURLWithPath: prepared.catalogPath)), package: package, version: manifest.version, application: URL(fileURLWithPath: prepared.application))
+                return (manifest, bytes, signature)
+            }.value
+            guard MacManifest.newer(restored.0.version, than: installedVersion) else { UserDefaults.standard.removeObject(forKey: "Ka4alkaPreparedUpdate"); return }
+            self.prepared = prepared; manifest = restored.0; manifestData = restored.1; signatureData = restored.2
+            available = true; ready = true; statusText = tr("Обновление готово к установке", "Update ready to install")
+        } catch { UserDefaults.standard.removeObject(forKey: "Ka4alkaPreparedUpdate") }
+    }
     func primaryAction() async { if ready { do { try install() } catch { statusText = error.localizedDescription } } else if available { await download() } else { await check() } }
     func check(autoDownload: Bool = false) async {
-        guard !busy else { return }; busy = true; defer { busy = false }
+        guard !busy, !ready else { return }; busy = true; defer { busy = false }
         do {
             let (data, response) = try await URLSession.shared.data(from: Self.feed)
             // Older Windows-only releases have no macOS manifest.
@@ -107,6 +126,7 @@ struct MacUpdateJob: Codable {
         busy = true; statusText = tr("Проверяем компоненты…", "Checking components…"); defer { busy = false }
         do {
             prepared = try await engine.call("prepareUpdate", ["manifest": .string(manifestData.base64EncodedString()), "signature": .string(signatureData.base64EncodedString()), "architecture": .string(Self.architecture), "installed": .string(Bundle.main.bundlePath)], as: PreparedMacUpdate.self)
+            UserDefaults.standard.set(try JSONEncoder().encode(prepared), forKey: "Ka4alkaPreparedUpdate")
             ready = true
             statusText = tr("Обновление готово к установке", "Update ready to install")
             if let prepared { statusText += " · " + byteText(Double(prepared.downloadedBytes)) + " · " + tr("Сохранено компонентов: ", "Reused components: ") + String(prepared.reusedFiles) }
@@ -124,7 +144,8 @@ struct MacUpdateJob: Codable {
         let jobURL = directory.appendingPathComponent("job.json"); try JSONEncoder().encode(job).write(to: jobURL, options: .atomic)
         let process = Process(); process.executableURL = helper; process.arguments = ["--apply-update", jobURL.path]; try process.run()
         installing = true
-        if terminate { NSApp.terminate(nil) }
+        UserDefaults.standard.removeObject(forKey: "Ka4alkaPreparedUpdate")
+        if terminate { requestApplicationQuit() }
     }
 
 }

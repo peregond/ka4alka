@@ -14,7 +14,7 @@ import SwiftUI
                 .frame(minWidth: 760, minHeight: 520)
                 .preferredColorScheme(model.settings?.light == true ? .light : .dark)
                 .task {
-                    delegate.model = model; delegate.updater = updater; updater.engine = model.bridge
+                    delegate.model = model; delegate.updater = updater; updater.engine = model.bridge; ImageStore.shared.engine = model.bridge
                     model.onUpdateProgress = { [weak updater] value in updater?.progress(value) }
                     await model.bootstrap()
                     let environment = ProcessInfo.processInfo.environment
@@ -22,8 +22,9 @@ import SwiftUI
                         try? JSONEncoder().encode(["token": token, "version": model.version]).write(to: URL(fileURLWithPath: path), options: .atomic)
                     }
                     if ProcessInfo.processInfo.arguments.contains("--smoke-test") { await MacSmoke.run(model: model) }
-                    else if model.settings?.checkForUpdates == true { await updater.check(autoDownload: model.settings?.autoUpdate == true) }
+                    else { await updater.restore(); if model.settings?.checkForUpdates == true { await updater.check(autoDownload: model.settings?.autoUpdate == true) } }
                 }
+                .onChange(of: model.settings?.light) { _, light in NSApp.appearance = NSAppearance(named: light == true ? .aqua : .darkAqua) }
                 .onOpenURL { url in Task { await model.openURL(url) } }
         }
         .defaultSize(width: 1280, height: 820)
@@ -41,6 +42,11 @@ import SwiftUI
     weak var model: AppModel?
     weak var updater: MacUpdater?
     var quitting = false
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.appearance = NSAppearance(named: .darkAqua)
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+    }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard !quitting, let model else { return .terminateNow }; quitting = true
@@ -54,4 +60,11 @@ import SwiftUI
         }
         return .terminateLater
     }
+}
+
+// AppKit may enter a nested event loop for terminateLater. Calling terminate
+// from an active Swift main-actor job would prevent its async close job from
+// running in that loop. Leave the Swift job before asking AppKit to quit.
+@MainActor func requestApplicationQuit() {
+    DispatchQueue.main.async { NSApp.terminate(nil) }
 }

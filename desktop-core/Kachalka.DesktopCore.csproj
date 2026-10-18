@@ -18,6 +18,7 @@
     <Compile Include="../native/CinemaMetadata.cs" Link="CinemaMetadata.cs" />
     <Compile Include="../native/CinemaPeople.cs" Link="CinemaPeople.cs" />
     <Compile Include="../native/CinemaPortraits.cs" Link="CinemaPortraits.cs" />
+    <Compile Include="../native/CoverSource.cs" Link="CoverSource.cs" />
     <Compile Include="../native/CoverCache.cs" Link="CoverCache.cs" />
     <Compile Include="../native/DhtBootstrap.cs" Link="DhtBootstrap.cs" />
     <Compile Include="../native/DiagnosticLog.cs" Link="DiagnosticLog.cs" />

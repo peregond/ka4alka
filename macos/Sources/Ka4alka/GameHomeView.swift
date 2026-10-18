@@ -26,7 +26,7 @@ struct GameShelfView: View {
     @State private var error: String?
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack { Text(definition.title).font(.title2.bold()); Spacer(); Button(tr("Ещё", "More")) { model.openCollection("game-" + definition.id) } }
+            HStack { Text(definition.title).font(.title2.bold()); Spacer(); Button(tr("Ещё", "More")) { model.openCollection("steam-shelf:" + definition.id) } }
             if let result {
                 if definition.id == "popular", let first = result.items.first { FeaturedHero(card: first) }
                 ScrollView(.horizontal) { LazyHStack(alignment: .top, spacing: 16) { ForEach(model.visible(Array(result.items.prefix(12)))) { card in PosterCard(card: card, wide: true).frame(width: 230) } } }.scrollIndicators(.hidden)

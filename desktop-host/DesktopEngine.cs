@@ -73,6 +73,11 @@ sealed class DesktopEngine:IAsyncDisposable
                 return new{items=Remember(shelfPage.Items.Where(Visible)),hasNext=shelfPage.HasNext,title=AppLanguage.T(shelf.Title)};
             case "catalog":return await Catalog(p,ct);
             case "featured":return await Featured(p,ct);
+            case "coverFallback":
+                var coverUrl=S(p,"url");var proxy=CoverSource.ProxyPath(coverUrl)??throw new ArgumentException("No trusted image relay for this address.");
+                var coverPath=Path.Combine(Preferences.DataDir,"covers",Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(coverUrl)))+".img");
+                await CoverCache.Load(coverPath,2*1024*1024,token=>online.ReadSite(proxy,2*1024*1024,token),bytes=>bytes.Length,ct);
+                return new{path=coverPath};
             case "artwork":
                 var artCard=Card(S(p,"id"));var artId=OnlineIndexClient.IdFor(artCard);
                 if(artCard.Section=="Игры")return new{url=GameCatalog.HeroImage(artCard)};
@@ -199,15 +204,15 @@ sealed class DesktopEngine:IAsyncDisposable
         }
         if(S(p,"id").Length>0)
         {
-            if(S(p,"id").StartsWith("game-",StringComparison.Ordinal))
+            if(S(p,"id").StartsWith("steam-shelf:",StringComparison.Ordinal))
             {
-                var spec=GameShelves.Home.Single(x=>x.Key==S(p,"id")[5..]);
+                var spec=GameShelves.Home.Single(x=>x.Key==S(p,"id")[12..]);
                 var result=await new GameCatalog(source,prefs.UiLanguage).Browse(new("",spec.Sort,spec.Genre,Math.Clamp(I(p,"page",1),1,500)),ct);
                 return new{title=AppLanguage.T(spec.Title),description="",items=Remember(result.Items.Where(Visible)),hasNext=result.HasNext};
             }
             var group=groups[S(p,"id")];return new{title=group.Collection.Label,description=group.Collection.Summary,items=Remember(group.Items.Where(Visible)),hasNext=false};
         }
-        return new{groups=groups.Values.Select(group=>new{id=group.Collection.Id,title=group.Collection.Label,description=group.Collection.Summary,layout=group.Collection.Layout,items=Remember(group.Items.Where(Visible).Take(10)),count=group.Items.Length}).Where(group=>group.items.Length>0).Take(18)};
+        return new{groups=groups.Values.Select(group=>new{id=group.Collection.Id,title=group.Collection.Label,description=group.Collection.Summary,layout=group.Collection.Layout,items=Remember(group.Items.Where(Visible).Take(10)),count=group.Items.Length}).Where(group=>group.items.Length>0)};
     }
     async Task<object> Detail(MediaItem item,CancellationToken ct)
     {
@@ -248,6 +253,7 @@ sealed class DesktopEngine:IAsyncDisposable
         var providers=item.Section=="Игры"?GameReleaseSources.Create(source,item,configuredSources):NativeReleaseSources.Create(source,item);
         var sources=providers.ToList();if(item.Section!="Игры")sources.AddRange(configuredSources.Select(config=>new ReleaseSource(config.Name,t=>source.SearchTorznab(config,item.OriginalTitle??item.Title,t,item.Section=="Сериалы"?5000:2000))));if(item.Section!="Игры"&&OnlineIndexClient.IdFor(item)!=null)sources.Insert(0,new("Онлайн-индекс",t=>online.Releases(item,t,true)));
         var result=await ReleaseSearch.RunAsync(sources,new Progress<ReleaseSearchUpdate>(update=>Event("releases",new{request,items=ReleaseDtos(update.Items),complete=update.Complete,sources=update.Sources.Select(x=>new{x.Name,state=x.State.ToString()})})),ct);
+        item.SetReleaseQuality(result.Items,prefs.MinimumReleaseHeight);
         await index.CacheReleasesAsync(item,result.Items,result.Sources,ct);return new{items=ReleaseDtos(result.Items),complete=true,sources=result.Sources.Select(x=>new{x.Name,state=x.State.ToString()})};
     }
     object[] ReleaseDtos(IEnumerable<SourceEntry> items)=>SearchLanguage.AudioOrder(items,prefs.UiLanguage).Where(x=>!prefs.HidePoorQuality||!ReleaseQuality.Poor(x,prefs.MinimumReleaseHeight)).Select(entry=>

@@ -101,6 +101,10 @@ public sealed class MacUpdateClient:IDisposable
             if(OperatingSystem.IsMacOS())await VerifyCodeSignature(candidate,ct);
             var catalogPath=Path.Combine(destination,"components.json");var manifestPath=Path.Combine(destination,"manifest.json");var signaturePath=Path.Combine(destination,"manifest.sig");
             await File.WriteAllBytesAsync(catalogPath,indexBytes,ct);await File.WriteAllBytesAsync(manifestPath,manifestBytes,ct);await File.WriteAllBytesAsync(signaturePath,signature,ct);
+            // Keep just the verified candidate and its signed metadata. The
+            // downloaded streams are no longer needed for installation.
+            Directory.Delete(staged,true);
+            if(full)File.Delete(Path.Combine(destination,package.FileName));
             return new(candidate,catalogPath,manifestPath,signaturePath,received,package.Size,reused,full);
         }
         catch{try{Directory.Delete(destination,true);}catch(IOException){}throw;}
