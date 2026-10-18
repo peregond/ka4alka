@@ -5,6 +5,16 @@ import Security
 @testable import Ka4alka
 
 final class PlatformTests: XCTestCase {
+    func testCanonicalComponentBoundary() throws {
+        let files = FileManager.default
+        let root = files.temporaryDirectory.appendingPathComponent("качалка-path-" + UUID().uuidString)
+        try files.createDirectory(at: root.appendingPathComponent("Contents"), withIntermediateDirectories: true)
+        defer { try? files.removeItem(at: root) }
+        let file = root.appendingPathComponent("Contents/test.json")
+        try Data().write(to: file)
+        XCTAssertEqual(try MacComponentCatalog.relativePath(file.resolvingSymlinksInPath(), in: root), "Contents/test.json")
+        XCTAssertThrowsError(try MacComponentCatalog.relativePath(root.deletingLastPathComponent().appendingPathComponent("outside.json"), in: root))
+    }
     func testLiteralComponentPaths() {
         XCTAssertTrue(MacComponentCatalog.safePath("Contents/MacOS/Ka4alka"))
         XCTAssertTrue(MacComponentCatalog.safePath("Contents/Resources/en.json"))
@@ -93,7 +103,7 @@ final class MacInstallationTests: XCTestCase {
         for case let file as URL in try XCTUnwrap(files.enumerator(at: candidate, includingPropertiesForKeys: [.isRegularFileKey])) {
             let values = try file.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
             if values.isRegularFile != true { continue }
-            let relative = String(file.path.dropFirst(candidate.path.count + 1))
+            let relative = try MacComponentCatalog.relativePath(file, in: candidate)
             let attributes = try files.attributesOfItem(atPath: file.path)
             components.append(MacComponent(path: relative, size: Int64(try XCTUnwrap(values.fileSize)), sha256: try sha256File(file), offset: 0, packedSize: 0, method: 8, mode: try XCTUnwrap(attributes[.posixPermissions] as? NSNumber).intValue))
         }

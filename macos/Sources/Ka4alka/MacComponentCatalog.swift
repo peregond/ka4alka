@@ -6,6 +6,14 @@ struct MacComponent: Codable {
 }
 struct MacComponentCatalog: Codable {
     var schemaVersion: Int; var version: String; var files: [MacComponent]
+    static func relativePath(_ file: URL, in application: URL) throws -> String {
+        // macOS may return /private/var URLs while the caller holds /var.
+        // Compare canonical path components before calculating the suffix.
+        let root = application.resolvingSymlinksInPath().standardizedFileURL.pathComponents
+        let parts = file.resolvingSymlinksInPath().standardizedFileURL.pathComponents
+        guard parts.count > root.count, Array(parts.prefix(root.count)) == root else { throw UpdateError("Component outside the application") }
+        return parts.dropFirst(root.count).joined(separator: "/")
+    }
     static func safePath(_ path: String) -> Bool {
         let parts = path.split(separator: "/", omittingEmptySubsequences: false)
         // Foundation text search can ignore control scalars. Inspect bytes for
@@ -19,11 +27,12 @@ struct MacComponentCatalog: Codable {
         let index = try JSONDecoder().decode(Self.self, from: data)
         guard index.schemaVersion == 1, index.version == version, !index.files.isEmpty, index.files.count <= 4000 else { throw UpdateError("Invalid component index") }
         var paths = Set<String>(); var size: Int64 = 0
-        let root = application.standardizedFileURL.path + "/"
+        let canonical = application.resolvingSymlinksInPath().standardizedFileURL
+        let root = canonical.path + "/"
         for file in index.files {
             guard safePath(file.path), paths.insert(file.path.lowercased()).inserted, file.size >= 0, file.size <= 512 * 1024 * 1024, file.packedSize >= 0, file.offset >= 0, file.offset <= package.size - file.packedSize, [0, 8].contains(file.method), [0o644, 0o755].contains(file.mode), file.sha256.range(of: #"^[a-f0-9]{64}$"#, options: .regularExpression) != nil else { throw UpdateError("Unsafe component path or size: \(file.path), mode \(file.mode)") }
             size += file.size; guard size <= 2 * 1024 * 1024 * 1024 else { throw UpdateError("Application exceeds size limit") }
-            let path = application.appendingPathComponent(file.path).standardizedFileURL
+            let path = canonical.appendingPathComponent(file.path).standardizedFileURL
             guard path.path.hasPrefix(root), path.resolvingSymlinksInPath().path == path.path else { throw UpdateError("Symlink in application components") }
             let properties = try path.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
             let attributes = try FileManager.default.attributesOfItem(atPath: path.path)
@@ -36,11 +45,11 @@ struct MacComponentCatalog: Codable {
         for required in ["Contents/Info.plist", "Contents/MacOS/Ka4alka", "Contents/Resources/engine/Kachalka.Engine", "Contents/Resources/engine/Kachalka.Engine.dll", "Contents/Resources/engine/Kachalka.DesktopCore.dll", "Contents/Resources/update-public.pem"] {
             guard paths.contains(required.lowercased()) else { throw UpdateError("Missing application component") }
         }
-        guard let enumerator = FileManager.default.enumerator(at: application, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey]) else { throw UpdateError("Cannot inspect application") }
+        guard let enumerator = FileManager.default.enumerator(at: canonical, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey]) else { throw UpdateError("Cannot inspect application") }
         for case let url as URL in enumerator {
             let properties = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
             guard properties.isSymbolicLink != true else { throw UpdateError("Unexpected symlink") }
-            if properties.isRegularFile == true { guard paths.contains(String(url.path.dropFirst(root.count)).lowercased()) else { throw UpdateError("Unexpected application component") } }
+            if properties.isRegularFile == true { guard paths.contains(try relativePath(url, in: canonical).lowercased()) else { throw UpdateError("Unexpected application component") } }
         }
     }
 }

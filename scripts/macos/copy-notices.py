@@ -1,5 +1,5 @@
 """Include notices for the exact shared dependencies and bundled .NET runtime."""
-import json, os, shutil, sys
+import json, shutil, sys
 from pathlib import Path
 
 bundle, rid = sys.argv[1:]
