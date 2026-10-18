@@ -72,8 +72,10 @@ internal sealed class LanState : IDisposable
     internal static X509Certificate2 LoadCertificate(byte[] pfx)
     {
         // Do not request PersistKeySet: disposing the certificate also removes its temporary key container.
-        // The only durable identity copy remains the current-user DPAPI blob written by this class.
-        var flags = OperatingSystem.IsWindows()
+        // The durable copy is DPAPI-protected on Windows and stored in a private user-only file elsewhere.
+        // macOS does not support EphemeralKeySet; its temporary keychain item
+        // is removed when the certificate is disposed, without PersistKeySet.
+        var flags = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
             ? X509KeyStorageFlags.UserKeySet | X509KeyStorageFlags.Exportable
             : X509KeyStorageFlags.EphemeralKeySet | X509KeyStorageFlags.Exportable;
         return X509CertificateLoader.LoadPkcs12(pfx, null, flags);

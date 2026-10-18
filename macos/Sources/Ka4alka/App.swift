@@ -12,6 +12,7 @@ import SwiftUI
         WindowGroup("Качалка") {
             RootView().environmentObject(model).environmentObject(updater)
                 .frame(minWidth: 760, minHeight: 520)
+                .environment(\.locale, Locale(identifier: model.settings?.uiLanguage == "en" ? "en" : "ru"))
                 .preferredColorScheme(model.settings?.light == true ? .light : .dark)
                 .task {
                     delegate.model = model; delegate.updater = updater; updater.engine = model.bridge; ImageStore.shared.engine = model.bridge

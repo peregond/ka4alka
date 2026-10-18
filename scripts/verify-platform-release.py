@@ -3,7 +3,7 @@ import json, os, subprocess, sys
 from pathlib import Path
 
 def gh(*args):
-    return json.loads(subprocess.check_output(['gh', *args], text=True))
+    return json.loads(subprocess.check_output(['gh', *args], text=True, stderr=subprocess.PIPE))
 
 version, directory = sys.argv[1:]
 if tuple(map(int, version.split('.'))) < (0, 44, 0):
@@ -20,9 +20,22 @@ if proof['repository'] != repo or proof['version'] != version:
 run = gh('api', f'repos/{repo}/actions/runs/{int(proof["runId"])}')
 if run['path'] != '.github/workflows/release.yml' or run['head_sha'] != proof['commit']:
     raise ValueError('Validation evidence does not match the release workflow source')
-tag = gh('api', f'repos/{repo}/git/ref/tags/v{version}')
-if tag['object']['type'] != 'commit' or tag['object']['sha'] != proof['commit']:
-    raise ValueError('Release tag does not point to the verified source revision')
+release = gh('release', 'view', f'v{version}', '--json', 'isDraft,targetCommitish')
+if release['targetCommitish'] != proof['commit']:
+    raise ValueError('Release does not target the verified source revision')
+try:
+    tag = gh('api', f'repos/{repo}/git/ref/tags/v{version}')
+except subprocess.CalledProcessError:
+    # GitHub creates a new tag only when a draft is published. The draft must
+    # already target the full checked commit; a mutable branch is insufficient.
+    if not release['isDraft']:
+        raise
+else:
+    target = tag['object']
+    if target['type'] == 'tag':
+        target = gh('api', f'repos/{repo}/git/tags/{target["sha"]}')['object']
+    if target['type'] != 'commit' or target['sha'] != proof['commit']:
+        raise ValueError('Release tag does not point to the verified source revision')
 jobs = gh('api', f'repos/{repo}/actions/runs/{int(proof["runId"])}/jobs?per_page=100')['jobs']
 # "publish" itself is still running when this gate is called.
 for name in ['release','mac-assets','macos / macos (macos-15, arm64)','macos / macos (macos-15-intel, x64)','portable / shared-engine (ubuntu-latest)','portable / shared-engine (windows-latest)']:

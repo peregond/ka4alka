@@ -2,7 +2,7 @@ name: Verify shared Windows and Mac engine
 on:
   push:
     branches: [claude/quirky-hopper-1vlmj6]
-    paths: ['desktop-core/**', 'desktop-core-tests/**', 'desktop-host/**', 'mac-update-core/**', 'mac-update-tests/**', 'release-tools/**', 'native/**', 'scripts/test-desktop-ipc.py', '.github/workflows/portable-core.yml']
+    paths: ['desktop-core/**', 'desktop-core-tests/**', 'desktop-host/**', 'mac-update-core/**', 'mac-update-tests/**', 'release-tools/**', 'lan-core/**', 'lan-tests/**', 'native/**', 'scripts/test-desktop-ipc.py', '.github/workflows/portable-core.yml']
   workflow_dispatch:
   workflow_call:
 permissions:
