@@ -71,6 +71,8 @@ private let updateFailurePathKey = "Ka4alkaUpdateFailurePath"
     @Published var isError = false
     /// Download progress 0...1 while the engine reports sizes; nil otherwise.
     @Published var progressValue: Double?
+    /// The reason the last install did not happen, set by `consumeInstallFailure()` and cleared when `install()` starts. `check()` leaves it alone.
+    @Published var installFailure: String?
     private var manifest: MacManifest?
     private var manifestData: Data?
     private var signatureData: Data?
@@ -88,6 +90,12 @@ private let updateFailurePathKey = "Ka4alkaUpdateFailurePath"
     var buttonTitle: String { ready ? tr("Обновить и перезапустить", "Update and restart") : busy ? tr("Загрузка…", "Loading…") : available ? tr("Скачать обновление", "Download update") : tr("Проверить обновления", "Check for updates") }
     private func setStatus(_ text: String, error: Bool = false) { statusText = text; isError = error }
     private func setFailure(_ error: Error) { setStatus(error.localizedDescription, error: true) }
+    /// Forgets a prepared update that can no longer be installed, so the button offers to download it again.
+    private func discardPrepared() {
+        ready = false
+        prepared = nil
+        UserDefaults.standard.removeObject(forKey: "Ka4alkaPreparedUpdate")
+    }
     var installedVersion: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0.0" }
     func restore() async {
         guard !busy, !ready else { return }
@@ -162,6 +170,7 @@ private let updateFailurePathKey = "Ka4alkaUpdateFailurePath"
         guard let reason = found else { return nil }
         let text = tr("Обновление не установлено: ", "The update was not installed: ") + reason
         setStatus(text, error: true)
+        installFailure = text
         return text
     }
     func primaryAction() async {
@@ -173,10 +182,18 @@ private let updateFailurePathKey = "Ka4alkaUpdateFailurePath"
     func preflight() async throws {
         guard ready, let prepared else { throw UpdateError(tr("Обновление не готово к установке.", "The update is not ready to install.")) }
         let application = URL(fileURLWithPath: prepared.application)
-        guard FileManager.default.fileExists(atPath: application.path) else { throw UpdateError(tr("Файлы обновления не найдены. Скачай обновление заново.", "The update files are missing. Download the update again.")) }
-        try await Task.detached(priority: .userInitiated) { () throws -> Void in
-            _ = try runTool("/usr/bin/codesign", ["--verify", "--deep", "--strict", application.path])
-        }.value
+        guard FileManager.default.fileExists(atPath: application.path) else {
+            discardPrepared()
+            throw UpdateError(tr("Файлы обновления не найдены. Скачай обновление заново.", "The update files are missing. Download the update again."))
+        }
+        do {
+            try await Task.detached(priority: .userInitiated) { () throws -> Void in
+                _ = try runTool("/usr/bin/codesign", ["--verify", "--deep", "--strict", application.path])
+            }.value
+        } catch {
+            discardPrepared()
+            throw error
+        }
     }
     func check(autoDownload: Bool = false) async {
         guard !busy, !ready else { return }; busy = true; defer { busy = false }
@@ -219,12 +236,16 @@ private let updateFailurePathKey = "Ka4alkaUpdateFailurePath"
     /// Starts the helper that replaces the application after this process exits. Throws, without quitting, when the install cannot work.
     /// `terminate` is true for "Update and restart" (the new version is launched and checked); false when the person is quitting.
     func install(terminate: Bool = true) throws {
+        installFailure = nil
         guard !installing, ready, let prepared, let keyURL = Bundle.main.url(forResource: "update-public", withExtension: "pem"), let executable = Bundle.main.executableURL else { throw UpdateError(tr("Обновление не готово к установке.", "The update is not ready to install.")) }
         let installed = URL(fileURLWithPath: Bundle.main.bundlePath)
         guard installed.lastPathComponent == "Ka4alka.app" else { throw UpdateError(tr("Обновить можно только приложение Ka4alka.app.", "Only Ka4alka.app can be updated.")) }
         guard (try? installed.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) != true else { throw UpdateError(tr("Ka4alka.app не должно быть ссылкой.", "Ka4alka.app must not be a symbolic link.")) }
         guard FileManager.default.isWritableFile(atPath: installed.deletingLastPathComponent().path) else { throw UpdateError(tr("Перемести Качалку в доступную для записи папку Applications.", "Move Ka4alka to a writable Applications folder before updating.")) }
-        guard FileManager.default.fileExists(atPath: prepared.application) else { throw UpdateError(tr("Файлы обновления не найдены. Скачай обновление заново.", "The update files are missing. Download the update again.")) }
+        guard FileManager.default.fileExists(atPath: prepared.application) else {
+            discardPrepared()
+            throw UpdateError(tr("Файлы обновления не найдены. Скачай обновление заново.", "The update files are missing. Download the update again."))
+        }
         let directory = URL(fileURLWithPath: prepared.manifestPath).deletingLastPathComponent()
         let failureFile = directory.deletingLastPathComponent().appendingPathComponent("last-error.txt")
         try? FileManager.default.removeItem(at: failureFile)

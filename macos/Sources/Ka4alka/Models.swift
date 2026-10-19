@@ -77,6 +77,8 @@ struct DetailResult: Decodable {
 struct PersonResult: Decodable { var person: Person; var description: String; var items: [MediaCard]; var sourceUrl: String? }
 struct ReleaseRow: Decodable, Identifiable, Equatable { var id: String; var title: String; var source: String; var size: Double?; var seeds: Int?; var leechers: Int?; var quality: String; var type: String; var audio: String; var studios: [String]; var audioTypes: [String]; var codec: String; var subs: String; var hdr: String; var poor: Bool; var downloadable: Bool; var recommended: Bool; var season: Int?; var episode: Int?; var multipleSeasons: Bool; var multipleEpisodes: Bool; var englishAudio: Bool; var russianAudio: Bool; var gameKind: String?; var gameGroup: String?; var gameVersion: String?
     var russianDub: Bool? = nil; var qualityLabel: String? = nil
+    /// The tracker's own id of the release (matches `Transfer.releaseId` of a queued download); nil from an older engine.
+    var entryId: String? = nil
 }
 struct SourceState: Decodable, Identifiable { var name: String; var state: String; var count: Int? = nil; var id: String { name } }
 struct ReleaseResult: Decodable { var request: String?; var items: [ReleaseRow]; var complete: Bool; var sources: [SourceState] }
@@ -90,11 +92,14 @@ struct Transfer: Decodable, Identifiable, Equatable {
     /// ETA text such as "осталось 5 мин"; empty when unknown.
     var remaining: String? = nil
     var indeterminate: Bool? = nil
+    /// The tracker id and source name of the release this download came from (match `ReleaseRow.entryId` and `ReleaseRow.source`).
+    var releaseId: String? = nil
+    var releaseSource: String? = nil
     var isActive: Bool { !paused && !complete && statusKind != "error" }
 }
 extension Transfer {
     enum CodingKeys: String, CodingKey {
-        case id, title, releaseTitle, poster, progress, status, hint, paused, complete, missing, lowSpace, downloadRate, uploadRate, totalBytes, addedUtc, folder, mediaId, canUpdateRelease, peers, files, statusKind, remaining, indeterminate
+        case id, title, releaseTitle, poster, progress, status, hint, paused, complete, missing, lowSpace, downloadRate, uploadRate, totalBytes, addedUtc, folder, mediaId, canUpdateRelease, peers, files, statusKind, remaining, indeterminate, releaseId, releaseSource
     }
     /// One malformed or missing field must never void the whole queue: every field except the id falls back to a default.
     init(from decoder: Decoder) throws {
@@ -122,9 +127,11 @@ extension Transfer {
         statusKind = (try? values.decodeIfPresent(String.self, forKey: .statusKind)) ?? nil
         remaining = (try? values.decodeIfPresent(String.self, forKey: .remaining)) ?? nil
         indeterminate = (try? values.decodeIfPresent(Bool.self, forKey: .indeterminate)) ?? nil
+        releaseId = (try? values.decodeIfPresent(String.self, forKey: .releaseId)) ?? nil
+        releaseSource = (try? values.decodeIfPresent(String.self, forKey: .releaseSource)) ?? nil
     }
 }
-struct DownloadResult: Decodable { var items: [Transfer] }
+struct DownloadResult: Decodable { var items: [Transfer]; var updated: Bool? = nil }
 struct DownloadFile: Decodable, Identifiable { var name: String; var fullPath: String; var incompletePath: String; var size: Double; var progress: Double; var id: String { fullPath } }
 struct FilesResult: Decodable { var files: [DownloadFile] }
 struct LanDevice: Decodable, Identifiable { var id: String; var name: String; var address: String; var paired: Bool; var fingerprint: String }
