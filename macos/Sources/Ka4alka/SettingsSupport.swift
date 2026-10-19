@@ -107,8 +107,10 @@ struct SettingsCardOffsetKey: PreferenceKey {
 struct SettingsSectionList: View {
     var active: SettingsSectionID
     var onSelect: (SettingsSectionID) -> Void
+    @Environment(\.locale) private var locale
 
     var body: some View {
+        let _ = locale
         VStack(spacing: 0) {
             Color.clear
                 .frame(height: 0)
@@ -183,6 +185,7 @@ struct SettingsCard<Content: View>: View {
     let section: SettingsSectionID
     let icon: String
     let content: Content
+    @Environment(\.locale) private var locale
 
     init(_ section: SettingsSectionID, icon: String? = nil, @ViewBuilder content: () -> Content) {
         self.section = section
@@ -191,6 +194,7 @@ struct SettingsCard<Content: View>: View {
     }
 
     var body: some View {
+        let _ = locale
         VStack(alignment: .leading, spacing: KD.Space.m) {
             header
             VStack(alignment: .leading, spacing: KD.Space.s) { content }

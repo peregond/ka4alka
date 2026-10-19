@@ -275,6 +275,7 @@ struct SettingsLanCard: View {
 struct SettingsStartupCard: View {
     @State private var status: SMAppService.Status = .notRegistered
     @State private var failure: String?
+    @Environment(\.locale) private var locale
 
     private var isOn: Bool { status == .enabled || status == .requiresApproval }
 
@@ -289,6 +290,7 @@ struct SettingsStartupCard: View {
     }
 
     var body: some View {
+        let _ = locale
         SettingsCard(.startup) {
             SettingsSwitch(
                 tr("Открывать при входе в систему", "Open at login"),

@@ -95,8 +95,10 @@ struct SettingsUpdatesCard: View {
 
 struct SettingsCommunityCard: View {
     @State private var notice: SettingsNotice?
+    @Environment(\.locale) private var locale
 
     var body: some View {
+        let _ = locale
         SettingsCard(.community) {
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: KD.Space.s) { buttons }
