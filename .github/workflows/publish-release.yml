@@ -38,14 +38,19 @@ jobs:
           if([Version]$env:RELEASE_VERSION -lt [Version]'0.44.0'){exit 0}
           $readback=Join-Path $env:RUNNER_TEMP 'platform-release-check'
           New-Item -ItemType Directory -Force $readback | Out-Null
-          gh release download ('v'+$env:RELEASE_VERSION) --dir $readback
-          if($LASTEXITCODE -ne 0){throw 'Cannot read back all platform assets'}
-          python scripts/verify-platform-release.py $env:RELEASE_VERSION $readback
-          if($LASTEXITCODE -ne 0){throw 'Both platforms must pass before publication'}
-          dotnet run --project release-tools/Kachalka.ReleaseTools.csproj -c Release -- --verify-mac $readback
-          if($LASTEXITCODE -ne 0){throw 'Mac publisher signature or component catalog invalid'}
-          dotnet run --project update-tests/Kachalka.UpdateTests.csproj -c Release -- --verify-release $readback
-          if($LASTEXITCODE -ne 0){throw 'Windows publisher signature or component catalog invalid'}
+          function Fail($title, $lines) {
+            $text=((@($lines) | ForEach-Object { "$_" }) | Select-Object -Last 6) -join ' | '
+            Write-Output ('::error title='+$title+'::'+$text.Replace('%','%25').Replace("`r",'').Replace("`n",' '))
+            throw $title
+          }
+          $out=gh release download ('v'+$env:RELEASE_VERSION) --dir $readback 2>&1
+          if($LASTEXITCODE -ne 0){Fail 'Cannot read back all platform assets' $out}
+          $out=python scripts/verify-platform-release.py $env:RELEASE_VERSION $readback 2>&1
+          if($LASTEXITCODE -ne 0){Fail 'Both platforms must pass before publication' $out}
+          $out=dotnet run --project release-tools/Kachalka.ReleaseTools.csproj -c Release -- --verify-mac $readback 2>&1
+          if($LASTEXITCODE -ne 0){Fail 'Mac publisher signature or component catalog invalid' $out}
+          $out=dotnet run --project update-tests/Kachalka.UpdateTests.csproj -c Release -- --verify-release $readback 2>&1
+          if($LASTEXITCODE -ne 0){Fail 'Windows publisher signature or component catalog invalid' $out}
       - name: Publish the draft as the latest release
         shell: pwsh
         run: |
