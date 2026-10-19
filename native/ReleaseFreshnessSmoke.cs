@@ -23,8 +23,9 @@ public partial class MainWindow
             {DataReceivedUtc=now.AddMinutes(-7),DataProvider="RuTor",Leechers=12};
         var indexed=direct with{Id="freshness-ui-indexed",Source="The Pirate Bay",Title="Freshness Film 1080p ENG subs RUS",TorrentUrl="magnet:?xt=urn:btih:"+new string('b',40),DataReceivedUtc=now,DataProvider="Онлайн-индекс"};
         var legacy=direct with{Id="freshness-ui-legacy",Source="NNM-Club",Title="Данные раздач (2026) WEB-DL 1080p",TorrentUrl="magnet:?xt=urn:btih:"+new string('c',40),DataReceivedUtc=null,DataProvider=null,Seeds=null,Leechers=null};
+        var voiceover=direct with{Id="freshness-ui-voiceover",Title="Данные раздач (2026) WEB-DL 1080p RUS MVO [LostFilm]",TorrentUrl="magnet:?xt=urn:btih:"+new string('d',40)};
         requestedDetails.Add(movie.Id);cardMetadata[movie.Id]=Task.FromResult(movie);
-        liveReleases[movie.Id]=[direct,indexed,legacy];
+        liveReleases[movie.Id]=[direct,indexed,legacy,voiceover];
         releaseViews[movie.Id]=new(){Saved=true,ReceivedUtc=now,Sources=[
             new("RuTor",SourceState.Ready,1,direct.DataReceivedUtc,direct.DataReceivedUtc),
             new("The Pirate Bay",SourceState.Unavailable,CheckedUtc:now,LastSuccessUtc:now.AddHours(-3)),
@@ -35,16 +36,17 @@ public partial class MainWindow
         MaxWidth=1800;MaxHeight=1000;MinHeight=760;
         async Task Settle(){UpdateLayout();await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);await Task.Delay(70);UpdateLayout();}
         void Check(bool good,string message){if(!good)throw new Exception(message);}
-        void Shot(string name)
+        void Shot(string name,FrameworkElement? target=null)
         {
-            var bitmap=new RenderTargetBitmap((int)Math.Ceiling(ActualWidth),(int)Math.Ceiling(ActualHeight),96,96,PixelFormats.Pbgra32);bitmap.Render(this);
+            var element=target??this;
+            var bitmap=new RenderTargetBitmap((int)Math.Ceiling(element.ActualWidth),(int)Math.Ceiling(element.ActualHeight),96,96,PixelFormats.Pbgra32);bitmap.Render(element);
             var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(bitmap));using var image=File.Create(Path.Combine(output,name+".png"));encoder.Save(image);
         }
         try
         {
             foreach(var (light,width,name) in new[]{(false,1500d,"release-freshness-dark"),(true,900d,"release-freshness-light-compact")})
             {
-                liveReleases[movie.Id]=[direct,indexed,legacy];qualitySnapshots.Remove(movie.Id);
+                liveReleases[movie.Id]=[direct,indexed,legacy,voiceover];qualitySnapshots.Remove(movie.Id);
                 prefs.Light=light;ApplyTheme();MinWidth=width;Width=width;Height=760;Render();await Settle();
                 var texts=VisualElements<TextBlock>(Body).ToArray();var misses=new List<string>();
                 void Expect(bool good,string message){if(!good)misses.Add(message);}
@@ -66,26 +68,44 @@ public partial class MainWindow
                 toggle=FindVisual<Button>(Body,x=>AutomationProperties.GetName(x)=="Показать состояние источников")!;sourcePanel=FindVisual<StackPanel>(Body,x=>x.Name=="ReleaseSourceDetails")!;
                 toggle.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Settle();
                 Check(sourcePanel.Visibility==Visibility.Collapsed,name+": repeated click did not collapse the source details.");
-                var studio=FindVisual<ComboBox>(Body,x=>AutomationProperties.GetName(x)=="Раздачи: Студия озвучки")!;
-                var audioType=FindVisual<ComboBox>(Body,x=>AutomationProperties.GetName(x)=="Раздачи: Тип озвучки")!;
-                // The audio filters are buttons with a menu in the primary row; the combo boxes behind them hold the value.
-                var studioChip=FindVisual<Button>(Body,x=>AutomationProperties.GetName(x)=="Фильтр раздач: Студия озвучки");var typeChip=FindVisual<Button>(Body,x=>AutomationProperties.GetName(x)=="Фильтр раздач: Тип озвучки");
-                Check(studioChip is {IsVisible:true}&&typeChip is {IsVisible:true}&&studioChip.ActualHeight==typeChip.ActualHeight&&studioChip.ActualHeight==40,name+": audio filters are not visible in the primary row at one height.");
-                studio.SelectedItem="LostFilm";await Settle();
+                var audioChip=FindVisual<Button>(Body,x=>AutomationProperties.GetName(x)=="Фильтр раздач: Озвучка");
+                Check(audioChip is {IsVisible:true,ActualHeight:40}&&VisualElements<Button>(Body).Count(x=>AutomationProperties.GetName(x)=="Фильтр раздач: Озвучка")==1,
+                    name+": one combined audio filter must be visible in the primary row.");
+                Check(!VisualElements<Button>(Body).Any(x=>AutomationProperties.GetName(x) is "Фильтр раздач: Студия озвучки" or "Фильтр раздач: Тип озвучки"),name+": separate studio/type filter buttons remain.");
+                var audioMenu=audioChip!.ContextMenu!;
+                var roots=audioMenu.Items.OfType<MenuItem>().ToArray();
+                Check(roots.Take(3).Select(x=>x.Tag as string).SequenceEqual(new[]{"Все","Дубляж","Оригинал"}),name+": main audio choices are not All, Dubbed, Original.");
+                var other=roots.Single(x=>Equals(x.Header,"Другие типы"));
+                Check(other.Items.OfType<MenuItem>().Any(x=>Equals(x.Tag,"Многоголосая"))&&!roots.Any(x=>Equals(x.Tag,"Многоголосая")),name+": voice-over types must remain available under Other types.");
+                void ChooseAudio(string value,bool studioChoice=false)
+                {
+                    var choices=studioChoice?roots.SkipWhile(x=>!Equals(x.Header,"Студии")).Skip(1):roots.TakeWhile(x=>!Equals(x.Header,"Студии"));
+                    choices.Single(x=>Equals(x.Tag,value)).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+                }
+                audioChip.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Settle();
+                Check(audioMenu.IsOpen,name+": combined audio menu did not open.");Shot(name+"-audio-menu",audioMenu);
+                ChooseAudio("Дубляж");ChooseAudio("LostFilm",true);await Settle();
+                Check(!audioMenu.IsOpen,name+": selecting audio did not close its menu.");
+                Check(ChipText(audioChip).Contains("Дубляж")&&ChipText(audioChip).Contains("LostFilm"),name+": combined chip does not show its selected type and studio.");
                 Check(VisualElements<Button>(Body).Any(x=>x.Tag is SourceEntry e&&e.Id==direct.Id)
                     &&!VisualElements<Button>(Body).Any(x=>x.Tag is SourceEntry e&&e.Id==indexed.Id),name+": studio filter did not select the advertised track.");
                 Check(VisualElements<TextBlock>(Body).Any(x=>x.Text=="LostFilm"),name+": studio label is missing from the release card.");
-                audioType.SelectedItem="Оригинал";await Settle();
+                ChooseAudio("Оригинал");await Settle();
                 Check(!VisualElements<Button>(Body).Any(x=>x.Tag is SourceEntry),name+": studio and audio type are not combined.");
-                studio.SelectedItem="Все";await Settle();
+                ChooseAudio("Все",true);await Settle();
                 Check(VisualElements<Button>(Body).Any(x=>x.Tag is SourceEntry e&&e.Id==indexed.Id)
                     &&!VisualElements<Button>(Body).Any(x=>x.Tag is SourceEntry e&&e.Id==direct.Id),name+": original audio filter is incorrect.");
-                audioType.SelectedItem="Все";await Settle();
+                ChooseAudio("Все");await Settle();
+                Check(ChipText(audioChip)=="Озвучка",name+": audio reset leaves stale chip text.");
+                other.Items.OfType<MenuItem>().Single(x=>Equals(x.Tag,"Многоголосая")).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));await Settle();
+                Check(VisualElements<Button>(Body).Any(x=>x.Tag is SourceEntry e&&e.Id==voiceover.Id)&&!VisualElements<Button>(Body).Any(x=>x.Tag is SourceEntry e&&e.Id==direct.Id),name+": optional voice-over type does not filter releases.");
+                ChooseAudio("Все");await Settle();
+                checks.Add(new{Stage=name+"-audio-menu",CombinedAudioFilter=true,TypeAndStudioCombined=true,OtherTypesOptional=true,ResetClearsSelection=true});
                 RefreshDetailActions();
                 Check(FindVisual<Button>(Body,x=>x.Name=="DetailDownload")?.Tag is SourceEntry selected&&selected.Id==direct.Id,
                     name+": periodic refresh lost the filtered recommendation.");
                 var changedRelease=direct with{Title=direct.Title.Replace("1080p","2160p")};
-                liveReleases[movie.Id]=[changedRelease,indexed,legacy];qualitySnapshots.Remove(movie.Id);ApplyKnownQuality(current!);
+                liveReleases[movie.Id]=[changedRelease,indexed,legacy,voiceover];qualitySnapshots.Remove(movie.Id);ApplyKnownQuality(current!);
                 var beforeBatch=renderCount;var beforePicker=releasePickerRenders;
                 var banner=FindVisual<Grid>(Body,x=>x.Name=="CinemaCards");
                 for(var i=0;i<32;i++)QueueDetailRefresh(movie.Id,releasesOnly:true);

@@ -77,9 +77,10 @@ struct DetailView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack { Text(tr("Выбрать раздачу", "Choose a release")).font(.title2.bold()); if model.releasesLoading { ProgressView().controlSize(.small) }; Spacer(); Button { Task { await model.loadReleases(card) } } label: { Image(systemName: "arrow.clockwise") } }
             ScrollView(.horizontal) { HStack {
-                releaseMenu(tr("Студия", "Studio"), value: $studio, options: Array(Set(model.releases.flatMap(\.studios) + model.releases.compactMap(\.gameGroup))).sorted())
-                releaseMenu(tr("Озвучка", "Audio"), value: $audio, options: Array(Set(model.releases.flatMap(\.audioTypes))).sorted())
-                if card.section != "games" {
+                if card.section == "games" {
+                    releaseMenu(tr("Сборка", "Release group"), value: $studio, options: Array(Set(model.releases.compactMap(\.gameGroup))).sorted())
+                } else {
+                    audioMenu
                     releaseMenu(tr("Качество", "Quality"), value: $quality, options: ["HD Ready", "Full HD", "4K"])
                     releaseMenu(tr("Видео", "Video"), value: $codec, options: Array(Set(model.releases.map(\.codec))).filter { $0 != "Не указано" }.sorted())
                     Toggle(tr("С субтитрами", "With subtitles"), isOn: $subtitles).toggleStyle(.button)
@@ -101,6 +102,42 @@ struct DetailView: View {
                     ReleaseListRow(release: release, card: card)
                 }
             }
+        }
+    }
+    private var audioMenu: some View {
+        let types = Set(model.releases.flatMap(\.audioTypes))
+        let primary = ["Дубляж", "Оригинал"]
+        let other = types.subtracting(primary).sorted()
+        let studios = Array(Set(model.releases.flatMap(\.studios))).sorted()
+        let selected = [audio, studio].filter { !$0.isEmpty }.map { tr($0) }
+        return Menu {
+            Section(tr("Тип озвучки", "Audio type")) {
+                audioChoice(tr("Все", "All"), value: "", selected: $audio)
+                ForEach(primary.filter { types.contains($0) }, id: \.self) { value in
+                    audioChoice(tr(value), value: value, selected: $audio)
+                }
+                if !other.isEmpty {
+                    Menu(tr("Другие типы", "Other types")) {
+                        ForEach(other, id: \.self) { value in audioChoice(tr(value), value: value, selected: $audio) }
+                    }
+                }
+            }
+            Section(tr("Студии", "Studios")) {
+                audioChoice(tr("Все студии", "All studios"), value: "", selected: $studio)
+                ForEach(studios, id: \.self) { value in audioChoice(value, value: value, selected: $studio) }
+            }
+        } label: {
+            Text(tr("Озвучка", "Audio") + (selected.isEmpty ? "" : " · " + selected.joined(separator: " · ")))
+                .lineLimit(1)
+        }
+        .accessibilityIdentifier("release-audio-filter")
+        .accessibilityLabel(tr("Озвучка", "Audio"))
+        .accessibilityValue(selected.joined(separator: ", "))
+    }
+    private func audioChoice(_ title: String, value: String, selected: Binding<String>) -> some View {
+        Button { selected.wrappedValue = value } label: {
+            if selected.wrappedValue == value { Label(title, systemImage: "checkmark") }
+            else { Text(title) }
         }
     }
     private func releaseMenu(_ title: String, value: Binding<String>, options: [String]) -> some View { Menu { Button(tr("Все", "All")) { value.wrappedValue = "" }; ForEach(options, id: \.self) { option in Button(tr(option)) { value.wrappedValue = option } } } label: { Text(value.wrappedValue.isEmpty ? title : tr(value.wrappedValue)) } }
