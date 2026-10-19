@@ -91,6 +91,21 @@ enum FeaturedLayout {
     static let rankNumeralSize: CGFloat = 88
     /// Lifts the ranking numeral from the card's text area up to the poster's bottom edge.
     static let rankNumeralLift: CGFloat = 52
+    /// The lead rubric puts the list beside the lead story only when its content is at least this wide.
+    static let leadSideBySideMinWidth: CGFloat = 860
+    /// Vertical room kept inside the clip of a shelf so the hover ring and shadow of a poster are not cut off.
+    static let shelfClipInset: CGFloat = 8
+}
+
+extension View {
+    /// KDShelf scrolls edge to edge and does not clip. On a window wider than the page column the posters would slide
+    /// out into the empty side margins, so a shelf in the capped column is clipped to the column.
+    func featuredClippedShelf() -> some View {
+        self
+            .padding(.vertical, FeaturedLayout.shelfClipInset)
+            .clipShape(Rectangle())
+            .padding(.vertical, -FeaturedLayout.shelfClipInset)
+    }
 }
 
 /// "Драма, Триллер" -> "Драма". The store label "Windows" is not a genre.
@@ -269,7 +284,7 @@ struct FeaturedLeadRubric: View {
 
     private var cards: [MediaCard] { Array(slice.cards.prefix(5)) }
     private var rest: [MediaCard] { Array(cards.dropFirst()) }
-    private var isCompact: Bool { width > 0 && width < KD.Width.compactContent }
+    private var isCompact: Bool { width > 0 && width < FeaturedLayout.leadSideBySideMinWidth }
     private func shown(_ card: MediaCard) -> MediaCard { localized[card.id] ?? card }
 
     var body: some View {
@@ -379,6 +394,7 @@ struct FeaturedShelfSection: View {
             KDShelf(slice.cards) { card in
                 PosterCard(card: card, wide: wide).frame(width: cardWidth)
             }
+            .featuredClippedShelf()
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(slice.group.title)
@@ -399,6 +415,15 @@ enum FeaturedRankKind: String, CaseIterable, Identifiable {
     }
 }
 
+/// State of the ranking that must outlive the view: the page is a LazyVStack and discards a row that scrolls away.
+struct FeaturedRankingState {
+    /// The full chart (films, series, games); nil until the first load succeeds.
+    var full: [MediaCard]?
+    var kind: FeaturedRankKind = .movies
+    /// The catalog revision `full` was loaded for.
+    var loadedRevision: Int?
+}
+
 struct FeaturedRankedCard: Identifiable {
     var rank: Int
     var card: MediaCard
@@ -409,10 +434,9 @@ struct FeaturedRankedCard: Identifiable {
 struct FeaturedRanking: View {
     @EnvironmentObject private var model: AppModel
     var group: CuratedGroup
-    @State private var full: [MediaCard]?
-    @State private var kind: FeaturedRankKind = .movies
+    @Binding var state: FeaturedRankingState
 
-    private var source: [MediaCard] { model.visible(full ?? group.items) }
+    private var source: [MediaCard] { model.visible(state.full ?? group.items) }
 
     private func entries(for tab: FeaturedRankKind) -> [FeaturedRankedCard] {
         let matching: [MediaCard] = source.filter { (card: MediaCard) -> Bool in card.section == tab.rawValue }
@@ -426,12 +450,12 @@ struct FeaturedRanking: View {
     }
 
     private var activeKind: FeaturedRankKind {
-        if availableKinds.contains(kind) { return kind }
-        return availableKinds.first ?? kind
+        if availableKinds.contains(state.kind) { return state.kind }
+        return availableKinds.first ?? state.kind
     }
 
     private var kindBinding: Binding<FeaturedRankKind> {
-        Binding<FeaturedRankKind>(get: { activeKind }, set: { (value: FeaturedRankKind) in kind = value })
+        Binding<FeaturedRankKind>(get: { activeKind }, set: { (value: FeaturedRankKind) in state.kind = value })
     }
 
     var body: some View {
@@ -474,12 +498,18 @@ struct FeaturedRanking: View {
             .accessibilityElement(children: .contain)
             .accessibilityLabel("№" + String(entry.rank) + ", " + entry.card.title)
         }
+        .featuredClippedShelf()
         .id(tab.rawValue)
     }
 
     private func loadFull() async {
+        let revision: Int = model.revision
+        if state.full != nil && state.loadedRevision == revision { return }
         let result: CatalogResult? = try? await model.bridge.call("featured", ["id": .string(group.id)], as: CatalogResult.self)
         if Task.isCancelled { return }
-        if let result, !result.items.isEmpty { full = result.items }
+        if let result, !result.items.isEmpty {
+            state.full = result.items
+            state.loadedRevision = revision
+        }
     }
 }

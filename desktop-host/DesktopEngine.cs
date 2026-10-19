@@ -178,14 +178,14 @@ sealed class DesktopEngine:IAsyncDisposable
         }
         await BundledCatalog.EnsureLoadedAsync(ct);var category=section=="series"?"Сериалы":"Фильмы";
         var selection=new CatalogSelection(S(p,"genre"),S(p,"country"),I(p,"year")==0?null:I(p,"year"),I(p,"rating"),S(p,"sort","date"));
+        var qualityHeight=S(p,"quality") switch{"HD Ready"=>720,"Full HD"=>1080,"4K"=>2160,_=>0};
         if(query.Length>0)
         {
             var result=await UnifiedSearch.FindAsync(query,(kind,t)=>online.Browse(kind,query,1,t),kind=>shared.Search(kind,query),ct,
                 ImdbSuggestions.Applies(query)?t=>ImdbSuggestions.SearchAsync(query,t):null,preferredLanguage:prefs.UiLanguage);
-            var filtered=result.Items.Where(Visible).Where(selection.Matches).Where(item=>S(p,"kind").Length==0||item.Section==(S(p,"kind")=="series"?"Сериалы":"Фильмы")).ToArray();
+            var filtered=result.Items.Where(Visible).Where(selection.Matches).Where(item=>S(p,"kind").Length==0||item.Section==(S(p,"kind")=="series"?"Сериалы":"Фильмы")).Where(item=>qualityHeight==0||QualityMatches(item,qualityHeight)).ToArray();
             return new{items=Remember(filtered),hasNext=false,offline=result.Offline};
         }
-        var qualityHeight=S(p,"quality") switch{"HD Ready"=>720,"Full HD"=>1080,"4K"=>2160,_=>0};
         var candidates=await Task.Run(()=>shared.All.Where(item=>item.Section==category&&Visible(item)&&selection.Matches(item)).ToArray(),ct);
         var local=qualityHeight==0?candidates:await Task.Run(()=>candidates.Where(item=>QualityMatches(item,qualityHeight)).ToArray(),ct);
         if(candidates.Length>0)

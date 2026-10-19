@@ -65,6 +65,7 @@ struct RootView: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var draft = ""
     @State private var dropTargeted = false
+    @State private var lastSidebarChange = Date.distantPast
 
     var body: some View {
         NavigationSplitView {
@@ -137,7 +138,12 @@ struct RootView: View {
     private var sidebarSelection: Binding<Section?> {
         Binding<Section?>(
             get: { model.section },
-            set: { next in if let next { model.select(next) } }
+            set: { next in
+                if let next {
+                    lastSidebarChange = Date()
+                    model.select(next)
+                }
+            }
         )
     }
     private var libraryEntries: [Section] {
@@ -180,9 +186,17 @@ struct RootView: View {
                 .simultaneousGesture(TapGesture().onEnded { revisit(entry) })
         }
     }
-    /// Clicking the open section while a title, person or collection is on top goes back to the section page.
+    /// Clicking the open section goes back to its page when a title, person or collection is on top,
+    /// and otherwise resets its search, filter and page. A click that has just changed the section
+    /// through the list selection is not repeated.
     private func revisit(_ entry: Section) {
-        if model.section == entry, model.route != Route.section(entry) { model.select(entry) }
+        guard model.section == entry else { return }
+        if model.route != Route.section(entry) {
+            model.select(entry)
+            return
+        }
+        let elapsed: TimeInterval = Date().timeIntervalSince(lastSidebarChange)
+        if elapsed > 0.6 { model.select(entry) }
     }
     private var showsUpdateStatus: Bool {
         !updater.statusText.isEmpty && (updater.available || updater.busy || updater.isError)
@@ -444,6 +458,10 @@ struct AddTorrentSheet: View {
     private static let torrentType: UTType = UTType("org.bittorrent.torrent") ?? UTType(filenameExtension: "torrent") ?? UTType.data
     private var trimmed: String { model.magnet.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var canAdd: Bool { !busy && ShellTorrentInput.isValid(trimmed) }
+    private var inputHint: String {
+        tr("Нужна magnet-ссылка, адрес http(s) или существующий файл .torrent", "Enter a magnet link, an http(s) address or an existing .torrent file")
+    }
+    private var showsInputHint: Bool { !busy && !trimmed.isEmpty && !ShellTorrentInput.isValid(trimmed) }
     var body: some View {
         VStack(alignment: .leading, spacing: KD.Space.m) {
             Text(tr("Добавить торрент", "Add torrent"))
@@ -453,6 +471,12 @@ struct AddTorrentSheet: View {
                 .textFieldStyle(.roundedBorder)
                 .focused($fieldFocused)
                 .frame(minWidth: 440)
+            if showsInputHint {
+                Text(inputHint)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if let message = model.addError {
                 Text(message)
                     .font(.callout)
@@ -469,6 +493,7 @@ struct AddTorrentSheet: View {
                 Button(tr("Добавить", "Add")) { submit() }
                     .buttonStyle(KDPrimaryButtonStyle())
                     .disabled(!canAdd)
+                    .accessibilityHint(showsInputHint ? inputHint : "")
                     .keyboardShortcut(.defaultAction)
             }
         }

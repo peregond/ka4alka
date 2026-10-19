@@ -152,7 +152,10 @@ struct DetailHero: View {
 
     private var badges: [String] {
         var result: [String] = []
-        for height in detail?.resolutions ?? [] { result.append(DetailHero.resolutionTitle(height)) }
+        for height in detail?.resolutions ?? [] {
+            let title: String = DetailHero.resolutionTitle(height)
+            if !result.contains(title) { result.append(title) }
+        }
         if result.isEmpty, let quality = item.quality, DetailReleaseText.meaningful(quality) { result.append(quality) }
         return result
     }
@@ -270,6 +273,7 @@ struct DetailActionRow: View {
         ViewThatFits(in: .horizontal) {
             actions(labelled: true)
             actions(labelled: false)
+            stackedActions
         }
         .settingsLayoutProbe("detail.actions")
         .task(id: item.id) { await loadShareLink() }
@@ -278,17 +282,31 @@ struct DetailActionRow: View {
     private func actions(labelled: Bool) -> some View {
         HStack(spacing: KD.Space.s) {
             DetailPrimaryAction(transfers: model.transfers, card: item, onChooseRelease: onChooseRelease)
-            heroButton(saved ? tr("Сохранено", "Saved") : tr("Сохранить", "Save"), saved ? "heart.fill" : "heart", labelled: labelled) {
-                Task { @MainActor in await model.save(item) }
-            }
-            heroButton(tr("Не интересно", "Not interested"), "eye.slash", labelled: labelled) {
-                Task { @MainActor in
-                    let hidden = await model.hide(item)
-                    if hidden { model.back() }
-                }
-            }
-            shareControl(labelled: labelled)
+            secondaryButtons(labelled: labelled)
         }
+    }
+
+    /// Narrow banners: the primary action gets its own line and the icon buttons sit under it.
+    private var stackedActions: some View {
+        VStack(alignment: .leading, spacing: KD.Space.s) {
+            DetailPrimaryAction(transfers: model.transfers, card: item, onChooseRelease: onChooseRelease)
+            HStack(spacing: KD.Space.s) {
+                secondaryButtons(labelled: false)
+            }
+        }
+    }
+
+    @ViewBuilder private func secondaryButtons(labelled: Bool) -> some View {
+        heroButton(saved ? tr("Сохранено", "Saved") : tr("Сохранить", "Save"), saved ? "heart.fill" : "heart", labelled: labelled) {
+            Task { @MainActor in await model.save(item) }
+        }
+        heroButton(tr("Не интересно", "Not interested"), "eye.slash", labelled: labelled) {
+            Task { @MainActor in
+                let hidden = await model.hide(item)
+                if hidden { model.back() }
+            }
+        }
+        shareControl(labelled: labelled)
     }
 
     @ViewBuilder private func heroButton(_ title: String, _ systemImage: String, labelled: Bool, action: @escaping () -> Void) -> some View {
@@ -408,7 +426,7 @@ struct DetailPrimaryAction: View {
             if adding {
                 ProgressView().controlSize(.small)
             } else {
-                Label(downloadTitle(row), systemImage: "arrow.down")
+                Label(downloadTitle(row), systemImage: "arrow.down").lineLimit(1)
             }
         }
         .buttonStyle(KDPrimaryButtonStyle())

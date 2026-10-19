@@ -93,7 +93,7 @@ extension SmokePage {
         case .downloadsEmpty:
             return SmokePageSpec(prefixes: ["downloads."], required: ["downloads.header"], network: false, plain: true, toolbar: false, scansText: true)
         case .downloadsQueue:
-            return SmokePageSpec(prefixes: ["downloads."], required: ["downloads.header", "downloads.tiles", "downloads.row.0", "downloads.row.4"], network: false, plain: false, toolbar: false, scansText: false)
+            return SmokePageSpec(prefixes: ["downloads."], required: ["downloads.header", "downloads.tiles", "downloads.row.0"], network: false, plain: false, toolbar: false, scansText: false)
         case .settings:
             let cards: [String] = SettingsSectionID.allCases.map { (section: SettingsSectionID) -> String in "card." + section.rawValue }
             return SmokePageSpec(prefixes: ["card.", "settings.", "appearance.", "header", "content", "viewport"], required: ["header", "viewport", "content"] + cards, network: false, plain: true, toolbar: false, scansText: true)

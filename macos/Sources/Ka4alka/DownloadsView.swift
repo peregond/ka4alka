@@ -411,9 +411,11 @@ struct DownloadsView: View {
     // MARK: Summary tiles
 
     private var summaryTiles: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .top, spacing: KD.Space.s) { downloadTile; uploadTile; diskTile }
-            VStack(alignment: .leading, spacing: KD.Space.s) { downloadTile; uploadTile; diskTile }
+        let columns: [GridItem] = [GridItem(.adaptive(minimum: 150), spacing: KD.Space.s, alignment: .top)]
+        return LazyVGrid(columns: columns, alignment: .leading, spacing: KD.Space.s) {
+            downloadTile
+            uploadTile
+            diskTile
         }
         .settingsLayoutProbe("downloads.tiles")
     }
@@ -577,7 +579,10 @@ private struct DownloadsTile: View {
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
                 Text(title).font(KDFont.meta).foregroundStyle(.secondary)
-                Text(value).font(Font.title3.weight(.semibold).monospacedDigit()).lineLimit(1)
+                Text(value)
+                    .font(Font.title3.weight(.semibold).monospacedDigit())
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
                 if let share {
                     ProgressView(value: min(1, max(0, share)))
                         .tint(tone == KDTone.neutral ? KDPalette.accent : tone.foreground)
@@ -587,7 +592,7 @@ private struct DownloadsTile: View {
             Spacer(minLength: 0)
         }
         .padding(KD.Space.s)
-        .frame(minWidth: 170, maxWidth: .infinity, alignment: .leading)
+        .frame(minWidth: 140, maxWidth: .infinity, alignment: .leading)
         .kdCard(radius: KD.Radius.control)
         .accessibilityElement(children: .combine)
     }
@@ -608,10 +613,13 @@ private struct DownloadsStat: View {
             if let symbol = item.symbol {
                 Image(systemName: symbol).font(.system(size: 10, weight: .semibold)).accessibilityHidden(true)
             }
-            Text(item.text).font(KDFont.meta.monospacedDigit()).lineLimit(1)
+            Text(item.text)
+                .font(KDFont.meta.monospacedDigit())
+                .lineLimit(1)
+                .truncationMode(.tail)
         }
         .foregroundStyle(.secondary)
-        .fixedSize(horizontal: true, vertical: false)
+        .frame(maxWidth: 240, alignment: .leading)
     }
 }
 
@@ -796,14 +804,8 @@ struct TransferRow: View {
     }
 
     private var statsNarrow: some View {
-        let rows = stats
-        let firstRow = Array(rows.prefix(2))
-        let secondRow = Array(rows.dropFirst(2))
-        return VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: KD.Space.s) { ForEach(firstRow) { stat in DownloadsStat(item: stat) } }
-            if !secondRow.isEmpty {
-                HStack(spacing: KD.Space.s) { ForEach(secondRow) { stat in DownloadsStat(item: stat) } }
-            }
+        KDFlowLayout(spacing: KD.Space.s, lineSpacing: 2) {
+            ForEach(stats) { stat in DownloadsStat(item: stat) }
         }
     }
 

@@ -4,7 +4,13 @@ import SwiftUI
 /// next to a left-aligned column of cards; narrower it is a single column. The cards live in the Settings*Card files.
 struct SettingsView: View {
     @State private var activeSection: SettingsSectionID = SettingsSectionID.downloads
+    @State private var pinnedSection: SettingsSectionID?
+    @State private var pinnedUntil: Date?
+    @State private var pinnedSettledOffset: CGFloat?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// How long after a click the highlight ignores scroll position (covers the 0.25 s animated jump).
+    private static let pinDuration: TimeInterval = 0.6
 
     private static let listBreakpoint: CGFloat = 900
     private static let listWidth: CGFloat = 220
@@ -73,6 +79,9 @@ struct SettingsView: View {
 
     private func jump(to section: SettingsSectionID, with proxy: ScrollViewProxy) {
         activeSection = section
+        pinnedSection = section
+        pinnedUntil = Date().addingTimeInterval(SettingsView.pinDuration)
+        pinnedSettledOffset = nil
         if reduceMotion {
             proxy.scrollTo(section.rawValue, anchor: .top)
         } else {
@@ -83,10 +92,29 @@ struct SettingsView: View {
     /// Highlights the last card whose top has reached the reading line below the visible top.
     private func follow(_ offsets: [String: CGFloat]) {
         guard let top = offsets[SettingsCardOffsetKey.topKey] else { return }
+        if holdsPinnedSection(offsets, top: top) { return }
         var current: SettingsSectionID = SettingsSectionID.allCases[0]
         for section in SettingsSectionID.allCases {
             if let y = offsets[section.rawValue], y - top <= SettingsView.readingLine { current = section }
         }
         if current != activeSection { activeSection = current }
+    }
+
+    /// True while the section the user just clicked must stay highlighted: during the animated jump, and afterwards
+    /// as long as the clicked card stays where the jump left it (the last cards cannot reach the reading line).
+    /// Any scroll by the user moves the card and releases the pin.
+    private func holdsPinnedSection(_ offsets: [String: CGFloat], top: CGFloat) -> Bool {
+        guard let pinned = pinnedSection else { return false }
+        guard let cardY = offsets[pinned.rawValue] else { return false }
+        let relative: CGFloat = cardY - top
+        if let until = pinnedUntil, Date() < until {
+            pinnedSettledOffset = relative
+            return true
+        }
+        if let settled = pinnedSettledOffset, abs(relative - settled) <= 2 { return true }
+        pinnedSection = nil
+        pinnedUntil = nil
+        pinnedSettledOffset = nil
+        return false
     }
 }

@@ -185,6 +185,7 @@ struct TransferDiagnosticsView: View {
     var item: Transfer
     @State private var result: JSONValue?
     @State private var error: String?
+    @State private var actionError: String?
     @State private var notice: String?
     @State private var working = false
     @State private var confirmLogs = false
@@ -259,6 +260,9 @@ struct TransferDiagnosticsView: View {
                 Label(notice, systemImage: "checkmark.circle")
                     .font(KDFont.secondary)
                     .foregroundStyle(KDPalette.success)
+            }
+            if let actionError {
+                KDBanner(message: actionError, tone: KDTone.danger, onDismiss: { self.actionError = nil })
             }
             if let error {
                 KDBanner(message: error, tone: KDTone.danger, actionTitle: tr("Повторить", "Retry"), onAction: { Task { await load() } })
@@ -426,13 +430,16 @@ struct TransferDiagnosticsView: View {
         if working { return }
         working = true
         notice = nil
+        actionError = nil
+        let previous: String? = model.error
         model.error = nil
         let id = item.id
         Task {
             await model.transferAction(method, id: id, deleteFiles: false)
-            if let failure = model.error {
-                error = failure
-                model.error = nil
+            let failure: String? = model.error
+            model.error = previous
+            if let failure {
+                actionError = failure
             } else {
                 notice = success
             }

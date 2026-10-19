@@ -37,6 +37,9 @@ import SwiftUI
         delegate.model = model; delegate.updater = updater; updater.engine = model.bridge; ImageStore.shared.engine = model.bridge
         model.onUpdateProgress = { [weak updater] value in updater?.progress(value) }
         await model.bootstrap()
+        // A cancelled start-up (the window content was rebuilt) leaves neither a connection nor an
+        // error to show, so let the next task run start it again.
+        if Task.isCancelled, !model.connected { delegate.didStart = false; return }
         if let failure = updater.consumeInstallFailure() { model.toast = failure }
         let environment = ProcessInfo.processInfo.environment
         if model.settings != nil, let path = environment["KACHALKA_UPDATE_HEALTH_PATH"], let token = environment["KACHALKA_UPDATE_HEALTH_TOKEN"] {

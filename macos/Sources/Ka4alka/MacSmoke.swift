@@ -23,12 +23,12 @@ final class SmokeCloseMarker: @unchecked Sendable { var windowClosed = false }
             guard model.connected, let window = mainWindow() else { throw UpdateError("Native close test has no connected window") }
             let marker = SmokeCloseMarker()
             let center = NotificationCenter.default
-            _ = center.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) { (_: Notification) in
+            _ = center.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: nil) { (_: Notification) in
                 marker.windowClosed = true
             }
             // applicationShouldTerminate only answers terminateNow after the engine shutdown finished,
             // so this notification is the proof that the whole chain ran.
-            _ = center.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { (_: Notification) in
+            _ = center.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: nil) { (_: Notification) in
                 let report: [String: Bool] = ["connected": true, "windowClosedBeforeTerminate": marker.windowClosed, "terminated": true]
                 if let data = try? JSONEncoder().encode(report) { try? data.write(to: directory.appendingPathComponent("checks.json")) }
             }
@@ -139,7 +139,11 @@ struct SmokeShot {
         let frames: [String: CGRect] = SettingsLayoutMeasurements.frames
         for id in frames.keys.sorted() {
             if let frame = frames[id] {
-                parts.append(id + ":" + String(Int(frame.minX)) + "," + String(Int(frame.minY)) + "," + String(Int(frame.width)) + "," + String(Int(frame.height)))
+                let x: Int = Int(frame.minX)
+                let y: Int = Int(frame.minY)
+                let w: Int = Int(frame.width)
+                let h: Int = Int(frame.height)
+                parts.append("\(id):\(x),\(y),\(w),\(h)")
             }
         }
         return parts.joined(separator: ";")
@@ -599,11 +603,17 @@ struct SmokeShot {
         for index in 0..<5 {
             if let frame = frames["downloads.row." + String(index)] { rows.append(frame) }
         }
-        if rows.count == 5 {
+        // The queue is a lazy list, so only the rows that were realised at this window size can be measured.
+        if rows.count >= 2 {
             var ordered: Bool = true
-            for index in 1..<5 where rows[index].minY < rows[index - 1].maxY - 1 { ordered = false }
+            for index in 1..<rows.count where rows[index].minY < rows[index - 1].maxY - 1 { ordered = false }
             check(ordered, "downloads: queue rows are stacked without overlapping")
+        }
+        if !rows.isEmpty {
             check(rows.allSatisfy { (row: CGRect) -> Bool in row.height >= 40 }, "downloads: every queue row is tall enough for its content")
+        }
+        if rows.count < 5 {
+            note("not-instrumented:downloads-lazy-rows: only " + String(rows.count) + " of 5 queue rows were realised at this size")
         }
         guard let main = MacSmoke.mainWindow() else { return }
         let nodes: [SmokeAccessibilityNode] = SmokeAccessibility.nodes(in: main)
@@ -660,7 +670,9 @@ struct SmokeShot {
         let expectedWidth: Int = Int((shot.bounds.width * shot.scale).rounded())
         let expectedHeight: Int = Int((shot.bounds.height * shot.scale).rounded())
         if abs(shot.bitmap.pixelsWide - expectedWidth) > 2 || abs(shot.bitmap.pixelsHigh - expectedHeight) > 2 {
-            violate("pixel", "the screenshot is " + String(shot.bitmap.pixelsWide) + "x" + String(shot.bitmap.pixelsHigh) + " px but the window is " + String(expectedWidth) + "x" + String(expectedHeight) + " px")
+            let actualText: String = "\(shot.bitmap.pixelsWide)x\(shot.bitmap.pixelsHigh)"
+            let expectedText: String = "\(expectedWidth)x\(expectedHeight)"
+            violate("pixel", "the screenshot is \(actualText) px but the window is \(expectedText) px")
         }
         let region: CGRect
         if shot.isSheet {

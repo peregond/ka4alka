@@ -37,6 +37,8 @@ struct FeaturedAwardsView: View {
     /// 0 means "all years".
     @State private var year = 0
     @State private var attempt = 0
+    /// Loaded pages by year. The "all years" list is lazy and discards sections that scroll away; the cache keeps their content.
+    @State private var pages: [Int: AwardPage] = [:]
 
     private var awardID: String { String(collectionID.dropFirst(6)) }
     private var group: CuratedGroup? { model.curated.first { (value: CuratedGroup) -> Bool in value.id == collectionID } }
@@ -85,12 +87,19 @@ struct FeaturedAwardsView: View {
         if year == 0 {
             LazyVStack(alignment: .leading, spacing: KD.Space.xl) {
                 ForEach(years, id: \.self) { value in
-                    FeaturedYearSection(awardID: awardID, year: value, solo: false)
+                    FeaturedYearSection(awardID: awardID, year: value, solo: false, page: pageBinding(for: value))
                 }
             }
         } else {
-            FeaturedYearSection(awardID: awardID, year: year, solo: true).id(year)
+            FeaturedYearSection(awardID: awardID, year: year, solo: true, page: pageBinding(for: year)).id(year)
         }
+    }
+
+    private func pageBinding(for value: Int) -> Binding<AwardPage?> {
+        Binding<AwardPage?>(
+            get: { pages[value] },
+            set: { (next: AwardPage?) in pages[value] = next }
+        )
     }
 
     // MARK: Year strip
@@ -138,6 +147,7 @@ struct FeaturedAwardsView: View {
     /// A call with a year that matches nothing returns only the list of years, which is all this page needs first.
     private func loadYears() async {
         yearsError = nil
+        pages = [:]
         do {
             let result = try await model.bridge.call("awards", ["award": .string(awardID), "year": .number(-1)], as: AwardPage.self)
             if Task.isCancelled { return }
@@ -159,7 +169,8 @@ struct FeaturedYearSection: View {
     var year: Int
     /// True when it is the only year on the page: an empty year then explains itself.
     var solo: Bool
-    @State private var page: AwardPage?
+    /// Owned by the page, so a section that scrolls out of the lazy list keeps what it loaded.
+    @Binding var page: AwardPage?
     @State private var failure: String?
     @State private var attempt = 0
 
@@ -206,6 +217,7 @@ struct FeaturedYearSection: View {
     }
 
     private func load() async {
+        if page != nil { return }
         failure = nil
         do {
             let result = try await model.bridge.call("awards", ["award": .string(awardID), "year": .number(Double(year))], as: AwardPage.self)

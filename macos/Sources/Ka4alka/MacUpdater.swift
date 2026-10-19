@@ -117,6 +117,8 @@ private let updateFailurePathKey = "Ka4alkaUpdateFailurePath"
     }
     /// Deletes prepared-update directories other than the one in use. Only `<updates>/<32 hex digits>` folders are ever touched.
     private func pruneStaleUpdates(keeping keep: URL?) {
+        // The update helper is still verifying this launch and reads its own folder in there; the next normal launch cleans up.
+        if ProcessInfo.processInfo.environment["KACHALKA_UPDATE_HEALTH_PATH"] != nil { return }
         var root: URL?
         if let keep { root = keep.deletingLastPathComponent() }
         else if let stored = UserDefaults.standard.string(forKey: updatesRootKey) { root = URL(fileURLWithPath: stored) }
@@ -127,12 +129,15 @@ private let updateFailurePathKey = "Ka4alkaUpdateFailurePath"
     nonisolated static func pruneUpdateDirectories(root: URL, keeping keep: URL?) {
         guard root.lastPathComponent == "updates" else { return }
         let files = FileManager.default
-        guard let children = try? files.contentsOfDirectory(at: root, includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey], options: []) else { return }
+        guard let children = try? files.contentsOfDirectory(at: root, includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey, .contentModificationDateKey], options: []) else { return }
+        let recent = Date().addingTimeInterval(-600)
         let kept = keep?.resolvingSymlinksInPath().standardizedFileURL.path
         for child in children {
             guard child.lastPathComponent.range(of: #"^[0-9a-fA-F]{32}$"#, options: .regularExpression) != nil else { continue }
-            let values = try? child.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+            let values = try? child.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey, .contentModificationDateKey])
             guard values?.isDirectory == true, values?.isSymbolicLink != true else { continue }
+            // A folder touched in the last ten minutes may belong to an install or a download that is still running.
+            if let modified = values?.contentModificationDate, modified > recent { continue }
             if child.resolvingSymlinksInPath().standardizedFileURL.path == kept { continue }
             try? files.removeItem(at: child)
         }

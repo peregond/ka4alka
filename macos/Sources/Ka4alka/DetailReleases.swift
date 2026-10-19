@@ -685,6 +685,7 @@ struct ReleaseListRow: View {
         .controlSize(.small)
         .disabled(!release.downloadable)
         .help(noLinkHelp)
+        .accessibilityLabel(downloadTitle + ": " + release.title)
     }
 
     private var menuLabel: some View {
@@ -711,6 +712,7 @@ struct ReleaseListRow: View {
         .fixedSize()
         .disabled(!release.downloadable)
         .help(noLinkHelp)
+        .accessibilityLabel(downloadTitle + ": " + release.title)
     }
 
     @ViewBuilder private func queuedView(_ item: Transfer) -> some View {
@@ -771,6 +773,7 @@ struct DetailReleasesSection: View {
     private var linkedTransfers: [String: Transfer] {
         var result: [String: Transfer] = [:]
         for item in transfers.items where item.mediaId == card.id {
+            if item.complete && item.missing { continue }
             if let known = result[item.releaseTitle], known.complete { continue }
             result[item.releaseTitle] = item
         }

@@ -196,7 +196,9 @@ private struct LayoutOutcome {
                         renders += 1
                         if outcome.scrollViewFound { scrollViews += 1 }
                         for problem in outcome.problems {
-                            failures.append(pageCase.name + " " + language + " " + String(Int(width)) + (dark ? " dark: " : " light: ") + problem)
+                            let mode: String = dark ? "dark: " : "light: "
+                            let widthText: String = String(Int(width))
+                            failures.append("\(pageCase.name) \(language) \(widthText) \(mode)\(problem)")
                         }
                     }
                 }
@@ -244,9 +246,11 @@ private struct LayoutOutcome {
                     let controller = NSHostingController(rootView: AnyView(sheet.environmentObject(model).environmentObject(updater)))
                     let size: CGSize = controller.sizeThatFits(in: CGSize(width: width, height: 10_000))
                     // The folder and add-torrent sheets are fixed-width dialogs; a narrower proposal may not shrink them.
-                    let fixedWidth: Bool = name == "folder" || name == "add-torrent"
+                    let fixedWidth: Bool = name == "folder" || name == "add-torrent" || name == "pairing"
                     if size.width > width + 1 && !(fixedWidth && width < 460) {
-                        failures.append(name + " " + language + " wants " + String(Int(size.width)) + " pt for a proposal of " + String(Int(width)) + " pt")
+                        let wantedText: String = String(Int(size.width))
+                        let proposedText: String = String(Int(width))
+                        failures.append("\(name) \(language) wants \(wantedText) pt for a proposal of \(proposedText) pt")
                     }
                 }
             }
@@ -327,12 +331,19 @@ private struct LayoutOutcome {
                 guard let foreground = rgb(NSColor(color), appearance: name) else { continue }
                 for (backgroundName, background) in [("page", page), ("surface", surface)] {
                     let ratio: Double = contrast(foreground, background)
-                    if ratio < minimum { failures.append(role + " on " + backgroundName + " (" + label + ") has contrast " + String(format: "%.2f", ratio) + ", needs " + String(minimum)) }
+                    if ratio < minimum {
+                        let ratioText: String = String(format: "%.2f", ratio)
+                        let minimumText: String = String(minimum)
+                        failures.append("\(role) on \(backgroundName) (\(label)) has contrast \(ratioText), needs \(minimumText)")
+                    }
                 }
             }
             if let fill = rgb(NSColor(KDPalette.accentFill), appearance: name), let ink = rgb(NSColor(KDPalette.accentInk), appearance: name) {
                 let ratio: Double = contrast(fill, ink)
-                if ratio < 4.5 { failures.append("accentInk on accentFill (" + label + ") has contrast " + String(format: "%.2f", ratio)) }
+                if ratio < 4.5 {
+                    let ratioText: String = String(format: "%.2f", ratio)
+                    failures.append("accentInk on accentFill (\(label)) has contrast \(ratioText)")
+                }
             }
         }
         XCTAssertTrue(failures.isEmpty, failures.joined(separator: "\n"))

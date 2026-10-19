@@ -103,7 +103,8 @@ jobs:
   # Not part of the release gate: which macOS and Xcode combinations build and pass the same smoke test.
   # It also records which surface variant (glass, material or solid) is live on each of them.
   macos-compat:
-    if: ${{ inputs.compat != false }}
+    # Direct runs (push, pull request, manual) have no inputs, so the caller's workflow name decides; a release caller opts in with compat: true.
+    if: ${{ inputs.compat == true || github.workflow == 'Verify native macOS application' }}
     strategy:
       fail-fast: false
       matrix:

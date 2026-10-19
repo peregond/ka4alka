@@ -172,6 +172,7 @@ struct GameHomeView: View {
                     Button { model.filter.genre = genre.key } label: { KDChipLabel(text: genre.label) }
                         .buttonStyle(.plain)
                 }
+                .featuredClippedShelf()
             }
             .accessibilityElement(children: .contain)
             .accessibilityLabel(tr("Жанры", "Genres"))
@@ -192,6 +193,7 @@ struct GameHomeView: View {
                 KDShelf(cards) { card in
                     PosterCard(card: card, wide: true).frame(width: KD.Size.wideCardWidth)
                 }
+                .featuredClippedShelf()
             }
             .accessibilityElement(children: .contain)
             .accessibilityLabel(row.definition.title)
@@ -289,6 +291,7 @@ struct GameHomeOwnedShelf: View {
                 KDShelf(rows) { card in
                     PosterCard(card: card, wide: true).frame(width: KD.Size.wideCardWidth)
                 }
+                .featuredClippedShelf()
             }
             .accessibilityElement(children: .contain)
             .accessibilityLabel(tr("Ваши игры", "Your games"))

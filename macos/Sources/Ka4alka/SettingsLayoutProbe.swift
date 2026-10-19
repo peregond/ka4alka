@@ -78,18 +78,27 @@ private let layoutProbeEnabled: Bool = CommandLine.arguments.contains("--smoke-t
             guard let frame = frames[id] else { continue }
             let kind: LayoutProbeKind = kinds[id] ?? .container
             if frame.minX < -1 {
-                problems.append(id + " starts left of the window (x=" + String(Int(frame.minX)) + ")")
+                let x: Int = Int(frame.minX)
+                problems.append("\(id) starts left of the window (x=\(x))")
             }
             if let windowWidth, frame.maxX > windowWidth + 1 {
-                problems.append(id + " ends right of the window (maxX=" + String(Int(frame.maxX)) + ", window=" + String(Int(windowWidth)) + ")")
+                let maxX: Int = Int(frame.maxX)
+                let win: Int = Int(windowWidth)
+                problems.append("\(id) ends right of the window (maxX=\(maxX), window=\(win))")
             }
             if let group = groups[id], let parent = frames[group] {
-                let outside: Bool = frame.minX < parent.minX - 1 || frame.maxX > parent.maxX + 1 || frame.minY < parent.minY - 1 || frame.maxY > parent.maxY + 1
-                if outside { problems.append(id + " lies outside its group " + group) }
+                let outsideX: Bool = frame.minX < parent.minX - 1 || frame.maxX > parent.maxX + 1
+                let outsideY: Bool = frame.minY < parent.minY - 1 || frame.maxY > parent.maxY + 1
+                if outsideX || outsideY { problems.append("\(id) lies outside its group \(group)") }
                 if kind == .control { controlsByGroup[group, default: []].append(id) }
             }
-            if kind == .control && (frame.width < minHit - 0.5 || frame.height < minHit - 0.5) {
-                problems.append(id + " is smaller than " + String(Int(minHit)) + " pt (" + String(Int(frame.width)) + "x" + String(Int(frame.height)) + ")")
+            let tooNarrow: Bool = frame.width < minHit - 0.5
+            let tooShort: Bool = frame.height < minHit - 0.5
+            if kind == .control && (tooNarrow || tooShort) {
+                let w: Int = Int(frame.width)
+                let h: Int = Int(frame.height)
+                let limit: Int = Int(minHit)
+                problems.append("\(id) is smaller than \(limit) pt (\(w)x\(h))")
             }
         }
         for group in controlsByGroup.keys.sorted() {
@@ -99,7 +108,7 @@ private let layoutProbeEnabled: Bool = CommandLine.arguments.contains("--smoke-t
                     guard let a = frames[members[first]], let b = frames[members[second]] else { continue }
                     let overlap: CGRect = a.intersection(b)
                     if !overlap.isNull && overlap.width * overlap.height > 1 {
-                        problems.append(members[first] + " overlaps " + members[second])
+                        problems.append("\(members[first]) overlaps \(members[second])")
                     }
                 }
             }

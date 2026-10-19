@@ -79,12 +79,16 @@ struct CatalogFilter: Equatable {
     private var pendingReleaseCard: String?
     private var featuredToken = UUID()
     private var restarting = false
+    /// When the engine exited recently; three exits within a minute mean it cannot stay up and we stop restarting it.
+    private var engineExitTimes: [Date] = []
+    private static let engineExitWindow: TimeInterval = 60
+    private static let engineExitLimit = 3
     private var lastDecodeFailure = ""
     private let notificationDelegate = NotificationDelegate()
     private static let contentKeys: Set<String> = ["uiLanguage", "hidePoorQuality", "hiddenGenres", "minimumReleaseHeight", "homeCountry"]
     private static let gameShelfLifetime: TimeInterval = 15 * 60
-    /// Shown while at least one catalog, featured or collection request is in flight.
-    var loading: Bool { !loadingKeys.isEmpty }
+    /// Shown while a catalog page or a collection request is in flight. The background Featured request has its own `featuredState`.
+    var loading: Bool { loadingKeys.keys.contains { $0.hasPrefix("catalog:") || $0.hasPrefix("collection:") } }
     var route: Route { routes.last ?? .section(section) }
     var accent: Color { KDPalette.accent }
     init() {
@@ -142,6 +146,13 @@ struct CatalogFilter: Equatable {
         list = nil; curated = []; detail = nil; person = nil; releases = []; sources = []; releasesOwner = nil
         cache.removeAll(); gameShelfCache.removeAll(); gameShelves = []
         featuredState = .idle
+        let now = Date()
+        engineExitTimes = engineExitTimes.filter { now.timeIntervalSince($0) < Self.engineExitWindow }
+        engineExitTimes.append(now)
+        if engineExitTimes.count >= Self.engineExitLimit {
+            error = tr("Движок остановился и не запускается. Открой приложение заново.", "The engine stopped and cannot be started. Reopen the application.")
+            return
+        }
         restartEngine()
     }
     /// Starts the engine again and runs bootstrap, up to three times with 1, 3 and 8 second pauses.
@@ -381,17 +392,18 @@ struct CatalogFilter: Equatable {
 
     // MARK: Downloads and devices
 
-    /// Adds a release (or a pasted magnet / torrent path). The failure text goes to `addError`, which the add sheet shows.
+    /// Adds a release (or a pasted magnet / torrent path). Without a release the failure text goes to `addError`
+    /// (the add sheet and the drop handler read it); a release download from a detail page has no such place, so its failure goes to `error`.
     @discardableResult func add(_ release: ReleaseRow? = nil, card: MediaCard? = nil, source: String? = nil) async -> Bool {
         addError = nil
+        let manual = release == nil
         if settings?.folderConfigured != true {
             await chooseFolder()
             guard settings?.folderConfigured == true else {
-                addError = tr("Выбери папку для загрузок.", "Choose a download folder first.")
+                reportAddFailure(tr("Выбери папку для загрузок.", "Choose a download folder first."), manual: manual)
                 return false
             }
         }
-        let manual = release == nil
         var parameters: [String: JSONValue] = [:]
         if let release { parameters["release"] = .string(release.id) }
         if let card { parameters["card"] = .string(card.id) }
@@ -404,9 +416,13 @@ struct CatalogFilter: Equatable {
             if manual { select(.downloads) }
             return true
         } catch {
-            addError = message(for: error)
+            reportAddFailure(message(for: error), manual: manual)
             return false
         }
+    }
+    private func reportAddFailure(_ text: String?, manual: Bool) {
+        guard let text else { return }
+        if manual { addError = text } else { self.error = text }
     }
     func transferAction(_ method: String, id: String, deleteFiles: Bool = false) async {
         do { transfers.items = try await bridge.call(method, ["id": .string(id), "deleteFiles": .bool(deleteFiles)], as: DownloadResult.self).items } catch { fail(error) }

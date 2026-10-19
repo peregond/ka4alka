@@ -243,13 +243,15 @@ struct CatalogView: View {
     var saved = false
     @State private var savedKind = ""
     @State private var savedSort = "date"
+    /// True once the load for the current `loadID` has finished (successfully or not).
+    @State private var settled = false
     private static let topID = "catalog-top"
 
     private var showsSpotlight: Bool {
         !saved && (model.section == .movies || model.section == .series)
             && model.page == 1 && model.submittedQuery.isEmpty && !model.filter.active
     }
-    /// Title and filters stay on screen while a filter or a search is active; otherwise they scroll with the page.
+    /// The filters stay on screen while a filter or a search is active; the page title always scrolls with the content.
     private var pinsHeader: Bool { !saved && (model.filter.active || !model.submittedQuery.isEmpty) }
     private var showsPageHeader: Bool { saved || !model.submittedQuery.isEmpty || model.section == .games }
     private var loadID: String { saved ? "saved-" + String(model.revision) : model.requestKey }
@@ -257,7 +259,9 @@ struct CatalogView: View {
 
     var body: some View {
         pageBody.task(id: loadID) {
+            settled = false
             if saved { await model.loadSaved() } else { await model.loadCatalog() }
+            if !Task.isCancelled { settled = true }
         }
     }
 
@@ -286,10 +290,7 @@ struct CatalogView: View {
     }
 
     private var pinnedHeader: some View {
-        VStack(alignment: .leading, spacing: KD.Space.s) {
-            if !model.submittedQuery.isEmpty { pageHeader }
-            FilterBar()
-        }
+        FilterBar()
         .padding(.horizontal, KD.gutter)
         .padding(.vertical, KD.Space.s)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -299,14 +300,14 @@ struct CatalogView: View {
         if saved {
             KDPageHeader(tr("Сохранённое", "Saved"), subtitle: tr("Кино, к которому хочется вернуться.", "Films you want to come back to."))
         } else if !model.submittedQuery.isEmpty {
-            KDPageHeader(tr("Результаты поиска", "Search results"), subtitle: model.submittedQuery)
+            KDPageHeader(tr("Результаты поиска", "Search results"), subtitle: String(model.submittedQuery.prefix(80)))
         } else if model.section == .games {
             KDPageHeader(model.section.title, subtitle: tr("Каталог игр для Windows. Загрузки можно передать на ПК по локальной сети.", "Windows game catalog. Send downloads to a PC on your local network."))
         }
     }
 
     @ViewBuilder private var scrollContent: some View {
-        if !pinsHeader, showsPageHeader { pageHeader }
+        if showsPageHeader { pageHeader }
         heroBlock
         if !saved, !pinsHeader { FilterBar() }
         resultsBlock
@@ -326,7 +327,7 @@ struct CatalogView: View {
                         .font(KDFont.section)
                         .accessibilityAddTraits(.isHeader)
                 }
-            } else {
+            } else if !settled {
                 HeroPlaceholder().padding(.bottom, CatalogHeroMetrics.pagerHeight)
             }
         }
@@ -337,7 +338,7 @@ struct CatalogView: View {
     @ViewBuilder private var resultsBlock: some View {
         if let result = model.list {
             resultsContent(result)
-        } else if !model.loading, model.error != nil {
+        } else if settled, !model.loading {
             unavailable
         } else {
             loadingBlock
@@ -355,7 +356,7 @@ struct CatalogView: View {
             } else {
                 PosterGrid(items: shown, wide: model.section == .games)
             }
-            if showsPager, !shown.isEmpty || model.page > 1 { pager(hasNext: result.hasNext) }
+            if showsPager, !shown.isEmpty || model.page > 1 || result.hasNext { pager(hasNext: result.hasNext) }
         }
     }
 
@@ -371,7 +372,7 @@ struct CatalogView: View {
         KDEmptyState(
             title: tr("Каталог пока недоступен", "Catalog unavailable"),
             systemImage: "wifi.slash",
-            message: model.error,
+            message: model.error ?? tr("Не удалось загрузить каталог", "Could not load the catalog"),
             actionTitle: tr("Повторить", "Retry"),
             action: { model.revision += 1 }
         )

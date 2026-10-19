@@ -929,16 +929,61 @@ private struct KDShimmerSweep: View {
 struct KDSkeletonBlock: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.kdLite) private var lite
+    @Environment(\.kdShimmerTime) private var sharedTime
     var radius: CGFloat = KD.Radius.chip
     var lane = 0
+
+    private var shape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: radius, style: .continuous)
+    }
+
+    private func shimmering(time: TimeInterval) -> some View {
+        shape.fill(KDPalette.skeleton)
+            .overlay { KDShimmerSweep(time: time, lane: lane).clipShape(shape) }
+    }
+
+    @ViewBuilder
+    private var animated: some View {
+        if let time = sharedTime {
+            shimmering(time: time)
+        } else {
+            TimelineView(.animation(minimumInterval: lite ? 1.0 / 12.0 : 1.0 / 30.0)) { context in
+                shimmering(time: context.date.timeIntervalSinceReferenceDate)
+            }
+        }
+    }
+
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
         if reduceMotion {
             shape.fill(KDPalette.skeleton)
         } else {
+            animated
+        }
+    }
+}
+
+private struct KDShimmerTimeKey: EnvironmentKey { static let defaultValue: TimeInterval? = nil }
+extension EnvironmentValues {
+    /// Shared animation clock for skeleton blocks. When set by `KDShimmerClock`, every block under it
+    /// reads this time instead of owning its own TimelineView.
+    var kdShimmerTime: TimeInterval? {
+        get { self[KDShimmerTimeKey.self] }
+        set { self[KDShimmerTimeKey.self] = newValue }
+    }
+}
+
+/// One TimelineView for a whole skeleton (30 fps, 12 fps in Lite mode). Still under Reduce Motion.
+private struct KDShimmerClock<Content: View>: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.kdLite) private var lite
+    private let content: Content
+    init(@ViewBuilder content: () -> Content) { self.content = content() }
+    var body: some View {
+        if reduceMotion {
+            content
+        } else {
             TimelineView(.animation(minimumInterval: lite ? 1.0 / 12.0 : 1.0 / 30.0)) { context in
-                shape.fill(KDPalette.skeleton)
-                    .overlay { KDShimmerSweep(time: context.date.timeIntervalSinceReferenceDate, lane: lane).clipShape(shape) }
+                content.environment(\.kdShimmerTime, context.date.timeIntervalSinceReferenceDate)
             }
         }
     }
@@ -964,8 +1009,10 @@ struct KDPosterGridSkeleton: View {
     var wide = false
     var count = 12
     var body: some View {
-        LazyVGrid(columns: KD.posterColumns(wide: wide), alignment: .leading, spacing: KD.posterRowSpacing) {
-            ForEach(0..<count, id: \.self) { index in KDPosterSkeleton(wide: wide, lane: index % 8) }
+        KDShimmerClock {
+            LazyVGrid(columns: KD.posterColumns(wide: wide), alignment: .leading, spacing: KD.posterRowSpacing) {
+                ForEach(0..<count, id: \.self) { index in KDPosterSkeleton(wide: wide, lane: index % 8) }
+            }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(tr("Загрузка…", "Loading…"))
@@ -977,17 +1024,28 @@ struct KDShelfSkeleton: View {
     var wide = false
     var count = 6
     var body: some View {
-        VStack(alignment: .leading, spacing: KD.Space.s) {
-            KDSkeletonBlock(radius: 5).frame(width: 180, height: 22)
+        KDShimmerClock {
+            VStack(alignment: .leading, spacing: KD.Space.s) {
+                KDSkeletonBlock(radius: 5).frame(width: 180, height: 22)
+                posterRow
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(tr("Загрузка…", "Loading…"))
+    }
+
+    /// A non-interactive scroll view takes the proposed width and cuts off the overflow,
+    /// so a narrow window does not widen the skeleton.
+    private var posterRow: some View {
+        let cardWidth: CGFloat = wide ? KD.Size.wideCardWidth : KD.Size.posterWidth
+        return ScrollView(.horizontal, showsIndicators: false) {
             HStack(alignment: .top, spacing: KD.posterSpacing) {
                 ForEach(0..<count, id: \.self) { index in
-                    KDPosterSkeleton(wide: wide, lane: index).frame(width: wide ? KD.Size.wideCardWidth : KD.Size.posterWidth)
+                    KDPosterSkeleton(wide: wide, lane: index).frame(width: cardWidth)
                 }
             }
         }
-        .clipped()
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(tr("Загрузка…", "Loading…"))
+        .scrollDisabled(true)
     }
 }
 
@@ -996,13 +1054,16 @@ struct KDHeroSkeleton: View {
     var height: CGFloat = KD.Size.heroHeight
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: KD.Radius.hero, style: .continuous)
-        ZStack(alignment: .bottomLeading) {
-            KDBannerBase()
-            VStack(alignment: .leading, spacing: KD.Space.s) {
-                KDSkeletonBlock(radius: 5).frame(width: 110, height: 12)
-                KDSkeletonBlock(radius: 7).frame(maxWidth: 320).frame(height: 30)
-                KDSkeletonBlock(radius: 5).frame(width: 180, height: 13)
-            }.padding(28)
+        KDShimmerClock {
+            ZStack(alignment: .bottomLeading) {
+                KDBannerBase()
+                VStack(alignment: .leading, spacing: KD.Space.s) {
+                    KDSkeletonBlock(radius: 5).frame(width: 110, height: 12)
+                    KDSkeletonBlock(radius: 7).frame(maxWidth: 320).frame(height: 30)
+                    KDSkeletonBlock(radius: 5).frame(width: 180, height: 13)
+                }.padding(28)
+            }
+            .environment(\.colorScheme, .dark)
         }
         .frame(height: height)
         .clipShape(shape)
