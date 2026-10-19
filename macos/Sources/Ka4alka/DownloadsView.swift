@@ -917,7 +917,7 @@ struct TransferRow: View {
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
-        .frame(minHeight: 24)
+        .frame(minWidth: KD.Size.iconButton, minHeight: KD.Size.iconButton)
         .contentShape(Rectangle())
         .fixedSize()
         .help(tr("Ещё", "More"))
