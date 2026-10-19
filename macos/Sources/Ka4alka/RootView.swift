@@ -44,18 +44,10 @@ enum ShellTorrentInput {
 }
 
 private extension View {
-    /// Page colour behind the detail column. On macOS 26 the column stays transparent so the
-    /// toolbar's scroll-edge effect can show the content under it.
+    /// Page colour behind the detail column. It also fills the safe area, so the toolbar's
+    /// scroll-edge effect blends with the same near-black page in the dark theme.
     @ViewBuilder func shellPageBackground() -> some View {
-        #if compiler(>=6.2)
-        if #available(macOS 26.0, *) {
-            self
-        } else {
-            self.background(KDPalette.pageBackground)
-        }
-        #else
-        self.background(KDPalette.pageBackground)
-        #endif
+        self.background(KDPalette.pageBackground.ignoresSafeArea())
     }
 }
 
@@ -157,6 +149,8 @@ struct RootView: View {
             .collapsible(false)
         }
         .listStyle(.sidebar)
+        .scrollContentBackground(.hidden)
+        .background(colorScheme == .dark ? KDPalette.sidebarBackground : Color.clear)
         .settingsLayoutProbe("sidebar")
         .safeAreaInset(edge: .bottom, spacing: 0) { sidebarFooter }
         .navigationSplitViewColumnWidth(min: 170, ideal: 200, max: 240)
