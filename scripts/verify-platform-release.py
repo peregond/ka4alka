@@ -3,7 +3,10 @@ import json, os, subprocess, sys
 from pathlib import Path
 
 def gh(*args):
-    return json.loads(subprocess.check_output(['gh', *args], text=True, stderr=subprocess.PIPE))
+    result = subprocess.run(['gh', *args], capture_output=True, text=True, encoding='utf-8', check=True)
+    if not result.stdout or not result.stdout.strip():
+        raise ValueError('gh ' + ' '.join(args) + ' returned no output: ' + (result.stderr or '').strip())
+    return json.loads(result.stdout)
 
 version, directory = sys.argv[1:]
 if tuple(map(int, version.split('.'))) < (0, 44, 0):
