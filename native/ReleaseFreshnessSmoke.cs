@@ -90,20 +90,19 @@ public partial class MainWindow
                 var banner=FindVisual<Grid>(Body,x=>x.Name=="CinemaCards");
                 for(var i=0;i<32;i++)QueueDetailRefresh(movie.Id,releasesOnly:true);
                 Check(renderCount==beforeBatch,name+": source notifications synchronously rebuilt the card.");
-                // A busy Windows runner may dispatch Background timers after a fixed sleep.
-                // Wait for the actual batch, then keep the same render-count and identity checks.
+                // Wait for the queued batch, preserving the render-count and identity checks.
                 var batchDeadline=System.Diagnostics.Stopwatch.StartNew();
-                while((releasePickerRenders==beforePicker||detailRefreshTimer?.IsEnabled==true)&&batchDeadline.Elapsed<TimeSpan.FromSeconds(3))
+                while((releasePickerRenders==beforePicker||DetailRefreshPending)&&batchDeadline.Elapsed<TimeSpan.FromSeconds(3))
                     await Task.Delay(25);
                 await Settle();
                 var batchRenders=renderCount-beforeBatch;
                 var pickerRenders=releasePickerRenders-beforePicker;
                 if(batchRenders!=0||pickerRenders is <1 or >2)
-                    File.WriteAllText(Path.Combine(output,"batch-debug.json"),JsonSerializer.Serialize(new{batchRenders,pickerRenders,pendingFullDetailRefresh,pendingDetailRefreshId,TimerEnabled=detailRefreshTimer?.IsEnabled,Caller=lastRenderCaller,CurrentId=current?.Id,RowsHost=detailReleaseRowsHost!=null,ControlsHost=releaseControlsHost!=null}));
-                // How long a Background item waits on this run: a timer at that priority only ticks when the queue lets it.
+                    File.WriteAllText(Path.Combine(output,"batch-debug.json"),JsonSerializer.Serialize(new{batchRenders,pickerRenders,pendingFullDetailRefresh,pendingDetailRefreshId,RefreshPending=DetailRefreshPending,Caller=lastRenderCaller,CurrentId=current?.Id,RowsHost=detailReleaseRowsHost!=null,ControlsHost=releaseControlsHost!=null}));
+                // Record whether the dispatcher can service background work when a batch fails.
                 var backgroundWait=System.Diagnostics.Stopwatch.StartNew();string backgroundResult;
                 try{await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.Background).Task.WaitAsync(TimeSpan.FromSeconds(5));backgroundResult=backgroundWait.ElapsedMilliseconds+" ms";}catch(TimeoutException){backgroundResult="not served in 5 s";}
-                Check(batchRenders==0&&pickerRenders is >=1 and <=2,$"{name}: burst notifications rebuilt the full card or were not coalesced (full={batchRenders}, picker={pickerRenders}, fullPending={pendingFullDetailRefresh}, timer={detailRefreshTimer?.IsEnabled}, background={backgroundResult}, section={section}, current={current?.Id}, pendingId={pendingDetailRefreshId}, movie={movie.Id}).");
+                Check(batchRenders==0&&pickerRenders is >=1 and <=2,$"{name}: burst notifications rebuilt the full card or were not coalesced (full={batchRenders}, picker={pickerRenders}, fullPending={pendingFullDetailRefresh}, refreshPending={DetailRefreshPending}, background={backgroundResult}, section={section}, current={current?.Id}, pendingId={pendingDetailRefreshId}, movie={movie.Id}).");
                 Check(ReferenceEquals(banner,FindVisual<Grid>(Body,x=>x.Name=="CinemaCards")),name+": release updates replaced the banner and actor controls.");
                 Check(detailMetaRow!.Children.OfType<Border>().Any(x=>Equals(x.Tag,"DetailQualityBadge")&&x.Child is TextBlock t&&t.Text=="4K"),name+": partial release refresh left the quality badges stale.");
                 Check(FindVisual<Button>(Body,x=>x.Name=="DetailDownload")?.Tag is SourceEntry offered&&offered.Title==changedRelease.Title,name+": same-ID updated release left a stale download action.");
