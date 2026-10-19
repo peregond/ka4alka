@@ -42,6 +42,12 @@ struct FeaturedAwardsView: View {
     /// The chip at the centre of the year strip.
     @State private var stripID: Int?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Restarts the loading task when the collection, a retry or a catalog refresh changes.
+    private var taskKey: String {
+        let revision: String = String(model.revision)
+        let tries: String = String(attempt)
+        return "\(collectionID)|\(tries)|\(revision)"
+    }
 
     private var awardID: String { String(collectionID.dropFirst(6)) }
     private var group: CuratedGroup? { model.curated.first { (value: CuratedGroup) -> Bool in value.id == collectionID } }
@@ -59,7 +65,7 @@ struct FeaturedAwardsView: View {
             .frame(maxWidth: .infinity)
         }
         .onChange(of: year) { _, next in model.awardYears[collectionID] = next }
-        .task(id: collectionID + "|" + String(attempt) + "|" + String(model.revision)) { await loadYears() }
+        .task(id: taskKey) { await loadYears() }
     }
 
     @ViewBuilder private var content: some View {
@@ -197,6 +203,11 @@ struct FeaturedYearSection: View {
     @Binding var page: AwardPage?
     @State private var failure: String?
     @State private var attempt = 0
+    private var taskKey: String {
+        let revision: String = String(model.revision)
+        let tries: String = String(attempt)
+        return "\(awardID)|\(year)|\(tries)|\(revision)"
+    }
 
     private var winners: [MediaCard] { featuredUnique(model.visible(page?.winners ?? [])) }
     private var nominees: [MediaCard] { featuredUnique(model.visible(page?.nominees ?? [])) }
@@ -211,7 +222,7 @@ struct FeaturedYearSection: View {
         VStack(alignment: .leading, spacing: KD.Space.m) {
             sectionContent
         }
-        .task(id: awardID + "|" + String(year) + "|" + String(attempt) + "|" + String(model.revision)) { await load() }
+        .task(id: taskKey) { await load() }
     }
 
     private var heading: some View {
@@ -293,6 +304,12 @@ struct FeaturedCollectionPage: View {
     private static let topID = "collection-top"
     /// The page lives in the model, so Back returns to the page that was open.
     private var collectionPage: Int { model.collectionPages[id] ?? 1 }
+    private var taskKey: String {
+        let page: String = String(collectionPage)
+        let revision: String = String(model.revision)
+        let tries: String = String(attempt)
+        return "\(id)|\(page)|\(tries)|\(revision)"
+    }
 
     private var isShelf: Bool { id.hasPrefix("steam-shelf:") }
     private var group: CuratedGroup? { model.curated.first { (value: CuratedGroup) -> Bool in value.id == id } }
@@ -326,7 +343,7 @@ struct FeaturedCollectionPage: View {
         }
         .scrollPosition(id: $scrollID, anchor: .top)
         .onChange(of: collectionPage) { _, _ in jumpToTop() }
-        .task(id: id + "|" + String(collectionPage) + "|" + String(attempt) + "|" + String(model.revision)) { await load() }
+        .task(id: taskKey) { await load() }
     }
 
     private func setPage(_ next: Int) {

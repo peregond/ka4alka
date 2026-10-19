@@ -599,7 +599,10 @@ struct ReleaseListRow: View {
             for studio in release.studios { add(studio, .neutral, nil) }
             for kind in release.audioTypes { add(tr(kind), .info, nil) }
             if release.studios.isEmpty && release.audioTypes.isEmpty { add(DetailReleaseText.localized(release.audio), .neutral, nil) }
-            if DetailReleaseText.meaningful(release.subs) { add(tr("Субтитры", "Subtitles") + ": " + tr(release.subs), .neutral, nil) }
+            if DetailReleaseText.meaningful(release.subs) {
+                let subtitles: String = tr("Субтитры", "Subtitles") + ": " + tr(release.subs)
+                add(subtitles, .neutral, nil)
+            }
             add(release.codec, .neutral, nil)
             add(release.hdr, .accent, nil)
         }
