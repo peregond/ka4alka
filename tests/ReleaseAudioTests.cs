@@ -31,6 +31,15 @@ static class ReleaseAudioTests
             var variant=dubbing with{Title="Backrooms 2026 1080p "+label};
             Check(ReleaseRecommendation.Pick([voiceover,variant])?.Entry==variant,"explicit dubbing labels receive priority: "+label);
         }
+        foreach(var codes in new[]{"| D |","| D, P, A |","[D, P, A]","| d/p/a |","[D+P2+L1]","| D","| D, P, A"})
+        {
+            var shorthand=dubbing with{Title="Backrooms (2026) WEB-DL 1080p [Flarrow Films] "+codes};
+            Check(ReleaseAudio.MatchesType(shorthand,"Дубляж")&&RussianAudio.Rank(shorthand)==3,"Russian tracker dubbing codes are parsed as audio: "+codes);
+            Check(ReleaseRecommendation.Pick([voiceover,shorthand])?.Entry==shorthand,"short dubbing codes receive the same priority as full words: "+codes);
+        }
+        foreach(var title in new[]{"Tenacious D (2026) WEB-DL 1080p","Backrooms 1080p | D-BOX |","Backrooms 1080p [D Studio]","Backrooms 1080p | P, A |","Backrooms 1080p subs [D, P, A]","Backrooms 1080p [D"})
+            Check(!RussianAudio.DubbedAudio(dubbing with{Title=title}),"non-audio letters and subtitles cannot invent dubbing: "+title);
+        Check(!RussianAudio.DubbedAudio(dubbing with{Title="Backrooms 1080p [D]",Source="Foreign source"}),"tracker-specific D code is not applied to unrelated sources");
         var otherDub=voiceover with{Title="Backrooms 2026 1080p DUB [HDrezka Studio]"};
         Check(ReleaseRecommendation.Pick([dubbing,otherDub])?.Entry==otherDub,"equivalent dubs are ranked by seeders rather than a studio whitelist");
         var savedLanguage=AppLanguage.Current;

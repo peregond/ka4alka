@@ -11,7 +11,7 @@ public static class RussianAudio
     {
         // Russian subtitles alone are not evidence of a Russian audio track.
         var audio=ReleaseAudio.AudioTitle(entry.Title);
-        if(Russian.IsMatch(audio)||RussianSource(entry)&&Dubbed.IsMatch(audio))return 3;
+        if(Russian.IsMatch(audio)||RussianSource(entry)&&(Dubbed.IsMatch(audio)||DubbedAudio(entry)))return 3;
         if(Original.IsMatch(audio))return 0;
         return RussianSource(entry)?2:1;
     }
@@ -19,5 +19,5 @@ public static class RussianAudio
     // tier. A studio name alone is never evidence of dubbing or licensing.
     public static bool DubbedAudio(SourceEntry entry)=>ReleaseAudio.TypeNames(entry).Contains("Дубляж");
     public static IEnumerable<SourceEntry> Order(IEnumerable<SourceEntry> entries)=>entries
-        .OrderBy(x=>x.Seeds==0).ThenByDescending(Rank).ThenByDescending(DubbedAudio).ThenByDescending(x=>x.Seeds??-1);
+        .OrderBy(x=>x.Seeds==0).ThenByDescending(Rank).ThenByDescending(ReleaseAudio.DubbingPriority).ThenByDescending(x=>x.Seeds??-1);
 }

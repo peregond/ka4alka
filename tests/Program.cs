@@ -73,7 +73,7 @@ DownloadFolderTests.Run();
 LanguageResourceTests.Run();SearchLanguageTests.Run();
 await GameCatalogTests.Run(root);
 ReleaseQualityTests.Run();
-ReleaseAudioTests.Run();
+ReleaseAudioTests.Run();BackroomsAudioTests.Run();await ReleaseAudioRulesTests.Run();
 FeaturePosterTests.Run();
 ZonaPosterTests.Run();
 ScrollStripTests.Run();

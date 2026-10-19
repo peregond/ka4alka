@@ -61,7 +61,7 @@
     <Compile Include="../native/ProfessionalCinemaPeople.cs" Link="ProfessionalCinemaPeople.cs" />
     <Compile Include="../native/RegionalCatalog.cs" Link="RegionalCatalog.cs" />
     <Compile Include="../native/ReleaseAvailabilityRules.cs" Link="ReleaseAvailabilityRules.cs" />
-    <Compile Include="../native/ReleaseAudio.cs" Link="ReleaseAudio.cs" />
+    <Compile Include="../native/ReleaseAudioRules.cs" Link="ReleaseAudioRules.cs" /><Compile Include="../native/ReleaseAudioRulesClient.cs" Link="ReleaseAudioRulesClient.cs" /><Compile Include="../native/ReleaseAudio.cs" Link="ReleaseAudio.cs" />
     <Compile Include="../native/ReleaseFreshness.cs" Link="ReleaseFreshness.cs" />
     <Compile Include="../native/ReleaseQuality.cs" Link="ReleaseQuality.cs" />
     <Compile Include="../native/ReleaseRecommendation.cs" Link="ReleaseRecommendation.cs" />

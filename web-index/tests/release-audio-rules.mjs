@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+import ts from 'typescript';
+const data=fs.readFileSync(new URL('../app/data/release-audio-rules.json',import.meta.url));
+assert.ok(data.length<64*1024);
+const rules=JSON.parse(data);
+assert.equal(rules.schemaVersion,1);assert.ok(Number.isSafeInteger(rules.revision)&&rules.revision>0);
+assert.ok(rules.studios.some(row=>row.name==='Flarrow Films'));
+assert.ok(rules.types.find(row=>row.name==='Дубляж').codes.includes('D'));
+const exports={};
+vm.runInNewContext(ts.transpileModule(fs.readFileSync(new URL('../app/api/release-audio-rules/route.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,esModuleInterop:true}}).outputText,{exports,Response,require:()=>rules});
+const response=await exports.GET();assert.equal(response.status,200);
+assert.match(response.headers.get('cache-control'),/max-age=300/);
+assert.equal((await response.json()).revision,rules.revision);
+console.log('PASS: remote audio rule feed has a bounded, versioned contract and needs no database or credentials');

@@ -44,6 +44,7 @@ jobs:
           cd "$candidate"
           node scripts/verify-source.mjs "$RUNNER_TEMP/sites-source/source-manifest.json"
           npm run install:ci
+          node tests/release-audio-rules.mjs
           node tests/title-lookup.mjs
           node tests/localized-media.mjs
           node tests/tmdb-backdrop.mjs
