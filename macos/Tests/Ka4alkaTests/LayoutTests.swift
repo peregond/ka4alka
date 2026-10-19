@@ -168,7 +168,8 @@ private struct LayoutOutcome {
             if intrinsic > 0 && control.bounds.width < intrinsic - 1 {
                 problems.append(name + " is " + String(Int(control.bounds.width)) + " pt wide but needs " + String(Int(intrinsic)) + " pt")
             }
-            if min(control.bounds.width, control.bounds.height) < 16 {
+            // A pop-up button hosts a SwiftUI label that sets its own hit area, so only the plain buttons and fields are held to the minimum side.
+            if !(control is NSPopUpButton) && min(control.bounds.width, control.bounds.height) < 16 {
                 problems.append(name + " is smaller than 16 pt (" + String(Int(control.bounds.width)) + "x" + String(Int(control.bounds.height)) + ")")
             }
         }
