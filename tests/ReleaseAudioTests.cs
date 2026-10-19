@@ -19,6 +19,38 @@ static class ReleaseAudioTests
         Check(ReleaseAudio.StudioNames(Entry("LostFilmography NewStudioX")).Count==0,"studio matching respects word boundaries");
         Check(ReleaseAudio.MatchesStudio(Entry("Фильм 2026"),"Не указано")&&ReleaseAudio.MatchesStudio(multi,"Все"),"unknown and all filters behave explicitly");
         Check(ReleaseAudio.StudioNames(Entry("Сериал subs [LostFilm]")).Count==0&&ReleaseAudio.TypeNames(Entry("Фильм subs ENG")).Count==0,"subtitle metadata does not identify the audio track");
+        foreach(var name in new[]{"Flarrow Films","FLARROW.FILMS","Flarrow-Films","Фларроу Филмс"})
+            Check(ReleaseAudio.StudioNames(Entry("Фильм DUB ["+name+"]")).SequenceEqual(new[]{"Flarrow Films"}),"Flarrow Films studio alias is recognized: "+name);
+        var dubbing=Entry("Закулисье реальности / Backrooms (2026) WEB-DL 1080p DUB [Flarrow Films]") with{Id="dub",Seeds=80,TorrentUrl="magnet:?xt=urn:btih:"+new string('a',40)};
+        var voiceover=dubbing with{Id="mvo",Title="Закулисье реальности / Backrooms (2026) WEB-DL 1080p MVO [HDrezka Studio]",Seeds=600};
+        Check(ReleaseAudio.MatchesStudio(dubbing,"Flarrow Films")&&ReleaseAudio.MatchesType(dubbing,"Дубляж"),"studio and dubbing filters find the advertised Flarrow Films track");
+        Check(ReleaseRecommendation.Pick([voiceover,dubbing])?.Entry==dubbing,"an available Russian dub is recommended ahead of a voice-over with more seeds");
+        Check(ReleaseRecommendation.Pick([voiceover,dubbing])!.Reason.Contains("дубляж"),"the recommendation explains the advertised dubbing preference");
+        foreach(var label in new[]{"дубляж","дублированный","дублированное","DUB"})
+        {
+            var variant=dubbing with{Title="Backrooms 2026 1080p "+label};
+            Check(ReleaseRecommendation.Pick([voiceover,variant])?.Entry==variant,"explicit dubbing labels receive priority: "+label);
+        }
+        var otherDub=voiceover with{Title="Backrooms 2026 1080p DUB [HDrezka Studio]"};
+        Check(ReleaseRecommendation.Pick([dubbing,otherDub])?.Entry==otherDub,"equivalent dubs are ranked by seeders rather than a studio whitelist");
+        var savedLanguage=AppLanguage.Current;
+        try
+        {
+            AppLanguage.Set("en");
+            Check(AppLanguage.T(ReleaseRecommendation.Pick([voiceover,dubbing])!.Reason).StartsWith("Russian dubbing"),"the dubbing recommendation explanation has an English translation");
+        }
+        finally{AppLanguage.Set(savedLanguage);}
+        var unknownDub=dubbing with{Id="unknown",Title="Backrooms (2026) WEB-DL 1080p [Flarrow Films]"};
+        Check(!RussianAudio.DubbedAudio(unknownDub)&&ReleaseAudio.TypeNames(unknownDub).Count==0,"the Flarrow Films name alone does not invent dubbing");
+        var multiDub=dubbing with{Id="multi",Title="Backrooms 2026 1080p DUB [Flarrow Films] + MVO [HDrezka Studio]"};
+        Check(ReleaseAudio.StudioNames(multiDub).Count==2&&ReleaseAudio.TypeNames(multiDub).Count==2,"a release advertising both tracks retains both studios and types");
+        Check(ReleaseRecommendation.Pick([voiceover,dubbing with{Seeds=19}])?.Entry==voiceover,"dubbing priority cannot bypass minimum seeder availability");
+        Check(ReleaseRecommendation.Pick([voiceover,dubbing with{TorrentUrl=null}])?.Entry==voiceover,"dubbing priority cannot recommend a metadata-only release");
+        Check(ReleaseRecommendation.Pick([voiceover,dubbing with{Title=dubbing.Title+" HDCAM"}])?.Entry==voiceover,"dubbing priority cannot recommend a screen recording");
+        var english=dubbing with{Id="english",Source="Test",Title="Backrooms 2026 1080p ENG",Seeds=30};
+        Check(ReleaseRecommendation.Pick([dubbing,english],preferredLanguage:"en")?.Entry==english,"English interface keeps English audio ahead of Russian dubbing");
+        Check(!RussianAudio.DubbedAudio(dubbing with{Title="Backrooms 1080p subs [DUB Flarrow Films]"}),"dubbing in subtitle metadata cannot change audio priority");
+        Check(RussianAudio.Order([dubbing with{Seeds=0},voiceover]).First()==voiceover,"a dead dubbing swarm remains behind a live voice-over");
         var clone=multi with{Title="Фильм [AlexFilm] DUB"};
         Check(ReleaseAudio.MatchesStudio(clone,"AlexFilm")&&!ReleaseAudio.MatchesStudio(clone,"LostFilm"),"cached labels do not leak from a cloned release with a new title");
         Check(ReleaseAudio.StudioNames(Entry("Сериал LostFilm / lost-film")).Count==1,"duplicate studio aliases are collapsed");

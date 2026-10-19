@@ -10,11 +10,14 @@ public static class RussianAudio
     public static int Rank(SourceEntry entry)
     {
         // Russian subtitles alone are not evidence of a Russian audio track.
-        var audio=Regex.Replace(entry.Title,@"(?i)(?:subtitles?|subs?|субтитры)\s*[:=\-]?\s*(?:\[[^\]\r\n]*\]|\([^\)\r\n]*\)|RU(?:S)?\b|русские\b)","");
+        var audio=ReleaseAudio.AudioTitle(entry.Title);
         if(Russian.IsMatch(audio)||RussianSource(entry)&&Dubbed.IsMatch(audio))return 3;
         if(Original.IsMatch(audio))return 0;
         return RussianSource(entry)?2:1;
     }
+    // An advertised dub wins over voice-over only within the same language
+    // tier. A studio name alone is never evidence of dubbing or licensing.
+    public static bool DubbedAudio(SourceEntry entry)=>ReleaseAudio.TypeNames(entry).Contains("Дубляж");
     public static IEnumerable<SourceEntry> Order(IEnumerable<SourceEntry> entries)=>entries
-        .OrderBy(x=>x.Seeds==0).ThenByDescending(Rank).ThenByDescending(x=>x.Seeds??-1);
+        .OrderBy(x=>x.Seeds==0).ThenByDescending(Rank).ThenByDescending(DubbedAudio).ThenByDescending(x=>x.Seeds??-1);
 }

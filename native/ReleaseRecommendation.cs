@@ -19,7 +19,7 @@ public static class ReleaseRecommendation
     {
         var parts=new List<string>();
         if(preferredLanguage=="en"&&SearchLanguage.EnglishAudioRank(best)==3)parts.Add("английская озвучка");
-        else if(RussianAudio.Rank(best)==3)parts.Add("русская озвучка");
+        else if(RussianAudio.Rank(best)==3)parts.Add(RussianAudio.DubbedAudio(best)?"русский дубляж":"русская озвучка");
         if(best.Seeds==candidates.Max(x=>x.Seeds))parts.Add("больше всего отдающих");
         else if(best.Seeds>=100)parts.Add("много отдающих");
         var sizes=candidates.Where(x=>x.Size.HasValue).Select(x=>x.Size!.Value).OrderBy(x=>x).ToArray();

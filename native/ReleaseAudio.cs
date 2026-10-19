@@ -14,6 +14,7 @@ public static class ReleaseAudio
         ("AlexFilm",Token(@"Alex[ ._-]?Film|Алекс[ ._-]?Фильм")),
         ("Кубик в Кубе",Token(@"Кубик[ ._-]*в[ ._-]*Кубе|Kubik[ ._-]*v[ ._-]*Kube")),
         ("Jaskier",Token(@"Jaskier|Яскиер")),
+        ("Flarrow Films",Token(@"Flarrow[ ._-]*Films|Фларроу[ ._-]*Филмс")),
         ("HDrezka",Token(@"HD[ ._-]?rezka(?:[ ._-]?Studio)?|ХДрезка")),
         ("RuDub",Token(@"Ru[ ._-]?Dub|Ру[ ._-]?Даб")),
         ("TVShows",Token(@"TV[ ._-]?Shows")),

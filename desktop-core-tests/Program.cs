@@ -5,6 +5,9 @@ using System.Security.Cryptography;
 using Kachalka;
 using MonoTorrent;
 using MonoTorrent.Client;
+ReleaseAudioTests.Run();
+SearchLanguageTests.Run();
+if(args.Contains("--release-audio"))return;
 var root=Path.Combine(Path.GetTempPath(),"kachalka-portable-"+Guid.NewGuid().ToString("N"));
 Directory.CreateDirectory(root);
 // macOS exposes /var through a system symlink; the deletion tests intentionally

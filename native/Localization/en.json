@@ -1581,5 +1581,10 @@
   "Фильтр раздач: Источник": "Release filter: Source",
   "Фильтр раздач: Тип": "Release filter: Type",
   "Фильтр раздач: Кодек": "Release filter: Codec",
-  "Фильтр раздач: HDR": "Release filter: HDR"
+  "Фильтр раздач: HDR": "Release filter: HDR",
+  "Русский дубляж": "Russian dubbing",
+  "Русский дубляж при больше всего отдающих": "Russian dubbing · most seeders",
+  "Русский дубляж при много отдающих": "Russian dubbing · many seeders",
+  "Русский дубляж при умеренный размер": "Russian dubbing · moderate size",
+  "Русский дубляж при проверенный источник": "Russian dubbing · verified source"
 }
