@@ -78,7 +78,12 @@ jobs:
         env:
           KACHALKA_TEST_APP: ${{ github.workspace }}/dist/macos-${{ matrix.arch }}/Ka4alka.app
         working-directory: macos
-        run: swift test -c release --jobs 3
+        run: |
+          set -o pipefail
+          swift test -c release --jobs 3 2>&1 | tee "$RUNNER_TEMP/test.log" || {
+            grep -E "error:|failed|Fatal|Test Case .* failed" "$RUNNER_TEMP/test.log" | sort -u | head -30 | while IFS= read -r line; do echo "::error title=Swift test failure::${line:0:900}"; done
+            exit 1
+          }
       - name: Collect evidence (crash reports, engine logs, environment)
         if: always()
         run: |
@@ -114,8 +119,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runner: macos-14
-            xcode: '15.4'
           - runner: macos-15
             xcode: '16.4'
           - runner: macos-26
