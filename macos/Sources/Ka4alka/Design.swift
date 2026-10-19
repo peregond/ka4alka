@@ -145,9 +145,18 @@ enum KDPalette {
     static let bannerTop = Color(red: 0.04, green: 0.23, blue: 0.27)
     static let bannerBottom = Color(red: 0.08, green: 0.09, blue: 0.18)
 
-    static let pageBackground = Color(nsColor: .windowBackgroundColor)
-    static let surface = Color(nsColor: .controlBackgroundColor)
-    static let hairline = Color(nsColor: .separatorColor)
+    /// Near-black dark surfaces, the same values as the Windows app; light keeps the system colours.
+    private static func adaptive(dark: UInt32, light: NSColor) -> Color {
+        Color(nsColor: NSColor(name: nil) { appearance in
+            let match = appearance.bestMatch(from: [.darkAqua, .aqua, .accessibilityHighContrastDarkAqua, .accessibilityHighContrastAqua])
+            if match == .darkAqua || match == .accessibilityHighContrastDarkAqua { return KDHex.ns(dark) }
+            return light
+        })
+    }
+    static let pageBackground = adaptive(dark: 0x0A0C0F, light: .windowBackgroundColor)
+    static let sidebarBackground = adaptive(dark: 0x0E1115, light: .windowBackgroundColor)
+    static let surface = adaptive(dark: 0x111419, light: .controlBackgroundColor)
+    static let hairline = adaptive(dark: 0x1E232A, light: .separatorColor)
     static let skeleton = Color.primary.opacity(0.08)
 }
 
