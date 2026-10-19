@@ -474,9 +474,10 @@ struct CatalogFilter: Equatable {
     private func installNotificationDelegate() {
         guard AppModel.canNotify else { return }
         notificationDelegate.onOpenDownloads = { [weak self] in
+            let owner = self
             Task { @MainActor in
                 NSApplication.shared.activate(ignoringOtherApps: true)
-                self?.select(.downloads)
+                owner?.select(.downloads)
             }
         }
         UNUserNotificationCenter.current().delegate = notificationDelegate

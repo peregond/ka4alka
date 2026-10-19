@@ -64,18 +64,18 @@ struct ShellCommands: Commands {
     }
     var body: some Commands {
         CommandGroup(replacing: .appSettings) {
-            Button(tr("Настройки…", "Settings…")) { model.select(.settings) }.keyboardShortcut(",")
+            Button(tr("Настройки…", "Settings…")) { Task { @MainActor in model.select(.settings) } }.keyboardShortcut(",")
         }
         SidebarCommands()
         CommandGroup(replacing: .newItem) {
-            Button(tr("Добавить торрент…", "Add torrent…")) { model.addTorrent = true }.keyboardShortcut("o")
+            Button(tr("Добавить торрент…", "Add torrent…")) { Task { @MainActor in model.addTorrent = true } }.keyboardShortcut("o")
         }
         CommandMenu(tr("Медиатека", "Library")) {
             ForEach(Section.allCases) { section in
-                Button(section.title) { model.select(section) }.keyboardShortcut(ShellCommands.key(for: section), modifiers: .command)
+                Button(section.title) { Task { @MainActor in model.select(section) } }.keyboardShortcut(ShellCommands.key(for: section), modifiers: .command)
             }
             Divider()
-            Button(tr("Назад", "Back")) { model.back() }.keyboardShortcut("[").disabled(!canGoBack)
+            Button(tr("Назад", "Back")) { Task { @MainActor in model.back() } }.keyboardShortcut("[").disabled(!canGoBack)
             Button(tr("Обновить каталог", "Refresh catalog")) { Task { await model.refresh() } }.keyboardShortcut("r").disabled(refreshing)
         }
         CommandGroup(replacing: .help) {

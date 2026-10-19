@@ -147,7 +147,7 @@ struct SettingsSectionList: View {
             .accessibilityAddTraits(.isHeader)
     }
 
-    private func row(_ section: SettingsSectionID) -> some View {
+    @MainActor private func row(_ section: SettingsSectionID) -> some View {
         let selected: Bool = section == active
         let shape = RoundedRectangle(cornerRadius: KD.Radius.chip, style: .continuous)
         return Button {

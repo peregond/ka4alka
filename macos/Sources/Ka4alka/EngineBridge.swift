@@ -36,17 +36,20 @@ import Foundation
             tail.append(data)
         }
         process.terminationHandler = { [weak self] finished in
+            let owner = self
             let identity = ObjectIdentifier(finished); let status = finished.terminationStatus; let reason = finished.terminationReason
-            Task { @MainActor in self?.ended(identity, status, reason) }
+            Task { @MainActor in owner?.ended(identity, status, reason) }
         }
         try process.run(); self.input = input; self.process = process
         // FileHandle.AsyncBytes may perform a blocking read on the caller's
         // executor for pipes. Read available chunks on Foundation's I/O queue;
         // only completed messages are delivered to the main actor.
         let decoder = PipeMessageDecoder(onMessage: { [weak self] data in
-            Task { @MainActor in self?.receive(data) }
+            let owner = self
+            Task { @MainActor in owner?.receive(data) }
         }, onError: { [weak self] message in
-            Task { @MainActor in self?.onFailure?(message) }
+            let owner = self
+            Task { @MainActor in owner?.onFailure?(message) }
         })
         outputReader = output.fileHandleForReading
         output.fileHandleForReading.readabilityHandler = { handle in
@@ -72,7 +75,7 @@ import Foundation
                     }
                 } catch { finish(id, .failure(error)) }
             }
-        }, onCancel: { [weak self] in Task { @MainActor in self?.cancel(id) } })
+        }, onCancel: { [weak self] in let owner = self; Task { @MainActor in owner?.cancel(id) } })
     }
     func call<T: Decodable>(_ method: String, _ parameters: [String: JSONValue] = [:], as: T.Type) async throws -> T { try await call(method, parameters).decode(T.self) }
     private func send(id: String, method: String, parameters: [String: JSONValue]) throws {
