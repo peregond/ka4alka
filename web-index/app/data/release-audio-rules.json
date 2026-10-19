@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "revision": 1,
+  "revision": 2,
   "dubbingPriority": 1,
   "otherCodes": [
     "P",
@@ -26,7 +26,9 @@
         "Lost_Film",
         "ЛостФильм",
         "Лост-Фильм",
-        "Лост Фильм"
+        "Лост Фильм",
+        "Лост.Фильм",
+        "Лост_Фильм"
       ],
       "prefixes": [],
       "codes": []
@@ -41,7 +43,9 @@
         "New_Studio",
         "НьюСтудио",
         "Нью-Студио",
-        "Нью Студио"
+        "Нью Студио",
+        "Нью.Студио",
+        "Нью_Студио"
       ],
       "prefixes": [],
       "codes": []
@@ -56,7 +60,9 @@
         "Alex_Film",
         "АлексФильм",
         "Алекс-Фильм",
-        "Алекс Фильм"
+        "Алекс Фильм",
+        "Алекс.Фильм",
+        "Алекс_Фильм"
       ],
       "prefixes": [],
       "codes": []
@@ -69,7 +75,11 @@
         "Кубик.в.Кубе",
         "Кубик_в_Кубе",
         "Kubik v Kube",
-        "Kubik-v-Kube"
+        "Kubik-v-Kube",
+        "КубиквКубе",
+        "Kubik.v.Kube",
+        "Kubik_v_Kube",
+        "KubikvKube"
       ],
       "prefixes": [],
       "codes": []
@@ -92,7 +102,10 @@
         "Flarrow.Films",
         "Flarrow_Films",
         "Фларроу Филмс",
-        "Фларроу-Филмс"
+        "Фларроу-Филмс",
+        "Фларроу.Филмс",
+        "Фларроу_Филмс",
+        "ФларроуФилмс"
       ],
       "prefixes": [],
       "codes": []
@@ -106,7 +119,11 @@
         "HD-rezka",
         "HD.rezka",
         "HD_rezka",
-        "ХДрезка"
+        "ХДрезка",
+        "HDrezka.Studio",
+        "HDrezka-Studio",
+        "HDrezka_Studio",
+        "HDrezkaStudio"
       ],
       "prefixes": [],
       "codes": []
@@ -121,7 +138,9 @@
         "Ru_Dub",
         "РуДаб",
         "Ру-Даб",
-        "Ру Даб"
+        "Ру Даб",
+        "Ру.Даб",
+        "Ру_Даб"
       ],
       "prefixes": [],
       "codes": []
@@ -167,7 +186,11 @@
         "КуражБамбей",
         "Kuraj-Bambey",
         "Kuraj Bambey",
-        "KurajBambey"
+        "KurajBambey",
+        "Кураж.Бамбей",
+        "Кураж_Бамбей",
+        "Kuraj.Bambey",
+        "Kuraj_Bambey"
       ],
       "prefixes": [],
       "codes": []
@@ -187,7 +210,9 @@
         "AniLibria",
         "Ani Libria",
         "Ani-Libria",
-        "Анилибрия"
+        "Анилибрия",
+        "Ani.Libria",
+        "Ani_Libria"
       ],
       "prefixes": [],
       "codes": []
@@ -198,7 +223,9 @@
         "AniDUB",
         "Ani Dub",
         "Ani-Dub",
-        "Анидаб"
+        "Анидаб",
+        "Ani.Dub",
+        "Ani_Dub"
       ],
       "prefixes": [],
       "codes": []
@@ -217,7 +244,9 @@
         "Red Head Sound",
         "Red-Head-Sound",
         "RedHeadSound",
-        "RHS"
+        "RHS",
+        "Red.Head.Sound",
+        "Red_Head_Sound"
       ],
       "prefixes": [],
       "codes": []
@@ -227,7 +256,9 @@
       "aliases": [
         "StudioBand",
         "Studio Band",
-        "Studio-Band"
+        "Studio-Band",
+        "Studio.Band",
+        "Studio_Band"
       ],
       "prefixes": [],
       "codes": []
@@ -246,7 +277,9 @@
       "aliases": [
         "ColdFilm",
         "Cold Film",
-        "Cold-Film"
+        "Cold-Film",
+        "Cold.Film",
+        "Cold_Film"
       ],
       "prefixes": [],
       "codes": []
@@ -256,7 +289,9 @@
       "aliases": [
         "ViruseProject",
         "Viruse Project",
-        "Viruse-Project"
+        "Viruse-Project",
+        "Viruse.Project",
+        "Viruse_Project"
       ],
       "prefixes": [],
       "codes": []
@@ -266,7 +301,9 @@
       "aliases": [
         "СВ-Дубль",
         "СВДубль",
-        "СВ Дубль"
+        "СВ Дубль",
+        "СВ.Дубль",
+        "СВ_Дубль"
       ],
       "prefixes": [],
       "codes": []
