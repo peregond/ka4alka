@@ -159,6 +159,9 @@ struct RootView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) { sidebarFooter }
         .navigationSplitViewColumnWidth(min: 170, ideal: 200, max: 240)
     }
+    private var showsUpdateStatus: Bool {
+        !updater.statusText.isEmpty && (updater.available || updater.busy || updater.isError)
+    }
     /// Downloads and Settings sit at the bottom of the sidebar, as in the Windows app. They are plain buttons,
     /// not list rows, so a click always reaches them.
     private var pinnedSections: some View {
