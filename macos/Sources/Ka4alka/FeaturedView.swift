@@ -1,51 +1,122 @@
 import SwiftUI
 
+/// Актуальное: a news-portal page. Masthead, banner, three top stories, then rubrics and shelves.
 struct FeaturedView: View {
     @EnvironmentObject private var model: AppModel
-    var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 30) {
-                HStack { VStack(alignment: .leading, spacing: 6) { Text(tr("Актуальное", "Featured")).font(.largeTitle.bold()); Text(tr("Выбираем истории, в которые стоит погрузиться.", "Stories and worlds worth exploring.")).foregroundStyle(.secondary) }; Spacer(); if model.loading { ProgressView().controlSize(.small) }; Button { Task { await model.refresh(); await model.loadFeatured() } } label: { Image(systemName: "arrow.clockwise") } }
-                if model.curated.isEmpty { SkeletonGrid() }
-                ForEach(model.curated) { group in
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack { Button { model.openCollection(group.id) } label: { HStack { Text(group.title).font(.title2.bold()); Image(systemName: "chevron.right").font(.callout.weight(.semibold)) } }.buttonStyle(.plain); Spacer(); Button(tr("Ещё", "More")) { model.openCollection(group.id) }.buttonStyle(.borderless) }
-                        if !group.description.isEmpty { Text(group.description).font(.callout).foregroundStyle(.secondary) }
-                        if group.layout == "lead", let lead = group.items.first { FeaturedHero(card: lead) }
-                        ScrollView(.horizontal) {
-                            LazyHStack(alignment: .top, spacing: 16) { ForEach(Array(model.visible(group.items).enumerated()), id: \.element.id) { index, card in PosterCard(card: card, rank: group.layout == "ranking" ? index + 1 : nil).frame(width: 155) } }.padding(.vertical, 4)
-                        }.scrollIndicators(.hidden)
-                    }
-                }
-            }.padding(24)
-        }.task(id: model.revision) { await model.loadFeatured() }
+    /// The rubric at the top of the visible area. Saved to the model when the page goes away, so Back returns to the same place.
+    @State private var anchor: String?
+
+    private func visibleSlices() -> [FeaturedGroupSlice] {
+        var rows: [FeaturedGroupSlice] = []
+        for group in model.curated {
+            let cards: [MediaCard] = model.visible(group.items)
+            if !cards.isEmpty { rows.append(FeaturedGroupSlice(group: group, cards: cards)) }
+        }
+        return rows
     }
-}
-struct AwardPage: Decodable { var years: [Int]; var items: [MediaCard]; var winners: [MediaCard]?; var nominees: [MediaCard]? }
-struct CollectionView: View {
-    @EnvironmentObject private var model: AppModel
-    var id: String
-    @State private var award: AwardPage?
-    @State private var year = 0
-    @State private var page = 1
-    private var isAward: Bool { id.hasPrefix("award-") }
+
     var body: some View {
+        let slices: [FeaturedGroupSlice] = visibleSlices()
+        let plan = FeaturedPlan(slices: slices)
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                Text(model.list?.title ?? model.curated.first { $0.id == id }?.title ?? tr("Подборка", "Collection")).font(.largeTitle.bold())
-                if let description = model.list?.description, !description.isEmpty { Text(description).foregroundStyle(.secondary) }
-                if isAward, let award {
-                    Picker(tr("Год", "Year"), selection: $year) { Text(tr("Все годы", "All years")).tag(0); ForEach(award.years, id: \.self) { Text(String($0)).tag($0) } }.pickerStyle(.menu).frame(width: 200)
-                    if let winners = award.winners { Text(tr("Победители", "Winners")).font(.title2.bold()); PosterGrid(items: winners) }
-                    if let nominees = award.nominees, !nominees.isEmpty { Text(tr("Номинанты", "Nominees")).font(.title2.bold()); PosterGrid(items: nominees) }
-                    if award.winners == nil { PosterGrid(items: award.items) }
-                } else if let list = model.list { if list.items.isEmpty { ContentUnavailableView(tr("Подборка пока недоступна", "Collection unavailable"), systemImage: "rectangle.stack") } else { PosterGrid(items: list.items, wide: list.items.allSatisfy { $0.section == "games" } && id != "top-rated") } }
-                else { SkeletonGrid() }
-                if id.hasPrefix("steam-shelf:"), let list = model.list {
-                    HStack { Spacer(); Button(tr("Назад", "Previous")) { page = max(1, page - 1) }.disabled(page == 1); Text(String(page)); Button(tr("Далее", "Next")) { page += 1 }.disabled(!list.hasNext); Spacer() }
-                }
-            }.padding(24)
-        }.task(id: id + String(page)) { await model.loadCollection(id, page: page); if isAward { await loadAwards() } }.task(id: year) { if isAward { await loadAwards() } }
+            LazyVStack(alignment: .leading, spacing: KD.Space.xl) {
+                masthead
+                content(slices: slices, plan: plan)
+            }
+            .scrollTargetLayout()
+            .padding(.vertical, KD.gutter)
+            .frame(maxWidth: KD.Width.page)
+            .frame(maxWidth: .infinity)
+        }
+        .scrollPosition(id: $anchor, anchor: .top)
+        .onAppear { if anchor == nil { anchor = model.featuredAnchor } }
+        .onDisappear { model.featuredAnchor = anchor }
+        .task(id: model.revision) { await model.loadFeatured() }
     }
-    private func loadAwards() async { do { let value = try await model.bridge.call("awards", ["award": .string(String(id.dropFirst(6))), "year": .number(Double(year))], as: AwardPage.self); if !Task.isCancelled { award = value } } catch is CancellationError {} catch { if !Task.isCancelled { model.error = error.localizedDescription } } }
+
+    private var masthead: some View {
+        KDPageHeader(tr("Актуальное", "Featured"), subtitle: KDFormat.mastheadDate() + " · " + tr("Что смотреть и во что играть", "What to watch and play"))
+            .padding(.horizontal, KD.gutter)
+            .id("featured-masthead")
+            .settingsLayoutProbe("featured.masthead")
+    }
+
+    @ViewBuilder private func content(slices: [FeaturedGroupSlice], plan: FeaturedPlan) -> some View {
+        if slices.isEmpty {
+            emptyContent
+        } else {
+            if !plan.banner.isEmpty {
+                CatalogSpotlightView(items: plan.banner)
+                    .padding(.horizontal, KD.gutter)
+                    .id("featured-hero")
+                    .settingsLayoutProbe("featured.hero")
+            }
+            if !plan.digest.isEmpty {
+                FeaturedDigest(stories: plan.digest)
+                    .id("featured-digest")
+                    .settingsLayoutProbe("featured.digest")
+            }
+            ForEach(plan.display) { slice in
+                group(slice).id(slice.id)
+            }
+        }
+    }
+
+    @ViewBuilder private func group(_ slice: FeaturedGroupSlice) -> some View {
+        if slice.group.layout == "lead" {
+            FeaturedLeadRubric(slice: slice)
+        } else if slice.group.layout == "ranking" {
+            FeaturedRanking(group: slice.group)
+                .settingsLayoutProbe("featured.ranking")
+        } else {
+            FeaturedShelfSection(slice: slice)
+        }
+    }
+
+    // MARK: States
+
+    /// Nothing to show: still loading, the engine failed, the catalog is empty, or every title is hidden.
+    @ViewBuilder private var emptyContent: some View {
+        if !model.curated.isEmpty {
+            KDEmptyState(
+                title: tr("Все подборки скрыты", "All collections are hidden"),
+                systemImage: "eye.slash",
+                message: tr("Скрытые названия можно вернуть в настройках.", "Hidden titles can be restored in Settings.")
+            )
+            .frame(maxWidth: .infinity, minHeight: 320)
+        } else {
+            switch model.featuredState {
+            case .failed(let message):
+                KDEmptyState(
+                    title: tr("Не удалось загрузить подборки", "Could not load collections"),
+                    systemImage: "rectangle.stack.badge.minus",
+                    message: message,
+                    actionTitle: tr("Повторить", "Retry"),
+                    action: { Task { await model.loadFeatured(force: true) } }
+                )
+                .frame(maxWidth: .infinity, minHeight: 320)
+            case .empty:
+                KDEmptyState(
+                    title: tr("Подборки пока пусты", "No collections yet"),
+                    systemImage: "rectangle.stack",
+                    message: tr("Каталог ещё готовится. Загляни сюда чуть позже.", "The catalog is still being prepared. Check back in a moment."),
+                    actionTitle: tr("Обновить", "Reload"),
+                    action: { Task { await model.loadFeatured(force: true) } }
+                )
+                .frame(maxWidth: .infinity, minHeight: 320)
+            default:
+                loadingContent
+            }
+        }
+    }
+
+    @ViewBuilder private var loadingContent: some View {
+        HeroPlaceholder()
+            .padding(.horizontal, KD.gutter)
+            .settingsLayoutProbe("featured.hero")
+        KDShelfSkeleton()
+            .padding(.horizontal, KD.gutter)
+        KDShelfSkeleton()
+            .padding(.horizontal, KD.gutter)
+    }
 }

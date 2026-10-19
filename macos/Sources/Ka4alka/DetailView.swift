@@ -1,167 +1,593 @@
 import AppKit
 import SwiftUI
 
+// MARK: Detail page
+
 struct DetailView: View {
     @EnvironmentObject private var model: AppModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var card: MediaCard
-    @State private var studio = ""
-    @State private var audio = ""
-    @State private var quality = ""
-    @State private var releaseSort = "recommended"
-    @State private var season = 0
-    @State private var episode = 0
-    @State private var codec = ""
-    @State private var source = ""
-    @State private var subtitles = false
-    @State private var language = ""
+    @State private var detailLoading = true
+    private static let releasesAnchor = "detail-releases"
+
+    /// The loaded detail, but only when it belongs to this card.
     private var detail: DetailResult? { model.detail?.item.id == card.id ? model.detail : nil }
     private var item: MediaCard { detail?.item ?? card }
-    private var visibleReleases: [ReleaseRow] {
-        let rows = model.releases.filter { release in
-            (studio.isEmpty || release.studios.contains(studio) || release.gameGroup == studio) &&
-            (audio.isEmpty || release.audioTypes.contains(audio)) &&
-            (quality.isEmpty || release.quality == quality) &&
-            (language.isEmpty || (language == "ENG" ? release.englishAudio : release.russianAudio)) &&
-            (season == 0 || release.multipleSeasons || release.season == season) &&
-            (episode == 0 || release.multipleEpisodes || release.episode == episode) &&
-            (codec.isEmpty || release.codec == codec) && (source.isEmpty || release.source == source) &&
-            (!subtitles || release.subs != "Не указано")
-        }
-        if releaseSort == "size" { return rows.sorted { ($0.size ?? Double.greatestFiniteMagnitude) < ($1.size ?? Double.greatestFiniteMagnitude) } }
-        if releaseSort == "seeds" { return rows.sorted { ($0.seeds ?? -1) > ($1.seeds ?? -1) } }
-        return rows.sorted { $0.recommended && !$1.recommended }
-    }
+    private var isGame: Bool { card.section == "games" }
+    private var lite: Bool { model.settings?.liteMode ?? false }
+    private var loadKey: String { card.id + "|" + (model.settings?.uiLanguage ?? "ru") }
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                ZStack(alignment: .bottomLeading) {
-                    if let backdrop = detail?.backdrop { GeometryReader { geo in Artwork(address: backdrop, width: 1280).frame(width: geo.size.width, height: 320) } }
-                    else { LinearGradient(colors: [model.accent.opacity(0.12), Color.primary.opacity(0.03)], startPoint: .topTrailing, endPoint: .bottomLeading) }
-                    LinearGradient(colors: [.clear, .black.opacity(0.85)], startPoint: .top, endPoint: .bottom)
-                    HStack(alignment: .bottom, spacing: 22) {
-                        Artwork(address: item.poster).aspectRatio(2.0 / 3, contentMode: .fit).frame(width: 135).clipShape(RoundedRectangle(cornerRadius: 12))
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text(item.title).font(.largeTitle.bold()).lineLimit(3)
-                            Text([item.year > 0 ? String(item.year) : "", item.genre, item.rating == "—" ? "" : "★ " + item.rating].filter { !$0.isEmpty }.joined(separator: " · ")).foregroundStyle(.white.opacity(0.8))
-                            HStack { Button { Task { await model.save(item) } } label: { Label(model.isSaved(item) ? tr("Сохранено", "Saved") : tr("Сохранить", "Save"), systemImage: model.isSaved(item) ? "heart.fill" : "heart") }; Button { Task { await model.hide(item); model.back() } } label: { Label(tr("Не интересно", "Not interested"), systemImage: "eye.slash") } ; Button { Task { await model.share(item) } } label: { Label(tr("Поделиться", "Share"), systemImage: "square.and.arrow.up") } }.buttonStyle(.bordered)
-                        }.frame(maxWidth: .infinity, alignment: .leading)
-                    }.padding(24).foregroundStyle(.white)
-                }.frame(height: 320).clipShape(RoundedRectangle(cornerRadius: 18))
-                if !item.description.isEmpty { Text(item.description).font(.body).lineSpacing(4).textSelection(.enabled) }
-                else if model.detail == nil { ProgressView(tr("Загружаем описание…", "Loading description…")).controlSize(.small) }
-                if let game = detail?.game {
-                    Label(tr("Раздачи для Windows не запускаются в macOS без совместимого ПО.", "Windows releases do not run directly on macOS."), systemImage: "desktopcomputer").font(.callout).foregroundStyle(.secondary)
-                    HStack {
-                        if let address = game.steamUrl, let url = URL(string: address) { Link("Steam", destination: url) }
-                        if let address = game.steamDbUrl, let url = URL(string: address) { Link("SteamDB", destination: url) }
-                        if game.metacritic > 0 { Text("Metacritic \(game.metacritic)").font(.callout.weight(.semibold)) }
-                        if let review = game.review { Text("Steam \(review.percent)% · \(review.count)").font(.callout) }
-                        if game.discount > 0 { Text("−\(game.discount)%").foregroundStyle(.green) }
-                    }
-                    if !game.releaseDate.isEmpty { Text(game.releaseDate).font(.callout).foregroundStyle(.secondary) }
-                    if game.russian != "Unknown" && game.russian != "Absent" { Label(game.russian == "Voiced" ? tr("Русская озвучка", "Russian audio") : tr("Русский интерфейс", "Russian interface"), systemImage: "text.bubble").font(.callout) }
-                    Text([game.developers, game.publishers, game.price].filter { !$0.isEmpty }.joined(separator: " · ")).font(.callout)
-                    if !game.gallery.isEmpty { ScrollView(.horizontal) { LazyHStack { ForEach(game.gallery) { shot in Artwork(address: shot.thumb, width: 640).frame(width: 280, height: 157).clipShape(RoundedRectangle(cornerRadius: 9)).onTapGesture { if let url = URL(string: shot.full) { NSWorkspace.shared.open(url) } } } } }.scrollIndicators(.hidden) }
-                    if !game.requirements.isEmpty { DisclosureGroup(tr("Системные требования", "System requirements")) { Text(game.requirements).font(.callout).frame(maxWidth: .infinity, alignment: .leading).padding(.top, 8) } }
-                }
-                if let people = detail?.people, !people.isEmpty {
-                    Text(tr("Актёры и создатели", "Cast and crew")).font(.title2.bold())
-                    ScrollView(.horizontal) { LazyHStack(alignment: .top, spacing: 16) { ForEach(people) { person in Button { model.open(person) } label: { VStack(alignment: .leading, spacing: 6) { Artwork(address: person.photoUrl, width: 240).frame(width: 100, height: 125).clipShape(RoundedRectangle(cornerRadius: 10)); Text(person.name).font(.callout.weight(.medium)).lineLimit(2); Text(tr(person.role)).font(.caption).foregroundStyle(.secondary) }.frame(width: 100) }.buttonStyle(.plain) } } }.scrollIndicators(.hidden)
-                }
-                if let awards = detail?.awards, !awards.isEmpty { DisclosureGroup(tr("Награды", "Awards")) { VStack(alignment: .leading, spacing: 8) { ForEach(awards) { award in Label("\(award.name) · \(award.year) · \(award.category)", systemImage: award.winner ? "trophy.fill" : "laurel.leading").font(.callout) } }.frame(maxWidth: .infinity, alignment: .leading).padding(.top, 8) } }
-                releaseSection
-            }.padding(24)
-        }.task(id: card.id + (model.settings?.uiLanguage ?? "ru")) { await model.loadDetail(card) }.background { Color.clear.task(id: card.id + (model.settings?.uiLanguage ?? "ru")) { await model.loadReleases(card) } }
+        ScrollViewReader { proxy in
+            ScrollView {
+                page(proxy)
+            }
+        }
+        .task(id: loadKey) { await loadDetail() }
+        .task(id: loadKey) { await model.loadReleases(card) }
     }
-    private var releaseSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack { Text(tr("Выбрать раздачу", "Choose a release")).font(.title2.bold()); if model.releasesLoading { ProgressView().controlSize(.small) }; Spacer(); Button { Task { await model.loadReleases(card) } } label: { Image(systemName: "arrow.clockwise") } }
-            ScrollView(.horizontal) { HStack {
-                releaseMenu(tr("Студия", "Studio"), value: $studio, options: Array(Set(model.releases.flatMap(\.studios) + model.releases.compactMap(\.gameGroup))).sorted())
-                releaseMenu(tr("Озвучка", "Audio"), value: $audio, options: Array(Set(model.releases.flatMap(\.audioTypes))).sorted())
-                if card.section != "games" {
-                    releaseMenu(tr("Качество", "Quality"), value: $quality, options: ["HD Ready", "Full HD", "4K"])
-                    releaseMenu(tr("Видео", "Video"), value: $codec, options: Array(Set(model.releases.map(\.codec))).filter { $0 != "Не указано" }.sorted())
-                    Toggle(tr("С субтитрами", "With subtitles"), isOn: $subtitles).toggleStyle(.button)
-                }
-                if card.section == "series" {
-                    Menu { Button(tr("Все сезоны", "All seasons")) { season = 0 }; ForEach(Array(Set(model.releases.compactMap(\.season))).sorted(), id: \.self) { value in Button(String(value)) { season = value } } } label: { Text(season == 0 ? tr("Сезон", "Season") : "S\(season)") }
-                    Menu { Button(tr("Все серии", "All episodes")) { episode = 0 }; ForEach(Array(Set(model.releases.compactMap(\.episode))).sorted(), id: \.self) { value in Button(String(value)) { episode = value } } } label: { Text(episode == 0 ? tr("Серия", "Episode") : "E\(episode)") }
-                }
-                releaseMenu(tr("Источник", "Source"), value: $source, options: Array(Set(model.releases.map(\.source))).sorted())
-                Menu { Button(tr("Рекомендуемые", "Recommended")) { releaseSort = "recommended" }; Button(tr("Больше отдающих", "Most seeders")) { releaseSort = "seeds" }; Button(tr("Меньше размер", "Smallest size")) { releaseSort = "size" } } label: { Text(tr("Порядок", "Sort")) }
-                Menu { Button(tr("Все языки", "All languages")) { language = "" }; Button("English") { language = "ENG" }; Button(tr("Русский", "Russian")) { language = "RUS" } } label: { Text(language.isEmpty ? tr("Язык", "Language") : language) }
-                Toggle(tr("Без плохого качества", "Hide low quality"), isOn: Binding(get: { model.settings?.hidePoorQuality ?? true }, set: { next in Task { await model.set("hidePoorQuality", .bool(next)); await model.loadReleases(card) } })).toggleStyle(.button)
-                if !studio.isEmpty || !audio.isEmpty || !quality.isEmpty || !language.isEmpty || !codec.isEmpty || !source.isEmpty || season != 0 || episode != 0 || subtitles { Button(tr("Сбросить", "Reset")) { studio = ""; audio = ""; quality = ""; language = ""; codec = ""; source = ""; season = 0; episode = 0; subtitles = false } }
-            } }.scrollIndicators(.hidden)
-            if !model.sources.isEmpty { Text(model.sources.map { $0.name + " · " + sourceState($0.state) }.joined(separator: "    ")).font(.caption).foregroundStyle(.secondary).lineLimit(3) }
-            if visibleReleases.isEmpty { if model.releasesLoading { ProgressView(tr("Ищем раздачи…", "Searching for releases…")).padding(.vertical, 24) } else { ContentUnavailableView(tr("Раздачи не найдены", "No releases found"), systemImage: "tray", description: Text(tr("Попробуй сбросить фильтры или повторить поиск позже.", "Reset filters or try again later."))) } }
-            LazyVStack(spacing: 8) {
-                ForEach(visibleReleases) { release in
-                    ReleaseListRow(release: release, card: card)
-                }
+
+    private func page(_ proxy: ScrollViewProxy) -> some View {
+        VStack(alignment: .leading, spacing: KD.Space.l) {
+            DetailHero(card: card, detail: detail, onChooseRelease: { scrollToReleases(proxy) })
+            descriptionBlock
+            gameBlock
+            peopleBlock
+            awardsBlock
+            VStack(alignment: .leading, spacing: 0) {
+                Color.clear.frame(height: 0).id(DetailView.releasesAnchor)
+                DetailReleasesSection(transfers: model.transfers, card: card).id(card.id)
+            }
+        }
+        .frame(maxWidth: KD.Width.page, alignment: .leading)
+        .padding(KD.gutter)
+        .frame(maxWidth: .infinity)
+    }
+
+    // MARK: Loading
+
+    private func loadDetail() async {
+        detailLoading = true
+        await model.loadDetail(card)
+        if !Task.isCancelled { detailLoading = false }
+    }
+
+    /// Retry runs both requests, so a failed page and an empty release list recover together.
+    private func retryAll() {
+        Task { @MainActor in await loadDetail() }
+        Task { @MainActor in await model.loadReleases(card) }
+    }
+
+    private func scrollToReleases(_ proxy: ScrollViewProxy) {
+        if reduceMotion {
+            proxy.scrollTo(DetailView.releasesAnchor, anchor: .top)
+        } else {
+            withAnimation(.easeInOut(duration: 0.3)) { proxy.scrollTo(DetailView.releasesAnchor, anchor: .top) }
+        }
+    }
+
+    // MARK: Blocks
+
+    @ViewBuilder private var descriptionBlock: some View {
+        if !item.description.isEmpty {
+            DetailExpandableText(text: item.description).id(card.id)
+        } else if detail != nil {
+            Text(tr("Описание пока недоступно.", "No description yet."))
+                .font(KDFont.secondary)
+                .foregroundStyle(.secondary)
+        } else if detailLoading {
+            DetailSkeletonLines()
+        } else {
+            detailFailed
+        }
+    }
+
+    private var detailFailed: some View {
+        HStack(spacing: KD.Space.s) {
+            Label(tr("Не удалось загрузить описание.", "Could not load the description."), systemImage: "exclamationmark.triangle")
+                .font(KDFont.secondary)
+                .foregroundStyle(KDPalette.warning)
+            Button(tr("Повторить", "Retry")) { retryAll() }
+                .buttonStyle(KDSecondaryButtonStyle())
+                .controlSize(.small)
+        }
+    }
+
+    @ViewBuilder private var gameBlock: some View {
+        if let game = detail?.game {
+            VStack(alignment: .leading, spacing: KD.Space.m) {
+                Label(tr("Раздачи для Windows не запускаются в macOS без совместимого ПО.", "Windows releases do not run directly on macOS."), systemImage: "desktopcomputer")
+                    .font(KDFont.secondary)
+                    .foregroundStyle(.secondary)
+                GameFactsCard(game: game, item: item)
+                if !game.gallery.isEmpty && !lite { GameGalleryView(shots: game.gallery).id(card.id) }
+                if !game.requirements.isEmpty { DetailRequirementsView(text: game.requirements) }
             }
         }
     }
-    private func releaseMenu(_ title: String, value: Binding<String>, options: [String]) -> some View { Menu { Button(tr("Все", "All")) { value.wrappedValue = "" }; ForEach(options, id: \.self) { option in Button(tr(option)) { value.wrappedValue = option } } } label: { Text(value.wrappedValue.isEmpty ? title : tr(value.wrappedValue)) } }
+
+    @ViewBuilder private var peopleBlock: some View {
+        if let people = detail?.people, !people.isEmpty {
+            DetailCastSection(people: people).id(card.id)
+        } else if detail != nil && !isGame {
+            DetailCastEmpty(onRetry: { Task { @MainActor in await loadDetail() } })
+        }
+    }
+
+    @ViewBuilder private var awardsBlock: some View {
+        if let awards = detail?.awards, !awards.isEmpty {
+            DetailAwardsSection(awards: awards)
+        }
+    }
 }
+
+// MARK: Hero banner
+
+struct DetailHero: View {
+    @EnvironmentObject private var model: AppModel
+    var card: MediaCard
+    var detail: DetailResult?
+    var onChooseRelease: () -> Void
+    @State private var width: CGFloat = 0
+
+    private var item: MediaCard { detail?.item ?? card }
+    private var isGame: Bool { card.section == "games" }
+    private var lite: Bool { model.settings?.liteMode ?? false }
+    private var compact: Bool { width > 0 && width < KD.Width.compactContent }
+
+    private var originalTitle: String? {
+        guard let original = detail?.originalTitle, !original.isEmpty else { return nil }
+        if original.lowercased() == item.title.lowercased() { return nil }
+        return original
+    }
+
+    private var metaLine: String {
+        var parts: [String] = []
+        let genres: String = (detail?.genres ?? "").isEmpty ? item.genre : (detail?.genres ?? "")
+        if !genres.isEmpty { parts.append(genres) }
+        if let country = detail?.country, !country.isEmpty { parts.append(country) }
+        if item.year > 0 { parts.append(String(item.year)) }
+        return parts.joined(separator: " · ")
+    }
+
+    private var badges: [String] {
+        var result: [String] = []
+        for height in detail?.resolutions ?? [] { result.append(DetailHero.resolutionTitle(height)) }
+        if result.isEmpty, let quality = item.quality, DetailReleaseText.meaningful(quality) { result.append(quality) }
+        return result
+    }
+
+    static func resolutionTitle(_ height: Int) -> String {
+        if height >= 2160 { return "4K" }
+        if height >= 1080 { return "Full HD" }
+        if height >= 720 { return "HD Ready" }
+        return String(height) + "p"
+    }
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: KD.Radius.hero, style: .continuous)
+        content
+            .background { layers }
+            .clipShape(shape)
+            .kdReadWidth($width)
+            .settingsLayoutProbe("detail.banner")
+    }
+
+    // MARK: Layers
+
+    private var layers: some View {
+        ZStack {
+            KDBannerBase()
+            backdrop
+            KDBannerScrim()
+        }
+    }
+
+    /// The artwork fades in by itself (and not at all under Reduce Motion). Lite mode skips it.
+    @ViewBuilder private var backdrop: some View {
+        if !lite, let address = detail?.backdrop, !address.isEmpty {
+            GeometryReader { proxy in
+                Artwork(address: address, width: proxy.size.width > 1200 ? 1920 : 1280)
+                    .frame(width: proxy.size.width, height: proxy.size.height)
+                    .kdBackdropExtension()
+            }
+        }
+    }
+
+    // MARK: Content
+
+    private var content: some View {
+        HStack(alignment: .bottom, spacing: compact ? KD.Space.m : KD.Space.l) {
+            posterView
+            textColumn
+        }
+        .padding(compact ? KD.Space.m : KD.Space.l)
+        .frame(maxWidth: .infinity, minHeight: KD.Size.heroHeight, alignment: .bottomLeading)
+        .kdOnBanner()
+    }
+
+    @ViewBuilder private var posterView: some View {
+        if isGame {
+            Artwork(address: item.poster, width: 640, placeholderSymbol: "gamecontroller")
+                .aspectRatio(460.0 / 215.0, contentMode: .fit)
+                .frame(width: compact ? 220 : 320)
+                .clipShape(RoundedRectangle(cornerRadius: KD.Radius.poster, style: .continuous))
+        } else {
+            Artwork(address: item.poster, width: 400, placeholderSymbol: card.section == "series" ? "tv" : "film")
+                .aspectRatio(2.0 / 3.0, contentMode: .fit)
+                .frame(width: compact ? 100 : 135)
+                .clipShape(RoundedRectangle(cornerRadius: KD.Radius.poster, style: .continuous))
+        }
+    }
+
+    private var textColumn: some View {
+        VStack(alignment: .leading, spacing: KD.Space.s) {
+            Text(item.title)
+                .font(compact ? KDFont.displayCompact : KDFont.display)
+                .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+            if let original = originalTitle {
+                Text(original)
+                    .font(KDFont.secondary)
+                    .foregroundStyle(Color.white.opacity(0.78))
+                    .lineLimit(2)
+            }
+            if !item.ratings.isEmpty { KDRatingRow(ratings: item.ratings) }
+            if !metaLine.isEmpty {
+                Text(metaLine)
+                    .font(KDFont.meta)
+                    .foregroundStyle(Color.white.opacity(0.85))
+                    .lineLimit(2)
+            }
+            let tags = badges
+            if !tags.isEmpty {
+                KDFlowLayout(spacing: 6, lineSpacing: 6) {
+                    ForEach(tags, id: \.self) { text in
+                        KDPosterBadge(text: text)
+                    }
+                }
+            }
+            DetailActionRow(item: item, isGame: isGame, onChooseRelease: onChooseRelease)
+                .padding(.top, KD.Space.xs)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+// MARK: Hero actions
+
+struct DetailActionRow: View {
+    @EnvironmentObject private var model: AppModel
+    var item: MediaCard
+    var isGame: Bool
+    var onChooseRelease: () -> Void
+    @State private var shareURL: URL?
+
+    private var saved: Bool { model.isSaved(item) }
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            actions(labelled: true)
+            actions(labelled: false)
+        }
+        .settingsLayoutProbe("detail.actions")
+        .task(id: item.id) { await loadShareLink() }
+    }
+
+    private func actions(labelled: Bool) -> some View {
+        HStack(spacing: KD.Space.s) {
+            DetailPrimaryAction(transfers: model.transfers, card: item, onChooseRelease: onChooseRelease)
+            heroButton(saved ? tr("Сохранено", "Saved") : tr("Сохранить", "Save"), saved ? "heart.fill" : "heart", labelled: labelled) {
+                Task { @MainActor in await model.save(item) }
+            }
+            heroButton(tr("Не интересно", "Not interested"), "eye.slash", labelled: labelled) {
+                Task { @MainActor in
+                    let hidden = await model.hide(item)
+                    if hidden { model.back() }
+                }
+            }
+            shareControl(labelled: labelled)
+        }
+    }
+
+    @ViewBuilder private func heroButton(_ title: String, _ systemImage: String, labelled: Bool, action: @escaping () -> Void) -> some View {
+        if labelled {
+            Button(action: action) { Label(title, systemImage: systemImage) }
+                .buttonStyle(KDOverlayButtonStyle())
+        } else {
+            Button(action: action) { Image(systemName: systemImage) }
+                .buttonStyle(KDOverlayButtonStyle(circular: true))
+                .help(title)
+                .accessibilityLabel(title)
+        }
+    }
+
+    /// The engine has no share link for games, so there is no Share control for them.
+    @ViewBuilder private func shareControl(labelled: Bool) -> some View {
+        if !isGame, let url = shareURL {
+            if labelled {
+                ShareLink(item: url, subject: Text(item.title)) {
+                    Label(tr("Поделиться", "Share"), systemImage: "square.and.arrow.up")
+                }
+                .buttonStyle(KDOverlayButtonStyle())
+            } else {
+                ShareLink(item: url, subject: Text(item.title)) {
+                    Image(systemName: "square.and.arrow.up")
+                }
+                .buttonStyle(KDOverlayButtonStyle(circular: true))
+                .help(tr("Поделиться", "Share"))
+                .accessibilityLabel(tr("Поделиться", "Share"))
+            }
+        }
+    }
+
+    private func loadShareLink() async {
+        shareURL = nil
+        if isGame { return }
+        do {
+            let result = try await model.bridge.call("share", ["id": .string(item.id)])
+            let text = result["url"].string
+            if !Task.isCancelled, !text.isEmpty, let url = URL(string: text), url.scheme != nil { shareURL = url }
+        } catch {
+            // No link means no Share control; the rest of the page is unaffected.
+            shareURL = nil
+        }
+    }
+}
+
+/// The one state-aware primary action: show the file, follow the download, take the recommended release, or pick one.
+struct DetailPrimaryAction: View {
+    @EnvironmentObject private var model: AppModel
+    @ObservedObject var transfers: TransferStore
+    var card: MediaCard
+    var onChooseRelease: () -> Void
+    @State private var adding = false
+
+    private var own: [Transfer] { transfers.items.filter { $0.mediaId == card.id } }
+    private var finished: Transfer? { own.first(where: { $0.complete && !$0.missing }) }
+    private var inQueue: Transfer? {
+        if let running = own.first(where: { $0.isActive }) { return running }
+        return own.first(where: { !$0.complete })
+    }
+    private var recommended: ReleaseRow? {
+        model.releases(for: card).first(where: { $0.recommended && $0.downloadable })
+    }
+
+    var body: some View {
+        if let done = finished {
+            showButton(done)
+        } else if let queued = inQueue {
+            progressButton(queued)
+        } else if let row = recommended {
+            downloadButton(row)
+        } else {
+            chooseButton
+        }
+    }
+
+    private func showButton(_ transfer: Transfer) -> some View {
+        Button {
+            if transfer.folder.isEmpty {
+                model.select(.downloads)
+            } else {
+                NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: transfer.folder)])
+            }
+        } label: {
+            Label(tr("Показать в папке", "Show in folder"), systemImage: "folder")
+        }
+        .buttonStyle(KDPrimaryButtonStyle())
+        .controlSize(.large)
+    }
+
+    private func progressButton(_ transfer: Transfer) -> some View {
+        let verb: String = transfer.isActive ? tr("Качается", "Downloading") : (transfer.paused ? tr("Пауза", "Paused") : tr("В загрузках", "In downloads"))
+        let text = verb + " · " + KDFormat.percent(transfer.progress)
+        return Button {
+            model.select(.downloads)
+        } label: {
+            Label(text, systemImage: "arrow.down.circle")
+        }
+        .buttonStyle(KDPrimaryButtonStyle())
+        .controlSize(.large)
+        .help(tr("Открыть загрузки", "Open Downloads"))
+    }
+
+    private func downloadTitle(_ row: ReleaseRow) -> String {
+        var parts: [String] = [tr("Скачать", "Download")]
+        let quality = DetailReleaseText.qualityText(row, isGame: card.section == "games")
+        if quality != "—" { parts.append(quality) }
+        if let size = row.size { parts.append(KDFormat.bytes(size)) }
+        return parts.joined(separator: " · ")
+    }
+
+    private func downloadButton(_ row: ReleaseRow) -> some View {
+        Button {
+            start(row)
+        } label: {
+            if adding {
+                ProgressView().controlSize(.small)
+            } else {
+                Label(downloadTitle(row), systemImage: "arrow.down")
+            }
+        }
+        .buttonStyle(KDPrimaryButtonStyle())
+        .controlSize(.large)
+        .disabled(adding)
+    }
+
+    private var chooseButton: some View {
+        Button {
+            onChooseRelease()
+        } label: {
+            Label(tr("Выбрать раздачу", "Choose a release"), systemImage: "list.bullet")
+        }
+        .buttonStyle(KDPrimaryButtonStyle())
+        .controlSize(.large)
+    }
+
+    private func start(_ row: ReleaseRow) {
+        if adding { return }
+        adding = true
+        Task { @MainActor in
+            _ = await model.add(row, card: card)
+            adding = false
+        }
+    }
+}
+
+// MARK: Person page
+
 struct PersonView: View {
     @EnvironmentObject var model: AppModel
     var person: Person
-    var body: some View {
-        ScrollView { VStack(alignment: .leading, spacing: 22) {
-            HStack(alignment: .top, spacing: 22) { Artwork(address: person.photoUrl, width: 400).frame(width: 170, height: 215).clipShape(RoundedRectangle(cornerRadius: 14)); VStack(alignment: .leading, spacing: 14) { Text(person.name).font(.largeTitle.bold()); Text(tr(person.role)).foregroundStyle(.secondary); if let profile = model.person { Text(profile.description).textSelection(.enabled) } else { ProgressView(tr("Загружаем биографию…", "Loading biography…")) } }.frame(maxWidth: .infinity, alignment: .leading) }
-            if let profile = model.person { Text(tr("Фильмография", "Filmography")).font(.title2.bold()); PosterGrid(items: profile.items) }
-        }.padding(24) }.task(id: person.id) { await model.loadPerson(person) }
-    }
-}
+    @State private var loading = true
 
-struct ReleaseListRow: View {
-    @EnvironmentObject private var model: AppModel
-    var release: ReleaseRow
-    var card: MediaCard
-    private var metadata: String {
-        if card.section == "games" { return [release.source, release.gameKind, release.gameGroup, release.gameVersion, release.size.map(byteText)].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ") }
-        return [release.source, release.poor ? tr("Экранка", "Low quality") : release.quality,
-         release.audio, release.size.map(byteText) ?? ""].filter { !$0.isEmpty }.joined(separator: " · ")
-    }
-    private var peers: String {
-        let seeds = release.seeds.map { String($0) } ?? "—"
-        let leechers = release.leechers.map { String($0) } ?? "—"
-        return tr("Отдают", "Seeders") + ": " + seeds + "   " + tr("Скачивают", "Leechers") + ": " + leechers
-    }
+    private var profile: PersonResult? { model.personResult(for: person) }
+
     var body: some View {
-        HStack(spacing: 14) {
-            VStack(alignment: .leading, spacing: 6) {
-                if release.recommended { Label(tr("Рекомендуем", "Recommended"), systemImage: "checkmark.seal").font(.caption.weight(.semibold)).foregroundStyle(model.accent) }
-                Text(release.title).font(.callout.weight(.medium)).lineLimit(3)
-                Text(metadata).font(.caption).foregroundStyle(.secondary)
-                Text(peers)
-                    .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
-            }.frame(maxWidth: .infinity, alignment: .leading)
-            Menu {
-                Button(tr("Скачать на этот Mac", "Download on this Mac")) {
-                    Task { await model.add(release, card: card) }
-                }
-                ForEach((model.lanState?.devices ?? []).filter(\.paired)) { device in
-                    Button(tr("Скачать на ", "Download on ") + device.name) {
-                        Task { await model.lan("send", ["device": .string(device.id), "release": .string(release.id), "card": .string(card.id)]) }
+        ScrollView {
+            VStack(alignment: .leading, spacing: KD.Space.l) {
+                header
+                filmography
+            }
+            .frame(maxWidth: KD.Width.page, alignment: .leading)
+            .padding(KD.gutter)
+            .frame(maxWidth: .infinity)
+        }
+        .task(id: person.id) { await load() }
+    }
+
+    private func load() async {
+        loading = true
+        await model.loadPerson(person)
+        if !Task.isCancelled { loading = false }
+    }
+
+    private func retry() {
+        Task { @MainActor in await load() }
+    }
+
+    // MARK: Header
+
+    private var header: some View {
+        HStack(alignment: .top, spacing: KD.Space.l) {
+            Artwork(address: profile?.person.photoUrl ?? person.photoUrl, width: 400, placeholderSymbol: "person.crop.rectangle")
+                .frame(width: 170, height: 215)
+                .clipShape(RoundedRectangle(cornerRadius: KD.Radius.card, style: .continuous))
+            VStack(alignment: .leading, spacing: KD.Space.s) {
+                Text(person.name)
+                    .font(KDFont.pageTitle)
+                    .accessibilityAddTraits(.isHeader)
+                Text(detailRoleTitle(person.role))
+                    .font(KDFont.secondary)
+                    .foregroundStyle(.secondary)
+                biography
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    @ViewBuilder private var biography: some View {
+        if let profile {
+            if profile.description.isEmpty {
+                Text(tr("Биография пока недоступна.", "No biography yet."))
+                    .font(KDFont.secondary)
+                    .foregroundStyle(.secondary)
+            } else {
+                DetailExpandableText(text: profile.description, lines: 6, expandTitle: tr("Подробнее", "More")).id(person.id)
+            }
+            if let url = sourceLink(profile.sourceUrl) {
+                Link(tr("Источник биографии", "Biography source"), destination: url)
+                    .font(.callout)
+                    .foregroundStyle(KDPalette.accent)
+            }
+        } else if loading {
+            DetailSkeletonLines()
+        } else {
+            HStack(spacing: KD.Space.s) {
+                Label(tr("Не удалось загрузить страницу.", "Could not load the page."), systemImage: "exclamationmark.triangle")
+                    .font(KDFont.secondary)
+                    .foregroundStyle(KDPalette.warning)
+                Button(tr("Повторить", "Retry")) { retry() }
+                    .buttonStyle(KDSecondaryButtonStyle())
+                    .controlSize(.small)
+            }
+        }
+    }
+
+    /// Only the biography sources the engine uses are linked.
+    private func sourceLink(_ text: String?) -> URL? {
+        guard let url = detailSecureURL(text), let host = url.host else { return nil }
+        if host == "ru.wikipedia.org" && url.path.hasPrefix("/wiki/") { return url }
+        if host == "kino-teatr.ua" || host == "www.kino-teatr.ua" { return url }
+        return nil
+    }
+
+    // MARK: Filmography
+
+    private func newestFirst(_ items: [MediaCard]) -> [MediaCard] {
+        let indexed: [(offset: Int, element: MediaCard)] = Array(items.enumerated())
+        let ordered = indexed.sorted { (left: (offset: Int, element: MediaCard), right: (offset: Int, element: MediaCard)) -> Bool in
+            if left.element.year != right.element.year { return left.element.year > right.element.year }
+            return left.offset < right.offset
+        }
+        return ordered.map { $0.element }
+    }
+
+    private func ratingValue(_ card: MediaCard) -> Double {
+        let text = card.rating.replacingOccurrences(of: ",", with: ".")
+        return Double(text) ?? 0
+    }
+
+    private func bestRated(_ items: [MediaCard]) -> [MediaCard] {
+        let rated: [MediaCard] = items.filter { ratingValue($0) > 0 }
+        let ordered = rated.sorted { ratingValue($0) > ratingValue($1) }
+        return Array(ordered.prefix(10))
+    }
+
+    @ViewBuilder private var filmography: some View {
+        if let profile {
+            let films: [MediaCard] = newestFirst(model.visible(profile.items))
+            if films.isEmpty {
+                emptyFilmography
+            } else {
+                filmographyContent(films)
+            }
+        }
+    }
+
+    private var emptyFilmography: some View {
+        VStack(alignment: .leading, spacing: KD.Space.xs) {
+            KDSectionHeader(title: tr("Фильмография", "Filmography"))
+            Text(tr("Подтверждённые фильмы и сериалы пока недоступны.", "No confirmed films or series yet."))
+                .font(KDFont.secondary)
+                .foregroundStyle(.secondary)
+            Button(tr("Повторить", "Retry")) { retry() }
+                .buttonStyle(KDSecondaryButtonStyle())
+                .controlSize(.small)
+        }
+    }
+
+    private func filmographyContent(_ films: [MediaCard]) -> some View {
+        let best: [MediaCard] = films.count > 3 ? bestRated(films) : []
+        return VStack(alignment: .leading, spacing: KD.Space.l) {
+            if best.count >= 3 {
+                VStack(alignment: .leading, spacing: KD.Space.s) {
+                    KDSectionHeader(title: tr("Лучшие по рейтингу", "Top rated"))
+                    KDShelf(best) { card in
+                        PosterCard(card: card).frame(width: KD.Size.posterWidth)
                     }
+                    .padding(.horizontal, -KD.gutter)
                 }
-            } label: {
-                Label(tr("Скачать", "Download"), systemImage: "arrow.down")
-            }.disabled(!release.downloadable)
-        }.padding(14).background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 12))
-    }
-}
-
-func sourceState(_ state: String) -> String {
-    switch state {
-    case "Ready": return tr("Найдено", "Found")
-    case "Empty": return tr("Нет результатов", "No results")
-    case "Loading": return tr("Поиск…", "Searching…")
-    case "Failed": return tr("Недоступен", "Unavailable")
-    case "TimedOut": return tr("Нет ответа", "Timed out")
-    default: return tr(state)
+            }
+            VStack(alignment: .leading, spacing: KD.Space.s) {
+                KDSectionHeader(
+                    title: tr("Фильмография", "Filmography"),
+                    subtitle: tr("Фильмов и сериалов: \(films.count)", "Films and series: \(films.count)")
+                )
+                PosterGrid(items: films)
+            }
+        }
     }
 }
