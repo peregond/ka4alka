@@ -1,5 +1,8 @@
 name: Verify macOS audio menus and layout
 on:
+  push:
+    branches: [claude/quirky-hopper-1vlmj6]
+    paths: ['.github/workflows/macos-layout.yml']
   workflow_dispatch:
 permissions:
   contents: read
