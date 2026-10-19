@@ -5,8 +5,6 @@ struct FeaturedView: View {
     @EnvironmentObject private var model: AppModel
     /// The rubric at the top of the visible area. Saved to the model when the page goes away, so Back returns to the same place.
     @State private var anchor: String?
-    /// The ranking lives in a lazily built row, so its tab and the loaded chart are kept here.
-    @State private var rankingState = FeaturedRankingState()
 
     private func visibleSlices() -> [FeaturedGroupSlice] {
         var rows: [FeaturedGroupSlice] = []
@@ -68,7 +66,7 @@ struct FeaturedView: View {
         if slice.group.layout == "lead" {
             FeaturedLeadRubric(slice: slice)
         } else if slice.group.layout == "ranking" {
-            FeaturedRanking(group: slice.group, state: $rankingState)
+            FeaturedRanking(group: slice.group, state: $model.rankingState)
                 .settingsLayoutProbe("featured.ranking")
         } else {
             FeaturedShelfSection(slice: slice)

@@ -84,9 +84,12 @@ struct FeaturedHero: View {
     @State private var backdrop: String?
     @State private var localized: MediaCard?
     @State private var width: CGFloat = 0
-    private var item: MediaCard { model.settings?.uiLanguage == "en" ? localized ?? card : card }
+    private var language: String { model.settings?.uiLanguage ?? "ru" }
+    private var item: MediaCard { catalogShownCard(card, local: localized, english: language == "en") }
+    /// The loaded address, or the one remembered from an earlier showing, so a banner flip does not restart from the blurred poster.
+    private var shownBackdrop: String? { backdrop ?? CatalogMemo.backdrops[card.id] }
     private var lite: Bool { model.settings?.liteMode == true }
-    private var requestID: String { card.id + ":" + (model.settings?.uiLanguage ?? "ru") }
+    private var requestID: String { card.id + ":" + language }
     private var heroHeight: CGFloat { CatalogHeroMetrics.height(forWidth: width > 0 ? width : 900) }
     private var saved: Bool { model.isSaved(card) }
     private var saveTitle: String { saved ? tr("Удалить из сохранённого", "Remove from Saved") : tr("Сохранить", "Save") }
@@ -104,16 +107,23 @@ struct FeaturedHero: View {
         .kdReadWidth($width)
         .settingsLayoutProbe("catalog.hero")
         .task(id: requestID) {
+            CatalogMemo.sync(language: language, revision: model.revision)
+            if let known = CatalogMemo.backdrops[card.id] {
+                backdrop = known
+                return
+            }
             backdrop = nil
             let result = try? await model.bridge.call("artwork", ["id": .string(card.id)])
             if !Task.isCancelled {
                 let address = result?["url"].string ?? ""
+                if !address.isEmpty { CatalogMemo.backdrops[card.id] = address }
                 backdrop = address.isEmpty ? nil : address
             }
         }
         .task(id: "localized-" + requestID) {
+            CatalogMemo.sync(language: language, revision: model.revision)
             localized = nil
-            if model.settings?.uiLanguage == "en", card.section != "games" {
+            if language == "en", card.section != "games" {
                 let result = await catalogLocalizedCard(card, bridge: model.bridge)
                 if !Task.isCancelled { localized = result }
             }
@@ -133,7 +143,7 @@ struct FeaturedHero: View {
         ZStack(alignment: .bottomLeading) {
             HeroBackground(
                 poster: item.poster,
-                backdrop: backdrop,
+                backdrop: shownBackdrop,
                 lite: lite,
                 imageWidth: CatalogHeroMetrics.backdropWidth(forWidth: size.width, lite: lite)
             )
@@ -228,6 +238,14 @@ private struct HeroBackground: View {
     var imageWidth: Int
     @State private var image: NSImage?
 
+    init(poster: String?, backdrop: String?, lite: Bool, imageWidth: Int) {
+        self.poster = poster
+        self.backdrop = backdrop
+        self.lite = lite
+        self.imageWidth = imageWidth
+        _image = State(initialValue: ImageStore.cachedImage(backdrop, width: imageWidth))
+    }
+
     var body: some View {
         ZStack {
             KDBannerBase()
@@ -237,8 +255,9 @@ private struct HeroBackground: View {
             if let image { Image(nsImage: image).resizable().scaledToFill().transition(.opacity) }
         }.clipped()
         .task(id: (backdrop ?? "") + (lite ? ":lite" : ":full") + ":" + String(imageWidth)) {
+            guard let backdrop else { image = nil; return }
+            if let ready = ImageStore.cachedImage(backdrop, width: imageWidth) { image = ready; return }
             image = nil
-            guard let backdrop else { return }
             let result = await ImageStore.shared.image(backdrop, width: imageWidth)
             if !Task.isCancelled { withAnimation(reduceMotion || lite ? nil : .easeInOut(duration: 0.25)) { image = result } }
         }

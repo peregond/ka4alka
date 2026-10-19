@@ -186,13 +186,14 @@ struct FeaturedLocalizeModifier: ViewModifier {
     }
 
     private func localize() async {
+        CatalogMemo.sync(language: language, revision: model.revision)
         if language != "en" {
             if !localized.isEmpty { localized = [:] }
             return
         }
         for card in cards where card.section != "games" {
             if localized[card.id] != nil { continue }
-            let result: MediaCard? = try? await model.bridge.call("localizedCard", ["id": .string(card.id)], as: MediaCard.self)
+            let result: MediaCard? = await catalogLocalizedCard(card, bridge: model.bridge)
             if Task.isCancelled { return }
             if let result { localized[card.id] = result }
         }
@@ -208,6 +209,7 @@ extension View {
 // MARK: Digest "Главное сегодня"
 
 struct FeaturedDigest: View {
+    @EnvironmentObject private var model: AppModel
     var stories: [FeaturedDigestStory]
     @State private var localized: [String: MediaCard] = [:]
     @State private var width: CGFloat = 0
@@ -218,12 +220,16 @@ struct FeaturedDigest: View {
         return Array(repeating: GridItem(.flexible(), spacing: KD.Space.m, alignment: .top), count: count)
     }
 
+    private func shown(_ story: FeaturedDigestStory) -> MediaCard {
+        catalogShownCard(story.card, local: localized[story.id], english: model.settings?.uiLanguage == "en")
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: KD.Space.s) {
             KDSectionHeader(title: tr("Главное сегодня", "Today's top stories"))
             LazyVGrid(columns: columns, alignment: .leading, spacing: KD.Space.m) {
                 ForEach(stories) { story in
-                    FeaturedDigestCard(card: localized[story.id] ?? story.card, kicker: story.kicker)
+                    FeaturedDigestCard(card: shown(story), kicker: story.kicker)
                 }
             }
         }
@@ -245,7 +251,7 @@ struct FeaturedDigestCard: View {
     }
 
     private var poster: some View {
-        FeaturedPoster(address: card.poster, width: KD.Size.digestPoster, height: FeaturedLayout.digestPosterHeight, decodeWidth: 220, symbol: featuredSymbol(for: card))
+        FeaturedPoster(address: card.poster, width: KD.Size.digestPoster, height: FeaturedLayout.digestPosterHeight, decodeWidth: 360, symbol: featuredSymbol(for: card))
     }
 
     private var text: some View {
@@ -285,7 +291,9 @@ struct FeaturedLeadRubric: View {
     private var cards: [MediaCard] { Array(slice.cards.prefix(5)) }
     private var rest: [MediaCard] { Array(cards.dropFirst()) }
     private var isCompact: Bool { width > 0 && width < FeaturedLayout.leadSideBySideMinWidth }
-    private func shown(_ card: MediaCard) -> MediaCard { localized[card.id] ?? card }
+    private func shown(_ card: MediaCard) -> MediaCard {
+        catalogShownCard(card, local: localized[card.id], english: model.settings?.uiLanguage == "en")
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: KD.Space.m) {
@@ -325,7 +333,7 @@ struct FeaturedLeadRubric: View {
         let item: MediaCard = shown(lead)
         return Button { model.open(item) } label: {
             HStack(alignment: .top, spacing: KD.Space.m) {
-                FeaturedPoster(address: item.poster, width: FeaturedLayout.leadPosterWidth, height: FeaturedLayout.leadPosterHeight, decodeWidth: 320, symbol: featuredSymbol(for: item))
+                FeaturedPoster(address: item.poster, width: FeaturedLayout.leadPosterWidth, height: FeaturedLayout.leadPosterHeight, decodeWidth: 480, symbol: featuredSymbol(for: item))
                 VStack(alignment: .leading, spacing: 8) {
                     KDRankNumeral(rank: 1, size: 56)
                     Text(item.title).font(Font.title.bold()).lineLimit(3).multilineTextAlignment(.leading)

@@ -223,7 +223,12 @@ struct CatalogFilter: Equatable {
     }
     func open(_ card: MediaCard) { detail = nil; person = nil; releases = []; sources = []; releasesOwner = nil; routes.append(.detail(card)); error = nil }
     func open(_ person: Person) { self.person = nil; routes.append(.person(person)); error = nil }
-    func openCollection(_ id: String) { list = nil; routes.append(.collection(id)); error = nil }
+    func openCollection(_ id: String) {
+        // A fresh open starts at the first page and the newest year; Back keeps what the person had chosen.
+        collectionPages[id] = nil
+        awardYears[id] = nil
+        list = nil; routes.append(.collection(id)); error = nil
+    }
     func back() { if routes.count > 1 { routes.removeLast(); error = nil } }
     /// Opens a kachalka:// link (the title page) or hands a magnet link / torrent file to the add sheet.
     /// Returns false only when a kachalka:// link could not be opened.
