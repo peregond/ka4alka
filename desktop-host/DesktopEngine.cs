@@ -97,7 +97,7 @@ sealed class DesktopEngine:IAsyncDisposable
                 await awards.RestoreAsync(ct);await awards.RefreshNomineesAsync(ct);
                 var award=awards.All.FirstOrDefault(x=>x.Id==S(p,"award"));
                 var entries=(award?.Entries??[]).Concat(awards.NomineesOf(S(p,"award"))).Where(x=>I(p,"year")==0||x.Year==I(p,"year")).DistinctBy(x=>(x.Year,x.ImdbId)).ToArray();
-                return new{years=(award?.Entries??[]).Concat(awards.NomineesOf(S(p,"award"))).Select(x=>x.Year).Distinct().OrderDescending(),items=Remember(entries.Select(entry=>AwardsCatalog.Item(entry)).ToArray()),winners=Remember((award?.Entries??[]).Where(x=>I(p,"year")==0||x.Year==I(p,"year")).Select(entry=>AwardsCatalog.Item(entry))),nominees=Remember(awards.NomineesOf(S(p,"award")).Where(x=>(I(p,"year")==0||x.Year==I(p,"year"))&&!(award?.Entries??[]).Any(winner=>winner.Year==x.Year&&winner.ImdbId==x.ImdbId)).Select(entry=>AwardsCatalog.Item(entry)))};
+                return new{years=(award?.Entries??[]).Concat(awards.NomineesOf(S(p,"award"))).Select(x=>x.Year).Distinct().OrderDescending(),items=Remember(entries.Select(entry=>AwardsCatalog.Item(entry)).Where(Visible).ToArray()),winners=Remember((award?.Entries??[]).Where(x=>I(p,"year")==0||x.Year==I(p,"year")).Select(entry=>AwardsCatalog.Item(entry)).Where(Visible)),nominees=Remember(awards.NomineesOf(S(p,"award")).Where(x=>(I(p,"year")==0||x.Year==I(p,"year"))&&!(award?.Entries??[]).Any(winner=>winner.Year==x.Year&&winner.ImdbId==x.ImdbId)).Select(entry=>AwardsCatalog.Item(entry)).Where(Visible))};
             case "share":
                 var sharedCard=Card(S(p,"id"));return new{url=ShareLink.Create(sharedCard)};
             case "openLink":
@@ -163,10 +163,10 @@ sealed class DesktopEngine:IAsyncDisposable
         try
         {
             await BundledCatalog.EnsureLoadedAsync(lifetime.Token);await shared.RestoreAsync(lifetime.Token);await index.RestoreAsync(lifetime.Token);
-            Event("catalogReady",new{});
+            groups.Clear();Event("catalogReady",new{});
             if(prefs.AutoResumeDownloads)await downloads.ResumePendingAsync();
             if(prefs.LanEnabled)await EnsureLan(lifetime.Token);
-            if(await shared.RefreshAsync(lifetime.Token))Event("catalogReady",new{});
+            if(await shared.RefreshAsync(lifetime.Token)){groups.Clear();Event("catalogReady",new{});}
         }
         catch(OperationCanceledException){}catch(Exception error){ErrorLog.Write(error);}
     }
@@ -180,15 +180,17 @@ sealed class DesktopEngine:IAsyncDisposable
         }
         await BundledCatalog.EnsureLoadedAsync(ct);var category=section=="series"?"Сериалы":"Фильмы";
         var selection=new CatalogSelection(S(p,"genre"),S(p,"country"),I(p,"year")==0?null:I(p,"year"),I(p,"rating"),S(p,"sort","date"));
+        var qualityHeight=S(p,"quality") switch{"HD Ready"=>720,"Full HD"=>1080,"4K"=>2160,_=>0};
         if(query.Length>0)
         {
             var result=await UnifiedSearch.FindAsync(query,(kind,t)=>online.Browse(kind,query,1,t),kind=>shared.Search(kind,query),ct,
                 ImdbSuggestions.Applies(query)?t=>ImdbSuggestions.SearchAsync(query,t):null,preferredLanguage:prefs.UiLanguage);
-            var filtered=result.Items.Where(Visible).Where(selection.Matches).Where(item=>S(p,"kind").Length==0||item.Section==(S(p,"kind")=="series"?"Сериалы":"Фильмы")).ToArray();
+            var filtered=result.Items.Where(Visible).Where(selection.Matches).Where(item=>S(p,"kind").Length==0||item.Section==(S(p,"kind")=="series"?"Сериалы":"Фильмы")).Where(item=>qualityHeight==0||QualityMatches(item,qualityHeight)).ToArray();
             return new{items=Remember(filtered),hasNext=false,offline=result.Offline};
         }
-        var local=await Task.Run(()=>shared.All.Where(item=>item.Section==category&&Visible(item)&&selection.Matches(item)).ToArray(),ct);
-        if(local.Length>0)
+        var candidates=await Task.Run(()=>shared.All.Where(item=>item.Section==category&&Visible(item)&&selection.Matches(item)).ToArray(),ct);
+        var local=qualityHeight==0?candidates:await Task.Run(()=>candidates.Where(item=>QualityMatches(item,qualityHeight)).ToArray(),ct);
+        if(candidates.Length>0)
         {
             IEnumerable<MediaItem> rows=local;rows=selection.Order=="rating"?rows.OrderByDescending(item=>Rating(item)):selection.Order=="date"?rows.OrderByDescending(item=>item.Year):rows;
             var offset=(page-1)*CatalogPaging.Size;var data=rows.Skip(offset).Take(CatalogPaging.Size).ToArray();return new{items=Remember(data),hasNext=offset+data.Length<local.Length,offline=false};
@@ -200,6 +202,11 @@ sealed class DesktopEngine:IAsyncDisposable
     {
         var known=index.RememberedReleases(item);
         return !HiddenCatalog.Hidden(item,prefs,CatalogChoices.Genres)&&!ReleaseAvailability.Hidden(known,DateTime.UtcNow)&&(!prefs.HidePoorQuality||known==null||!ReleaseQuality.OnlyPoor(known.Items,prefs.MinimumReleaseHeight));
+    }
+    bool QualityMatches(MediaItem item,int height)
+    {
+        if(height==0)return true;
+        ApplyKnownQuality(item);return item.HasReleaseResolution(height);
     }
     void ApplyKnownQuality(MediaItem item)=>item.SetReleaseQuality(index.RememberedReleases(item)?.Items??[],prefs.MinimumReleaseHeight);
     async Task<MediaItem> Metadata(MediaItem item,CancellationToken ct)=>
@@ -237,7 +244,7 @@ sealed class DesktopEngine:IAsyncDisposable
             }
             if(backdrop==null)try{var id=OnlineIndexClient.IdFor(item);if(id!=null)backdrop=FeatureBackdrop.FromResponse(await online.ReadSite("api/backdrop?id="+Uri.EscapeDataString(id),128*1024,ct),id);}catch(Exception)when(!ct.IsCancellationRequested){}
         }
-        Remember([item]);return new{item=CardDto(item),backdrop,people=item.DisplayPeople,awards=item.Awards,game=game==null?null:new{game.Requirements,game.Developers,game.Publishers,game.Price,game.Metacritic,gallery=game.Gallery,game.Traits,game.OriginalPrice,game.Discount,game.ReleaseDate,game.Age,game.Review,russian=game.Russian.ToString(),steamUrl=item.PageUrl,steamDbUrl=GameCatalog.TryId(item.PageUrl,out var steamId)?"https://steamdb.info/app/"+steamId:null,platform="Windows"}};
+        Remember([item]);return new{item=CardDto(item),backdrop,people=item.DisplayPeople,awards=item.Awards,originalTitle=item.OriginalTitle,genres=item.AllGenres,country=item.DisplayCountry,resolutions=item.ReleaseResolutions.OrderByDescending(x=>x).ToArray(),game=game==null?null:new{game.Requirements,game.Developers,game.Publishers,game.Price,game.Metacritic,gallery=game.Gallery,game.Traits,game.OriginalPrice,game.Discount,game.ReleaseDate,game.Age,game.Review,russian=game.Russian.ToString(),steamUrl=item.PageUrl,steamDbUrl=GameCatalog.TryId(item.PageUrl,out var steamId)?"https://steamdb.info/app/"+steamId:null,platform="Windows"}};
     }
     async Task Localize(MediaItem item,CancellationToken ct)
     {
@@ -276,13 +283,13 @@ sealed class DesktopEngine:IAsyncDisposable
         var providers=item.Section=="Игры"?GameReleaseSources.Create(source,item,configuredSources):NativeReleaseSources.Create(source,Resolved,item.Section=="Сериалы",Aliases);
         var sources=providers.ToList();if(item.Section!="Игры")sources.AddRange(configuredSources.Select(config=>new ReleaseSource(config.Name,t=>source.SearchTorznab(config,item.OriginalTitle??item.Title,t,item.Section=="Сериалы"?5000:2000))));if(item.Section!="Игры"&&OnlineIndexClient.IdFor(item)!=null)sources.Insert(0,new("Онлайн-индекс",t=>online.Releases(item,t,true)));
         var rules=releaseAudioRules.Refresh(ct);
-        var result=await ReleaseSearch.RunAsync(sources,new Progress<ReleaseSearchUpdate>(update=>Event("releases",new{request,items=ReleaseDtos(ReleaseSearch.WithSaved(update.Items,saved),item.Section=="Игры"),complete=update.Complete,sources=update.Sources.Select(x=>new{x.Name,state=x.State.ToString()})})),ct);
+        var result=await ReleaseSearch.RunAsync(sources,new Progress<ReleaseSearchUpdate>(update=>Event("releases",new{request,items=ReleaseDtos(ReleaseSearch.WithSaved(update.Items,saved),item.Section=="Игры"),complete=update.Complete,sources=update.Sources.Select(x=>new{x.Name,state=x.State.ToString(),count=x.Count})})),ct);
         await rules;
         var combined=ReleaseSearch.WithSaved(result.Items,saved);
         item.SetReleaseQuality(combined,prefs.MinimumReleaseHeight);
         if(result.Items.Length>0||ReleaseAvailability.ConfirmedEmpty(result.Items,result.Sources))
             await index.CacheReleasesAsync(item,result.Items.Length==0?[]:combined,result.Sources,ct);
-        return new{items=ReleaseDtos(combined,item.Section=="Игры"),complete=true,sources=result.Sources.Select(x=>new{x.Name,state=x.State.ToString()})};
+        return new{items=ReleaseDtos(combined,item.Section=="Игры"),complete=true,sources=result.Sources.Select(x=>new{x.Name,state=x.State.ToString(),count=x.Count})};
     }
     object[] ReleaseDtos(IEnumerable<SourceEntry> items,bool games=false)
     {
@@ -292,11 +299,11 @@ sealed class DesktopEngine:IAsyncDisposable
         {
         var key=Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(entry.Source+"|"+entry.Id+"|"+entry.TorrentUrl)))[..24];
         if(releases.Count>3000)releases.Remove(releases.Keys.First());releases[key]=entry;
-        return (object)new{id=key,title=entry.Title,source=entry.Source,size=entry.Size,seeds=entry.Seeds,leechers=entry.Leechers,quality=entry.Quality,type=entry.Type,audio=entry.Voice,studios=ReleaseAudio.StudioNames(entry),audioTypes=ReleaseAudio.TypeNames(entry),codec=entry.Codec,subs=entry.Subs,hdr=entry.Hdr,poor=ReleaseQuality.Poor(entry,prefs.MinimumReleaseHeight),downloadable=ReleaseAvailability.Downloadable(entry),recommended=choice?.Entry==entry,season=entry.Series.Season,episode=entry.Series.Episode,multipleSeasons=entry.Series.MultipleSeasons,multipleEpisodes=entry.Series.MultipleEpisodes,englishAudio=SearchLanguage.EnglishAudioRank(entry)>=2,russianAudio=RussianAudio.Rank(entry)>=2,gameKind=games?GameReleaseInfo.Kind(entry):null,gameGroup=games?GameReleaseInfo.Group(entry):null,gameVersion=games?GameReleaseInfo.Version(entry):null};
+        return (object)new{id=key,title=entry.Title,source=entry.Source,size=entry.Size,seeds=entry.Seeds,leechers=entry.Leechers,quality=entry.Quality,type=entry.Type,audio=entry.Voice,studios=ReleaseAudio.StudioNames(entry),audioTypes=ReleaseAudio.TypeNames(entry),codec=entry.Codec,subs=entry.Subs,hdr=entry.Hdr,poor=ReleaseQuality.Poor(entry,prefs.MinimumReleaseHeight),downloadable=ReleaseAvailability.Downloadable(entry),recommended=choice?.Entry==entry,season=entry.Series.Season,episode=entry.Series.Episode,multipleSeasons=entry.Series.MultipleSeasons,multipleEpisodes=entry.Series.MultipleEpisodes,englishAudio=SearchLanguage.EnglishAudioRank(entry)>=2,russianAudio=RussianAudio.Rank(entry)>=2,russianDub=RussianAudio.Rank(entry)==3,qualityLabel=ReleaseQuality.Label(entry),gameKind=games?GameReleaseInfo.Kind(entry):null,gameGroup=games?GameReleaseInfo.Group(entry):null,gameVersion=games?GameReleaseInfo.Version(entry):null};
         }).ToArray();
     }
-    object Downloads()=>new{items=downloads.Items.OrderByDescending(x=>x.AddedUtc).Select(item=>new{id=item.Id,title=item.DisplayName,releaseTitle=item.Name,poster=item.ImageUrl,progress=item.Progress,status=AppLanguage.T(item.Status),hint=AppLanguage.T(item.Hint),paused=item.Paused,complete=item.Completed,missing=item.FilesMissing,lowSpace=item.LowSpacePaused,downloadRate=item.DownloadRate,uploadRate=item.UploadRate,totalBytes=item.TotalBytes,addedUtc=item.AddedUtc,folder=item.Folder,mediaId=DownloadMetadata.Card(item) is {} media?Remember([media])[0].id:null,canUpdateRelease=item.CanUpdateRelease,peers=item.PeersText,files=item.Files.Count})};
-    object Settings()=>new{prefs.Folder,prefs.FolderConfigured,prefs.UiLanguage,prefs.Light,prefs.LiteMode,prefs.AutoResumeDownloads,prefs.AutoRecoverDownloads,prefs.NotifyDownloads,prefs.CheckForUpdates,prefs.AutoUpdate,prefs.HidePoorQuality,prefs.MinimumReleaseHeight,prefs.MaxDownloadKbps,prefs.MaxUploadKbps,prefs.LanEnabled,prefs.DownloadSort,hidden=prefs.HiddenTitles.Select(x=>new{id=x.Identity,title=x.Title}),hiddenGenres=prefs.HiddenGenres,savedIds=prefs.LiveFavorites.Select(Key)};
+    object Downloads()=>new{items=downloads.Items.OrderByDescending(x=>x.AddedUtc).Select(item=>new{id=item.Id,title=item.DisplayName,releaseTitle=item.Name,poster=item.ImageUrl,progress=item.Progress,status=AppLanguage.T(item.Status),hint=AppLanguage.T(item.Hint),paused=item.Paused,complete=item.Completed,missing=item.FilesMissing,lowSpace=item.LowSpacePaused,downloadRate=item.DownloadRate,uploadRate=item.UploadRate,totalBytes=item.TotalBytes,addedUtc=item.AddedUtc,folder=item.Folder,mediaId=DownloadMetadata.Card(item) is {} media?Remember([media])[0].id:null,canUpdateRelease=item.CanUpdateRelease,peers=item.PeersText,files=item.Files.Count,statusKind=item.StatusKind.ToString().ToLowerInvariant(),remaining=AppLanguage.T(item.Remaining),indeterminate=item.Indeterminate})};
+    object Settings()=>new{prefs.Folder,prefs.FolderConfigured,prefs.UiLanguage,prefs.Light,prefs.LiteMode,prefs.AutoResumeDownloads,prefs.AutoRecoverDownloads,prefs.NotifyDownloads,prefs.CheckForUpdates,prefs.AutoUpdate,prefs.HidePoorQuality,prefs.MinimumReleaseHeight,prefs.MaxDownloadKbps,prefs.MaxUploadKbps,prefs.LanEnabled,prefs.DownloadSort,prefs.HomeCountry,hidden=prefs.HiddenTitles.Select(x=>new{id=x.Identity,title=x.Title}),hiddenGenres=prefs.HiddenGenres,savedIds=prefs.LiveFavorites.Select(Key)};
     async Task<object> SetSettings(JsonElement p,CancellationToken ct)
     {
         if(p.TryGetProperty("uiLanguage",out var language)){prefs.UiLanguage=AppLanguage.Normalize(language.GetString());AppLanguage.Set(prefs.UiLanguage);groups.Clear();}
@@ -311,6 +318,7 @@ sealed class DesktopEngine:IAsyncDisposable
         if(p.TryGetProperty("maxDownloadKbps",out var down))prefs.MaxDownloadKbps=Math.Max(0,down.GetInt32());
         if(p.TryGetProperty("maxUploadKbps",out var up))prefs.MaxUploadKbps=Math.Max(0,up.GetInt32());
         if(p.TryGetProperty("downloadSort",out var downloadSort)&&new[]{"newest","name","speed","size","progress"}.Contains(downloadSort.GetString()))prefs.DownloadSort=downloadSort.GetString()!;
+        if(p.TryGetProperty("homeCountry",out var homeCountry)&&homeCountry.ValueKind==JsonValueKind.String){var previousHome=prefs.HomeCountry;prefs.HomeCountry=CatalogRegions.HomeCountry(homeCountry.GetString());if(prefs.HomeCountry!=previousHome)groups.Clear();}
         if(p.TryGetProperty("hiddenGenres",out var hidden))prefs.HiddenGenres=hidden.Deserialize<HashSet<string>>(Json)??[];
         if(p.TryGetProperty("lanEnabled",out var enabled)){prefs.LanEnabled=enabled.GetBoolean();if(prefs.LanEnabled)await EnsureLan(ct);else if(lan!=null){await lan.DisposeAsync();lan=null;}}
         await downloads.SetLimitsAsync(prefs.MaxDownloadKbps,prefs.MaxUploadKbps);prefs.Save();Event("personal",Settings());return Settings();
@@ -406,7 +414,7 @@ sealed class DesktopEngine:IAsyncDisposable
     CardView CardDto(MediaItem item)
     {
         ApplyKnownQuality(item);
-        return new(Key(item),item.DisplayTitle,item.Section=="Игры"?"games":item.Section=="Сериалы"?"series":"movies",item.Year,item.CardRating,item.DisplayImageUrl??(prefs.UiLanguage=="en"?null:item.ImageUrl),item.DisplayDescription??"",item.CardGenre,item.HasPosterQuality?item.PosterQuality:null,IsSaved(item),item.Section=="Игры"?"Windows":null,item.Store);
+        return new(Key(item),item.DisplayTitle,item.Section=="Игры"?"games":item.Section=="Сериалы"?"series":"movies",item.Year,item.CardRating,item.DisplayImageUrl??(prefs.UiLanguage=="en"?null:item.ImageUrl),item.DisplayDescription??"",item.CardGenre,item.HasPosterQuality?item.PosterQuality:null,IsSaved(item),item.Section=="Игры"?"Windows":null,item.Store,item.KpAvailable?item.KpValue:null,item.ImdbAvailable?item.ImdbValue:null,item.CardRatingSource);
     }
     MediaItem Card(string id)=>cards.GetValueOrDefault(id)??throw new KeyNotFoundException("Карточка устарела. Обнови страницу.");
     DownloadItem Download(string id)=>downloads.Items.Single(item=>item.Id==id);
@@ -424,4 +432,4 @@ sealed class DesktopEngine:IAsyncDisposable
         await downloads.Close();prefs.Save();source.Dispose();lifetime.Dispose();
     }
 }
-sealed record CardView(string id,string title,string section,int year,string rating,string? poster,string description,string genre,string? quality,bool saved,string? platform,GameStoreInfo? store);
+sealed record CardView(string id,string title,string section,int year,string rating,string? poster,string description,string genre,string? quality,bool saved,string? platform,GameStoreInfo? store,string? kp,string? imdb,string? ratingSource);

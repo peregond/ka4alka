@@ -1,0 +1,105 @@
+{
+  "minimumChecks": 100,
+  "patterns": [
+    "^Native SwiftUI application launches its packaged shared engine$",
+    "^Engine is connected within 20 s of the process start$",
+    "^The active surface variant is recorded: (glass|material|solid)$",
+    "^\\[ru/dark\\] Featured resolves real bundled catalog membership$",
+    "^\\[ru/dark\\] Movie catalog loads from the shared snapshot$",
+    "^\\[ru/dark\\] Series catalog is available through the same engine$",
+    "^\\[ru/dark\\] The Windows game catalog uses real Steam entries on macOS$",
+    "^\\[ru/dark\\] Saved titles use the shared preference engine$",
+    "^\\[ru/dark\\] The Saved page lists the saved title$",
+    "^\\[ru/dark\\] Back preserves the catalog route$",
+    "^\\[ru/dark\\] The first-run folder sheet opens$",
+    "^\\[ru/dark\\] The folder sheet closes$",
+    "^\\[ru/dark\\] The add-torrent sheet opens$",
+    "^\\[ru/dark\\] The add-torrent sheet has an editable link field$",
+    "^\\[ru/dark\\] The add-torrent sheet closes$",
+    "^\\[en/light\\] Featured resolves real bundled catalog membership$",
+    "^\\[en/light\\] Featured labels use authored English translations$",
+    "^\\[ru/dark \\d+x\\d+\\] toolbar: toolbar\\.add is visible and not clipped by its native host$",
+    "^\\[ru/dark \\d+x\\d+\\] toolbar: the search field is visible, inside the window and large enough$",
+    {
+      "pattern": "^\\[ru/dark \\d+x\\d+\\] movies: spotlight banner has a complete native layout$",
+      "min": 4
+    },
+    {
+      "pattern": "^\\[ru/dark \\d+x\\d+\\] series: spotlight banner is visible at the top of the catalog$",
+      "min": 4
+    },
+    {
+      "pattern": "^\\[ru/dark \\d+x\\d+\\] settings: all settings cards fit horizontally$",
+      "min": 4
+    },
+    {
+      "pattern": "^\\[ru/dark \\d+x\\d+\\] settings: the full settings header is visible below the toolbar$",
+      "min": 4
+    },
+    {
+      "pattern": "^\\[ru/dark \\d+x\\d+\\] settings: final settings section is reachable by scrolling$",
+      "min": 4
+    },
+    {
+      "pattern": "^\\[en/light \\d+x\\d+\\] settings: all settings cards fit horizontally$",
+      "min": 3
+    },
+    {
+      "pattern": "^\\[en/light \\d+x\\d+\\] settings: final settings section is reachable by scrolling$",
+      "min": 3
+    },
+    {
+      "pattern": "^\\[ru/dark \\d+x\\d+\\] downloads: queue rows are stacked without overlapping$",
+      "min": 4
+    },
+    {
+      "pattern": "^\\[ru/dark \\d+x\\d+\\] settings: the cards appear in the declared order$",
+      "min": 4
+    },
+    "^perf: resident memory stays under 600 MB$",
+    "^The layout matrix produced measurements \\(\\d+ cells\\)$"
+  ],
+  "matrix": {
+    "combinations": [
+      {
+        "language": "ru",
+        "theme": "dark",
+        "sizes": [
+          "760x520",
+          "1000x700",
+          "1280x820",
+          "1920x1080"
+        ]
+      },
+      {
+        "language": "en",
+        "theme": "light",
+        "sizes": [
+          "760x520",
+          "1280x820",
+          "1920x1080"
+        ]
+      }
+    ],
+    "requiredPages": [
+      "featured",
+      "movies",
+      "series",
+      "games-grid",
+      "saved",
+      "downloads-empty",
+      "downloads-queue",
+      "settings",
+      "folder-sheet",
+      "add-sheet"
+    ],
+    "optionalPages": [
+      "games-home",
+      "detail-movie",
+      "detail-series",
+      "detail-game",
+      "person",
+      "award"
+    ]
+  }
+}

@@ -68,6 +68,336 @@ final class PlatformTests: XCTestCase {
     }
 }
 
+// MARK: Decoding of the engine contract
+
+final class ModelDecodingTests: XCTestCase {
+    func testTransferWithNullTotalBytesAndNoStatusKind() throws {
+        let json = #"{"id":"t1","title":"Фильм","releaseTitle":"Film.2026","progress":12.5,"status":"Качается","hint":"","paused":false,"complete":false,"missing":false,"lowSpace":false,"downloadRate":1000,"uploadRate":0,"totalBytes":null,"addedUtc":"2026-10-01T10:00:00Z","folder":"/tmp","mediaId":null,"canUpdateRelease":false,"peers":"3","files":1}"#
+        let item = try TestFixtures.decode(Transfer.self, json)
+        XCTAssertNil(item.totalBytes)
+        XCTAssertNil(item.statusKind)
+        XCTAssertNil(item.remaining)
+        XCTAssertNil(item.indeterminate)
+        XCTAssertTrue(item.isActive)
+    }
+    func testTransferNeedsOnlyAnIdentifier() throws {
+        let item = try TestFixtures.decode(Transfer.self, #"{"id":"only"}"#)
+        XCTAssertEqual(item.id, "only")
+        XCTAssertEqual(item.title, "")
+        XCTAssertEqual(item.progress, 0)
+        XCTAssertFalse(item.paused)
+        XCTAssertNil(item.totalBytes)
+    }
+    func testTransferWrongTypesFallBackToDefaults() throws {
+        let item = try TestFixtures.decode(Transfer.self, #"{"id":"x","progress":"oops","paused":"no","files":"many","totalBytes":"big"}"#)
+        XCTAssertEqual(item.progress, 0)
+        XCTAssertFalse(item.paused)
+        XCTAssertEqual(item.files, 0)
+        XCTAssertNil(item.totalBytes)
+    }
+    func testQueueSurvivesOneBrokenItem() throws {
+        let result = try TestFixtures.decode(DownloadResult.self, #"{"items":[{"id":"a"},{"id":"b","progress":"oops","statusKind":"error"},{"id":"c","totalBytes":null}]}"#)
+        XCTAssertEqual(result.items.map { $0.id }, ["a", "b", "c"])
+        XCTAssertFalse(result.items[1].isActive)
+        XCTAssertTrue(result.items[2].isActive)
+    }
+    func testMediaCardWithBothRatings() throws {
+        let card = try TestFixtures.decode(MediaCard.self, TestFixtures.cardJSON(id: "movies:a", title: "A", extra: #","kp":"8.1","imdb":"7.9","ratingSource":"Кинопоиск""#))
+        XCTAssertEqual(card.ratings.count, 2)
+        XCTAssertEqual(card.ratings[0].source, KDRatingSource.kinopoisk)
+        XCTAssertEqual(card.ratings[0].value, "8.1")
+        XCTAssertEqual(card.ratings[1].source, KDRatingSource.imdb)
+        XCTAssertEqual(card.ratings[1].value, "7.9")
+    }
+    func testMediaCardWithoutRatingFieldsStillDecodes() throws {
+        let card = try TestFixtures.card("movies:b", "B")
+        XCTAssertNil(card.kp); XCTAssertNil(card.imdb); XCTAssertNil(card.ratingSource)
+        XCTAssertEqual(card.ratings.count, 1)
+        XCTAssertEqual(card.ratings[0].value, "7.8")
+    }
+    func testSingleRatingKeepsItsSource() throws {
+        let card = try TestFixtures.decode(MediaCard.self, TestFixtures.cardJSON(id: "movies:c", title: "C", extra: #","ratingSource":"IMDb""#))
+        XCTAssertEqual(card.ratings.count, 1)
+        XCTAssertEqual(card.ratings[0].source, KDRatingSource.imdb)
+    }
+    func testUnusableRatingsAreHidden() throws {
+        let card = try TestFixtures.decode(MediaCard.self, #"{"id":"movies:d","title":"D","section":"movies","year":2024,"rating":"—","poster":null,"description":"","genre":"","quality":null,"saved":false,"platform":null,"kp":"","imdb":"—"}"#)
+        XCTAssertTrue(card.ratings.isEmpty)
+    }
+    func testStoreCardWithSoonAndReviewTone() throws {
+        let card = try TestFixtures.decode(MediaCard.self, TestFixtures.cardJSON(id: "games:a", title: "G", section: "games", extra: #","store":{"price":"","originalPrice":"","discount":0,"free":false,"reviewPercent":0,"soon":true,"soonLabel":"Скоро","released":"2027","reviewTone":"mixed","reviewLabel":"Смешанные","reviewCount":120}"#))
+        XCTAssertEqual(card.store?.soon, true)
+        XCTAssertEqual(card.store?.reviewTone, "mixed")
+        XCTAssertEqual(card.store?.reviewCount, 120)
+        let plain = try TestFixtures.decode(MediaCard.self, TestFixtures.cardJSON(id: "games:b", title: "G2", section: "games", extra: #","store":{"price":"1","originalPrice":"","discount":0,"free":false,"reviewPercent":50}"#))
+        XCTAssertNil(plain.store?.soon)
+        XCTAssertNil(plain.store?.reviewTone)
+    }
+    func testReleaseRowWithoutRussianDub() throws {
+        let plain = try TestFixtures.decode(ReleaseRow.self, TestFixtures.releaseJSON(id: "r1", title: "T"))
+        XCTAssertNil(plain.russianDub)
+        XCTAssertNil(plain.qualityLabel)
+        let marked = try TestFixtures.decode(ReleaseRow.self, TestFixtures.releaseJSON(id: "r2", title: "T", extra: #","russianDub":true,"qualityLabel":"Full HD""#))
+        XCTAssertEqual(marked.russianDub, true)
+        XCTAssertEqual(marked.qualityLabel, "Full HD")
+    }
+    func testDetailAndSettingsExtrasAreOptional() throws {
+        let card: String = TestFixtures.cardJSON(id: "movies:e", title: "E")
+        let bare = try TestFixtures.decode(DetailResult.self, "{\"item\":" + card + ",\"people\":[],\"awards\":[]}")
+        XCTAssertNil(bare.originalTitle); XCTAssertNil(bare.resolutions)
+        let full = try TestFixtures.decode(DetailResult.self, "{\"item\":" + card + ",\"people\":[],\"awards\":[],\"originalTitle\":\"E\",\"genres\":\"драма\",\"country\":\"США\",\"resolutions\":[2160,1080]}")
+        XCTAssertEqual(full.resolutions ?? [], [2160, 1080])
+        let settings = try TestFixtures.decode(AppSettings.self, TestFixtures.settingsJSON)
+        XCTAssertNil(settings.homeCountry)
+        let withCountry = TestFixtures.settingsJSON.replacingOccurrences(of: "\"savedIds\":[]", with: "\"savedIds\":[],\"homeCountry\":\"rossiia\"")
+        XCTAssertEqual(try TestFixtures.decode(AppSettings.self, withCountry).homeCountry, "rossiia")
+    }
+    func testSourceStateCount() throws {
+        let sources = try TestFixtures.decode(ReleaseResult.self, #"{"items":[],"complete":true,"sources":[{"name":"A","state":"Ready","count":12},{"name":"B","state":"Empty"}]}"#)
+        XCTAssertEqual(sources.sources[0].count, 12)
+        XCTAssertNil(sources.sources[1].count)
+    }
+    func testDecoderResynchronisesAfterAnOversizedMessage() {
+        final class Received: @unchecked Sendable { var lines: [Data] = []; var errors: [String] = [] }
+        let received = Received()
+        let decoder = PipeMessageDecoder(limit: 32, onMessage: { received.lines.append($0) }, onError: { received.errors.append($0) })
+        XCTAssertFalse(decoder.consume(Data(repeating: 65, count: 40)))
+        XCTAssertEqual(received.errors.count, 1)
+        XCTAssertTrue(decoder.consume(Data("rest of the big message\n".utf8)))
+        XCTAssertTrue(decoder.consume(Data("{\"ok\":1}\n".utf8)))
+        XCTAssertEqual(received.lines.count, 1)
+        XCTAssertEqual(String(data: received.lines[0], encoding: .utf8), "{\"ok\":1}")
+        XCTAssertFalse(decoder.consume(Data(repeating: 66, count: 40) + Data("\n".utf8)))
+        XCTAssertTrue(decoder.consume(Data("{\"ok\":2}\n".utf8)))
+        XCTAssertEqual(received.lines.count, 2)
+        XCTAssertEqual(received.errors.count, 2)
+    }
+}
+
+// MARK: State machine of the model (no engine)
+
+@MainActor final class ModelLogicTests: XCTestCase {
+    private func makeModel() -> AppModel {
+        let model = AppModel()
+        model.bridge.disabled = true
+        return model
+    }
+
+    func testSelectClearsContextOnSectionChange() throws {
+        let model = makeModel()
+        model.select(.movies)
+        model.filter.genre = "drama"
+        model.page = 3
+        model.submittedQuery = "матрица"
+        model.query = "матрица"
+        model.select(.series)
+        XCTAssertEqual(model.section, Section.series)
+        XCTAssertEqual(model.filter, CatalogFilter())
+        XCTAssertEqual(model.page, 1)
+        XCTAssertEqual(model.submittedQuery, "")
+        XCTAssertEqual(model.query, "")
+        XCTAssertNil(model.list)
+    }
+    func testSelectKeepsContextWhenReturningFromADetailPage() throws {
+        let model = makeModel()
+        model.select(.movies)
+        model.filter.genre = "drama"
+        model.submittedQuery = "abc"
+        model.open(try TestFixtures.card("movies:one", "One"))
+        XCTAssertEqual(model.routes.count, 2)
+        let revision = model.revision
+        model.select(.movies)
+        XCTAssertEqual(model.routes.count, 1)
+        XCTAssertEqual(model.filter.genre, "drama")
+        XCTAssertEqual(model.submittedQuery, "abc")
+        XCTAssertEqual(model.revision, revision)
+    }
+    func testSelectOnTheSectionRootResetsFilters() {
+        let model = makeModel()
+        model.select(.movies)
+        model.filter.genre = "drama"
+        model.submittedQuery = "abc"
+        let revision = model.revision
+        model.select(.movies)
+        XCTAssertEqual(model.filter, CatalogFilter())
+        XCTAssertEqual(model.submittedQuery, "")
+        XCTAssertEqual(model.revision, revision + 1)
+    }
+    func testChangingTheFilterResetsThePage() {
+        let model = makeModel()
+        model.page = 4
+        model.filter.quality = "4K"
+        XCTAssertEqual(model.page, 1)
+        model.page = 3
+        model.filter.quality = "4K"
+        XCTAssertEqual(model.page, 3, "assigning the same filter must not reset the page")
+    }
+    func testVisibleHidesOnlyHiddenCards() throws {
+        let model = makeModel()
+        let hidden = try TestFixtures.card("movies:hidden", "Hidden")
+        let poor = try TestFixtures.decode(MediaCard.self, #"{"id":"movies:poor","title":"Poor","section":"movies","year":2020,"rating":"5.0","poster":null,"description":"","genre":"","quality":"CAM","saved":false,"platform":null}"#)
+        let fine = try TestFixtures.card("movies:fine", "Fine")
+        model.hiddenCards = ["movies:hidden"]
+        XCTAssertEqual(model.visible([hidden, poor, fine]).map { $0.id }, ["movies:poor", "movies:fine"])
+    }
+    func testReleasesBelongToTheirCard() throws {
+        let model = makeModel()
+        let first = try TestFixtures.card("movies:one", "One")
+        let second = try TestFixtures.card("movies:two", "Two")
+        let row = try TestFixtures.decode(ReleaseRow.self, TestFixtures.releaseJSON(id: "r1", title: "T"))
+        model.releasesOwner = first.id
+        model.releases = [row]
+        XCTAssertEqual(model.releases(for: first).count, 1)
+        XCTAssertTrue(model.releases(for: second).isEmpty)
+        XCTAssertTrue(model.sources(for: second).isEmpty)
+    }
+    func testOpeningACardClearsTheReleasesOfThePreviousOne() throws {
+        let model = makeModel()
+        let first = try TestFixtures.card("movies:one", "One")
+        model.releasesOwner = first.id
+        model.releases = [try TestFixtures.decode(ReleaseRow.self, TestFixtures.releaseJSON(id: "r1", title: "T"))]
+        model.open(try TestFixtures.card("movies:two", "Two"))
+        XCTAssertTrue(model.releases.isEmpty)
+        XCTAssertNil(model.releasesOwner)
+    }
+    func testTransferCountsExcludePausedFinishedAndFailed() throws {
+        let store = TransferStore()
+        defer { store.items = [] }
+        let queue = #"[{"id":"a","statusKind":"downloading","downloadRate":1000,"uploadRate":50},{"id":"b","paused":true,"downloadRate":-5},{"id":"c","complete":true,"uploadRate":200},{"id":"d","statusKind":"error"},{"id":"e","totalBytes":null,"downloadRate":500}]"#
+        store.items = try TestFixtures.decode([Transfer].self, queue)
+        XCTAssertEqual(store.activeCount, 2)
+        XCTAssertEqual(store.downloadRate, 1500)
+        XCTAssertEqual(store.uploadRate, 250)
+    }
+    func testFailIgnoresCancellationAndTheDisabledEngine() {
+        let model = makeModel()
+        model.fail(CancellationError())
+        XCTAssertNil(model.error)
+        model.fail(RPCError(code: "disabled", message: "off"))
+        XCTAssertNil(model.error)
+        model.fail(RPCError(code: "boom", message: "Broken"))
+        XCTAssertEqual(model.error, "Broken")
+    }
+    func testBackNeverRemovesTheRootRoute() throws {
+        let model = makeModel()
+        model.back()
+        XCTAssertEqual(model.routes.count, 1)
+        model.open(try TestFixtures.card("movies:one", "One"))
+        model.back()
+        XCTAssertEqual(model.route, Route.section(.featured))
+    }
+}
+
+// MARK: Formatting
+
+final class FormattingTests: XCTestCase {
+    func testBytesNeverSayZeroKB() {
+        let saved = TestLanguage.current()
+        defer { TestLanguage.restore(saved) }
+        for language in ["ru", "en"] {
+            UserDefaults.standard.set(language, forKey: "UiLanguage")
+            XCTAssertFalse(KDFormat.bytes(0).lowercased().contains("zero"))
+            XCTAssertTrue(KDFormat.bytes(0).hasPrefix("0 "), KDFormat.bytes(0))
+            XCTAssertFalse(KDFormat.bytes(.infinity).isEmpty)
+            XCTAssertFalse(KDFormat.bytes(-1).isEmpty)
+        }
+    }
+    func testBytesFollowTheInterfaceLanguage() {
+        let saved = TestLanguage.current()
+        defer { TestLanguage.restore(saved) }
+        UserDefaults.standard.set("ru", forKey: "UiLanguage")
+        XCTAssertEqual(KDFormat.bytes(1_400_000_000), "1,4 ГБ")
+        XCTAssertEqual(KDFormat.bytes(512), "512 Б")
+        UserDefaults.standard.set("en", forKey: "UiLanguage")
+        XCTAssertEqual(KDFormat.bytes(1_400_000_000), "1.4 GB")
+        XCTAssertEqual(KDFormat.bytes(512), "512 B")
+    }
+    func testPercentFloorsInsteadOfRounding() {
+        let saved = TestLanguage.current()
+        defer { TestLanguage.restore(saved) }
+        UserDefaults.standard.set("en", forKey: "UiLanguage")
+        XCTAssertEqual(KDFormat.percent(99.96), "99%")
+        XCTAssertEqual(KDFormat.percent(100), "100%")
+        XCTAssertEqual(KDFormat.percent(-3), "0%")
+        XCTAssertEqual(KDFormat.percent(.nan), "0%")
+        XCTAssertEqual(KDFormat.percent(42.78, fractionDigits: 1), "42.7%")
+    }
+    func testMastheadDateStartsWithACapital() {
+        let saved = TestLanguage.current()
+        defer { TestLanguage.restore(saved) }
+        let noon = Date(timeIntervalSince1970: 1_792_000_000)
+        for language in ["ru", "en"] {
+            UserDefaults.standard.set(language, forKey: "UiLanguage")
+            let text = KDFormat.mastheadDate(noon)
+            XCTAssertFalse(text.isEmpty)
+            if let first = text.first { XCTAssertTrue(first.isUppercase, text) }
+        }
+    }
+}
+
+// MARK: Localisation lint (reads the sources)
+
+final class LocalizationLintTests: XCTestCase {
+    /// Russian-only words that are chosen by hand next to an English branch (plural forms, units, matching keys).
+    private let allowedLiterals: Set<String> = [
+        "Русский", "Не указано", "КП", "кп", "кино", "Б", "КБ", "МБ", "ГБ", "ТБ", "Актёры", "Режиссёры", "Операторы", "-е",
+        "название", "названия", "названий", "загрузка", "загрузки", "загрузок", "Пауза", "Продолжить", "[А-Яа-яЁё]"
+    ]
+    private func literalExpression() throws -> NSRegularExpression {
+        return try NSRegularExpression(pattern: "\"((?:[^\"\\\\\\n]|\\\\.)*)\"")
+    }
+    func testNoCyrillicLiteralOutsideTr() throws {
+        let literal = try literalExpression()
+        var offenders: [String] = []
+        for file in try TestSources.swiftFiles() {
+            var number = 0
+            for line in file.text.components(separatedBy: "\n") {
+                number += 1
+                if line.trimmingCharacters(in: .whitespaces).hasPrefix("//") { continue }
+                let ns = line as NSString
+                for match in literal.matches(in: line, range: NSRange(location: 0, length: ns.length)) {
+                    let text = ns.substring(with: match.range(at: 1))
+                    if !SmokeText.hasCyrillic(text) || allowedLiterals.contains(text) { continue }
+                    let before = ns.substring(to: match.range.location).trimmingCharacters(in: .whitespaces)
+                    if before.hasSuffix("tr(") { continue }
+                    offenders.append(file.name + ":" + String(number) + " " + text)
+                }
+            }
+        }
+        XCTAssertTrue(offenders.isEmpty, "Russian text that bypasses tr(\"ru\", \"en\"):\n" + offenders.joined(separator: "\n"))
+    }
+    func testTwoArgumentTrHasARealEnglishText() throws {
+        let literal = "\"((?:[^\"\\\\\\n]|\\\\.)*)\""
+        let expression = try NSRegularExpression(pattern: "\\btr\\(\\s*" + literal + "\\s*,\\s*" + literal + "\\s*\\)")
+        var offenders: [String] = []
+        for file in try TestSources.swiftFiles() {
+            let ns = file.text as NSString
+            for match in expression.matches(in: file.text, range: NSRange(location: 0, length: ns.length)) {
+                let russian = ns.substring(with: match.range(at: 1))
+                let english = ns.substring(with: match.range(at: 2))
+                if english.trimmingCharacters(in: .whitespaces).isEmpty { offenders.append(file.name + ": empty English text for " + russian) }
+                if SmokeText.hasCyrillic(english) { offenders.append(file.name + ": Cyrillic English text " + english) }
+                if !SmokeText.hasCyrillic(russian) { offenders.append(file.name + ": the Russian text has no Cyrillic: " + russian) }
+            }
+        }
+        XCTAssertTrue(offenders.isEmpty, offenders.joined(separator: "\n"))
+    }
+    func testOneArgumentTrIsInTheEnglishDictionary() throws {
+        let data = try Data(contentsOf: TestSources.repository.appendingPathComponent("native/Localization/en.json"))
+        let dictionary = try JSONDecoder().decode([String: String].self, from: data)
+        let expression = try NSRegularExpression(pattern: "\\btr\\(\\s*\"((?:[^\"\\\\\\n]|\\\\.)*)\"\\s*\\)")
+        var missing: [String] = []
+        for file in try TestSources.swiftFiles() {
+            let ns = file.text as NSString
+            for match in expression.matches(in: file.text, range: NSRange(location: 0, length: ns.length)) {
+                let russian = ns.substring(with: match.range(at: 1))
+                if SmokeText.hasCyrillic(russian) && dictionary[russian] == nil { missing.append(file.name + ": " + russian) }
+            }
+        }
+        XCTAssertTrue(missing.isEmpty, "tr() with one argument needs an entry in native/Localization/en.json:\n" + missing.joined(separator: "\n"))
+    }
+}
+
 final class MacInstallationTests: XCTestCase {
     func testVerifiedApplicationReplacement() throws {
         guard let sourcePath = ProcessInfo.processInfo.environment["KACHALKA_TEST_APP"] else { throw XCTSkip("A signed packaged application is required") }
@@ -174,4 +504,67 @@ final class MacInstallationTests: XCTestCase {
         try runTool("/usr/bin/codesign", ["--verify", "--deep", "--strict", installed.path])
     }
 
+}
+
+// MARK: Audio menu compatibility with the shared engine
+
+final class ReleaseAudioFilterTests: XCTestCase {
+    private func row(_ id: String, studio: String, audio: String, group: String? = nil) throws -> ReleaseRow {
+        let data = Data(TestFixtures.releaseJSON(id: id, title: id).utf8)
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        json["studios"] = [studio]
+        json["audioTypes"] = [audio]
+        if let group { json["gameGroup"] = group }
+        return try JSONDecoder().decode(ReleaseRow.self, from: JSONSerialization.data(withJSONObject: json))
+    }
+
+    func testAudioTypeAndStudioCombineAndResetIndependently() throws {
+        let rows = [
+            try row("flarrow-dub", studio: "Flarrow Films", audio: "Дубляж"),
+            try row("rezka-dub", studio: "HDrezka Studio", audio: "Дубляж"),
+            try row("flarrow-voice", studio: "Flarrow Films", audio: "Многоголосая"),
+            try row("original", studio: "", audio: "Оригинал")
+        ]
+        var filters = DetailReleaseFilters()
+        filters.audio = "Дубляж"
+        filters.studio = "Flarrow Films"
+        XCTAssertEqual(filters.arrange(rows).map(\.id), ["flarrow-dub"])
+        filters.studio = ""
+        XCTAssertEqual(filters.arrange(rows).map(\.id), ["flarrow-dub", "rezka-dub"])
+        filters.studio = "Flarrow Films"
+        filters.audio = ""
+        XCTAssertEqual(filters.arrange(rows).map(\.id), ["flarrow-dub", "flarrow-voice"])
+        filters.audio = "Оригинал"
+        XCTAssertTrue(filters.arrange(rows).isEmpty)
+        filters = DetailReleaseFilters()
+        XCTAssertEqual(filters.arrange(rows).count, rows.count)
+        XCTAssertTrue(filters.isDefault)
+    }
+
+    func testMainAudioChoicesAndOptionalTypesComeFromAvailableTracks() throws {
+        let rows = [
+            try row("dub", studio: "Flarrow Films", audio: "Дубляж"),
+            try row("voice", studio: "HDrezka Studio", audio: "Многоголосая"),
+            try row("original", studio: "", audio: "Оригинал")
+        ]
+        let facets = DetailReleaseFacets(rows: rows, season: 0)
+        XCTAssertEqual(facets.primaryAudioTypes, ["Дубляж", "Оригинал"])
+        XCTAssertEqual(facets.otherAudioTypes, ["Многоголосая"])
+        XCTAssertEqual(facets.studios, ["Flarrow Films", "HDrezka Studio"])
+        let partial = DetailReleaseFacets(rows: [rows[0]], season: 0)
+        XCTAssertEqual(partial.primaryAudioTypes, ["Дубляж"])
+        XCTAssertTrue(partial.otherAudioTypes.isEmpty)
+    }
+
+    func testGamesKeepReleaseGroupSelection() throws {
+        let rows = [
+            try row("game-a", studio: "", audio: "", group: "FitGirl"),
+            try row("game-b", studio: "", audio: "", group: "DODI")
+        ]
+        let facets = DetailReleaseFacets(rows: rows, season: 0)
+        XCTAssertEqual(facets.gameGroups, ["DODI", "FitGirl"])
+        var filters = DetailReleaseFilters()
+        filters.studio = "FitGirl"
+        XCTAssertEqual(filters.arrange(rows).map(\.id), ["game-a"])
+    }
 }

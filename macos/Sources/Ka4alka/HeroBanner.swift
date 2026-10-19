@@ -4,41 +4,61 @@ import SwiftUI
 /// A single visible hero uses the same bounded artwork cache as poster cards.
 /// No timer preloads the remaining slides or redraws the catalog while scrolling.
 struct CatalogSpotlightView: View {
-    static let reservedHeight: CGFloat = 348
     var items: [MediaCard]
     @State private var selectedID: String?
     private var selected: MediaCard? { items.first { $0.id == selectedID } ?? items.first }
 
     var body: some View {
         if let selected {
-            VStack(spacing: 12) {
-                FeaturedHero(card: selected, eyebrow: tr("В центре внимания", "In the spotlight"))
+            VStack(spacing: CatalogHeroMetrics.pagerGap) {
+                FeaturedHero(card: selected, eyebrow: eyebrow(for: selected))
                     .id(selected.id)
-                if items.count > 1 {
-                    HStack(spacing: 8) {
-                        ForEach(items) { item in
-                            Button { selectedID = item.id } label: {
-                                Capsule().fill(item.id == selected.id ? Color.accentColor : Color.secondary.opacity(0.25))
-                                    .frame(width: item.id == selected.id ? 24 : 7, height: 7)
-                                    .padding(.vertical, 7)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(item.title)
-                            .accessibilityValue(item.id == selected.id ? tr("Выбрано", "Selected") : "")
-                        }
-                        Spacer()
-                        Button { advance(-1) } label: { Image(systemName: "chevron.left") }
-                            .help(tr("Предыдущий баннер", "Previous banner"))
-                            .accessibilityLabel(tr("Предыдущий баннер", "Previous banner"))
-                        Button { advance(1) } label: { Image(systemName: "chevron.right") }
-                            .help(tr("Следующий баннер", "Next banner"))
-                            .accessibilityLabel(tr("Следующий баннер", "Next banner"))
-                    }.controlSize(.small)
-                }
+                if items.count > 1 { pager(selected: selected) }
             }
-            .frame(height: Self.reservedHeight, alignment: .top)
+            .onKeyPress(keys: [.leftArrow, .rightArrow]) { (press: KeyPress) -> KeyPress.Result in
+                if !press.modifiers.isEmpty { return .ignored }
+                advance(press.key == .leftArrow ? -1 : 1)
+                return .handled
+            }
             .accessibilityIdentifier("catalog-spotlight")
         }
+    }
+
+    private func eyebrow(for card: MediaCard) -> String {
+        if card.section == "games" { return tr("Стоит поиграть", "Worth playing") }
+        if items.first?.id == card.id { return tr("В центре внимания", "In the spotlight") }
+        return tr("Стоит посмотреть", "Worth watching")
+    }
+
+    private func pager(selected: MediaCard) -> some View {
+        HStack(spacing: 0) {
+            dots(selected: selected)
+            Spacer(minLength: KD.Space.s)
+            KDIconButton(systemImage: "chevron.backward", label: tr("Предыдущий баннер", "Previous banner")) { advance(-1) }
+            KDIconButton(systemImage: "chevron.forward", label: tr("Следующий баннер", "Next banner")) { advance(1) }
+        }
+    }
+
+    private func dots(selected: MediaCard) -> some View {
+        HStack(spacing: 0) {
+            ForEach(items) { item in dot(item, isSelected: item.id == selected.id) }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(tr("Баннеры", "Banners"))
+    }
+
+    private func dot(_ item: MediaCard, isSelected: Bool) -> some View {
+        Button { selectedID = item.id } label: {
+            Capsule()
+                .fill(isSelected ? KDPalette.accent : Color.primary.opacity(0.35))
+                .frame(width: isSelected ? 24 : 8, height: 8)
+                .frame(minWidth: KD.Size.minHit, minHeight: KD.Size.minHit)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(item.title)
+        .accessibilityLabel(item.title)
+        .accessibilityAddTraits(isSelected ? AccessibilityTraits.isSelected : AccessibilityTraits())
     }
 
     private func advance(_ delta: Int) {
@@ -48,17 +68,12 @@ struct CatalogSpotlightView: View {
     }
 }
 
+/// The dark banner base with shimmering lines, drawn while the first page is loading.
 struct HeroPlaceholder: View {
+    @State private var width: CGFloat = 0
     var body: some View {
-        RoundedRectangle(cornerRadius: 22, style: .continuous)
-            .fill(LinearGradient(colors: [Color.accentColor.opacity(0.16), Color.primary.opacity(0.04)], startPoint: .topLeading, endPoint: .bottomTrailing))
-            .overlay(alignment: .bottomLeading) {
-                VStack(alignment: .leading, spacing: 12) {
-                    RoundedRectangle(cornerRadius: 5).fill(.quaternary).frame(width: 110, height: 12)
-                    RoundedRectangle(cornerRadius: 7).fill(.quaternary).frame(maxWidth: 280).frame(height: 30)
-                    RoundedRectangle(cornerRadius: 5).fill(.quaternary).frame(width: 150, height: 13)
-                }.padding(28)
-            }.accessibilityHidden(true)
+        KDHeroSkeleton(height: CatalogHeroMetrics.height(forWidth: width > 0 ? width : 900))
+            .kdReadWidth($width)
     }
 }
 
@@ -68,44 +83,26 @@ struct FeaturedHero: View {
     var eyebrow: String? = nil
     @State private var backdrop: String?
     @State private var localized: MediaCard?
+    @State private var width: CGFloat = 0
     private var item: MediaCard { model.settings?.uiLanguage == "en" ? localized ?? card : card }
     private var lite: Bool { model.settings?.liteMode == true }
     private var requestID: String { card.id + ":" + (model.settings?.uiLanguage ?? "ru") }
+    private var heroHeight: CGFloat { CatalogHeroMetrics.height(forWidth: width > 0 ? width : 900) }
+    private var saved: Bool { model.isSaved(card) }
+    private var saveTitle: String { saved ? tr("Удалить из сохранённого", "Remove from Saved") : tr("Сохранить", "Save") }
+    private var heroShape: RoundedRectangle { RoundedRectangle(cornerRadius: KD.Radius.hero, style: .continuous) }
 
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .bottomLeading) {
-                Button { model.open(item) } label: {
-                    ZStack(alignment: .bottomLeading) {
-                        HeroBackground(poster: item.poster, backdrop: backdrop, lite: lite)
-                            .frame(width: geometry.size.width, height: geometry.size.height)
-                        LinearGradient(colors: [.black.opacity(0.05), .black.opacity(0.78)], startPoint: .top, endPoint: .bottom)
-                        LinearGradient(colors: [.black.opacity(0.55), .clear], startPoint: .leading, endPoint: .trailing)
-                        heroText(compact: geometry.size.width < 580)
-                            .frame(maxWidth: min(geometry.size.width - 48, 640), alignment: .leading)
-                            .padding(24).padding(.bottom, 54)
-                    }
-                    .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-                }.buttonStyle(.plain)
-                    .accessibilityLabel(item.title + ", " + tr("Подробнее", "Details"))
-                    .accessibilityIdentifier("hero-open")
-                HStack(spacing: 10) {
-                    Button { model.open(item) } label: { Label(tr("Подробнее", "Details"), systemImage: "info.circle") }
-                        .buttonStyle(.borderedProminent)
-                    Button { Task { await model.save(card) } } label: {
-                        Image(systemName: model.isSaved(card) ? "heart.fill" : "heart")
-                            .foregroundStyle(model.isSaved(card) ? .pink : .white)
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(.white)
-                    .help(model.isSaved(card) ? tr("Удалить из сохранённого", "Remove from Saved") : tr("Сохранить", "Save"))
-                    .accessibilityLabel(model.isSaved(card) ? tr("Удалить из сохранённого", "Remove from Saved") : tr("Сохранить", "Save"))
-                }.controlSize(.large).padding(24)
+                openButton(size: geometry.size)
+                actionRow
             }
-            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .overlay { RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(.white.opacity(0.12), lineWidth: 1).allowsHitTesting(false) }
+            .kdOnBanner()
         }
-        .frame(height: 300)
+        .frame(height: heroHeight)
+        .kdReadWidth($width)
+        .settingsLayoutProbe("catalog.hero")
         .task(id: requestID) {
             backdrop = nil
             let result = try? await model.bridge.call("artwork", ["id": .string(card.id)])
@@ -117,24 +114,108 @@ struct FeaturedHero: View {
         .task(id: "localized-" + requestID) {
             localized = nil
             if model.settings?.uiLanguage == "en", card.section != "games" {
-                let result = try? await model.bridge.call("localizedCard", ["id": .string(card.id)], as: MediaCard.self)
+                let result = await catalogLocalizedCard(card, bridge: model.bridge)
                 if !Task.isCancelled { localized = result }
             }
         }
     }
 
-    private func heroText(compact: Bool) -> some View {
+    // MARK: Pieces
+
+    private func openButton(size: CGSize) -> some View {
+        Button { model.open(item) } label: { bannerFace(size: size) }
+            .buttonStyle(KDPosterButtonStyle(radius: KD.Radius.hero))
+            .accessibilityLabel(accessibilityTitle)
+            .accessibilityIdentifier("hero-open")
+    }
+
+    private func bannerFace(size: CGSize) -> some View {
+        ZStack(alignment: .bottomLeading) {
+            HeroBackground(
+                poster: item.poster,
+                backdrop: backdrop,
+                lite: lite,
+                imageWidth: CatalogHeroMetrics.backdropWidth(forWidth: size.width, lite: lite)
+            )
+            .frame(width: size.width, height: size.height)
+            KDBannerScrim()
+            heroText(compact: size.width < 580, descriptionLines: size.height >= 330 ? 3 : 2)
+                .frame(maxWidth: max(120, min(size.width - 48, 640)), alignment: .leading)
+                .padding(24)
+                .padding(.bottom, 54)
+        }
+        .frame(width: size.width, height: size.height)
+        .clipShape(heroShape)
+        .overlay(heroShape.strokeBorder(Color.white.opacity(0.12), lineWidth: 1).allowsHitTesting(false))
+        .contentShape(heroShape)
+    }
+
+    private var accessibilityTitle: String {
+        var parts: [String] = [item.title]
+        for rating in item.ratings { parts.append(rating.source.spokenName + " " + rating.value) }
+        parts.append(tr("Подробнее", "Details"))
+        return parts.joined(separator: ", ")
+    }
+
+    private func heroText(compact: Bool, descriptionLines: Int) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            if let eyebrow { Label(eyebrow, systemImage: "sparkles").font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.8)) }
-            Text(item.title).font(.system(size: compact ? 28 : 36, weight: .bold)).lineLimit(2)
-            HStack(spacing: 10) {
-                if !item.rating.isEmpty, item.rating != "—" { Label(item.rating, systemImage: "star.fill").foregroundStyle(.yellow) }
-                Text([item.year > 0 ? String(item.year) : "", item.genre].filter { !$0.isEmpty }.joined(separator: " · ")).foregroundStyle(.white.opacity(0.8))
-            }.font(.callout).lineLimit(1)
-            if !item.description.isEmpty {
-                Text(item.description).font(.callout).foregroundStyle(.white.opacity(0.9)).lineLimit(compact ? 2 : 3)
+            if let eyebrow {
+                Label(eyebrow, systemImage: "sparkles")
+                    .font(KDFont.kicker)
+                    .foregroundStyle(KDPalette.accent)
             }
-        }.foregroundStyle(.white).frame(maxWidth: .infinity, alignment: .leading)
+            Text(item.title)
+                .font(compact ? KDFont.displayCompact : KDFont.display)
+                .lineLimit(2)
+                .settingsLayoutProbe("catalog.hero.title")
+            metaRow
+            if !item.description.isEmpty {
+                Text(item.description)
+                    .font(KDFont.secondary)
+                    .foregroundStyle(Color.white.opacity(0.9))
+                    .lineLimit(descriptionLines)
+            }
+        }
+        .foregroundStyle(Color.white)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var metaText: String {
+        var parts: [String] = []
+        if item.year > 0 { parts.append(String(item.year)) }
+        let genre = catalogGenreLine(item.genre, limit: 2)
+        if !genre.isEmpty { parts.append(genre) }
+        return parts.joined(separator: " · ")
+    }
+
+    private var metaRow: some View {
+        HStack(spacing: 10) {
+            if !item.ratings.isEmpty { KDRatingRow(ratings: item.ratings, valueColor: Color.white) }
+            Text(metaText)
+                .foregroundStyle(Color.white.opacity(0.85))
+                .lineLimit(1)
+            if let quality = item.quality, !quality.isEmpty { KDPosterBadge(text: tr(quality)) }
+        }
+        .font(KDFont.meta)
+    }
+
+    private var actionRow: some View {
+        KDGlassGroup(spacing: 10) {
+            HStack(spacing: 10) {
+                Button { model.open(item) } label: { Label(tr("Подробнее", "Details"), systemImage: "info.circle") }
+                    .buttonStyle(KDPrimaryButtonStyle())
+                Button { Task { await model.save(card) } } label: {
+                    Image(systemName: saved ? "heart.fill" : "heart")
+                        .foregroundStyle(saved ? Color.pink : Color.white)
+                }
+                .buttonStyle(KDOverlayButtonStyle(circular: true))
+                .help(saveTitle)
+                .accessibilityLabel(saveTitle)
+            }
+        }
+        .controlSize(.large)
+        .padding(24)
+        .settingsLayoutProbe("catalog.hero.actions")
     }
 }
 
@@ -144,20 +225,21 @@ private struct HeroBackground: View {
     var poster: String?
     var backdrop: String?
     var lite: Bool
+    var imageWidth: Int
     @State private var image: NSImage?
 
     var body: some View {
         ZStack {
-            LinearGradient(colors: [Color(red: 0.04, green: 0.23, blue: 0.27), Color(red: 0.08, green: 0.09, blue: 0.18)], startPoint: .topTrailing, endPoint: .bottomLeading)
+            KDBannerBase()
             if image == nil, !lite, !reduceTransparency {
                 Artwork(address: poster, width: 180).blur(radius: 26, opaque: true).opacity(0.55)
             }
             if let image { Image(nsImage: image).resizable().scaledToFill().transition(.opacity) }
         }.clipped()
-        .task(id: (backdrop ?? "") + (lite ? ":lite" : ":full")) {
+        .task(id: (backdrop ?? "") + (lite ? ":lite" : ":full") + ":" + String(imageWidth)) {
             image = nil
             guard let backdrop else { return }
-            let result = await ImageStore.shared.image(backdrop, width: lite ? 640 : 1280)
+            let result = await ImageStore.shared.image(backdrop, width: imageWidth)
             if !Task.isCancelled { withAnimation(reduceMotion || lite ? nil : .easeInOut(duration: 0.25)) { image = result } }
         }
         .onDisappear { image = nil }
