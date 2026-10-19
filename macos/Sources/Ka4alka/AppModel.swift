@@ -72,6 +72,16 @@ struct CatalogFilter: Equatable {
     @Published var featuredState: LoadState = .idle
     @Published var gameShelves: [GameShelfDefinition] = []
     @Published var hiddenCards = Set<String>()
+    /// Page state that must survive Back, because the views are rebuilt with `.id(route.key)`.
+    /// The Saved page: the kind filter ("" = everything, otherwise a group key such as "games") and the order ("date" or "rating").
+    @Published var savedKind = ""
+    @Published var savedSort = "date"
+    /// The Featured ranking: its tab and the loaded chart.
+    @Published var rankingState = FeaturedRankingState()
+    /// The page shown on each collection page, by collection id.
+    @Published var collectionPages: [String: Int] = [:]
+    /// The year chosen on each awards page, by award id.
+    @Published var awardYears: [String: Int] = [:]
     var gameShelfCache: [String: (date: Date, result: CatalogResult)] = [:]
     var genres: [Choice] = []; var countries: [Choice] = []; var gameGenres: [Choice] = []
     var browseAnchor: String?
@@ -125,6 +135,7 @@ struct CatalogFilter: Equatable {
     func bootstrap() async {
         guard !bootstrapping else { return }
         bootstrapping = true
+        error = nil
         defer { bootstrapping = false }
         do {
             let result = try await bridge.call("bootstrap", as: Bootstrap.self)
@@ -168,6 +179,7 @@ struct CatalogFilter: Equatable {
             }
             self.restarting = false
             if self.connected {
+                ImageStore.shared.clearFailures()
                 self.revision += 1
                 self.toast = tr("Движок перезапущен", "The engine was restarted")
             } else {
@@ -213,22 +225,58 @@ struct CatalogFilter: Equatable {
     func open(_ person: Person) { self.person = nil; routes.append(.person(person)); error = nil }
     func openCollection(_ id: String) { list = nil; routes.append(.collection(id)); error = nil }
     func back() { if routes.count > 1 { routes.removeLast(); error = nil } }
-    func openURL(_ url: URL) async {
+    /// Opens a kachalka:// link (the title page) or hands a magnet link / torrent file to the add sheet.
+    /// Returns false only when a kachalka:// link could not be opened.
+    @discardableResult func openURL(_ url: URL) async -> Bool {
         if url.scheme == "kachalka" {
-            do { let card = try await bridge.call("openLink", ["url": .string(url.absoluteString)], as: MediaCard.self); open(card) }
-            catch { fail(error) }
-        } else { magnet = url.isFileURL ? url.path : url.absoluteString; addTorrent = true }
+            do {
+                let card = try await bridge.call("openLink", ["url": .string(url.absoluteString)], as: MediaCard.self)
+                open(card)
+                return true
+            } catch {
+                fail(error)
+                return false
+            }
+        }
+        magnet = url.isFileURL ? url.path : url.absoluteString
+        addTorrent = true
+        return true
     }
     func share(_ card: MediaCard) async {
         do { let result = try await bridge.call("share", ["id": .string(card.id)]); let link = result["url"].string
             guard !link.isEmpty else { return }; NSPasteboard.general.clearContents(); NSPasteboard.general.setString(link, forType: .string); toast = tr("Ссылка скопирована", "Link copied")
         } catch { fail(error) }
     }
+    /// Runs the search for `query` (also with an empty query, which shows the plain catalog), or opens a pasted kachalka:// link.
     func submit() {
-        if query.hasPrefix("kachalka://"), let url = URL(string: query) { Task { await openURL(url) }; return }
-        submittedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines); filter = CatalogFilter(); page = 1; browseAnchor = nil
+        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        if q.hasPrefix("kachalka://"), let url = URL(string: q) {
+            Task {
+                let opened = await self.openURL(url)
+                if opened { self.query = "" }
+            }
+            return
+        }
+        submittedQuery = q; filter = CatalogFilter(); page = 1; browseAnchor = nil
         let target: Section = section == .games ? .games : .movies
         section = target; routes = [.section(target)]; revision += 1
+    }
+    /// The Return key in the search field: does nothing for an empty or blank query.
+    func submitSearch() {
+        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty else { return }
+        submit()
+    }
+    /// The search field was cleared. On a section page the catalog is reloaded without the query; on a title, person or
+    /// collection page only the stored search is reset and the route stays where it is.
+    func clearSearch() {
+        query = ""
+        guard !submittedQuery.isEmpty else { return }
+        if case .section = route {
+            submit()
+        } else {
+            submittedQuery = ""; filter = CatalogFilter(); page = 1; browseAnchor = nil
+        }
     }
 
     // MARK: Catalog and pages
@@ -298,8 +346,8 @@ struct CatalogFilter: Equatable {
             if route == .collection(id), !Task.isCancelled { list = result }
         } catch { if route == .collection(id) { fail(error) } }
     }
+    /// Keeps the list that is already on screen until the new one arrives, so the Saved grid keeps its scroll position.
     func loadSaved() async {
-        list = nil
         await fetchSaved()
     }
     private func fetchSaved() async {
@@ -349,7 +397,7 @@ struct CatalogFilter: Equatable {
     @discardableResult func hide(_ card: MediaCard) async -> Bool {
         do {
             _ = try await bridge.call("hide", ["id": .string(card.id)])
-            hiddenCards.insert(card.id); cache.removeAll()
+            hiddenCards.insert(card.id)
             toast = tr("Скрыто. Вернуть можно в настройках.", "Hidden. Restore it in Settings.")
             return true
         } catch { fail(error); return false }
@@ -364,6 +412,7 @@ struct CatalogFilter: Equatable {
     /// Everything the engine built from content settings is stale: shelves, pages and Steam shelves.
     private func invalidateContent() {
         cache.removeAll(); gameShelfCache.removeAll(); curated = []; featuredState = .idle; revision += 1
+        rankingState = FeaturedRankingState(); collectionPages = [:]; awardYears = [:]
     }
     func set(_ key: String, _ value: JSONValue) async { await setMany([key: value]) }
     /// One `setSettings` call for several keys. Only content settings (language, quality, genres, home country) rebuild the pages.
@@ -376,9 +425,12 @@ struct CatalogFilter: Equatable {
             ImageStore.shared.setLite(updated.liteMode)
             let changesContent = !AppModel.contentKeys.isDisjoint(with: values.keys)
             if values["uiLanguage"] != nil {
-                let localized = try await bridge.call("bootstrap", as: Bootstrap.self)
-                genres = localized.genres; countries = localized.countries; gameGenres = localized.gameGenres
+                do {
+                    let localized = try await bridge.call("bootstrap", as: Bootstrap.self)
+                    genres = localized.genres; countries = localized.countries; gameGenres = localized.gameGenres
+                } catch { fail(error) }
                 gameShelves = []
+                savedKind = ""; savedSort = "date"
             }
             if changesContent { invalidateContent() }
         } catch { fail(error) }
@@ -387,13 +439,14 @@ struct CatalogFilter: Equatable {
         let panel = NSOpenPanel(); panel.canChooseFiles = false; panel.canChooseDirectories = true; panel.canCreateDirectories = true; panel.allowsMultipleSelection = false
         panel.message = tr("В выбранной папке будет создана папка Ka4alka для загрузок.", "A Ka4alka download folder will be created inside the selected folder.")
         guard await panel.begin() == .OK, let folder = panel.url else { return }
-        do { settings = try await bridge.call("folder", ["path": .string(folder.resolvingSymlinksInPath().path)], as: AppSettings.self); folderRequired = false } catch { fail(error) }
+        do { settings = try await bridge.call("folder", ["path": .string(folder.resolvingSymlinksInPath().path)], as: AppSettings.self); folderRequired = false; error = nil } catch { fail(error) }
     }
 
     // MARK: Downloads and devices
 
     /// Adds a release (or a pasted magnet / torrent path). Without a release the failure text goes to `addError`
-    /// (the add sheet and the drop handler read it); a release download from a detail page has no such place, so its failure goes to `error`.
+    /// (the add sheet and the drop handler read it); a release download from a detail page has no such place, and the
+    /// error banner's Retry cannot repeat an add, so its failure goes to `toast`.
     @discardableResult func add(_ release: ReleaseRow? = nil, card: MediaCard? = nil, source: String? = nil) async -> Bool {
         addError = nil
         let manual = release == nil
@@ -412,7 +465,7 @@ struct CatalogFilter: Equatable {
             _ = try await bridge.call("add", parameters)
             addTorrent = false; magnet = ""; addError = nil
             toast = tr("Раздача добавлена", "Download added")
-            if settings?.notifyDownloads == true { _ = await enableNotifications() }
+            if settings?.notifyDownloads == true { Task { _ = await self.enableNotifications() } }
             if manual { select(.downloads) }
             return true
         } catch {
@@ -422,31 +475,45 @@ struct CatalogFilter: Equatable {
     }
     private func reportAddFailure(_ text: String?, manual: Bool) {
         guard let text else { return }
-        if manual { addError = text } else { self.error = text }
+        if manual { addError = text } else { toast = text }
     }
-    func transferAction(_ method: String, id: String, deleteFiles: Bool = false) async {
-        do { transfers.items = try await bridge.call(method, ["id": .string(id), "deleteFiles": .bool(deleteFiles)], as: DownloadResult.self).items } catch { fail(error) }
+    /// Runs a queue command and replaces the queue with the answer. Returns false when the call failed (the failure is in `error`).
+    /// For "refreshTorrent" it returns true only when the engine swapped the torrent; "nothing changed" is false with no error.
+    @discardableResult func transferAction(_ method: String, id: String, deleteFiles: Bool = false) async -> Bool {
+        do {
+            let result = try await bridge.call(method, ["id": .string(id), "deleteFiles": .bool(deleteFiles)], as: DownloadResult.self)
+            transfers.items = result.items
+            return result.updated ?? true
+        } catch {
+            fail(error)
+            return false
+        }
     }
     func batch(completed: Bool, paused: Bool) async {
         do { transfers.items = try await bridge.call("batch", ["completed": .bool(completed), "paused": .bool(paused)], as: DownloadResult.self).items } catch { fail(error) }
     }
     /// Asks the engine to re-check the catalog. The shelves on screen stay until the new ones arrive.
-    func refresh() async {
-        guard !refreshing else { return }
+    /// Returns the failure text, or nil when the catalog was refreshed (or a refresh is already running, or the request was cancelled).
+    @discardableResult func refresh() async -> String? {
+        guard !refreshing else { return nil }
         refreshing = true
         defer { refreshing = false }
         toast = tr("Проверяем каталог…", "Checking the catalog…")
         do {
             _ = try await bridge.call("refresh")
-            cache.removeAll(); gameShelfCache.removeAll(); revision += 1
+            cache.removeAll(); gameShelfCache.removeAll(); ImageStore.shared.clearFailures(); revision += 1
             await loadFeatured(force: true)
             toast = tr("Каталог обновлён.", "Catalog updated.")
+            return nil
         } catch {
             toast = nil
+            let text = message(for: error)
             fail(error)
+            return text
         }
     }
-    func lan(_ action: String, _ parameters: [String: JSONValue] = [:]) async {
+    /// Returns false when the engine call failed (the failure is in `error`).
+    @discardableResult func lan(_ action: String, _ parameters: [String: JSONValue] = [:]) async -> Bool {
         var values = parameters; values["action"] = .string(action)
         let deviceID = parameters["device"]?.string ?? ""
         do {
@@ -455,14 +522,23 @@ struct CatalogFilter: Equatable {
                 let name = lanState?.devices.first(where: { $0.id == deviceID })?.name ?? ""
                 toast = name.isEmpty ? tr("Отправлено", "Sent") : tr("Отправлено на «\(name)»", "Sent to “\(name)”")
             }
-        } catch { fail(error) }
+            return true
+        } catch {
+            fail(error)
+            return false
+        }
     }
     func approvePairing(_ accepted: Bool) async { guard let prompt = pairingPrompt else { return }; pairingPrompt = nil; await lan("approve", ["id": .string(prompt.id), "approved": .bool(accepted)]) }
-    func logs() async {
+    /// Copies the diagnostic report to the clipboard. Returns false when it could not be built (the failure is in `error`).
+    @discardableResult func logs() async -> Bool {
         do {
             let result = try await bridge.call("logs")
             NSPasteboard.general.clearContents(); NSPasteboard.general.setString(result["text"].string, forType: .string); toast = tr("Логи скопированы", "Logs copied")
-        } catch { fail(error) }
+            return true
+        } catch {
+            fail(error)
+            return false
+        }
     }
     func visible(_ items: [MediaCard]) -> [MediaCard] { items.filter { !hiddenCards.contains($0.id) } }
     func card(_ id: String) -> MediaCard? { ([list?.items ?? []] + curated.map(\.items) + [detail.map { [$0.item] } ?? []]).flatMap { $0 }.first { $0.id == id } }
@@ -532,15 +608,20 @@ struct CatalogFilter: Equatable {
         case "downloads": receiveDownloads(data)
         case "personal":
             if let value = try? data.decode(AppSettings.self) { settings = value; seedHidden(from: value) }
-        case "releases":
-            if case .detail(let card) = route, card.id == pendingReleaseCard, let result = try? data.decode(ReleaseResult.self) {
-                releases = result.items; sources = result.sources; releasesOwner = card.id; releasesLoading = !result.complete
-            }
+        case "releases": receiveReleases(data)
         case "pairing": pairingPrompt = try? data.decode(PairingPrompt.self)
         case "notice": postNotice(data)
         case "catalogReady": catalogBecameReady()
         default: break
         }
+    }
+    /// A progressive release list. An event that names another title than the one being loaded is a late answer and is dropped.
+    private func receiveReleases(_ data: JSONValue) {
+        guard case .detail(let card) = route, card.id == pendingReleaseCard else { return }
+        let named: String = data["card"].string
+        if !named.isEmpty, named != pendingReleaseCard { return }
+        guard let result = try? data.decode(ReleaseResult.self) else { return }
+        releases = result.items; sources = result.sources; releasesOwner = card.id; releasesLoading = !result.complete
     }
     private func receiveDownloads(_ data: JSONValue) {
         do {
@@ -555,6 +636,7 @@ struct CatalogFilter: Equatable {
     /// The engine rebuilt its catalog (bundled seed, then the fresh index): drop pages built from older data.
     private func catalogBecameReady() {
         cache.removeAll()
+        ImageStore.shared.clearFailures()
         let browsing = section == .movies || section == .series
         if browsing, list?.items.isEmpty != false { revision += 1 }
         Task { await self.loadFeatured(force: true) }
