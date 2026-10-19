@@ -84,6 +84,11 @@ public partial class MainWindow
                 }
                 audioChip.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Settle();
                 Check(audioMenu.IsOpen,name+": combined audio menu did not open.");Shot(name+"-audio-menu",audioMenu);
+                other.IsSubmenuOpen=true;await Settle();
+                var submenu=other.Template.FindName("PART_Popup",other) as System.Windows.Controls.Primitives.Popup;
+                Check(submenu is {IsOpen:true,Child:FrameworkElement {IsVisible:true,ActualHeight:>0}}&&other.Items.OfType<MenuItem>().All(x=>x.IsVisible),name+": Other types submenu is not rendered and reachable.");
+                Check(FindVisual<TextBlock>(other,x=>x.Name=="SubmenuArrow") is {IsVisible:true},name+": Other types has no visible submenu affordance.");
+                Shot(name+"-audio-other-types",(FrameworkElement)submenu!.Child);other.IsSubmenuOpen=false;
                 ChooseAudio("Дубляж");ChooseAudio("LostFilm",true);await Settle();
                 Check(!audioMenu.IsOpen,name+": selecting audio did not close its menu.");
                 Check(ChipText(audioChip).Contains("Дубляж")&&ChipText(audioChip).Contains("LostFilm"),name+": combined chip does not show its selected type and studio.");
