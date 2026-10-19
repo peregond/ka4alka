@@ -52,7 +52,12 @@ jobs:
           echo "::notice title=macOS SDKs::${sdks}"
           echo "::notice title=Swift::$(swift --version 2>&1 | head -n 1)"
       - name: Build native application and self-contained shared engine
-        run: bash scripts/macos/build.sh '${{ matrix.arch }}'
+        run: |
+          set -o pipefail
+          bash scripts/macos/build.sh '${{ matrix.arch }}' 2>&1 | tee "$RUNNER_TEMP/build.log" || {
+            grep -E 'error:' "$RUNNER_TEMP/build.log" | sort -u | head -30 | while IFS= read -r line; do echo "::error title=Swift compile error::${line:0:900}"; done
+            exit 1
+          }
       - name: Run native app with the packaged engine (page, size, theme and language matrix)
         run: |
           bash macos/Tests/run-smoke.sh render \
@@ -150,7 +155,12 @@ jobs:
           echo "::notice title=Selected Xcode::$(xcodebuild -version 2>&1 | tr '\n' ' ')"
           swift --version
       - name: Build (swift build -c release through the packaging script)
-        run: bash scripts/macos/build.sh arm64
+        run: |
+          set -o pipefail
+          bash scripts/macos/build.sh arm64 2>&1 | tee "$RUNNER_TEMP/build.log" || {
+            grep -E 'error:' "$RUNNER_TEMP/build.log" | sort -u | head -30 | while IFS= read -r line; do echo "::error title=Swift compile error::${line:0:900}"; done
+            exit 1
+          }
       - name: Run the smoke test on ${{ matrix.runner }}
         run: |
           bash macos/Tests/run-smoke.sh render \

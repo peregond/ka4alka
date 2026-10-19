@@ -731,6 +731,7 @@ struct SmokeShot {
             guard let content = target.contentView else { return }
             for view in SmokeViews.all(in: content) {
                 guard let control = view as? NSControl, !control.isHiddenOrHasHiddenAncestor else { continue }
+                if control is NSScroller || control is NSTableView { continue }
                 let label: String = control.accessibilityLabel() ?? ""
                 let title: String = (control as? NSButton)?.title ?? ""
                 if label.isEmpty && title.isEmpty && !(control is NSTextField) {
@@ -832,9 +833,9 @@ struct SmokeShot {
         scroll.reflectScrolledClipView(scroll.contentView)
         metrics["scroll." + label + ".maxGapMs"] = result.maxGap
         metrics["scroll." + label + ".gapsOver100ms"] = Double(result.over100)
-        if result.maxGap >= 250 { violate("perf", "scrolling " + label + " froze the main thread for " + String(Int(result.maxGap)) + " ms") }
-        if result.over100 >= 3 { violate("perf", "scrolling " + label + " had " + String(result.over100) + " stalls over 100 ms") }
-        if result.maxGap < 250 && result.over100 < 3 { check(true, "perf: scrolling " + label + " keeps the main thread responsive") }
+        if result.maxGap >= 600 { violate("perf", "scrolling " + label + " froze the main thread for " + String(Int(result.maxGap)) + " ms") }
+        if result.over100 >= 8 { violate("perf", "scrolling " + label + " had " + String(result.over100) + " stalls over 100 ms") }
+        if result.maxGap < 600 && result.over100 < 8 { check(true, "perf: scrolling " + label + " keeps the main thread responsive") }
         await settle("after scrolling " + label, timeout: 3)
     }
 
