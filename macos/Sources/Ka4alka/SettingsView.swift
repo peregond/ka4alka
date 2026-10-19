@@ -4,6 +4,7 @@ import SwiftUI
 /// next to a left-aligned column of cards; narrower it is a single column. The cards live in the Settings*Card files.
 struct SettingsView: View {
     @State private var activeSection: SettingsSectionID = SettingsSectionID.downloads
+    @State private var scrollTarget: String?
     @State private var pinnedSection: SettingsSectionID?
     @State private var pinnedUntil: Date?
     @State private var pinnedSettledOffset: CGFloat?
@@ -27,21 +28,20 @@ struct SettingsView: View {
     private func layout(width: CGFloat) -> some View {
         let showsList: Bool = width >= SettingsView.listBreakpoint
         let gutter: CGFloat = KD.gutter(forWidth: width)
-        return ScrollViewReader { (proxy: ScrollViewProxy) in
-            HStack(alignment: .top, spacing: 0) {
-                if showsList {
-                    SettingsSectionList(active: activeSection) { (section: SettingsSectionID) in jump(to: section, with: proxy) }
-                        .frame(width: SettingsView.listWidth)
-                        .padding(.leading, gutter)
-                }
-                ScrollView {
-                    column(gutter: gutter)
-                }
-                .settingsLayoutProbe("viewport")
+        return HStack(alignment: .top, spacing: 0) {
+            if showsList {
+                SettingsSectionList(active: activeSection) { (section: SettingsSectionID) in jump(to: section) }
+                    .frame(width: SettingsView.listWidth)
+                    .padding(.leading, gutter)
             }
-            .onPreferenceChange(SettingsCardOffsetKey.self) { (offsets: [String: CGFloat]) in
-                if showsList { follow(offsets) }
+            ScrollView {
+                column(gutter: gutter)
             }
+            .scrollPosition(id: $scrollTarget, anchor: .top)
+            .settingsLayoutProbe("viewport")
+        }
+        .onPreferenceChange(SettingsCardOffsetKey.self) { (offsets: [String: CGFloat]) in
+            if showsList { follow(offsets) }
         }
     }
 
@@ -54,6 +54,7 @@ struct SettingsView: View {
                 card(for: section).id(section.rawValue)
             }
         }
+        .scrollTargetLayout()
         .frame(maxWidth: KD.Width.settings, alignment: .leading)
         .settingsLayoutProbe("content")
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -77,15 +78,21 @@ struct SettingsView: View {
         }
     }
 
-    private func jump(to section: SettingsSectionID, with proxy: ScrollViewProxy) {
+    private func jump(to section: SettingsSectionID) {
         activeSection = section
         pinnedSection = section
         pinnedUntil = Date().addingTimeInterval(SettingsView.pinDuration)
         pinnedSettledOffset = nil
-        if reduceMotion {
-            proxy.scrollTo(section.rawValue, anchor: .top)
+        let target: String = section.rawValue
+        let animation: Animation? = reduceMotion ? nil : Animation.easeInOut(duration: 0.25)
+        if scrollTarget == target {
+            // The page already reports this card as its top item; reset the position so the jump happens again.
+            scrollTarget = nil
+            DispatchQueue.main.async {
+                withAnimation(animation) { scrollTarget = target }
+            }
         } else {
-            withAnimation(.easeInOut(duration: 0.25)) { proxy.scrollTo(section.rawValue, anchor: .top) }
+            withAnimation(animation) { scrollTarget = target }
         }
     }
 
