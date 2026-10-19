@@ -155,14 +155,6 @@ struct RootView: View {
                 ForEach(libraryEntries) { entry in libraryRow(entry) }
             }
             .collapsible(false)
-            SwiftUI.Section {
-                ShellDownloadsRow(store: model.transfers, selected: model.section == .downloads)
-                    .tag(Section.downloads)
-                    .simultaneousGesture(TapGesture().onEnded { revisit(.downloads) })
-                sidebarLabel(.settings)
-                    .tag(Section.settings)
-                    .simultaneousGesture(TapGesture().onEnded { revisit(.settings) })
-            }
         }
         .listStyle(.sidebar)
         .settingsLayoutProbe("sidebar")
@@ -201,8 +193,24 @@ struct RootView: View {
     private var showsUpdateStatus: Bool {
         !updater.statusText.isEmpty && (updater.available || updater.busy || updater.isError)
     }
+    /// Downloads and Settings sit at the bottom of the sidebar, as in the Windows app. They are plain buttons,
+    /// not list rows, so a click always reaches them.
+    private var pinnedSections: some View {
+        VStack(alignment: .leading, spacing: KD.Space.xxs) {
+            ShellPinnedRow(section: .downloads, selected: model.section == .downloads, store: model.transfers) {
+                pick(.downloads)
+            }
+            ShellPinnedRow(section: .settings, selected: model.section == .settings, store: nil) {
+                pick(.settings)
+            }
+        }
+    }
+    private func pick(_ entry: Section) {
+        if model.section == entry { revisit(entry) } else { model.select(entry) }
+    }
     private var sidebarFooter: some View {
         VStack(alignment: .leading, spacing: KD.Space.xs) {
+            pinnedSections
             if updater.available {
                 Button { Task { await updater.primaryAction() } } label: {
                     Label(updater.buttonTitle, systemImage: "arrow.triangle.2.circlepath")
@@ -342,15 +350,51 @@ struct RootView: View {
     }
 }
 
-/// The Downloads row lives in its own view so the once-a-second queue updates redraw only this row.
-struct ShellDownloadsRow: View {
-    @ObservedObject var store: TransferStore
+/// A sidebar button pinned to the bottom. Downloads shows the number of active transfers; the count lives in
+/// its own view so the once-a-second queue updates redraw only that badge.
+struct ShellPinnedRow: View {
+    var section: Section
     var selected: Bool
+    var store: TransferStore?
+    var action: () -> Void
     var body: some View {
-        let symbol = KDNavSymbol.symbol(for: Section.downloads.rawValue, selected: selected)
-        Label(Section.downloads.title, systemImage: symbol)
-            .accessibilityIdentifier("nav-" + Section.downloads.rawValue)
-            .badge(store.activeCount)
+        let shape = RoundedRectangle(cornerRadius: KD.Radius.chip, style: .continuous)
+        let symbol: String = KDNavSymbol.symbol(for: section.rawValue, selected: selected)
+        return Button(action: action) {
+            HStack(spacing: KD.Space.xs) {
+                Image(systemName: symbol)
+                    .font(.system(size: 14, weight: .regular))
+                    .frame(width: 20)
+                    .accessibilityHidden(true)
+                Text(section.title)
+                    .font(selected ? Font.body.weight(.semibold) : Font.body)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+                if let store { ShellActiveBadge(store: store) }
+            }
+            .foregroundStyle(selected ? KDPalette.accent : Color.primary)
+            .padding(.horizontal, KD.Space.s)
+            .frame(height: 32)
+            .background(shape.fill(selected ? KDPalette.accentSoft : Color.clear))
+            .contentShape(shape)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(section.title)
+        .accessibilityAddTraits(selected ? AccessibilityTraits.isSelected : AccessibilityTraits())
+        .accessibilityIdentifier("nav-" + section.rawValue)
+    }
+}
+
+struct ShellActiveBadge: View {
+    @ObservedObject var store: TransferStore
+    var body: some View {
+        if store.activeCount > 0 {
+            Text(String(store.activeCount))
+                .font(.caption.weight(.semibold))
+                .monospacedDigit()
+                .foregroundStyle(Color.secondary)
+                .accessibilityLabel(tr("Активных загрузок: ", "Active downloads: ") + String(store.activeCount))
+        }
     }
 }
 
