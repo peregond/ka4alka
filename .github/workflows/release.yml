@@ -63,9 +63,11 @@ jobs:
           node tests/title-identity.mjs
           if($LASTEXITCODE -ne 0){throw 'Server multilingual identity checks failed'}
           node tests/title-lookup.mjs
-          node tests/localized-media.mjs
-          node tests/tmdb-backdrop.mjs
           if($LASTEXITCODE -ne 0){throw 'Title lookup checks failed'}
+          node tests/localized-media.mjs
+          if($LASTEXITCODE -ne 0){throw 'Localized media checks failed'}
+          node tests/tmdb-backdrop.mjs
+          if($LASTEXITCODE -ne 0){throw 'TMDB backdrop checks failed'}
           node node_modules/typescript/bin/tsc --noEmit --incremental false
           if($LASTEXITCODE -ne 0){throw 'Server type check failed'}
       - uses: actions/setup-python@v5
