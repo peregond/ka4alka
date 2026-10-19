@@ -111,7 +111,7 @@ struct DetailView: View {
         let studios = Array(Set(model.releases.flatMap(\.studios))).sorted()
         let selected = [audio, studio].filter { !$0.isEmpty }.map { tr($0) }
         return Menu {
-            Section(tr("Тип озвучки", "Audio type")) {
+            SwiftUI.Section(tr("Тип озвучки", "Audio type")) {
                 audioChoice(tr("Все", "All"), value: "", selected: $audio)
                 ForEach(primary.filter { types.contains($0) }, id: \.self) { value in
                     audioChoice(tr(value), value: value, selected: $audio)
@@ -122,7 +122,7 @@ struct DetailView: View {
                     }
                 }
             }
-            Section(tr("Студии", "Studios")) {
+            SwiftUI.Section(tr("Студии", "Studios")) {
                 audioChoice(tr("Все студии", "All studios"), value: "", selected: $studio)
                 ForEach(studios, id: \.self) { value in audioChoice(value, value: value, selected: $studio) }
             }
