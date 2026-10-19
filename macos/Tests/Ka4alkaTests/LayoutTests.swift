@@ -118,6 +118,10 @@ private struct LayoutOutcome {
     // MARK: Hosting
 
     private func render(_ content: AnyView, model: AppModel, width: CGFloat, dark: Bool, rtl: Bool) -> LayoutOutcome {
+        let priorProbeMode = SettingsLayoutMeasurements.enabledForTests
+        SettingsLayoutMeasurements.enabledForTests = true
+        SettingsLayoutMeasurements.frames.removeAll()
+        defer { SettingsLayoutMeasurements.enabledForTests = priorProbeMode }
         let updater = MacUpdater()
         let direction: LayoutDirection = rtl ? .rightToLeft : .leftToRight
         let scheme: ColorScheme = dark ? .dark : .light
@@ -136,6 +140,12 @@ private struct LayoutOutcome {
         RunLoop.main.run(until: Date().addingTimeInterval(0.08))
         controller.view.layoutSubtreeIfNeeded()
         var problems: [String] = controlProblems(in: controller.view)
+        let menuFrames = SettingsLayoutMeasurements.frames.filter { $0.key.hasPrefix("menu.") }
+        let nativeMenus = SmokeViews.all(in: controller.view).contains { $0 is NSPopUpButton }
+        if nativeMenus && menuFrames.isEmpty {
+            problems.append("Menu hit-area probes were not recorded")
+        }
+        problems.append(contentsOf: SettingsLayoutMeasurements.audit(prefix: "menu.", minHit: 24, windowWidth: width))
         var found = false
         if let scroll = largestScrollView(in: controller.view), let document = scroll.documentView {
             found = true

@@ -358,8 +358,11 @@ struct DownloadsView: View {
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
+        .frame(minHeight: 24)
+        .contentShape(Rectangle())
         .fixedSize()
         .accessibilityLabel(tr("Управление загрузками", "Manage downloads"))
+        .settingsLayoutProbe("menu.downloads.controls", kind: .control)
     }
 
     private var controlStrip: some View {
@@ -394,18 +397,28 @@ struct DownloadsView: View {
         )
     }
 
-    private var sortPicker: some View {
-        Picker(tr("Порядок", "Sort"), selection: sortBinding) {
-            Text(tr("Сначала новые", "Newest first")).tag("newest")
-            Text(tr("По названию", "Name")).tag("name")
-            Text(tr("По скорости", "Speed")).tag("speed")
-            Text(tr("По размеру", "Size")).tag("size")
-            Text(tr("По прогрессу", "Progress")).tag("progress")
+    private var sortTitle: String {
+        switch sortKey {
+        case "name": return tr("По названию", "Name")
+        case "speed": return tr("По скорости", "Speed")
+        case "size": return tr("По размеру", "Size")
+        case "progress": return tr("По прогрессу", "Progress")
+        default: return tr("Сначала новые", "Newest first")
         }
-        .labelsHidden()
-        .pickerStyle(.menu)
-        .fixedSize()
-        .accessibilityLabel(tr("Порядок", "Sort"))
+    }
+
+    private var sortPicker: some View {
+        KDChipMenu(title: tr("Порядок", "Sort"), value: sortTitle) {
+            Picker(tr("Порядок", "Sort"), selection: sortBinding) {
+                Text(tr("Сначала новые", "Newest first")).tag("newest")
+                Text(tr("По названию", "Name")).tag("name")
+                Text(tr("По скорости", "Speed")).tag("speed")
+                Text(tr("По размеру", "Size")).tag("size")
+                Text(tr("По прогрессу", "Progress")).tag("progress")
+            }
+            .pickerStyle(.inline)
+            .labelsHidden()
+        }
     }
 
     // MARK: Summary tiles
@@ -904,9 +917,12 @@ struct TransferRow: View {
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
+        .frame(minWidth: KD.Size.iconButton, minHeight: KD.Size.iconButton)
+        .contentShape(Rectangle())
         .fixedSize()
         .help(tr("Ещё", "More"))
         .accessibilityLabel(tr("Ещё", "More"))
+        .settingsLayoutProbe("menu.downloads.more." + item.id, kind: .control)
     }
 
     @ViewBuilder private var menuItems: some View {

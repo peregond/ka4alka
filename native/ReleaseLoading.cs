@@ -7,6 +7,7 @@ namespace Kachalka;
 
 public partial class MainWindow
 {
+    ReleaseAudioRulesClient? releaseAudioRules;
     Border? releaseLoadingIndicator;
     int releaseLoadingItemId;
 
@@ -136,7 +137,10 @@ public partial class MainWindow
                 IndexRows(update.Items,SourceState.Ready);Publish();
             }
             var progress=new Progress<ReleaseSearchUpdate>(update=>{if(IsCurrent()&&!settled)Apply(update);});
+            var rulesClient=releaseAudioRules??=new(sourceClient);
+            var rules=Task.Run(()=>rulesClient.Refresh(token),token);
             var result=await ReleaseSearch.RunAsync(providers,progress,token);
+            await rules;
             settled=true;if(!IsCurrent())return;Apply(result);
             if(!IsCurrent())return;
             view.Checking=false;Publish();

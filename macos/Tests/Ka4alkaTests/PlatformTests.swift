@@ -341,7 +341,9 @@ final class LocalizationLintTests: XCTestCase {
     /// Russian-only words that are chosen by hand next to an English branch (plural forms, units, matching keys).
     private let allowedLiterals: Set<String> = [
         "Русский", "Не указано", "КП", "кп", "кино", "Б", "КБ", "МБ", "ГБ", "ТБ", "Актёры", "Режиссёры", "Операторы", "-е",
-        "название", "названия", "названий", "загрузка", "загрузки", "загрузок", "Пауза", "Продолжить", "[А-Яа-яЁё]"
+        "название", "названия", "названий", "загрузка", "загрузки", "загрузок", "Пауза", "Продолжить", "[А-Яа-яЁё]",
+        // Shared-engine protocol values, translated with tr(value) when displayed.
+        "Дубляж", "Оригинал"
     ]
     private func literalExpression() throws -> NSRegularExpression {
         return try NSRegularExpression(pattern: "\"((?:[^\"\\\\\\n]|\\\\.)*)\"")
@@ -504,4 +506,67 @@ final class MacInstallationTests: XCTestCase {
         try runTool("/usr/bin/codesign", ["--verify", "--deep", "--strict", installed.path])
     }
 
+}
+
+// MARK: Audio menu compatibility with the shared engine
+
+final class ReleaseAudioFilterTests: XCTestCase {
+    private func row(_ id: String, studio: String, audio: String, group: String? = nil) throws -> ReleaseRow {
+        let data = Data(TestFixtures.releaseJSON(id: id, title: id).utf8)
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        json["studios"] = [studio]
+        json["audioTypes"] = [audio]
+        if let group { json["gameGroup"] = group }
+        return try JSONDecoder().decode(ReleaseRow.self, from: JSONSerialization.data(withJSONObject: json))
+    }
+
+    func testAudioTypeAndStudioCombineAndResetIndependently() throws {
+        let rows = [
+            try row("flarrow-dub", studio: "Flarrow Films", audio: "Дубляж"),
+            try row("rezka-dub", studio: "HDrezka Studio", audio: "Дубляж"),
+            try row("flarrow-voice", studio: "Flarrow Films", audio: "Многоголосая"),
+            try row("original", studio: "", audio: "Оригинал")
+        ]
+        var filters = DetailReleaseFilters()
+        filters.audio = "Дубляж"
+        filters.studio = "Flarrow Films"
+        XCTAssertEqual(filters.arrange(rows).map(\.id), ["flarrow-dub"])
+        filters.studio = ""
+        XCTAssertEqual(filters.arrange(rows).map(\.id), ["flarrow-dub", "rezka-dub"])
+        filters.studio = "Flarrow Films"
+        filters.audio = ""
+        XCTAssertEqual(filters.arrange(rows).map(\.id), ["flarrow-dub", "flarrow-voice"])
+        filters.audio = "Оригинал"
+        XCTAssertTrue(filters.arrange(rows).isEmpty)
+        filters = DetailReleaseFilters()
+        XCTAssertEqual(filters.arrange(rows).count, rows.count)
+        XCTAssertTrue(filters.isDefault)
+    }
+
+    func testMainAudioChoicesAndOptionalTypesComeFromAvailableTracks() throws {
+        let rows = [
+            try row("dub", studio: "Flarrow Films", audio: "Дубляж"),
+            try row("voice", studio: "HDrezka Studio", audio: "Многоголосая"),
+            try row("original", studio: "", audio: "Оригинал")
+        ]
+        let facets = DetailReleaseFacets(rows: rows, season: 0)
+        XCTAssertEqual(facets.primaryAudioTypes, ["Дубляж", "Оригинал"])
+        XCTAssertEqual(facets.otherAudioTypes, ["Многоголосая"])
+        XCTAssertEqual(facets.studios, ["Flarrow Films", "HDrezka Studio"])
+        let partial = DetailReleaseFacets(rows: [rows[0]], season: 0)
+        XCTAssertEqual(partial.primaryAudioTypes, ["Дубляж"])
+        XCTAssertTrue(partial.otherAudioTypes.isEmpty)
+    }
+
+    func testGamesKeepReleaseGroupSelection() throws {
+        let rows = [
+            try row("game-a", studio: "", audio: "", group: "FitGirl"),
+            try row("game-b", studio: "", audio: "", group: "DODI")
+        ]
+        let facets = DetailReleaseFacets(rows: rows, season: 0)
+        XCTAssertEqual(facets.gameGroups, ["DODI", "FitGirl"])
+        var filters = DetailReleaseFilters()
+        filters.studio = "FitGirl"
+        XCTAssertEqual(filters.arrange(rows).map(\.id), ["game-a"])
+    }
 }

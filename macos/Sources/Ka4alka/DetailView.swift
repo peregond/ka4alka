@@ -119,6 +119,7 @@ struct DetailView: View {
             DetailAwardsSection(awards: awards)
         }
     }
+
 }
 
 // MARK: Hero banner

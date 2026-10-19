@@ -11,6 +11,7 @@ sealed class DesktopEngine:IAsyncDisposable
 {
     static readonly JsonSerializerOptions Json=new(JsonSerializerDefaults.Web);
     readonly SourceClient source=new();readonly Preferences prefs=Preferences.Load();
+    readonly ReleaseAudioRulesClient releaseAudioRules;
     readonly OnlineIndexClient online;readonly SharedCatalog shared;readonly AwardsCatalog awards;
     readonly CatalogIndex index=new(Preferences.DataDir,deferRestore:true);
     readonly DownloadService downloads;readonly CancellationTokenSource lifetime=new();
@@ -28,6 +29,7 @@ sealed class DesktopEngine:IAsyncDisposable
     public DesktopEngine()
     {
         AppLanguage.Set(prefs.UiLanguage);prefs.LiteMode=PerformanceBudget.DefaultLiteMode(prefs.LiteModeConfigured,prefs.LiteMode);PerformanceBudget.LiteMode=prefs.LiteMode;metadataSlots=new(PerformanceBudget.Constrained?1:3);
+        releaseAudioRules=new(source);
         online=new(source,relays:new IndexRelays(source));source.TorrentRelay=online.RelayTorrent;
         shared=new(source);awards=new(source);
         downloads=new(null,prefs.MaxDownloadKbps,prefs.MaxUploadKbps);
@@ -280,7 +282,9 @@ sealed class DesktopEngine:IAsyncDisposable
         }
         var providers=item.Section=="Игры"?GameReleaseSources.Create(source,item,configuredSources):NativeReleaseSources.Create(source,Resolved,item.Section=="Сериалы",Aliases);
         var sources=providers.ToList();if(item.Section!="Игры")sources.AddRange(configuredSources.Select(config=>new ReleaseSource(config.Name,t=>source.SearchTorznab(config,item.OriginalTitle??item.Title,t,item.Section=="Сериалы"?5000:2000))));if(item.Section!="Игры"&&OnlineIndexClient.IdFor(item)!=null)sources.Insert(0,new("Онлайн-индекс",t=>online.Releases(item,t,true)));
+        var rules=releaseAudioRules.Refresh(ct);
         var result=await ReleaseSearch.RunAsync(sources,new Progress<ReleaseSearchUpdate>(update=>Event("releases",new{request,items=ReleaseDtos(ReleaseSearch.WithSaved(update.Items,saved),item.Section=="Игры"),complete=update.Complete,sources=update.Sources.Select(x=>new{x.Name,state=x.State.ToString(),count=x.Count})})),ct);
+        await rules;
         var combined=ReleaseSearch.WithSaved(result.Items,saved);
         item.SetReleaseQuality(combined,prefs.MinimumReleaseHeight);
         if(result.Items.Length>0||ReleaseAvailability.ConfirmedEmpty(result.Items,result.Sources))

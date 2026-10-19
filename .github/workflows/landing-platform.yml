@@ -1,0 +1,54 @@
+name: Verify platform-aware landing
+on:
+  push:
+    branches: [claude/quirky-hopper-1vlmj6]
+    paths: ['landing/**', 'web-index/components/**', 'web-index/lib/app-release.ts', '.github/workflows/landing-platform.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: landing-platform-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: landing/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify and build the actual landing
+        working-directory: landing
+        run: |
+          npm ci
+          node tests/site-language.mjs
+          node tests/site-platform.mjs
+          node tests/app-screenshots.mjs
+          npx tsc --noEmit
+          npm run build
+      - name: Install browser
+        run: |
+          python -m pip install playwright==1.62.0
+          python -m playwright install --with-deps chromium
+      - name: Test platform selection, downloads and image fallback
+        working-directory: landing
+        run: |
+          HOSTNAME=127.0.0.1 PORT=3000 npm start > /tmp/landing-platform-server.log 2>&1 &
+          server=$!
+          trap 'kill "$server" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --silent --fail http://127.0.0.1:3000/ > /dev/null; then break; fi
+            sleep 1
+          done
+          python tests/platform-browser.py http://127.0.0.1:3000
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: platform-browser-evidence
+          path: landing/test-output/platform-browser/

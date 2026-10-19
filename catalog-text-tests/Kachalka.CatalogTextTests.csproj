@@ -16,7 +16,7 @@
     <Compile Include="../native/AppLanguage.cs" Link="AppLanguage.cs" />
     <Compile Include="../native/SearchLanguage.cs" Link="SearchLanguage.cs" />
     <Compile Include="../native/RussianAudio.cs" Link="RussianAudio.cs" />
-    <Compile Include="../native/ReleaseAudio.cs" Link="ReleaseAudio.cs" />
+    <Compile Include="../native/ReleaseAudioRules.cs" Link="ReleaseAudioRules.cs" /><Compile Include="../native/ReleaseAudio.cs" Link="ReleaseAudio.cs" />
     <Compile Include="../native/MediaIdentity.cs" Link="MediaIdentity.cs" />
     <Compile Include="../tests/SharedCatalogTests.cs" Link="SharedCatalogTests.cs" />
     <Compile Include="../tests/UnifiedSearchTests.cs" Link="UnifiedSearchTests.cs" />

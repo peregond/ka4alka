@@ -18,7 +18,8 @@ enum LayoutProbeKind {
 private let layoutProbeEnabled: Bool = CommandLine.arguments.contains("--smoke-test")
 
 @MainActor enum SettingsLayoutMeasurements {
-    static var isSmoke: Bool { layoutProbeEnabled }
+    static var enabledForTests = false
+    static var isSmoke: Bool { layoutProbeEnabled || enabledForTests }
     static var frames: [String: CGRect] = [:]
     static var kinds: [String: LayoutProbeKind] = [:]
     static var groups: [String: String] = [:]

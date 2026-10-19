@@ -44,6 +44,7 @@ jobs:
           cd "$candidate"
           node scripts/verify-source.mjs "$RUNNER_TEMP/sites-source/source-manifest.json"
           npm run install:ci
+          node tests/release-audio-rules.mjs
           node tests/title-lookup.mjs
           node tests/localized-media.mjs
           node tests/tmdb-backdrop.mjs
@@ -52,6 +53,7 @@ jobs:
           node tests/source-integrity.mjs
           node tests/site-language.mjs
           node tests/app-screenshots.mjs
+          node tests/site-platform.mjs
           node node_modules/typescript/bin/tsc --noEmit --incremental false
       - name: Build the identical verified source in the repository checkout
         working-directory: web-index

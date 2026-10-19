@@ -29,25 +29,25 @@ public partial class MainWindow
         onlineIndex.RetryNow();if(DetailMetadataNeedsRetry(item.Id))_ = FetchDetailMetadata(item,true);
         requestedDetails.Remove(item.Id);RefreshDetail(item.Id);
     }
-    DispatcherTimer? detailRefreshTimer;
+    DispatcherOperation? detailRefreshOperation;
+    bool DetailRefreshPending=>detailRefreshOperation?.Status is DispatcherOperationStatus.Pending or DispatcherOperationStatus.Executing;
     int pendingDetailRefreshId;
     bool pendingFullDetailRefresh;
     void QueueDetailRefresh(int id,bool releasesOnly=false)
     {
         if(closed||activePerson!=null||current?.Id!=id)return;
         RefreshLoadingIndicator();
-        pendingFullDetailRefresh=detailRefreshTimer?.IsEnabled==true&&pendingDetailRefreshId==id?pendingFullDetailRefresh||!releasesOnly:!releasesOnly;
+        pendingFullDetailRefresh=DetailRefreshPending&&pendingDetailRefreshId==id?pendingFullDetailRefresh||!releasesOnly:!releasesOnly;
         pendingDetailRefreshId=id;
-        if(detailRefreshTimer==null)
+        if(DetailRefreshPending)return;
+        // Queue one batch directly: DispatcherTimer can remain enabled without a tick
+        // when Windows does not promote its native timer under a busy dispatcher.
+        detailRefreshOperation=Dispatcher.BeginInvoke(DispatcherPriority.Background,new Action(()=>
         {
-            detailRefreshTimer=new DispatcherTimer(DispatcherPriority.Background,Dispatcher){Interval=TimeSpan.FromMilliseconds(80)};
-            detailRefreshTimer.Tick+=(_,_)=>
-            {
-                detailRefreshTimer.Stop();
-                RefreshDetail(pendingDetailRefreshId,!pendingFullDetailRefresh);
-            };
-        }
-        if(!detailRefreshTimer.IsEnabled)detailRefreshTimer.Start();
+            var refreshId=pendingDetailRefreshId;var releasesOnlyRefresh=!pendingFullDetailRefresh;
+            detailRefreshOperation=null;pendingFullDetailRefresh=false;
+            RefreshDetail(refreshId,releasesOnlyRefresh);
+        }));
     }
     void RefreshDetail(int id,bool releasesOnly=false)
     {

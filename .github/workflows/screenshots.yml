@@ -1,11 +1,19 @@
 name: Capture published application screenshots
 on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
+      publish_reviewed:
+        type: boolean
+        default: false
   workflow_dispatch:
     inputs:
       version:
         description: Published version to capture
         required: true
-        default: '0.43.4'
+        default: '0.44.1'
       publish_reviewed:
         description: Publish reviewed repository screenshots instead of capturing again
         type: boolean
@@ -103,24 +111,22 @@ jobs:
           })
           [ordered]@{Version=$env:RELEASE_VERSION;Language=$env:KACHALKA_SCREENSHOT_LANGUAGE;CaptureMethod=$info.CaptureMethod;ReleaseArchiveSha256=$env:RELEASE_ARCHIVE_SHA256;ReleaseDllSha256=$dllHash;Captures=$captures} | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $infoPath -Encoding utf8NoBOM
           Get-Content -LiteralPath $infoPath
-      - name: Save screenshots in a temporary documentation draft
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Publish verified platform gallery assets
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $ErrorActionPreference='Stop'
-          $folder=Join-Path $PWD 'test-output/documentation-${{ matrix.language }}'
-          $files=@(Get-ChildItem -LiteralPath $folder -Filter '*.png' -File | Where-Object {$_.Name -match '^[a-z0-9][a-z0-9.-]*\.png$'} | ForEach-Object {$_.FullName})
-          $files+=(Join-Path $folder 'capture-info.json')
-          if($files.Count -lt 10){throw 'Expected nine screenshots and sanitized capture metadata'}
-          $tag='docs-preview-${{ github.run_id }}-${{ matrix.language }}'
-          $existing=gh release view $tag --json isDraft --jq '.isDraft' 2>$null
-          if($LASTEXITCODE -ne 0){
-            gh release create $tag --draft --target '${{ github.sha }}' --title ('Temporary published '+$env:RELEASE_VERSION+' screenshots') --notes ('Documentation review evidence from the verified public '+$env:RELEASE_VERSION+' binary; not an application release.')
-            if($LASTEXITCODE -ne 0){throw 'Cannot create the temporary documentation draft'}
-          } elseif($existing -ne 'true'){throw 'Refusing to overwrite a published release'}
-          gh release upload $tag @files --clobber
-          if($LASTEXITCODE -ne 0){throw 'Cannot upload the temporary documentation previews'}
+          python -m pip install Pillow==11.3.0
+          if($LASTEXITCODE -ne 0){throw 'Image encoder install failed'}
+          $output='test-output/gallery-${{ matrix.language }}'
+          python scripts/screenshots/package-windows.py $env:RELEASE_VERSION '${{ matrix.language }}' 'test-output/documentation-${{ matrix.language }}' $output
+          if($LASTEXITCODE -ne 0){throw 'Screenshot verification failed'}
+          $files=@(Get-ChildItem $output -File | ForEach-Object {$_.FullName})
+          gh release upload ('v'+$env:RELEASE_VERSION) @files --clobber
+          if($LASTEXITCODE -ne 0){throw 'Screenshot upload failed'}
       - name: Preserve sanitized screenshot evidence
         if: always()
         uses: actions/upload-artifact@v4

@@ -1215,6 +1215,10 @@
   "Тема оформления и режим для слабых компьютеров.": "Theme and lite mode for slower computers.",
   "Теннис": "Tennis",
   "Тип": "Type",
+  "Другие типы": "Other types",
+  "Студии": "Studios",
+  "Все студии": "All studios",
+  "Фильтр раздач: Озвучка": "Release filter: Audio",
   "Тип озвучки": "Voice-over type",
   "Тихая волна": "Quiet Wave",
   "Тихая гавань": "Quiet Harbor",
@@ -1581,5 +1585,10 @@
   "Фильтр раздач: Источник": "Release filter: Source",
   "Фильтр раздач: Тип": "Release filter: Type",
   "Фильтр раздач: Кодек": "Release filter: Codec",
-  "Фильтр раздач: HDR": "Release filter: HDR"
+  "Фильтр раздач: HDR": "Release filter: HDR",
+  "Русский дубляж": "Russian dubbing",
+  "Русский дубляж при больше всего отдающих": "Russian dubbing · most seeders",
+  "Русский дубляж при много отдающих": "Russian dubbing · many seeders",
+  "Русский дубляж при умеренный размер": "Russian dubbing · moderate size",
+  "Русский дубляж при проверенный источник": "Russian dubbing · verified source"
 }

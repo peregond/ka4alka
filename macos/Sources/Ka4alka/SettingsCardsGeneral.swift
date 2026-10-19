@@ -53,7 +53,9 @@ struct SettingsAppearanceCard: View {
                 Text("English").tag("en")
             }
             .labelsHidden()
-            .frame(width: 145)
+            .frame(width: 145, height: 24)
+            .contentShape(Rectangle())
+            .settingsLayoutProbe("menu.settings.language", kind: .control)
         }
     }
 }
@@ -305,7 +307,9 @@ struct SettingsCatalogCard: View {
                     }
                 }
                 .labelsHidden()
-                .frame(maxWidth: 320, alignment: .leading)
+                .frame(maxWidth: 320, minHeight: 24, alignment: .leading)
+                .contentShape(Rectangle())
+                .settingsLayoutProbe("menu.settings.country", kind: .control)
                 SettingsCaption(tr("Учитываем страну производства, в том числе совместного.", "We use the country of production, co-productions included."))
                 SettingsNoticeLine(notice: $countryNotice)
             }
