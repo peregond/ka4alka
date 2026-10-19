@@ -1,0 +1,35 @@
+name: Verify shared Windows and Mac engine
+on:
+  push:
+    branches: [claude/quirky-hopper-1vlmj6]
+    paths: ['desktop-core/**', 'desktop-core-tests/**', 'desktop-host/**', 'mac-update-core/**', 'mac-update-tests/**', 'release-tools/**', 'lan-core/**', 'lan-tests/**', 'native/**', 'scripts/test-desktop-ipc.py', '.github/workflows/portable-core.yml']
+  workflow_dispatch:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  shared-engine:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: portable-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+      - run: dotnet run --project desktop-core-tests/Kachalka.DesktopCoreTests.csproj -c Release
+      - run: dotnet run --project lan-tests/Kachalka.LanTests.csproj -c Release
+      - run: dotnet run --project mac-update-tests/Kachalka.MacUpdateTests.csproj -c Release
+      - run: dotnet build release-tools/Kachalka.ReleaseTools.csproj -c Release
+      - run: dotnet build desktop-host/Kachalka.DesktopHost.csproj -c Release
+      - run: python scripts/test-desktop-ipc.py

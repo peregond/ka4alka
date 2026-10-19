@@ -48,3 +48,8 @@ work/
 
 __pycache__/
 *.pyc
+
+# Native macOS build products
+**/.build/
+**/.swiftpm/
+*.dmg

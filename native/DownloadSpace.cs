@@ -77,12 +77,43 @@ public sealed class DownloadSpace
         paths[path]=remaining;return remaining-previous;
     }
     static long Add(long a,long b)=>a>long.MaxValue-b?long.MaxValue:a+b;
+    // APFS firmlinks (for example /Users -> the Data volume) are not path
+    // prefixes in DriveInfo. Ask the filesystem which volume owns the folder.
+    [StructLayout(LayoutKind.Sequential,CharSet=CharSet.Ansi)]
+    struct MacFileSystem
+    {
+        public uint BlockSize;public int IoSize;
+        public ulong Blocks,FreeBlocks,AvailableBlocks,Files,FreeFiles;
+        public int FileSystemId0,FileSystemId1;
+        public uint Owner,Type,Flags,Subtype;
+        [MarshalAs(UnmanagedType.ByValTStr,SizeConst=16)]public string TypeName;
+        [MarshalAs(UnmanagedType.ByValTStr,SizeConst=1024)]public string MountPoint;
+        [MarshalAs(UnmanagedType.ByValTStr,SizeConst=1024)]public string Device;
+        public uint ExtendedFlags;
+        [MarshalAs(UnmanagedType.ByValArray,SizeConst=7)]public uint[] Reserved;
+    }
+    [DllImport("libc",EntryPoint="statfs",SetLastError=true)]
+    static extern int MacStatFs(string path,out MacFileSystem stat);
+    // Intel macOS retains the legacy statfs ABI under the unsuffixed symbol.
+    // Darwin headers bind the modern structure to statfs$INODE64 there.
+    [DllImport("libc",EntryPoint="statfs$INODE64",SetLastError=true)]
+    static extern int IntelMacStatFs(string path,out MacFileSystem stat);
     static DownloadVolume ReadVolume(string folder)
     {
         var full=Path.GetFullPath(folder);
+        if(OperatingSystem.IsMacOS())
+        {
+            var existing=full;
+            while(!Directory.Exists(existing))existing=Path.GetDirectoryName(existing)??throw new IOException("Download volume is unavailable.");
+            var result=RuntimeInformation.ProcessArchitecture==Architecture.X64
+                ?IntelMacStatFs(existing,out var stat):MacStatFs(existing,out stat);
+            if(result!=0)throw new Win32Exception(Marshal.GetLastWin32Error());
+            var macAvailable=stat.BlockSize==0?0:stat.AvailableBlocks>(ulong)long.MaxValue/stat.BlockSize?long.MaxValue:(long)(stat.AvailableBlocks*stat.BlockSize);
+            return new($"mac-volume:{stat.FileSystemId0:x8}:{stat.FileSystemId1:x8}",macAvailable);
+        }
         if(!OperatingSystem.IsWindows())
         {
-            var root=DriveInfo.GetDrives().Where(d=>full.StartsWith(d.RootDirectory.FullName,StringComparison.Ordinal)).OrderByDescending(d=>d.RootDirectory.FullName.Length).First();
+            var root=DriveInfo.GetDrives().Where(d=>(d.RootDirectory.FullName==Path.DirectorySeparatorChar.ToString()||full==Path.TrimEndingDirectorySeparator(d.RootDirectory.FullName)||full.StartsWith(Path.TrimEndingDirectorySeparator(d.RootDirectory.FullName)+Path.DirectorySeparatorChar,StringComparison.Ordinal))).OrderByDescending(d=>d.RootDirectory.FullName.Length).First();
             return new(root.Name,root.AvailableFreeSpace);
         }
         if(!GetDiskFreeSpaceEx(full,out var available,out _,out _))throw new Win32Exception(Marshal.GetLastWin32Error());
@@ -101,11 +132,30 @@ public sealed class DownloadSpace
     static long AllocatedBytes(string path)
     {
         if(string.IsNullOrWhiteSpace(path)||!File.Exists(path))return 0;
+        if(OperatingSystem.IsMacOS())
+        {
+            // ATTR_FILE_ALLOCSIZE counts allocated blocks, not the logical
+            // length of a sparse torrent file. Darwin attribute buffers align
+            // the returned off_t to four bytes after their length field.
+            var attributes=new MacAttributes{BitmapCount=5,FileAttributes=0x00000004};
+            var buffer=new byte[12];
+            if(MacGetAttributes(path,ref attributes,buffer,(nuint)buffer.Length,0)!=0)throw new Win32Exception(Marshal.GetLastWin32Error());
+            if(BitConverter.ToUInt32(buffer,0)!=12)throw new IOException("Invalid allocated-file-size response.");
+            return Math.Max(0,BitConverter.ToInt64(buffer,4));
+        }
         if(!OperatingSystem.IsWindows())return new FileInfo(path).Length;
         Marshal.SetLastPInvokeError(0);var low=GetCompressedFileSize(path,out var high);
         if(low==uint.MaxValue&&Marshal.GetLastPInvokeError()!=0)throw new Win32Exception(Marshal.GetLastPInvokeError());
         var bytes=((ulong)high<<32)|low;return bytes>long.MaxValue?long.MaxValue:(long)bytes;
     }
+    [StructLayout(LayoutKind.Sequential)]
+    struct MacAttributes
+    {
+        public ushort BitmapCount,Reserved;
+        public uint CommonAttributes,VolumeAttributes,DirectoryAttributes,FileAttributes,ForkAttributes;
+    }
+    [DllImport("libc",EntryPoint="getattrlist",SetLastError=true)]
+    static extern int MacGetAttributes(string path,ref MacAttributes attributes,[Out]byte[] buffer,nuint size,ulong options);
     [DllImport("kernel32.dll",CharSet=CharSet.Unicode,SetLastError=true)] static extern bool GetDiskFreeSpaceEx(string path,out ulong available,out ulong total,out ulong free);
     [DllImport("kernel32.dll",CharSet=CharSet.Unicode,SetLastError=true)] static extern bool GetVolumePathName(string path,StringBuilder volume,int length);
     [DllImport("kernel32.dll",CharSet=CharSet.Unicode,SetLastError=true)] static extern bool GetVolumeNameForVolumeMountPoint(string path,StringBuilder volume,int length);

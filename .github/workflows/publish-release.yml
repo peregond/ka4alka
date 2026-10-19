@@ -5,7 +5,7 @@ on:
       version:
         description: Version of the verified draft release to publish
         required: true
-        default: '0.43.14'
+        default: '0.44.2'
   # Called by "Prepare signed Windows release" once all of its checks pass.
   workflow_call:
     inputs:
@@ -14,6 +14,7 @@ on:
         required: true
 permissions:
   contents: write
+  actions: read
 jobs:
   publish:
     runs-on: windows-latest
@@ -21,13 +22,30 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
-      RELEASE_VERSION: ${{ inputs.version || '0.43.14' }}
+      RELEASE_VERSION: ${{ inputs.version || '0.44.2' }}
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Require completed Windows and Mac validation before publishing
+        shell: pwsh
+        run: |
+          if([Version]$env:RELEASE_VERSION -lt [Version]'0.44.0'){exit 0}
+          $readback=Join-Path $env:RUNNER_TEMP 'platform-release-check'
+          New-Item -ItemType Directory -Force $readback | Out-Null
+          gh release download ('v'+$env:RELEASE_VERSION) --dir $readback
+          if($LASTEXITCODE -ne 0){throw 'Cannot read back all platform assets'}
+          python scripts/verify-platform-release.py $env:RELEASE_VERSION $readback
+          if($LASTEXITCODE -ne 0){throw 'Both platforms must pass before publication'}
+          dotnet run --project release-tools/Kachalka.ReleaseTools.csproj -c Release -- --verify-mac $readback
+          if($LASTEXITCODE -ne 0){throw 'Mac publisher signature or component catalog invalid'}
+          dotnet run --project update-tests/Kachalka.UpdateTests.csproj -c Release -- --verify-release $readback
+          if($LASTEXITCODE -ne 0){throw 'Windows publisher signature or component catalog invalid'}
       - name: Publish the draft as the latest release
         shell: pwsh
         run: |
@@ -70,3 +88,17 @@ jobs:
           dotnet run --project update-tests/Kachalka.UpdateTests.csproj -c Release -- --verify-release $dir
           if($LASTEXITCODE -ne 0){throw 'Public package signature or contents invalid'}
           "Published $tag; public files downloaded without authentication and verified." >> $env:GITHUB_STEP_SUMMARY
+      - name: Verify public Mac packages
+        shell: pwsh
+        env:
+          GH_TOKEN: ''
+        run: |
+          if([Version]$env:RELEASE_VERSION -lt [Version]'0.44.0'){exit 0}
+          $dir=Join-Path $env:RUNNER_TEMP 'public-mac-release'
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          $base='https://github.com/'+$env:GH_REPO+'/releases/download/v'+$env:RELEASE_VERSION+'/'
+          foreach($file in @('Kachalka-macos-arm64.zip','Kachalka-macos-x64.zip','macos-latest.json','macos-latest.sig','macos-components-arm64.json','macos-components-x64.json')){
+            Invoke-WebRequest ($base+$file) -OutFile (Join-Path $dir $file) -MaximumRetryCount 5 -RetryIntervalSec 5
+          }
+          dotnet run --project release-tools/Kachalka.ReleaseTools.csproj -c Release -- --verify-mac $dir
+          if($LASTEXITCODE -ne 0){throw 'Public Mac release signature or contents invalid'}

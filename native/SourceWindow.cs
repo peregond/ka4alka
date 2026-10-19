@@ -191,17 +191,7 @@ public partial class MainWindow
     }
     // Catalog covers come straight from the image host. Where that host is slow, blocked or refuses us, the same
     // cover is asked from the site's proxy instead, as the website does; other covers have no second way.
-    async Task<byte[]> CoverBytes(string url,int max,CancellationToken ct)
-    {
-        if(url.StartsWith("//",StringComparison.Ordinal))url="https:"+url;
-        var proxied=ZonaPoster.ViaSite(url);
-        if(EnglishMedia.PosterUrl(url) is {} poster)proxied="api/backdrop-image?size=w500&file="+Uri.EscapeDataString("/"+new Uri(poster).Segments.Last());
-        if(proxied==null)return await sourceClient.Read(SourceClient.WebUri(url),max,ct);
-        using var direct=CancellationTokenSource.CreateLinkedTokenSource(ct);direct.CancelAfter(TimeSpan.FromSeconds(8));
-        try{return await sourceClient.Read(SourceClient.WebUri(url),max,direct.Token);}
-        catch(Exception) when(!ct.IsCancellationRequested){}
-        return await onlineIndex.ReadSite(proxied,max,ct);
-    }
+    Task<byte[]> CoverBytes(string url,int max,CancellationToken ct)=>CoverSource.ReadAsync(sourceClient,onlineIndex,url,max,ct);
     static string? CoverUrl(object? item)=>item switch{SourceEntry source=>source.ImageUrl,MediaItem media=>media.DisplayImageUrl,DownloadItem download=>download.ImageUrl,_=>null};
     static string CoverPath(string url)=>Path.Combine(Preferences.DataDir,"covers",Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(url)))+".img");
     void QueuePoster(Image image,CoverRequest state,object? item,string url,BitmapImage bitmap)

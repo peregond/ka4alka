@@ -1,0 +1,190 @@
+name: Verify native macOS application
+on:
+  push:
+    branches: [claude/quirky-hopper-1vlmj6, claude/mac-polish, 'claude/mac-**']
+    paths: ['macos/**', 'desktop-core/**', 'desktop-host/**', 'native/**', 'native/Localization/**', 'update-core/**', 'lan-core/**', 'lan-tests/**', 'mac-update-core/**', 'mac-update-tests/**', 'desktop-core-tests/**', 'scripts/test-desktop-ipc.py', 'scripts/macos/**', '.github/workflows/macos.yml']
+  pull_request:
+    paths: ['macos/**', 'desktop-core/**', 'desktop-host/**', 'native/**', 'native/Localization/**', 'update-core/**', 'lan-core/**', 'lan-tests/**', 'mac-update-core/**', 'mac-update-tests/**', 'desktop-core-tests/**', 'scripts/test-desktop-ipc.py', 'scripts/macos/**', '.github/workflows/macos.yml']
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      compat:
+        description: Also run the macOS and Xcode compatibility matrix (release callers leave this off)
+        type: boolean
+        default: false
+permissions:
+  contents: read
+# Only pushes to development branches and pull requests cancel their own older runs.
+# A manual run or a release gate gets a group of its own, so it can never be cancelled by (or cancel) anything else.
+concurrency:
+  group: macos-${{ github.workflow }}-${{ github.ref }}-${{ (github.event_name == 'pull_request' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/claude/'))) && 'branch' || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/claude/')) }}
+jobs:
+  macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    env:
+      KACHALKA_DATA: ${{ github.workspace }}/test-output/macos/profile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('**/*.csproj') }}
+      - name: Report the Xcode versions on this runner
+        run: |
+          installed="$(ls /Applications | grep -i xcode | tr '\n' ' ')"
+          selected="$(xcodebuild -version 2>&1 | tr '\n' ' ')"
+          sdks="$(xcodebuild -showsdks 2>&1 | grep -i 'macosx' | tr '\n' ' ')"
+          echo "::notice title=Installed Xcode versions::${installed}"
+          echo "::notice title=Selected Xcode::${selected}"
+          echo "::notice title=macOS SDKs::${sdks}"
+          echo "::notice title=Swift::$(swift --version 2>&1 | head -n 1)"
+      - name: Build native application and self-contained shared engine
+        run: |
+          set -o pipefail
+          bash scripts/macos/build.sh '${{ matrix.arch }}' 2>&1 | tee "$RUNNER_TEMP/build.log" || {
+            grep -E 'error:' "$RUNNER_TEMP/build.log" | sort -u | head -30 | while IFS= read -r line; do echo "::error title=Swift compile error::${line:0:900}"; done
+            exit 1
+          }
+      - name: Run native app with the packaged engine (page, size, theme and language matrix)
+        run: |
+          bash macos/Tests/run-smoke.sh render \
+            "$PWD/dist/macos-${{ matrix.arch }}/Ka4alka.app/Contents/MacOS/Ka4alka" \
+            "$PWD/test-output/macos/render" "${{ matrix.runner }}"
+      - name: Verify closing the native window saves state and exits
+        run: |
+          bash macos/Tests/run-smoke.sh close \
+            "$PWD/dist/macos-${{ matrix.arch }}/Ka4alka.app/Contents/MacOS/Ka4alka" \
+            "$PWD/test-output/macos/close" "${{ matrix.runner }}"
+      - name: Verify shared queue, magnet transfers and deleted-file recovery
+        run: dotnet run --project desktop-core-tests/Kachalka.DesktopCoreTests.csproj -c Release
+      - name: Verify mutual TLS device pairing and download requests
+        run: dotnet run --project lan-tests/Kachalka.LanTests.csproj -c Release
+      - name: Verify packaged pipe protocol without creating an idle torrent engine
+        run: python3 scripts/test-desktop-ipc.py "$PWD/dist/macos-${{ matrix.arch }}/Ka4alka.app/Contents/Resources/engine/Kachalka.Engine"
+      - name: Verify native models, layout and signed updater
+        env:
+          KACHALKA_TEST_APP: ${{ github.workspace }}/dist/macos-${{ matrix.arch }}/Ka4alka.app
+        working-directory: macos
+        run: |
+          set -o pipefail
+          swift test -c release --jobs 3 2>&1 | tee "$RUNNER_TEMP/test.log" || {
+            grep -E "error:|failed|Fatal|Test Case .* failed" "$RUNNER_TEMP/test.log" | sort -u | head -30 | while IFS= read -r line; do echo "::error title=Swift test failure::${line:0:900}"; done
+            exit 1
+          }
+      - name: Collect evidence (crash reports, engine logs, environment)
+        if: always()
+        run: |
+          evidence="$PWD/test-output/macos/evidence"
+          mkdir -p "$evidence"
+          {
+            sw_vers
+            xcodebuild -version
+            swift --version
+            ls /Applications | grep -i xcode
+            system_profiler SPDisplaysDataType
+          } > "$evidence/env.txt" 2>&1 || true
+          cp ~/Library/Logs/DiagnosticReports/Ka4alka* "$evidence/" 2>/dev/null || true
+          cp ~/Library/Logs/DiagnosticReports/Kachalka* "$evidence/" 2>/dev/null || true
+          if [ -d "$KACHALKA_DATA" ]; then rsync -a --exclude downloads "$KACHALKA_DATA/" "$evidence/profile/" || true; fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: macos-${{ matrix.arch }}-${{ github.sha }}
+          path: |
+            dist/macos-${{ matrix.arch }}/Kachalka-macos-*.zip
+            dist/macos-${{ matrix.arch }}/Kachalka-macos-*.dmg
+            test-output/macos/render/
+            test-output/macos/close/
+            test-output/macos/evidence/
+
+  # Not part of the release gate: which macOS and Xcode combinations build and pass the same smoke test.
+  # It also records which surface variant (glass, material or solid) is live on each of them.
+  macos-compat:
+    # Direct runs (push, pull request, manual) have no inputs, so the caller's workflow name decides; a release caller opts in with compat: true.
+    if: ${{ inputs.compat == true || github.workflow == 'Verify native macOS application' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            xcode: '16.4'
+          - runner: macos-26
+            xcode: '26'
+            experimental: true
+    runs-on: ${{ matrix.runner }}
+    continue-on-error: ${{ matrix.experimental == true }}
+    timeout-minutes: 60
+    env:
+      KACHALKA_DATA: ${{ github.workspace }}/test-output/macos/profile
+      KACHALKA_SKIP_DMG: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-arm64-${{ hashFiles('**/*.csproj') }}
+      - name: Select Xcode ${{ matrix.xcode }}
+        run: |
+          installed="$(ls /Applications | grep -i xcode | tr '\n' ' ')"
+          echo "::notice title=Installed Xcode versions (${{ matrix.runner }})::${installed}"
+          version='${{ matrix.xcode }}'
+          selected=''
+          for candidate in "/Applications/Xcode_${version}.app" "/Applications/Xcode_${version}.0.app" "/Applications/Xcode_${version}_beta.app"; do
+            if [ -d "$candidate" ]; then
+              sudo xcode-select -s "$candidate/Contents/Developer"
+              selected="$candidate"
+              break
+            fi
+          done
+          if [ -z "$selected" ]; then
+            echo "::warning title=Xcode ${version} not installed::using the default Xcode of ${{ matrix.runner }}"
+          fi
+          echo "::notice title=Selected Xcode::$(xcodebuild -version 2>&1 | tr '\n' ' ')"
+          swift --version
+      - name: Build (swift build -c release through the packaging script)
+        run: |
+          set -o pipefail
+          bash scripts/macos/build.sh arm64 2>&1 | tee "$RUNNER_TEMP/build.log" || {
+            grep -E 'error:' "$RUNNER_TEMP/build.log" | sort -u | head -30 | while IFS= read -r line; do echo "::error title=Swift compile error::${line:0:900}"; done
+            exit 1
+          }
+      - name: Run the smoke test on ${{ matrix.runner }}
+        run: |
+          bash macos/Tests/run-smoke.sh render \
+            "$PWD/dist/macos-arm64/Ka4alka.app/Contents/MacOS/Ka4alka" \
+            "$PWD/test-output/macos/render" "${{ matrix.runner }} / Xcode ${{ matrix.xcode }}"
+      - name: Collect evidence
+        if: always()
+        run: |
+          evidence="$PWD/test-output/macos/evidence"
+          mkdir -p "$evidence"
+          {
+            sw_vers
+            xcodebuild -version
+            swift --version
+            system_profiler SPDisplaysDataType
+          } > "$evidence/env.txt" 2>&1 || true
+          cp ~/Library/Logs/DiagnosticReports/Ka4alka* "$evidence/" 2>/dev/null || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: compat-${{ matrix.runner }}-${{ matrix.xcode }}
+          path: |
+            test-output/macos/render/
+            test-output/macos/evidence/

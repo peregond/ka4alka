@@ -2,12 +2,14 @@ using System.IO;
 namespace Kachalka;
 public static class DownloadFiles
 {
+    static StringComparison PathComparison=>OperatingSystem.IsWindows()?StringComparison.OrdinalIgnoreCase:StringComparison.Ordinal;
+    static StringComparer PathComparer=>OperatingSystem.IsWindows()?StringComparer.OrdinalIgnoreCase:StringComparer.Ordinal;
     const int SharingViolation=32,LockViolation=33;
     static readonly TimeSpan[] RetryDelays=[TimeSpan.FromMilliseconds(120),TimeSpan.FromMilliseconds(240),TimeSpan.FromMilliseconds(400),TimeSpan.FromMilliseconds(600)];
     public static void ValidatePath(string folder,string file)
     {
         var root=Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder));var path=Path.GetFullPath(file);
-        if(!path.StartsWith(root+Path.DirectorySeparatorChar,StringComparison.OrdinalIgnoreCase))throw new IOException("Файл находится вне папки этой загрузки.");
+        if(!path.StartsWith(root+Path.DirectorySeparatorChar,PathComparison))throw new IOException("Файл находится вне папки этой загрузки.");
         for(var current=path;current!=null;current=Path.GetDirectoryName(current))
             if(Attributes(current) is { } attributes&&(attributes&FileAttributes.ReparsePoint)!=0)throw new IOException("Удаление файлов через ссылки запрещено.");
     }
@@ -22,7 +24,7 @@ public static class DownloadFiles
     // Retry only Windows sharing/lock errors, never permissions or unsafe paths.
     public static Task<int> DeleteAsync(string folder,IReadOnlyList<string> files,CancellationToken cancellation=default)
     {
-        var paths=files.Where(path=>!string.IsNullOrWhiteSpace(path)).Select(Path.GetFullPath).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        var paths=files.Where(path=>!string.IsNullOrWhiteSpace(path)).Select(Path.GetFullPath).Distinct(PathComparer).ToArray();
         return Task.Run(async()=>
         {
             foreach(var path in paths)
@@ -83,7 +85,7 @@ public static class DownloadFiles
     public static void RemoveEmptyParents(string folder,string file)
     {
         var root=Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder));
-        for(var dir=Path.GetDirectoryName(Path.GetFullPath(file));dir!=null&&!dir.Equals(root,StringComparison.OrdinalIgnoreCase);dir=Path.GetDirectoryName(dir))
+        for(var dir=Path.GetDirectoryName(Path.GetFullPath(file));dir!=null&&!dir.Equals(root,PathComparison);dir=Path.GetDirectoryName(dir))
         {
             try
             {

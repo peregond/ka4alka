@@ -1,0 +1,93 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><EnableDefaultCompileItems>false</EnableDefaultCompileItems></PropertyGroup>
+  <ItemGroup><PackageReference Include="MonoTorrent" Version="3.0.2" /><PackageReference Include="HtmlAgilityPack" Version="1.13.0" /></ItemGroup>
+  <ItemGroup><ProjectReference Include="../lan-core/Kachalka.Lan.csproj" /><ProjectReference Include="../update-core/Kachalka.UpdateCore.csproj" /></ItemGroup>
+  <ItemGroup>
+    <Compile Include="../native/AppLanguage.cs" Link="AppLanguage.cs" />
+    <Compile Include="../native/AwardsCatalog.cs" Link="AwardsCatalog.cs" />
+    <Compile Include="../native/BigFanGroupSource.cs" Link="BigFanGroupSource.cs" />
+    <Compile Include="../native/BroadcastCatalog.cs" Link="BroadcastCatalog.cs" />
+    <Compile Include="../native/BugReportDraft.cs" Link="BugReportDraft.cs" />
+    <Compile Include="../native/BundledCatalog.cs" Link="BundledCatalog.cs" />
+    <Compile Include="../native/CacheStorage.cs" Link="CacheStorage.cs" />
+    <Compile Include="../native/CatalogBatch.cs" Link="CatalogBatch.cs" />
+    <Compile Include="../native/CatalogChoices.cs" Link="CatalogChoices.cs" />
+    <Compile Include="../native/CatalogIndex.cs" Link="CatalogIndex.cs" />
+    <Compile Include="../native/CatalogPaging.cs" Link="CatalogPaging.cs" />
+    <Compile Include="../native/CatalogRegions.cs" Link="CatalogRegions.cs" />
+    <Compile Include="../native/CinemaMetadata.cs" Link="CinemaMetadata.cs" />
+    <Compile Include="../native/CinemaPeople.cs" Link="CinemaPeople.cs" />
+    <Compile Include="../native/CinemaPortraits.cs" Link="CinemaPortraits.cs" />
+    <Compile Include="../native/CoverSource.cs" Link="CoverSource.cs" />
+    <Compile Include="../native/CoverCache.cs" Link="CoverCache.cs" />
+    <Compile Include="../native/DhtBootstrap.cs" Link="DhtBootstrap.cs" />
+    <Compile Include="../native/DiagnosticLog.cs" Link="DiagnosticLog.cs" />
+    <Compile Include="../native/DownloadDiagnostics.cs" Link="DownloadDiagnostics.cs" />
+    <Compile Include="../native/DownloadFiles.cs" Link="DownloadFiles.cs" />
+    <Compile Include="../native/DownloadFolders.cs" Link="DownloadFolders.cs" />
+    <Compile Include="../native/DownloadMetadata.cs" Link="DownloadMetadata.cs" />
+    <Compile Include="../native/DownloadNotices.cs" Link="DownloadNotices.cs" />
+    <Compile Include="../native/DownloadOrdering.cs" Link="DownloadOrdering.cs" />
+    <Compile Include="../native/DownloadRecovery.cs" Link="DownloadRecovery.cs" />
+    <Compile Include="../native/DownloadService.cs" Link="DownloadService.cs" />
+    <Compile Include="../native/DownloadSpace.cs" Link="DownloadSpace.cs" />
+    <Compile Include="../native/DownloadTelemetry.cs" Link="DownloadTelemetry.cs" />
+    <Compile Include="../native/EnglishMedia.cs" Link="EnglishMedia.cs" />
+    <Compile Include="../native/ErrorLog.cs" Link="ErrorLog.cs" />
+    <Compile Include="../native/FeatureBackdrop.cs" Link="FeatureBackdrop.cs" />
+    <Compile Include="../native/FeaturedCatalog.cs" Link="FeaturedCatalog.cs" />
+    <Compile Include="../native/GameCatalog.cs" Link="GameCatalog.cs" />
+    <Compile Include="../native/GameReleaseInfo.cs" Link="GameReleaseInfo.cs" />
+    <Compile Include="../native/GameReleaseSources.cs" Link="GameReleaseSources.cs" />
+    <Compile Include="../native/GameStore.cs" Link="GameStore.cs" />
+    <Compile Include="../native/HiddenCatalog.cs" Link="HiddenCatalog.cs" />
+    <Compile Include="../native/ImdbSuggestions.cs" Link="ImdbSuggestions.cs" />
+    <Compile Include="../native/IndexRelays.cs" Link="IndexRelays.cs" />
+    <Compile Include="../native/KnabenSource.cs" Link="KnabenSource.cs" />
+    <Compile Include="../native/LanDownloadReceiver.cs" Link="LanDownloadReceiver.cs" />
+    <Compile Include="../native/LiveCatalog.cs" Link="LiveCatalog.cs" />
+    <Compile Include="../native/MagnetDiscovery.cs" Link="MagnetDiscovery.cs" />
+    <Compile Include="../native/MediaIdentity.cs" Link="MediaIdentity.cs" />
+    <Compile Include="../native/MediaMetadata.cs" Link="MediaMetadata.cs" />
+    <Compile Include="../native/MegaPeerSource.cs" Link="MegaPeerSource.cs" />
+    <Compile Include="../native/MetadataScheduler.cs" Link="MetadataScheduler.cs" />
+    <Compile Include="../native/MissingDownloadFiles.cs" Link="MissingDownloadFiles.cs" />
+    <Compile Include="../native/Models.cs" Link="Models.cs" />
+    <Compile Include="../native/NativeReleaseSources.cs" Link="NativeReleaseSources.cs" />
+    <Compile Include="../native/NnmClubSource.cs" Link="NnmClubSource.cs" />
+    <Compile Include="../native/OnlineIndexClient.cs" Link="OnlineIndexClient.cs" />
+    <Compile Include="../native/PerformanceResources.cs" Link="PerformanceResources.cs" />
+    <Compile Include="../native/PirateBaySource.cs" Link="PirateBaySource.cs" />
+    <Compile Include="../native/ProfessionalCinemaPeople.cs" Link="ProfessionalCinemaPeople.cs" />
+    <Compile Include="../native/RegionalCatalog.cs" Link="RegionalCatalog.cs" />
+    <Compile Include="../native/ReleaseAvailabilityRules.cs" Link="ReleaseAvailabilityRules.cs" />
+    <Compile Include="../native/ReleaseAudio.cs" Link="ReleaseAudio.cs" />
+    <Compile Include="../native/ReleaseFreshness.cs" Link="ReleaseFreshness.cs" />
+    <Compile Include="../native/ReleaseQuality.cs" Link="ReleaseQuality.cs" />
+    <Compile Include="../native/ReleaseRecommendation.cs" Link="ReleaseRecommendation.cs" />
+    <Compile Include="../native/ReleaseSearch.cs" Link="ReleaseSearch.cs" />
+    <Compile Include="../native/RussianAudio.cs" Link="RussianAudio.cs" />
+    <Compile Include="../native/SearchLanguage.cs" Link="SearchLanguage.cs" />
+    <Compile Include="../native/SeasonalCatalog.cs" Link="SeasonalCatalog.cs" />
+    <Compile Include="../native/SeriesReleaseInfo.cs" Link="SeriesReleaseInfo.cs" />
+    <Compile Include="../native/SeriesSources.cs" Link="SeriesSources.cs" />
+    <Compile Include="../native/ShareLink.cs" Link="ShareLink.cs" />
+    <Compile Include="../native/SharedCatalog.cs" Link="SharedCatalog.cs" />
+    <Compile Include="../native/SiteCountry.cs" Link="SiteCountry.cs" />
+    <Compile Include="../native/Sources.cs" Link="Sources.cs" />
+    <Compile Include="../native/TextCatalogDownload.cs" Link="TextCatalogDownload.cs" />
+    <Compile Include="../native/TitleMetadata.cs" Link="TitleMetadata.cs" />
+    <Compile Include="../native/TvMazeMetadata.cs" Link="TvMazeMetadata.cs" />
+    <Compile Include="../native/UnifiedSearch.cs" Link="UnifiedSearch.cs" />
+    <Compile Include="../native/ZonaMovieMetadata.cs" Link="ZonaMovieMetadata.cs" />
+    <Compile Include="../native/ZonaPoster.cs" Link="ZonaPoster.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="../web-index/app/data/seed.json" LogicalName="Kachalka.catalog-seed.json" />
+    <EmbeddedResource Include="../web-index/app/data/starter.json" LogicalName="Kachalka.catalog-starter.json" />
+    <EmbeddedResource Include="../web-index/app/data/title-aliases.json" LogicalName="Kachalka.title-aliases.json" />
+    <EmbeddedResource Include="../scripts/catalog-collections.json" LogicalName="Kachalka.catalog-collections.json" />
+    <EmbeddedResource Include="../native/FeaturedCollections.json" LogicalName="Kachalka.FeaturedCollections.json" />
+    <EmbeddedResource Include="../native/Localization/en.json" LogicalName="Kachalka.Localization.en.json" />
+  </ItemGroup>
+</Project>

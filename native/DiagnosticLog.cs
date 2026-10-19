@@ -25,6 +25,15 @@ public static class DiagnosticLog
 
 public static class DiagnosticReport
 {
+    static bool AnimationsAvailable {
+        get {
+#if WINDOWS
+            return System.Windows.SystemParameters.ClientAreaAnimation;
+#else
+            return false;
+#endif
+        }
+    }
     public const string IssueUrl="https://github.com/peregond/ka4alka/issues/new?template=bug_report.yml";
     public static string Redact(string text,IEnumerable<string> paths)
     {
@@ -87,7 +96,7 @@ public static class DiagnosticReport
     public static Snapshot Capture(Preferences prefs,DownloadService downloads)
     {
         downloads.Update();
-        var header=JsonSerializer.Serialize(new{Version=typeof(Preferences).Assembly.GetName().Version?.ToString(3),Utc=DateTime.UtcNow,OS=Environment.OSVersion.VersionString,Architecture=System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString(),Theme=prefs.Light?"Светлая":"Тёмная",prefs.MaxDownloadKbps,prefs.MaxUploadKbps,FolderConfigured=prefs.FolderConfigured,LiteMode=prefs.LiteMode,WindowsAnimations=System.Windows.SystemParameters.ClientAreaAnimation,Language=prefs.UiLanguage,Processors=Environment.ProcessorCount,MemoryMb=GC.GetGCMemoryInfo().TotalAvailableMemoryBytes/1024/1024});
+        var header=JsonSerializer.Serialize(new{Version=typeof(Preferences).Assembly.GetName().Version?.ToString(3),Utc=DateTime.UtcNow,OS=Environment.OSVersion.VersionString,Architecture=System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString(),Theme=prefs.Light?"Светлая":"Тёмная",prefs.MaxDownloadKbps,prefs.MaxUploadKbps,FolderConfigured=prefs.FolderConfigured,LiteMode=prefs.LiteMode,WindowsAnimations=AnimationsAvailable,Language=prefs.UiLanguage,Processors=Environment.ProcessorCount,MemoryMb=GC.GetGCMemoryInfo().TotalAvailableMemoryBytes/1024/1024});
         var lines=downloads.Items.Take(100).Select(item=>JsonSerializer.Serialize(new{item.DisplayName,item.ReleaseSource,item.InfoHash,item.Paused,item.Status,item.Progress,item.PeersText,item.Hint,Files=item.Files.Count})).ToArray();
         var paths=new[]{prefs.Folder,Preferences.DataDir,Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)}.Concat(downloads.Items.Select(x=>x.Folder)).ToArray();
         return new(header,lines,paths,Preferences.DataDir,prefs.Folder);

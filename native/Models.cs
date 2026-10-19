@@ -4,9 +4,8 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.IO;
 using System.Text.RegularExpressions;
-using System.Windows.Media;
 namespace Kachalka;
-public record MediaItem(int Id, string Title, string Section, string Genre, int Year, string Kinopoisk, string Imdb, string Color) : INotifyPropertyChanged
+public partial record MediaItem(int Id, string Title, string Section, string Genre, int Year, string Kinopoisk, string Imdb, string Color) : INotifyPropertyChanged
 {
     EnglishMedia? english;
     [JsonIgnore] public EnglishMedia? English {get=>english;init=>english=value;}
@@ -123,7 +122,6 @@ public record MediaItem(int Id, string Title, string Section, string Genre, int 
         if(kpChanged||imdbChanged)Notify(nameof(CardRating),nameof(HasCardRating),nameof(CardRatingSource),nameof(Scores));
     }
     [JsonIgnore] public string Subtitle => Cinema ? string.Join(" · ",new[]{Section=="Сериалы"?"Сериал":Section=="Игры"?"Игра для Windows":"Фильм",Year>0?Year.ToString():null,InlineMetadata(Genre)}.Where(x=>!string.IsNullOrWhiteSpace(x))) : "Демонстрационный каталог";
-    [JsonIgnore] public Brush Cover { get { var b = new LinearGradientBrush((Color)ColorConverter.ConvertFromString(Color), (Color)ColorConverter.ConvertFromString("#20262E"), 75); b.Freeze(); return b; } }
 }
 public record CatalogRow
 {

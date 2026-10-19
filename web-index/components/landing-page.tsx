@@ -20,6 +20,7 @@ function WindowsIcon({ size = 21 }: { size?: number }) {
 
 export function LandingPage({ release }: { release: AppRelease }) {
   const { t } = useSiteLanguage();
+  const macDownloads = release.mac ? <div className="download-options" style={{ justifyContent: "center", flexWrap: "wrap", gap: 18 }}><span>macOS 14+</span><a href="/download?format=mac-arm64">Mac · Apple Silicon <ArrowDownToLine size={15} aria-hidden="true" /></a><a href="/download?format=mac-x64">Mac · Intel <ArrowDownToLine size={15} aria-hidden="true" /></a></div> : null;
   const size = Math.round(release.installerSize / 1_000_000);
   return <>
     <LocalizedMetadata title="Качалка — фильмы, сериалы, игры и загрузки для Windows" description="Твой вечер. Играй, смотри, качай. Фильмы, сериалы и игры, поиск раздач и управление загрузками в одном приложении. Скачать Качалку для Windows 10/11." />
@@ -30,10 +31,11 @@ export function LandingPage({ release }: { release: AppRelease }) {
         <div className="hero-language"><LanguageSwitcher /></div>
         <a className="release-badge" href={release.releaseUrl} target="_blank" rel="noreferrer"><span className="status-dot" />{t("Версия")} {release.version}<span className="badge-divider" />{t("Уже на GitHub")}<ArrowUpRight size={13} aria-hidden="true" /></a>
         <h1 id="hero-title">{t("Твой вечер.")}<br /><span>{t("Играй, смотри, качай.")}</span></h1>
-        <p className="hero-description">{t("Фильмы, сериалы, игры и загрузки — в одном приложении для Windows.")}<br className="desktop-break" /> {t("Выбери, во что играть или что смотреть, и добавь загрузку в очередь.")}</p>
+        <p className="hero-description">{t(release.mac ? "Фильмы, сериалы, игры и загрузки — в одном приложении для Windows и Mac." : "Фильмы, сериалы, игры и загрузки — в одном приложении для Windows.")}<br className="desktop-break" /> {t("Выбери, во что играть или что смотреть, и добавь загрузку в очередь.")}</p>
         <div className="hero-actions"><a className="button button-download" href="/download"><WindowsIcon />{t("Скачать для Windows")}<ArrowDownToLine size={21} aria-hidden="true" /></a><a className="button button-telegram" href="https://t.me/ka4alkacc" target="_blank" rel="noopener noreferrer"><TelegramIcon />{t("Мы в Telegram")}<ArrowUpRight size={16} aria-hidden="true" /></a></div>
         <div className="hero-feature-link"><a className="button-secondary" href="#features">{t("Что умеет Качалка")}<ArrowDown size={17} aria-hidden="true" /></a></div>
         <p className="download-meta">{t("Бесплатно и без рекламы")}<span />Windows 10 / 11 · x64<span />{t("Установщик ·")} {size} {t("МБ")}</p>
+        {macDownloads}
         <ProductPreview />
         <div className="product-facts"><span><Check size={17} aria-hidden="true" />{t("Бесплатно и без рекламы")}</span><span><Code2 size={16} aria-hidden="true" />{t("Открытый исходный код")}</span><span><Check size={17} aria-hidden="true" />{t("Без регистрации")}</span></div>
       </section>
@@ -72,6 +74,7 @@ export function LandingPage({ release }: { release: AppRelease }) {
           <li><span className="install-number">3</span><div><h3>{t("Если появится SmartScreen")}</h3><p>{t("В окне «Система Windows защитила ваш компьютер» нажми")} <strong>{t("«Подробнее»")}</strong>{t(", затем")} <strong>{t("«Выполнить в любом случае»")}</strong>{t(". Продолжай только если файл скачан из официального релиза Качалки и ты доверяешь приложению.")}</p><div className="install-clicks"><span>{t("Подробнее")}</span><ArrowRight size={16} aria-hidden="true" /><span>{t("Выполнить в любом случае")}</span></div></div></li>
           <li><span className="install-number">4</span><div><h3>{t("Заверши установку")}</h3><p>{t("Следуй шагам установщика. Запусти Качалку и выбери папку для загрузок — готово.")}</p></div></li>
         </ol>
+        {release.mac && <p className="install-note">{t("Mac: открой DMG и перетащи Ka4alka в Applications. В этом выпуске нет нотариализации Apple; при первом запуске может потребоваться разрешение в настройках безопасности. Игровой каталог содержит игры для Windows.")}</p>}
         <p className="install-note">{t("Если кнопки «Выполнить в любом случае» нет, не меняй защиту Windows. На рабочем компьютере обратись к администратору.")} <a href="https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/smartscreen-reputation" target="_blank" rel="noreferrer">{t("О SmartScreen — Microsoft")}<ArrowUpRight size={12} aria-hidden="true" /></a></p>
       </section>
 
