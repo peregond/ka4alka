@@ -96,6 +96,8 @@ struct SettingsNotificationsCard: View {
 struct SettingsLanCard: View {
     @EnvironmentObject private var model: AppModel
     @State private var discovering = false
+    /// The device a pairing request is in flight for; one request at a time.
+    @State private var pairingID: String?
     @State private var pairingUntil: Date?
     @State private var nameDraft = ""
     @State private var savedName = ""
@@ -218,9 +220,11 @@ struct SettingsLanCard: View {
                     .font(KDFont.secondary)
                     .foregroundStyle(KDPalette.success)
             } else {
-                Button(tr("Соединить", "Pair")) { Task { await model.lan("pair", ["id": .string(device.id)]) } }
+                if pairingID == device.id { SettingsSpinner() }
+                Button(tr("Соединить", "Pair")) { Task { await pair(device) } }
                     .buttonStyle(KDSecondaryButtonStyle())
                     .controlSize(.small)
+                    .disabled(pairingID != nil)
                     .accessibilityLabel(tr("Соединить с ", "Pair with ") + device.name)
             }
         }
@@ -245,8 +249,16 @@ struct SettingsLanCard: View {
     }
 
     @MainActor private func allowPairing() async {
-        await model.lan("allow")
-        pairingUntil = Date().addingTimeInterval(120)
+        if await model.lan("allow") {
+            pairingUntil = Date().addingTimeInterval(120)
+        }
+    }
+
+    @MainActor private func pair(_ device: LanDevice) async {
+        guard pairingID == nil else { return }
+        pairingID = device.id
+        defer { pairingID = nil }
+        await model.lan("pair", ["id": .string(device.id)])
     }
 
     @MainActor private func rename() async {

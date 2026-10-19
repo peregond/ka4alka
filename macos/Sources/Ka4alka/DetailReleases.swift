@@ -20,14 +20,19 @@ enum DetailReleaseText {
         }
     }
 
+    /// Engine words ("Экранка", "Есть", "Дубляж") in the UI language; a placeholder such as "Не указано" is left alone.
+    static func localized(_ text: String) -> String {
+        return meaningful(text) ? tr(text) : text
+    }
+
     /// The big label on the left of a row: "4K", "Full HD", "Экранка", or the game release kind.
     static func qualityText(_ release: ReleaseRow, isGame: Bool) -> String {
         if isGame {
-            if let kind = release.gameKind, meaningful(kind) { return kind }
+            if let kind = release.gameKind, meaningful(kind) { return tr(kind) }
             return "—"
         }
-        if let label = release.qualityLabel, meaningful(label) { return label }
-        if meaningful(release.quality) { return release.quality }
+        if let label = release.qualityLabel, meaningful(label) { return tr(label) }
+        if meaningful(release.quality) { return tr(release.quality) }
         return "—"
     }
 }
@@ -483,18 +488,27 @@ struct SourceStatusView: View {
     @State private var expanded = false
 
     private var failed: Int { sources.filter { sourceStateFailed($0.state) }.count }
+    private var searching: Bool { sources.contains { (source: SourceState) -> Bool in source.state == "Searching" } }
     private var summary: String {
-        if failed == 0 { return tr("Источники · \(sources.count)", "Sources · \(sources.count)") }
-        return tr("Не ответили: \(failed)", "No answer: \(failed)")
+        if failed > 0 { return tr("Не ответили: \(failed)", "No answer: \(failed)") }
+        if searching { return tr("Поиск…", "Searching…") }
+        return tr("Источники · \(sources.count)", "Sources · \(sources.count)")
     }
-    private var tone: KDTone { failed == 0 ? KDTone.success : KDTone.warning }
+    private var tone: KDTone {
+        if failed > 0 { return KDTone.warning }
+        return searching ? KDTone.info : KDTone.success
+    }
+    private var symbol: String {
+        if failed > 0 { return "exclamationmark.triangle" }
+        return searching ? "magnifyingglass" : "checkmark.circle"
+    }
 
     var body: some View {
         if !sources.isEmpty {
             DisclosureGroup(isExpanded: $expanded) {
                 statusGrid
             } label: {
-                Label(summary, systemImage: failed == 0 ? "checkmark.circle" : "exclamationmark.triangle")
+                Label(summary, systemImage: symbol)
                     .font(.callout)
                     .foregroundStyle(tone.foreground)
             }
@@ -584,8 +598,8 @@ struct ReleaseListRow: View {
         } else {
             for studio in release.studios { add(studio, .neutral, nil) }
             for kind in release.audioTypes { add(tr(kind), .info, nil) }
-            if release.studios.isEmpty && release.audioTypes.isEmpty { add(release.audio, .neutral, nil) }
-            if DetailReleaseText.meaningful(release.subs) { add(tr("Субтитры", "Subtitles") + ": " + release.subs, .neutral, nil) }
+            if release.studios.isEmpty && release.audioTypes.isEmpty { add(DetailReleaseText.localized(release.audio), .neutral, nil) }
+            if DetailReleaseText.meaningful(release.subs) { add(tr("Субтитры", "Subtitles") + ": " + tr(release.subs), .neutral, nil) }
             add(release.codec, .neutral, nil)
             add(release.hdr, .accent, nil)
         }
@@ -796,6 +810,46 @@ struct ReleaseListRow: View {
     }
 }
 
+// MARK: Queue links
+
+/// This title's queue entries, so a release row can show "В загрузках" or "Скачано".
+/// Rows and downloads are matched by the tracker id and source; the release title is only a fallback for queue
+/// entries that carry no ids, because the queue stores the torrent's name and not the tracker page title.
+struct DetailTransferLinks {
+    private var byRelease: [String: Transfer] = [:]
+    private var byTitle: [String: Transfer] = [:]
+
+    init(items: [Transfer], mediaId: String) {
+        for item in items where item.mediaId == mediaId {
+            if item.complete && item.missing { continue }
+            if let releaseId = item.releaseId, let source = item.releaseSource {
+                let key: String = DetailTransferLinks.key(source: source, id: releaseId)
+                DetailTransferLinks.store(item, key: key, in: &byRelease)
+            } else {
+                DetailTransferLinks.store(item, key: item.releaseTitle, in: &byTitle)
+            }
+        }
+    }
+
+    private static func key(source: String, id: String) -> String {
+        return source + "\u{1F}" + id
+    }
+
+    /// A finished download wins over a queued one for the same release.
+    private static func store(_ item: Transfer, key: String, in map: inout [String: Transfer]) {
+        if let known = map[key], known.complete { return }
+        map[key] = item
+    }
+
+    func transfer(for release: ReleaseRow) -> Transfer? {
+        if let releaseId = release.entryId {
+            let key: String = DetailTransferLinks.key(source: release.source, id: releaseId)
+            if let hit = byRelease[key] { return hit }
+        }
+        return byTitle[release.title]
+    }
+}
+
 // MARK: Releases section
 
 struct DetailReleasesSection: View {
@@ -810,16 +864,7 @@ struct DetailReleasesSection: View {
     private var isGame: Bool { card.section == "games" }
     private var isSeries: Bool { card.section == "series" }
 
-    /// This title's queue entries by release title, so a row can show "В загрузках" or "Скачано".
-    private var linkedTransfers: [String: Transfer] {
-        var result: [String: Transfer] = [:]
-        for item in transfers.items where item.mediaId == card.id {
-            if item.complete && item.missing { continue }
-            if let known = result[item.releaseTitle], known.complete { continue }
-            result[item.releaseTitle] = item
-        }
-        return result
-    }
+    private var hidesPoorQuality: Bool { model.settings?.hidePoorQuality ?? true }
 
     private var pairedDevices: [LanDevice] { (model.lanState?.devices ?? []).filter { $0.paired } }
 
@@ -884,25 +929,49 @@ struct DetailReleasesSection: View {
         .accessibilityLabel(tr("Ищем раздачи…", "Searching for releases…"))
     }
 
-    private var noReleases: some View {
-        KDEmptyState(
-            title: tr("Раздачи не найдены", "No releases found"),
-            systemImage: "tray",
-            message: tr("Источники пока ничего не нашли. Повтори поиск позже.", "The sources found nothing yet. Try again later."),
-            actionTitle: tr("Повторить поиск", "Search again"),
-            action: { Task { @MainActor in await model.loadReleases(card) } }
-        )
+    @ViewBuilder private var noReleases: some View {
+        if hidesPoorQuality && !isGame {
+            KDEmptyState(
+                title: tr("Раздачи не найдены", "No releases found"),
+                systemImage: "tray",
+                message: tr(
+                    "Экранки и раздачи низкого качества скрыты. Возможно, других пока нет.",
+                    "Cam and low-quality releases are hidden. There may be no others yet."
+                ),
+                actionTitle: tr("Показать и низкое качество", "Show low quality too"),
+                action: { showLowQuality() }
+            )
+        } else {
+            KDEmptyState(
+                title: tr("Раздачи не найдены", "No releases found"),
+                systemImage: "tray",
+                message: tr("Источники пока ничего не нашли. Повтори поиск позже.", "The sources found nothing yet. Try again later."),
+                actionTitle: tr("Повторить поиск", "Search again"),
+                action: { retrySearch() }
+            )
+        }
+    }
+
+    private func retrySearch() {
+        Task { @MainActor in await model.loadReleases(card) }
+    }
+
+    private func showLowQuality() {
+        Task { @MainActor in
+            await model.set("hidePoorQuality", .bool(false))
+            await model.loadReleases(card)
+        }
     }
 
     private func rowList(_ rows: [ReleaseRow]) -> some View {
         let shown: [ReleaseRow] = Array(rows.prefix(limit))
         let remaining = rows.count - shown.count
-        let linked = linkedTransfers
+        let links = DetailTransferLinks(items: transfers.items, mediaId: card.id)
         let devices = pairedDevices
         return VStack(alignment: .leading, spacing: 8) {
             LazyVStack(spacing: 8) {
                 ForEach(shown) { release in
-                    ReleaseListRow(release: release, card: card, transfer: linked[release.title], devices: devices)
+                    ReleaseListRow(release: release, card: card, transfer: links.transfer(for: release), devices: devices)
                 }
             }
             if remaining > 0 {

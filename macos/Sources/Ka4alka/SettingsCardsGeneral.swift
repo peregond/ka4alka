@@ -8,6 +8,8 @@ import SwiftUI
 struct SettingsAppearanceCard: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.colorScheme) private var colorScheme
+    /// The language as just picked; nil once the engine has answered, so the picker never snaps back meanwhile.
+    @State private var languageLocal: String?
 
     private var cardIcon: String { colorScheme == .dark ? "moon" : "sun.max" }
 
@@ -39,8 +41,14 @@ struct SettingsAppearanceCard: View {
 
     private var languageBinding: Binding<String> {
         Binding<String>(
-            get: { model.settings?.uiLanguage ?? "ru" },
-            set: { (value: String) in Task { await model.set("uiLanguage", .string(value)) } }
+            get: { languageLocal ?? model.settings?.uiLanguage ?? "ru" },
+            set: { (value: String) in
+                languageLocal = value
+                Task { @MainActor in
+                    await model.set("uiLanguage", .string(value))
+                    if languageLocal == value { languageLocal = nil }
+                }
+            }
         )
     }
 
@@ -257,6 +265,8 @@ struct SettingsCatalogCard: View {
     @EnvironmentObject private var model: AppModel
     @State private var countryNotice: SettingsNotice?
     @State private var refreshNotice: SettingsNotice?
+    /// The country as just picked; nil once the engine has answered, so the picker never snaps back meanwhile.
+    @State private var countryLocal: String?
 
     private var countries: [Choice] {
         model.countries.sorted { (first: Choice, second: Choice) -> Bool in
@@ -266,10 +276,12 @@ struct SettingsCatalogCard: View {
 
     private var countryBinding: Binding<String> {
         Binding<String>(
-            get: { model.settings?.homeCountry ?? "" },
+            get: { countryLocal ?? model.settings?.homeCountry ?? "" },
             set: { (value: String) in
+                countryLocal = value
                 Task { @MainActor in
                     await model.set("homeCountry", .string(value))
+                    if countryLocal == value { countryLocal = nil }
                     if model.settings?.homeCountry == value {
                         countryNotice = SettingsNotice.ok(tr("Страна подборок сохранена.", "Country saved."))
                     }
@@ -348,12 +360,14 @@ struct SettingsCatalogCard: View {
     }
 
     @MainActor private func refreshCatalog() async {
+        guard !model.refreshing else { return }
         refreshNotice = nil
-        await model.refresh()
-        if model.toast == tr("Каталог обновлён.", "Catalog updated.") {
-            refreshNotice = SettingsNotice.ok(tr("Каталог обновлён. Новые названия появятся в разделах.", "Catalog updated. New titles will appear in the sections."))
-        } else if let message = model.error {
+        let failure: String? = await model.refresh()
+        if Task.isCancelled { return }
+        if let message = failure {
             refreshNotice = SettingsNotice.failure(tr("Не удалось проверить каталог: ", "The catalog could not be checked: ") + message)
+        } else {
+            refreshNotice = SettingsNotice.ok(tr("Каталог обновлён. Новые названия появятся в разделах.", "Catalog updated. New titles will appear in the sections."))
         }
     }
 }

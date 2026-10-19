@@ -563,8 +563,11 @@ struct DownloadsView: View {
                 let done: Bool = await model.add(source: source)
                 if done { added += 1 } else { failure = model.addError }
             }
-            if added > 1 {
+            if added > 1 && added == sources.count {
                 model.toast = tr("Добавлено раздач: \(added)", "Downloads added: \(added)")
+            } else if added > 0 && added < sources.count {
+                let total: Int = sources.count
+                model.toast = tr("Добавлено: \(added) из \(total)", "Added \(added) of \(total)")
             } else if added == 0 {
                 let reason: String = failure ?? ""
                 model.toast = reason.isEmpty ? tr("Не удалось добавить раздачу", "Could not add the download") : reason
@@ -960,9 +963,13 @@ struct TransferRow: View {
         model.error = nil
         let id = item.id
         Task {
-            await model.transferAction("refreshTorrent", id: id, deleteFiles: false)
+            let swapped: Bool = await model.transferAction("refreshTorrent", id: id, deleteFiles: false)
             updating = false
-            if model.error == nil { model.toast = tr("Раздача сериала проверена и обновлена", "The series torrent was checked and updated") }
+            if swapped {
+                model.toast = tr("Раздача обновлена", "The torrent was updated")
+            } else if model.error == nil {
+                model.toast = tr("Раздача сериала проверена, новых серий нет", "The series torrent is up to date")
+            }
         }
     }
 }

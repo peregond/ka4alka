@@ -238,7 +238,7 @@ struct SettingsCard<Content: View>: View {
 
 // MARK: Rows
 
-/// A row with a title, an optional explanation and a switch. The whole row toggles; VoiceOver reads it once, as the switch.
+/// A row with a title, an optional explanation and a switch. Clicking the text toggles it too; VoiceOver reads the row once, as the switch.
 struct SettingsSwitch: View {
     let title: String
     let detail: String?
@@ -252,6 +252,18 @@ struct SettingsSwitch: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: KD.Space.m) {
+            labelBlock
+            Toggle(title, isOn: $isOn)
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .fixedSize()
+                .accessibilityHint(detail ?? "")
+        }
+    }
+
+    /// The text side of the row toggles the switch. The switch itself is outside this tap area, so one click never toggles twice.
+    private var labelBlock: some View {
+        HStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title).fixedSize(horizontal: false, vertical: true)
                 if let detail {
@@ -261,16 +273,11 @@ struct SettingsSwitch: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .accessibilityHidden(true)
             Spacer(minLength: 0)
-            Toggle(title, isOn: $isOn)
-                .labelsHidden()
-                .toggleStyle(.switch)
-                .fixedSize()
-                .accessibilityHint(detail ?? "")
         }
         .contentShape(Rectangle())
         .onTapGesture { isOn.toggle() }
+        .accessibilityHidden(true)
     }
 }
 

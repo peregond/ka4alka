@@ -458,8 +458,9 @@ struct TransferDiagnosticsView: View {
 
     private func copyLogs() {
         Task {
-            await model.logs()
-            notice = tr("Логи скопированы в буфер обмена.", "The logs were copied to the clipboard.")
+            if await model.logs() {
+                notice = tr("Логи скопированы в буфер обмена.", "The logs were copied to the clipboard.")
+            }
         }
     }
 }
@@ -479,6 +480,7 @@ struct SpeedLimitsView: View {
     @State private var upText = ""
     @State private var errorText: String?
     @State private var saved = false
+    @State private var applying = false
     @FocusState private var focus: SpeedLimitField?
 
     private static let maximum = 2_097_151
@@ -516,6 +518,10 @@ struct SpeedLimitsView: View {
         .onChange(of: model.settings?.maxUploadKbps) { _, _ in if focus == nil { reload() } }
         .onChange(of: focus) { old, next in
             if old != nil && old != next { commit(close: false) }
+        }
+        .onDisappear {
+            // Typed values are saved at once, also when the page or popover goes away before a field loses focus.
+            if !applying { commit(close: false) }
         }
     }
 
@@ -565,8 +571,10 @@ struct SpeedLimitsView: View {
             if close { onApplied?() }
             return
         }
+        applying = true
         Task {
             await model.setMany(["maxDownloadKbps": .number(Double(down)), "maxUploadKbps": .number(Double(up))])
+            applying = false
             let stored = model.settings?.maxDownloadKbps == down && model.settings?.maxUploadKbps == up
             if stored {
                 saved = true

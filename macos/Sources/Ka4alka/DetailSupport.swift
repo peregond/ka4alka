@@ -160,7 +160,7 @@ struct DetailCastSection: View {
                 }
             }
             LazyVGrid(columns: columns, alignment: .leading, spacing: KD.Space.m) {
-                ForEach(shown) { person in
+                ForEach(Array(shown.enumerated()), id: \.offset) { _, person in
                     DetailPersonCell(person: person)
                 }
             }
@@ -196,7 +196,7 @@ struct DetailAwardsSection: View {
     var body: some View {
         DisclosureGroup(tr("Награды", "Awards"), isExpanded: $expanded) {
             VStack(alignment: .leading, spacing: KD.Space.xs) {
-                ForEach(awards) { award in
+                ForEach(Array(awards.enumerated()), id: \.offset) { _, award in
                     awardRow(award)
                 }
             }
