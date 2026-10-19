@@ -357,7 +357,6 @@ struct DownloadsView: View {
             KDChipLabel(text: tr("Управление", "Controls"), systemImage: "slider.horizontal.3", showsChevron: true)
         }
         .menuStyle(.borderlessButton)
-        .controlSize(.large)
         .menuIndicator(.hidden)
         .fixedSize()
         .accessibilityLabel(tr("Управление загрузками", "Manage downloads"))
@@ -395,19 +394,28 @@ struct DownloadsView: View {
         )
     }
 
-    private var sortPicker: some View {
-        Picker(tr("Порядок", "Sort"), selection: sortBinding) {
-            Text(tr("Сначала новые", "Newest first")).tag("newest")
-            Text(tr("По названию", "Name")).tag("name")
-            Text(tr("По скорости", "Speed")).tag("speed")
-            Text(tr("По размеру", "Size")).tag("size")
-            Text(tr("По прогрессу", "Progress")).tag("progress")
+    private var sortTitle: String {
+        switch sortKey {
+        case "name": return tr("По названию", "Name")
+        case "speed": return tr("По скорости", "Speed")
+        case "size": return tr("По размеру", "Size")
+        case "progress": return tr("По прогрессу", "Progress")
+        default: return tr("Сначала новые", "Newest first")
         }
-        .labelsHidden()
-        .pickerStyle(.menu)
-        .controlSize(.large)
-        .fixedSize()
-        .accessibilityLabel(tr("Порядок", "Sort"))
+    }
+
+    private var sortPicker: some View {
+        KDChipMenu(title: tr("Порядок", "Sort"), value: sortTitle) {
+            Picker(tr("Порядок", "Sort"), selection: sortBinding) {
+                Text(tr("Сначала новые", "Newest first")).tag("newest")
+                Text(tr("По названию", "Name")).tag("name")
+                Text(tr("По скорости", "Speed")).tag("speed")
+                Text(tr("По размеру", "Size")).tag("size")
+                Text(tr("По прогрессу", "Progress")).tag("progress")
+            }
+            .pickerStyle(.inline)
+            .labelsHidden()
+        }
     }
 
     // MARK: Summary tiles
@@ -905,7 +913,6 @@ struct TransferRow: View {
                 .contentShape(Rectangle())
         }
         .menuStyle(.borderlessButton)
-        .controlSize(.large)
         .menuIndicator(.hidden)
         .fixedSize()
         .help(tr("Ещё", "More"))

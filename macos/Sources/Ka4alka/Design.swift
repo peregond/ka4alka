@@ -605,7 +605,6 @@ struct KDChipMenu<Content: View>: View {
     var body: some View {
         Menu { content } label: { KDChipLabel(text: active ? (value ?? title) : title, isActive: active, showsChevron: true) }
             .menuStyle(.borderlessButton)
-            .controlSize(.large)
             .menuIndicator(.hidden)
             .fixedSize()
             .accessibilityLabel(title)

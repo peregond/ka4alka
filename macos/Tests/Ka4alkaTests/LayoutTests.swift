@@ -159,11 +159,25 @@ private struct LayoutOutcome {
     /// The smallest side is 16 pt here because checkboxes and switches are 16 to 18 pt tall natively.
     private func controlProblems(in root: NSView) -> [String] {
         var problems: [String] = []
+        let accessible = root.window.map { SmokeAccessibility.nodes(in: $0) } ?? []
+        let menuRoles: Set<String> = [NSAccessibility.Role.popUpButton.rawValue, NSAccessibility.Role.menuButton.rawValue, NSAccessibility.Role.button.rawValue]
         for view in SmokeViews.all(in: root) {
             guard let control = view as? NSControl, !control.isHiddenOrHasHiddenAncestor else { continue }
             let relevant: Bool = control is NSButton || control is NSSegmentedControl || control is NSSearchField
             if !relevant || control.bounds.width <= 0 { continue }
             let name: String = String(describing: type(of: control))
+            // SwiftUI's hidden pop-up bridge keeps a 15 pt cell under a larger custom label.
+            // Validate its public accessibility target, not that implementation cell.
+            if name == "SwiftUIPopupButton", let window = root.window {
+                let rect = window.convertToScreen(control.convert(control.bounds, to: nil))
+                let center = CGPoint(x: rect.midX, y: rect.midY)
+                let targets = accessible.filter { menuRoles.contains($0.role) && $0.frame.contains(center) && !$0.label.isEmpty }
+                if !targets.contains(where: { $0.frame.width >= max(16, rect.width - 1) && $0.frame.height >= 16 }) {
+                    let sizes = targets.map { $0.label + " " + String(Int($0.frame.width)) + "x" + String(Int($0.frame.height)) }
+                    problems.append(name + " has no labelled accessibility target at least 16 pt: " + sizes.joined(separator: "; "))
+                }
+                continue
+            }
             let intrinsic: CGFloat = control.intrinsicContentSize.width
             if intrinsic > 0 && control.bounds.width < intrinsic - 1 {
                 problems.append(name + " is " + String(Int(control.bounds.width)) + " pt wide but needs " + String(Int(intrinsic)) + " pt")

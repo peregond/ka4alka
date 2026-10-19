@@ -341,7 +341,9 @@ final class LocalizationLintTests: XCTestCase {
     /// Russian-only words that are chosen by hand next to an English branch (plural forms, units, matching keys).
     private let allowedLiterals: Set<String> = [
         "Русский", "Не указано", "КП", "кп", "кино", "Б", "КБ", "МБ", "ГБ", "ТБ", "Актёры", "Режиссёры", "Операторы", "-е",
-        "название", "названия", "названий", "загрузка", "загрузки", "загрузок", "Пауза", "Продолжить", "[А-Яа-яЁё]"
+        "название", "названия", "названий", "загрузка", "загрузки", "загрузок", "Пауза", "Продолжить", "[А-Яа-яЁё]",
+        // Shared-engine protocol values, translated with tr(value) when displayed.
+        "Дубляж", "Оригинал"
     ]
     private func literalExpression() throws -> NSRegularExpression {
         return try NSRegularExpression(pattern: "\"((?:[^\"\\\\\\n]|\\\\.)*)\"")
