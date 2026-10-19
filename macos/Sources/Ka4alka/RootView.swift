@@ -57,7 +57,6 @@ struct RootView: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var draft = ""
     @State private var dropTargeted = false
-    @State private var lastSidebarChange = Date.distantPast
 
     var body: some View {
         NavigationSplitView {
@@ -127,65 +126,38 @@ struct RootView: View {
 
     // MARK: Sidebar
 
-    private var sidebarSelection: Binding<Section?> {
-        Binding<Section?>(
-            get: { model.section },
-            set: { next in
-                if let next {
-                    lastSidebarChange = Date()
-                    model.select(next)
-                }
-            }
-        )
-    }
     private var libraryEntries: [Section] {
         Section.allCases.filter { $0 != .downloads && $0 != .settings }
     }
+    /// Every sidebar entry is a plain button that opens its section, so a click always lands. Clicking the open
+    /// section goes back to its page when a title, person or collection is on top, and otherwise resets its
+    /// search, filter and page.
     private var sidebar: some View {
-        List(selection: sidebarSelection) {
-            SwiftUI.Section(tr("Медиатека", "Library")) {
-                ForEach(libraryEntries) { entry in libraryRow(entry) }
+        ScrollView {
+            VStack(alignment: .leading, spacing: KD.Space.xxs) {
+                Text(tr("Медиатека", "Library"))
+                    .font(KDFont.kicker)
+                    .textCase(.uppercase)
+                    .foregroundStyle(Color.secondary)
+                    .padding(.horizontal, KD.Space.s)
+                    .padding(.bottom, KD.Space.xxs)
+                    .accessibilityAddTraits(.isHeader)
+                ForEach(libraryEntries) { (entry: Section) in
+                    ShellPinnedRow(
+                        section: entry,
+                        selected: model.section == entry,
+                        store: nil,
+                        badge: entry == .saved ? (model.settings?.savedIds.count ?? 0) : 0
+                    ) { pick(entry) }
+                }
             }
-            .collapsible(false)
+            .padding(.horizontal, KD.Space.s)
+            .padding(.top, KD.Space.s)
         }
-        .listStyle(.sidebar)
-        .scrollContentBackground(.hidden)
         .background(colorScheme == .dark ? KDPalette.sidebarBackground : Color.clear)
         .settingsLayoutProbe("sidebar")
         .safeAreaInset(edge: .bottom, spacing: 0) { sidebarFooter }
         .navigationSplitViewColumnWidth(min: 170, ideal: 200, max: 240)
-    }
-    private func sidebarLabel(_ entry: Section) -> some View {
-        let symbol = KDNavSymbol.symbol(for: entry.rawValue, selected: model.section == entry)
-        return Label(entry.title, systemImage: symbol)
-            .accessibilityIdentifier("nav-" + entry.rawValue)
-    }
-    @ViewBuilder private func libraryRow(_ entry: Section) -> some View {
-        if entry == .saved {
-            sidebarLabel(entry)
-                .badge(model.settings?.savedIds.count ?? 0)
-                .tag(entry)
-                .simultaneousGesture(TapGesture().onEnded { revisit(entry) })
-        } else {
-            sidebarLabel(entry)
-                .tag(entry)
-                .simultaneousGesture(TapGesture().onEnded { revisit(entry) })
-        }
-    }
-    /// Clicking the open section goes back to its page when a title, person or collection is on top,
-    /// and otherwise resets its search, filter and page. A click that has just changed the section
-    /// through the list selection is not repeated.
-    private func revisit(_ entry: Section) {
-        guard model.section == entry else { return }
-        if model.route != Route.section(entry) {
-            model.select(entry)
-            return
-        }
-        let elapsed: TimeInterval = Date().timeIntervalSince(lastSidebarChange)
-        if elapsed > 0.6 { model.select(entry) }
-    }
-    private var showsUpdateStatus: Bool {
-        !updater.statusText.isEmpty && (updater.available || updater.busy || updater.isError)
     }
     /// Downloads and Settings sit at the bottom of the sidebar, as in the Windows app. They are plain buttons,
     /// not list rows, so a click always reaches them.
@@ -200,7 +172,7 @@ struct RootView: View {
         }
     }
     private func pick(_ entry: Section) {
-        if model.section == entry { revisit(entry) } else { model.select(entry) }
+        model.select(entry)
     }
     private var sidebarFooter: some View {
         VStack(alignment: .leading, spacing: KD.Space.xs) {
@@ -350,6 +322,7 @@ struct ShellPinnedRow: View {
     var section: Section
     var selected: Bool
     var store: TransferStore?
+    var badge: Int = 0
     var action: () -> Void
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: KD.Radius.chip, style: .continuous)
@@ -365,6 +338,7 @@ struct ShellPinnedRow: View {
                     .lineLimit(1)
                 Spacer(minLength: 0)
                 if let store { ShellActiveBadge(store: store) }
+                if badge > 0 { ShellCountText(count: badge) }
             }
             .foregroundStyle(selected ? KDPalette.accent : Color.primary)
             .padding(.horizontal, KD.Space.s)
@@ -383,12 +357,19 @@ struct ShellActiveBadge: View {
     @ObservedObject var store: TransferStore
     var body: some View {
         if store.activeCount > 0 {
-            Text(String(store.activeCount))
-                .font(.caption.weight(.semibold))
-                .monospacedDigit()
-                .foregroundStyle(Color.secondary)
+            ShellCountText(count: store.activeCount)
                 .accessibilityLabel(tr("Активных загрузок: ", "Active downloads: ") + String(store.activeCount))
         }
+    }
+}
+
+struct ShellCountText: View {
+    var count: Int
+    var body: some View {
+        Text(String(count))
+            .font(.caption.weight(.semibold))
+            .monospacedDigit()
+            .foregroundStyle(Color.secondary)
     }
 }
 
