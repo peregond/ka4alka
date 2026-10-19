@@ -163,8 +163,42 @@ public partial class MainWindow
         var isSeries=current?.Section=="Сериалы";
         if(isSeries){Filter("Сезон",releases.Select(x=>x.Series).OrderBy(x=>x.Season??int.MaxValue).Select(x=>x.SeasonLabel),hidden,false);Filter("Серия",releases.Select(x=>x.Series).OrderBy(x=>x.Episode??int.MaxValue).Select(x=>x.EpisodeLabel),hidden,false);}
         Filter("Качество",releases.Select(x=>x.Quality),hidden,false);
-        Filter("Студия озвучки",releases.SelectMany(ReleaseAudio.StudioOptions).OrderBy(x=>x),top,true);
-        Filter("Тип озвучки",releases.SelectMany(ReleaseAudio.TypeOptions).OrderBy(x=>x),top,true);
+        Filter("Студия озвучки",releases.SelectMany(ReleaseAudio.StudioOptions).OrderBy(x=>x),hidden,false);
+        Filter("Тип озвучки",releases.SelectMany(ReleaseAudio.TypeOptions).OrderBy(x=>x),hidden,false);
+        var audioChip=new Button{Style=(Style)FindResource("ControlButton"),MaxWidth=340};
+        AutomationProperties.SetName(audioChip,AppLanguage.T("Фильтр раздач: Озвучка"));
+        var audioMenu=new ToggleContextMenu{PlacementTarget=audioChip,Placement=System.Windows.Controls.Primitives.PlacementMode.Bottom,MaxHeight=440};
+        var audioChoices=new List<(MenuItem Item,ComboBox Box,string Value)>();
+        MenuItem AudioChoice(ComboBox box,string value,string? caption=null)
+        {
+            var entry=new MenuItem{Header=AppLanguage.T(caption??value),IsCheckable=true,Tag=value};
+            entry.Click+=(_,_)=>{box.SelectedItem=value;entry.IsChecked=true;audioMenu.IsOpen=false;};
+            audioChoices.Add((entry,box,value));return entry;
+        }
+        var audioType=filters["Тип озвучки"];var audioStudio=filters["Студия озвучки"];
+        var audioTypes=(string[])audioType.ItemsSource;
+        foreach(var value in new[]{"Все","Дубляж","Оригинал"}.Where(audioTypes.Contains))audioMenu.Items.Add(AudioChoice(audioType,value));
+        var otherTypes=audioTypes.Except(new[]{"Все","Дубляж","Оригинал"}).ToArray();
+        if(otherTypes.Length>0)
+        {
+            var other=new MenuItem{Header=AppLanguage.T("Другие типы")};
+            foreach(var value in otherTypes)other.Items.Add(AudioChoice(audioType,value));
+            audioMenu.Items.Add(other);
+        }
+        audioMenu.Items.Add(new Separator());
+        audioMenu.Items.Add(new MenuItem{Header=AppLanguage.T("Студии"),IsEnabled=false});
+        foreach(var value in (string[])audioStudio.ItemsSource)audioMenu.Items.Add(AudioChoice(audioStudio,value,value=="Все"?"Все студии":null));
+        void ShowAudioChoice()
+        {
+            var chosen=new[]{audioType.SelectedItem?.ToString(),audioStudio.SelectedItem?.ToString()}.Where(value=>value!=null&&value!="Все").Select(value=>AppLanguage.T(value)).ToArray();
+            audioChip.Content=ChipContent(AppLanguage.T("Озвучка")+(chosen.Length>0?" · "+string.Join(" · ",chosen):""),true);
+            if(ChipLabel(audioChip) is {} audioLabel)audioLabel.MaxWidth=260;
+            StyleChip(audioChip,chosen.Length>0);audioChip.ToolTip=AppLanguage.T("Озвучка")+(chosen.Length>0?": "+string.Join(" · ",chosen):"");
+            AutomationProperties.SetItemStatus(audioChip,string.Join(" · ",chosen));
+            foreach(var choice in audioChoices)choice.Item.IsChecked=Equals(choice.Box.SelectedItem,choice.Value);
+        }
+        audioType.SelectionChanged+=(_,_)=>ShowAudioChoice();audioStudio.SelectionChanged+=(_,_)=>ShowAudioChoice();ShowAudioChoice();
+        AttachMenuToggle(audioChip,audioMenu);top.Children.Add(audioChip);
         Filter("Субтитры",releases.Select(x=>x.Subs),more,true);
         Filter("Источник",releases.Select(x=>x.Source),more,true);
         Filter("Тип",releases.Select(x=>x.Type),more,true);

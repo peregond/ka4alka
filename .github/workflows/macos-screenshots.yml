@@ -1,0 +1,88 @@
+name: Capture published Mac screenshots
+on:
+  push:
+    branches: [claude/quirky-hopper-1vlmj6]
+    paths: ['.github/workflows/macos-screenshots.yml', 'scripts/screenshots/package-mac.py']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Published application version (never rebuilt for capture)
+        required: true
+        default: '0.44.1'
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
+permissions:
+  contents: write
+concurrency:
+  group: mac-screenshots-${{ inputs.version }}
+  cancel-in-progress: false
+jobs:
+  capture:
+    runs-on: macos-15
+    timeout-minutes: 15
+    env:
+      RELEASE_VERSION: ${{ inputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify the exact published Mac packages
+        run: |
+          if [ -z "$RELEASE_VERSION" ]; then RELEASE_VERSION="$(gh release view --json tagName --jq '.tagName | ltrimstr("v")')"; fi
+          export RELEASE_VERSION
+          echo "RELEASE_VERSION=$RELEASE_VERSION" >> "$GITHUB_ENV"
+          python3 -c 'import os,re; v=os.environ["RELEASE_VERSION"]; assert re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+",v) and tuple(map(int,v.split("."))) >= (0,44,1)'
+          test "$(gh release view "v$RELEASE_VERSION" --json isDraft --jq .isDraft)" = false
+          mkdir -p published
+          gh release download "v$RELEASE_VERSION" --pattern 'Kachalka-macos-*.zip' --pattern 'macos-latest.*' --pattern 'macos-components-*.json' --dir published
+          dotnet run --project release-tools/Kachalka.ReleaseTools.csproj -c Release -- --verify-mac published
+          ditto -x -k published/Kachalka-macos-arm64.zip published/app
+          codesign --verify --deep --strict published/app/Ka4alka.app
+      - name: Capture real native windows in both languages
+        run: |
+          for language in ru en; do
+            export KACHALKA_DATA="$RUNNER_TEMP/capture-$language"
+            mkdir -p "$KACHALKA_DATA/downloads"
+            export CAPTURE_LANGUAGE="$language"
+            python3 - <<'PY'
+          import os,json
+          from pathlib import Path
+          root=Path(os.environ['KACHALKA_DATA'])
+          (root/'settings.json').write_text(json.dumps(dict(Folder=str(root/'downloads'),FolderConfigured=True,AutoResumeDownloads=False,CheckForUpdates=False,AutoUpdate=False,UiLanguage=os.environ['CAPTURE_LANGUAGE'])))
+          PY
+            # The runner belongs to this capture job. Clear the prior language
+            # run's saved window size; never touch a real user's preferences.
+            defaults delete org.ka4alka.app >/dev/null 2>&1 || true
+            output="$PWD/test-output/mac-capture/$language"
+            published/app/Ka4alka.app/Contents/MacOS/Ka4alka --smoke-test "$output" -ApplePersistenceIgnoreState YES &
+            process=$!
+            for ((attempt=0;attempt<240;attempt++)); do
+              if ! kill -0 "$process" 2>/dev/null; then break; fi
+              sleep 1
+            done
+            if kill -0 "$process" 2>/dev/null; then kill "$process"; echo 'Native capture timed out'; exit 1; fi
+            wait "$process"
+            test ! -f "$output/error.txt" || { cat "$output/error.txt"; exit 1; }
+            test -f "$output/checks.json"
+          done
+      - name: Encode and verify screenshots with provenance
+        run: |
+          python3 -m pip install Pillow==11.3.0
+          python3 scripts/screenshots/package-mac.py "$RELEASE_VERSION" published test-output/mac-capture test-output/mac-screenshots
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: published-macos-screenshots-${{ env.RELEASE_VERSION }}
+          path: test-output/mac-screenshots/
+          if-no-files-found: error
+      - name: Add screenshot assets to their published release
+        run: |
+          gh release upload "v$RELEASE_VERSION" test-output/mac-screenshots/screenshots-macos-* --clobber

@@ -188,6 +188,9 @@ struct DetailReleaseFacets {
     var qualities: [DetailFacetCount] = []
     var studios: [String] = []
     var audioTypes: [String] = []
+    var primaryAudioTypes: [String] { ["Дубляж", "Оригинал"].filter { audioTypes.contains($0) } }
+    var otherAudioTypes: [String] { audioTypes.filter { !["Дубляж", "Оригинал"].contains($0) } }
+    var gameGroups: [String] = []
     var codecs: [String] = []
     var hdrs: [String] = []
     var sources: [String] = []
@@ -200,6 +203,7 @@ struct DetailReleaseFacets {
     init(rows: [ReleaseRow], season: Int) {
         total = rows.count
         var counts: [String: Int] = [:]
+        var groupSet = Set<String>()
         var studioSet = Set<String>()
         var audioSet = Set<String>()
         var codecSet = Set<String>()
@@ -209,6 +213,7 @@ struct DetailReleaseFacets {
         var episodeSet = Set<Int>()
         for row in rows {
             if DetailReleaseText.meaningful(row.quality) { counts[row.quality, default: 0] += 1 }
+            if let group = row.gameGroup, DetailReleaseText.meaningful(group) { groupSet.insert(group) }
             for name in row.studios where DetailReleaseText.meaningful(name) { studioSet.insert(name) }
             for name in row.audioTypes where DetailReleaseText.meaningful(name) { audioSet.insert(name) }
             if DetailReleaseText.meaningful(row.codec) { codecSet.insert(row.codec) }
@@ -227,6 +232,7 @@ struct DetailReleaseFacets {
             if a != b { return a > b }
             return left.value < right.value
         }
+        gameGroups = groupSet.sorted()
         studios = studioSet.sorted()
         audioTypes = audioSet.sorted()
         codecs = codecSet.sorted()
@@ -249,8 +255,8 @@ struct ReleaseFilterBar: View {
     var isSeries: Bool
 
     private var showsQualityPicker: Bool { !isGame && facets.qualities.count >= 2 }
-    private var showsStudio: Bool { !isGame && (facets.studios.count >= 2 || !filters.studio.isEmpty) }
-    private var showsAudio: Bool { !isGame && (facets.audioTypes.count >= 2 || !filters.audio.isEmpty) }
+    private var showsAudio: Bool { !isGame && (!facets.studios.isEmpty || !facets.audioTypes.isEmpty || !filters.studio.isEmpty || !filters.audio.isEmpty) }
+    private var showsGameGroup: Bool { isGame && (!facets.gameGroups.isEmpty || !filters.studio.isEmpty) }
     private var showsRussianToggle: Bool { !isGame && (facets.hasRussian || filters.russianOnly) }
     private var showsCodec: Bool { !isGame && (facets.codecs.count >= 2 || !filters.codec.isEmpty) }
     private var showsHDR: Bool { !isGame && (facets.hdrs.count >= 2 || !filters.hdr.isEmpty) }
@@ -269,8 +275,8 @@ struct ReleaseFilterBar: View {
         VStack(alignment: .leading, spacing: KD.Space.xs) {
             KDFlowLayout(spacing: KD.Space.xs, lineSpacing: KD.Space.xs) {
                 if showsQualityPicker { qualityPicker }
-                if showsStudio { stringMenu(tr("Студия", "Studio"), selection: $filters.studio, options: facets.studios) }
-                if showsAudio { stringMenu(tr("Тип озвучки", "Voice type"), selection: $filters.audio, options: facets.audioTypes) }
+                if showsAudio { audioMenu }
+                if showsGameGroup { stringMenu(tr("Сборка", "Release group"), selection: $filters.studio, options: facets.gameGroups) }
                 if showsRussianToggle { russianToggle }
                 sortMenu
                 if hasExtras { extrasButton }
@@ -281,6 +287,41 @@ struct ReleaseFilterBar: View {
     }
 
     // MARK: Primary controls
+
+    private var audioValue: String? {
+        let selected = [filters.audio, filters.studio].filter { !$0.isEmpty }.map { tr($0) }
+        return selected.isEmpty ? nil : tr("Озвучка", "Audio") + " · " + selected.joined(separator: " · ")
+    }
+
+    private var audioMenu: some View {
+        KDChipMenu(title: tr("Озвучка", "Audio"), value: audioValue) {
+            audioChoice(tr("Все", "All"), value: "", selection: $filters.audio)
+            ForEach(facets.primaryAudioTypes, id: \.self) { option in
+                audioChoice(tr(option), value: option, selection: $filters.audio)
+            }
+            if !facets.otherAudioTypes.isEmpty {
+                Menu(tr("Другие типы", "Other types")) {
+                    ForEach(facets.otherAudioTypes, id: \.self) { option in
+                        audioChoice(tr(option), value: option, selection: $filters.audio)
+                    }
+                }
+            }
+            SwiftUI.Section(tr("Студии", "Studios")) {
+                audioChoice(tr("Все студии", "All studios"), value: "", selection: $filters.studio)
+                ForEach(facets.studios, id: \.self) { option in
+                    audioChoice(option, value: option, selection: $filters.studio)
+                }
+            }
+        }
+        .accessibilityIdentifier("release-audio-filter")
+    }
+
+    private func audioChoice(_ title: String, value: String, selection: Binding<String>) -> some View {
+        Button { selection.wrappedValue = value } label: {
+            if selection.wrappedValue == value { Label(title, systemImage: "checkmark") }
+            else { Text(title) }
+        }
+    }
 
     private var qualityPicker: some View {
         Picker(tr("Качество", "Quality"), selection: $filters.quality) {

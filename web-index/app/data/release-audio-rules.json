@@ -1,0 +1,387 @@
+{
+  "schemaVersion": 1,
+  "revision": 2,
+  "dubbingPriority": 1,
+  "otherCodes": [
+    "P",
+    "P1",
+    "P2",
+    "L",
+    "L1",
+    "L2",
+    "A",
+    "A1",
+    "A2",
+    "A3",
+    "O"
+  ],
+  "studios": [
+    {
+      "name": "LostFilm",
+      "aliases": [
+        "LostFilm",
+        "Lost Film",
+        "Lost-Film",
+        "Lost.Film",
+        "Lost_Film",
+        "ЛостФильм",
+        "Лост-Фильм",
+        "Лост Фильм",
+        "Лост.Фильм",
+        "Лост_Фильм"
+      ],
+      "prefixes": [],
+      "codes": []
+    },
+    {
+      "name": "NewStudio",
+      "aliases": [
+        "NewStudio",
+        "New Studio",
+        "New-Studio",
+        "New.Studio",
+        "New_Studio",
+        "НьюСтудио",
+        "Нью-Студио",
+        "Нью Студио",
+        "Нью.Студио",
+        "Нью_Студио"
+      ],
+      "prefixes": [],
+      "codes": []
+    },
+    {
+      "name": "AlexFilm",
+      "aliases": [
+        "AlexFilm",
+        "Alex Film",
+        "Alex-Film",
+        "Alex.Film",
+        "Alex_Film",
+        "АлексФильм",
+        "Алекс-Фильм",
+        "Алекс Фильм",
+        "Алекс.Фильм",
+        "Алекс_Фильм"
+      ],
+      "prefixes": [],
+      "codes": []
+    },
+    {
+      "name": "Кубик в Кубе",
+      "aliases": [
+        "Кубик в Кубе",
+        "Кубик-в-Кубе",
+        "Кубик.в.Кубе",
+        "Кубик_в_Кубе",
+        "Kubik v Kube",
+        "Kubik-v-Kube",
+        "КубиквКубе",
+        "Kubik.v.Kube",
+        "Kubik_v_Kube",
+        "KubikvKube"
+      ],
+      "prefixes": [],
+      "codes": []
+    },
+    {
+      "name": "Jaskier",
+      "aliases": [
+        "Jaskier",
+        "Яскиер"
+      ],
+      "prefixes": [],
+      "codes": []
+    },
+    {
+      "name": "Flarrow Films",
+      "aliases": [
+        "Flarrow Films",
+        "FlarrowFilms",
+        "Flarrow-Films",
+        "Flarrow.Films",
+        "Flarrow_Films",
+        "Фларроу Филмс",
+        "Фларроу-Филмс",
+        "Фларроу.Филмс",
+        "Фларроу_Филмс",
+        "ФларроуФилмс"
+      ],
+      "prefixes": [],
+      "codes": []
+    },
+    {
+      "name": "HDrezka",
+      "aliases": [
+        "HDrezka",
+        "HDrezka Studio",
+        "HD rezka",
+        "HD-rezka",
+        "HD.rezka",
+        "HD_rezka",
+        "ХДрезка",
+        "HDrezka.Studio",
+        "HDrezka-Studio",
+        "HDrezka_Studio",
+        "HDrezkaStudio"
+      ],
+      "prefixes": [],
+      "codes": []
+    },
+    {
+      "name": "RuDub",
+      "aliases": [
+        "RuDub",
+        "Ru Dub",
+        "Ru-Dub",
+        "Ru.Dub",
+        "Ru_Dub",
+        "РуДаб",
+        "Ру-Даб",
+        "Ру Даб",
+        "Ру.Даб",
+        "Ру_Даб"
+      ],
+      "prefixes": [],
+      "codes": []
+    },
+    {
+      "name": "TVShows",
+      "aliases": [
+        "TVShows",
+        "TV Shows",
+        "TV-Shows",
+        "TV.Shows",
+        "TV_Shows"
+      ],
+      "prefixes": [],
+      "codes": []
+    },
+    {
+      "name": "LE-Production",
+      "aliases": [
+        "LE-Production",
+        "LEProduction",
+        "LE Production",
+        "LE.Production",
+        "LE_Production"
+      ],
+      "prefixes": [],
+      "codes": []
+    },
+    {
+      "name": "BaibaKo",
+      "aliases": [
+        "BaibaKo",
+        "Байбако"
+      ],
+      "prefixes": [],
+      "codes": []
+    },
+    {
+      "name": "Кураж-Бамбей",
+      "aliases": [
+        "Кураж-Бамбей",
+        "Кураж Бамбей",
+        "КуражБамбей",
+        "Kuraj-Bambey",
+        "Kuraj Bambey",
+        "KurajBambey",
+        "Кураж.Бамбей",
+        "Кураж_Бамбей",
+        "Kuraj.Bambey",
+        "Kuraj_Bambey"
+      ],
+      "prefixes": [],
+      "codes": []
+    },
+    {
+      "name": "Сыендук",
+      "aliases": [
+        "Сыендук",
+        "Syenduk"
+      ],
+      "prefixes": [],
+      "codes": []
+    },
+    {
+      "name": "AniLibria",
+      "aliases": [
+        "AniLibria",
+        "Ani Libria",
+        "Ani-Libria",
+        "Анилибрия",
+        "Ani.Libria",
+        "Ani_Libria"
+      ],
+      "prefixes": [],
+      "codes": []
+    },
+    {
+      "name": "AniDUB",
+      "aliases": [
+        "AniDUB",
+        "Ani Dub",
+        "Ani-Dub",
+        "Анидаб",
+        "Ani.Dub",
+        "Ani_Dub"
+      ],
+      "prefixes": [],
+      "codes": []
+    },
+    {
+      "name": "Дубляжная",
+      "aliases": [
+        "Дубляжная"
+      ],
+      "prefixes": [],
+      "codes": []
+    },
+    {
+      "name": "Red Head Sound",
+      "aliases": [
+        "Red Head Sound",
+        "Red-Head-Sound",
+        "RedHeadSound",
+        "RHS",
+        "Red.Head.Sound",
+        "Red_Head_Sound"
+      ],
+      "prefixes": [],
+      "codes": []
+    },
+    {
+      "name": "StudioBand",
+      "aliases": [
+        "StudioBand",
+        "Studio Band",
+        "Studio-Band",
+        "Studio.Band",
+        "Studio_Band"
+      ],
+      "prefixes": [],
+      "codes": []
+    },
+    {
+      "name": "Ultradox",
+      "aliases": [
+        "Ultradox",
+        "Ультрадокс"
+      ],
+      "prefixes": [],
+      "codes": []
+    },
+    {
+      "name": "Coldfilm",
+      "aliases": [
+        "ColdFilm",
+        "Cold Film",
+        "Cold-Film",
+        "Cold.Film",
+        "Cold_Film"
+      ],
+      "prefixes": [],
+      "codes": []
+    },
+    {
+      "name": "ViruseProject",
+      "aliases": [
+        "ViruseProject",
+        "Viruse Project",
+        "Viruse-Project",
+        "Viruse.Project",
+        "Viruse_Project"
+      ],
+      "prefixes": [],
+      "codes": []
+    },
+    {
+      "name": "СВ-Дубль",
+      "aliases": [
+        "СВ-Дубль",
+        "СВДубль",
+        "СВ Дубль",
+        "СВ.Дубль",
+        "СВ_Дубль"
+      ],
+      "prefixes": [],
+      "codes": []
+    },
+    {
+      "name": "AMS",
+      "aliases": [
+        "AMS"
+      ],
+      "prefixes": [],
+      "codes": []
+    },
+    {
+      "name": "Octopus",
+      "aliases": [
+        "Octopus",
+        "Октопус"
+      ],
+      "prefixes": [],
+      "codes": []
+    }
+  ],
+  "types": [
+    {
+      "name": "Дубляж",
+      "aliases": [
+        "DUB",
+        "дубляж",
+        "полное дублирование"
+      ],
+      "prefixes": [
+        "дублирован"
+      ],
+      "codes": [
+        "D"
+      ]
+    },
+    {
+      "name": "Многоголосая",
+      "aliases": [
+        "MVO"
+      ],
+      "prefixes": [
+        "многоголос"
+      ],
+      "codes": []
+    },
+    {
+      "name": "Двухголосая",
+      "aliases": [
+        "DVO"
+      ],
+      "prefixes": [
+        "двухголос"
+      ],
+      "codes": []
+    },
+    {
+      "name": "Одноголосая",
+      "aliases": [
+        "AVO",
+        "VO"
+      ],
+      "prefixes": [
+        "одноголос"
+      ],
+      "codes": []
+    },
+    {
+      "name": "Оригинал",
+      "aliases": [
+        "ENG",
+        "ENGLISH",
+        "оригинал",
+        "original"
+      ],
+      "prefixes": [],
+      "codes": []
+    }
+  ]
+}

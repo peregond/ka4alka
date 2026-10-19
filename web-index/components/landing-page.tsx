@@ -3,6 +3,8 @@
 import { ArrowDown, ArrowDownToLine, ArrowRight, ArrowUpRight, Check, Code2, Laptop, Monitor, Moon, Network, Plus, Search, Settings2, ShieldCheck } from "lucide-react";
 import { ScrollHeader } from "@/components/scroll-header";
 import { ProductPreview } from "@/components/product-preview";
+import { SitePlatformProvider, PlatformSwitcher, useSitePlatform } from "@/components/site-platform";
+import { PlatformDownload, DownloadMeta } from "@/components/platform-download";
 import type { AppRelease } from "@/lib/app-release";
 import { LanguageSwitcher, LocalizedMetadata, useSiteLanguage } from "@/components/site-language";
 
@@ -14,16 +16,13 @@ function TelegramIcon() {
   return <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21.4 3.3 2.9 10.5c-1.3.5-1.3 1.2-.2 1.5l4.7 1.5 1.8 5.4c.2.6.1.8.7.8.4 0 .6-.2.8-.4l2.3-2.2 4.8 3.5c.9.5 1.6.2 1.8-.8l3.1-14.6c.3-1.3-.5-1.9-1.3-1.4ZM8.2 13.1l10.5-6.6c.5-.3.9-.1.6.2l-8.5 7.7-.3 3.2-2.3-4.5Z" /></svg>;
 }
 
-function WindowsIcon({ size = 21 }: { size?: number }) {
-  return <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M2 3.7 10.7 2.5v8.7H2zm10.3-1.5L22 1v10.2h-9.7zM2 12.8h8.7v8.7L2 20.3zm10.3 0H22V23l-9.7-1.2z" /></svg>;
-}
-
-export function LandingPage({ release }: { release: AppRelease }) {
+export function LandingPage({ release }: { release: AppRelease }) { return <SitePlatformProvider><LandingContent release={release} /></SitePlatformProvider>; }
+function LandingContent({ release }: { release: AppRelease }) {
   const { t } = useSiteLanguage();
-  const macDownloads = release.mac ? <div className="download-options" style={{ justifyContent: "center", flexWrap: "wrap", gap: 18 }}><span>macOS 14+</span><a href="/download?format=mac-arm64">Mac · Apple Silicon <ArrowDownToLine size={15} aria-hidden="true" /></a><a href="/download?format=mac-x64">Mac · Intel <ArrowDownToLine size={15} aria-hidden="true" /></a></div> : null;
-  const size = Math.round(release.installerSize / 1_000_000);
+  const { platform } = useSitePlatform();
+  const mac = platform === "macos";
   return <>
-    <LocalizedMetadata title="Качалка — фильмы, сериалы, игры и загрузки для Windows" description="Твой вечер. Играй, смотри, качай. Фильмы, сериалы и игры, поиск раздач и управление загрузками в одном приложении. Скачать Качалку для Windows 10/11." />
+    <LocalizedMetadata title="Качалка — фильмы, сериалы, игры и загрузки для Windows и macOS" description="Твой вечер. Играй, смотри, качай. Фильмы, сериалы и игры, поиск раздач и управление загрузками в одном приложении. Скачать Качалку для Windows и macOS." />
     <a className="skip-link" href="#main">{t("Перейти к содержимому")}</a>
     <ScrollHeader />
     <main id="main">
@@ -31,12 +30,12 @@ export function LandingPage({ release }: { release: AppRelease }) {
         <div className="hero-language"><LanguageSwitcher /></div>
         <a className="release-badge" href={release.releaseUrl} target="_blank" rel="noreferrer"><span className="status-dot" />{t("Версия")} {release.version}<span className="badge-divider" />{t("Уже на GitHub")}<ArrowUpRight size={13} aria-hidden="true" /></a>
         <h1 id="hero-title">{t("Твой вечер.")}<br /><span>{t("Играй, смотри, качай.")}</span></h1>
-        <p className="hero-description">{t(release.mac ? "Фильмы, сериалы, игры и загрузки — в одном приложении для Windows и Mac." : "Фильмы, сериалы, игры и загрузки — в одном приложении для Windows.")}<br className="desktop-break" /> {t("Выбери, во что играть или что смотреть, и добавь загрузку в очередь.")}</p>
-        <div className="hero-actions"><a className="button button-download" href="/download"><WindowsIcon />{t("Скачать для Windows")}<ArrowDownToLine size={21} aria-hidden="true" /></a><a className="button button-telegram" href="https://t.me/ka4alkacc" target="_blank" rel="noopener noreferrer"><TelegramIcon />{t("Мы в Telegram")}<ArrowUpRight size={16} aria-hidden="true" /></a></div>
+        <p className="hero-description">{t("Фильмы, сериалы, игры и загрузки — в одном приложении для Windows и Mac.")}<br className="desktop-break" /> {t("Выбери, во что играть или что смотреть, и добавь загрузку в очередь.")}</p>
+        <PlatformSwitcher />
+        <div className="hero-actions"><PlatformDownload release={release} /><a className="button button-telegram" href="https://t.me/ka4alkacc" target="_blank" rel="noopener noreferrer"><TelegramIcon />{t("Мы в Telegram")}<ArrowUpRight size={16} aria-hidden="true" /></a></div>
         <div className="hero-feature-link"><a className="button-secondary" href="#features">{t("Что умеет Качалка")}<ArrowDown size={17} aria-hidden="true" /></a></div>
-        <p className="download-meta">{t("Бесплатно и без рекламы")}<span />Windows 10 / 11 · x64<span />{t("Установщик ·")} {size} {t("МБ")}</p>
-        {macDownloads}
-        <ProductPreview />
+        <DownloadMeta release={release} />
+        <ProductPreview release={release} />
         <div className="product-facts"><span><Check size={17} aria-hidden="true" />{t("Бесплатно и без рекламы")}</span><span><Code2 size={16} aria-hidden="true" />{t("Открытый исходный код")}</span><span><Check size={17} aria-hidden="true" />{t("Без регистрации")}</span></div>
       </section>
 
@@ -63,24 +62,27 @@ export function LandingPage({ release }: { release: AppRelease }) {
       </section>
 
       <section id="download" className="download-section section-wrap" aria-labelledby="download-title">
-        <div className="download-panel"><img className="download-app-icon" src="/brand/logo.png" alt="" width="88" height="88" /><p className="eyebrow">{t("КАЧАЛКА ДЛЯ WINDOWS")}</p><h2 id="download-title">{t("Пора выбрать кино или игру.")}</h2><p>{t("Установи приложение, выбери папку для загрузок —")}<br className="desktop-break" /> {t("и выбирай, как провести свой вечер.")}</p><a className="button button-download" href="/download"><WindowsIcon />{t("Скачать для Windows")}<ArrowDownToLine size={21} aria-hidden="true" /></a><div className="download-options"><span>{t("Версия")} {release.version} {t("· Windows x64")}</span><a href="/download?format=zip">{t("Скачать ZIP")}<ArrowUpRight size={14} aria-hidden="true" /></a><a href={release.releaseUrl} target="_blank" rel="noreferrer">{t("Что нового")}<ArrowUpRight size={14} aria-hidden="true" /></a></div></div>
+        <div className="download-panel"><img className="download-app-icon" src="/brand/logo.png" alt="" width="88" height="88" /><p className="eyebrow">{t("Качалка для Windows и macOS")}</p><h2 id="download-title">{t("Пора выбрать кино или игру.")}</h2><p>{t("Установи приложение, выбери папку для загрузок —")}<br className="desktop-break" /> {t("и выбирай, как провести свой вечер.")}</p><PlatformDownload release={release} /><div className="download-options"><span>{t("Версия")} {release.version} · {mac ? "macOS 14+" : "Windows x64"}</span><a href={mac ? "/download?format=mac-arm64-zip" : "/download?format=zip"}>{mac ? "ZIP · Apple Silicon" : t("Скачать ZIP")}<ArrowUpRight size={14} aria-hidden="true" /></a>{mac && <a href="/download?format=mac-x64-zip">ZIP · Intel</a>}<a href={release.releaseUrl} target="_blank" rel="noreferrer">{t("Что нового")}<ArrowUpRight size={14} aria-hidden="true" /></a></div></div>
       </section>
 
       <section id="installation" className="installation section-wrap" aria-labelledby="installation-title">
         <p className="eyebrow">{t("НЕСКОЛЬКО ПРОСТЫХ ШАГОВ")}</p><h2 id="installation-title">{t("Как установить.")}</h2>
-        <ol className="install-steps">
+        {mac ? <ol className="install-steps">
+          <li><span className="install-number">1</span><div><h3>{t("Скачай DMG для своего Mac")}</h3><p>{t("Выбери Apple Silicon или Intel. Процессор указан в меню Apple → «Об этом Mac».")}</p></div></li>
+          <li><span className="install-number">2</span><div><h3>{t("Перенеси в Applications")}</h3><p>{t("Открой DMG и перетащи Ka4alka в папку «Программы» (Applications).")}</p></div></li>
+          <li><span className="install-number">3</span><div><h3>{t("Запусти Качалку")}</h3><p>{t("Выбери папку для загрузок. Требуется macOS 14 или новее; игровой каталог содержит игры для Windows.")}</p></div></li>
+        </ol> : <ol className="install-steps">
           <li><span className="install-number">1</span><div><h3>{t("Скачай установщик")}</h3><p>{t("Нажми «Скачать для Windows». Файл загрузится из официального GitHub Качалки.")}</p></div></li>
           <li><span className="install-number">2</span><div><h3>{t("Открой файл")}</h3><p>{t("В папке «Загрузки» дважды нажми на Kachalka-Setup-")}{release.version}.exe.</p></div></li>
           <li><span className="install-number">3</span><div><h3>{t("Если появится SmartScreen")}</h3><p>{t("В окне «Система Windows защитила ваш компьютер» нажми")} <strong>{t("«Подробнее»")}</strong>{t(", затем")} <strong>{t("«Выполнить в любом случае»")}</strong>{t(". Продолжай только если файл скачан из официального релиза Качалки и ты доверяешь приложению.")}</p><div className="install-clicks"><span>{t("Подробнее")}</span><ArrowRight size={16} aria-hidden="true" /><span>{t("Выполнить в любом случае")}</span></div></div></li>
           <li><span className="install-number">4</span><div><h3>{t("Заверши установку")}</h3><p>{t("Следуй шагам установщика. Запусти Качалку и выбери папку для загрузок — готово.")}</p></div></li>
-        </ol>
-        {release.mac && <p className="install-note">{t("Mac: открой DMG и перетащи Ka4alka в Applications. В этом выпуске нет нотариализации Apple; при первом запуске может потребоваться разрешение в настройках безопасности. Игровой каталог содержит игры для Windows.")}</p>}
-        <p className="install-note">{t("Если кнопки «Выполнить в любом случае» нет, не меняй защиту Windows. На рабочем компьютере обратись к администратору.")} <a href="https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/smartscreen-reputation" target="_blank" rel="noreferrer">{t("О SmartScreen — Microsoft")}<ArrowUpRight size={12} aria-hidden="true" /></a></p>
+        </ol>}
+        {mac ? <p className="install-note">{t("Приложение пока без нотариализации Apple. При первом запуске может потребоваться разрешение в «Системные настройки → Конфиденциальность и безопасность». Используй только официальный релиз.")}</p> : <p className="install-note">{t("Если кнопки «Выполнить в любом случае» нет, не меняй защиту Windows. На рабочем компьютере обратись к администратору.")} <a href="https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/smartscreen-reputation" target="_blank" rel="noreferrer">{t("О SmartScreen — Microsoft")}<ArrowUpRight size={12} aria-hidden="true" /></a></p>}
       </section>
 
       <section id="questions" className="faq section-wrap" aria-labelledby="faq-title"><div className="faq-heading"><p className="eyebrow">{t("ПЕРЕД ПЕРВЫМ ЗАПУСКОМ")}</p><h2 id="faq-title">{t("Пара вопросов.")}</h2><p>{t("Будем рады вашим идеям и обратной связи.")}<br /><a href="https://t.me/+6sT2ocaKvLxlNmRi" target="_blank" rel="noopener noreferrer">{t("Присоединяйтесь к нашей группе в Telegram")} <ArrowUpRight size={15} aria-hidden="true" /></a></p></div><div className="faq-list">
-        <details><summary>{t("Какая Windows нужна?")}<Plus size={20} aria-hidden="true" /></summary><p>{t("Windows 10 или Windows 11, 64-разрядная версия (x64). В сборку включён .NET — устанавливать его отдельно не нужно.")}</p></details>
-        <details><summary>{t("Как установить Качалку?")}<Plus size={20} aria-hidden="true" /></summary><p>{t("Нажми «Скачать для Windows», открой установщик и следуй его шагам. При первом запуске выбери папку для загрузок. Если предпочитаешь ZIP, распакуй архив целиком и запусти Kachalka.exe, оставив остальные файлы рядом.")}</p></details>
+        <details><summary>{t("Какая система нужна?")}<Plus size={20} aria-hidden="true" /></summary><p>{t("Windows 10/11 x64 или macOS 14+ на Apple Silicon и Intel. .NET включён в сборки. Каталог игр содержит версии для Windows.")}</p></details>
+        <details><summary>{t("Как установить Качалку?")}<Plus size={20} aria-hidden="true" /></summary><p>{t(mac ? "Открой DMG и перетащи Ka4alka в папку «Программы» (Applications)." : "Нажми «Скачать для Windows», открой установщик и следуй его шагам. При первом запуске выбери папку для загрузок. Если предпочитаешь ZIP, распакуй архив целиком и запусти Kachalka.exe, оставив остальные файлы рядом.")}</p></details>
         <details><summary>{t("Нужен отдельный торрент-клиент?")}<Plus size={20} aria-hidden="true" /></summary><p>{t("Нет. Качалка сама работает с magnet-ссылками и .torrent-файлами: добавляет задачи, скачивает и позволяет управлять очередью внутри приложения.")}</p></details>
         <details><summary>{t("Как получать новые версии?")}<Plus size={20} aria-hidden="true" /></summary><p>{t("Приложение проверяет обновления с GitHub. Управлять проверкой и установкой можно в настройках. Очередь и пользовательские настройки сохраняются при обновлении.")}</p></details>
       </div></section>

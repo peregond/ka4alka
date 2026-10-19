@@ -606,9 +606,12 @@ struct KDChipMenu<Content: View>: View {
         Menu { content } label: { KDChipLabel(text: active ? (value ?? title) : title, isActive: active, showsChevron: true) }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
+            .frame(minHeight: 24)
+            .contentShape(Rectangle())
             .fixedSize()
             .accessibilityLabel(title)
             .accessibilityValue(value ?? "")
+            .settingsLayoutProbe("menu." + title, kind: .control)
     }
 }
 

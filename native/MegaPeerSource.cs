@@ -53,7 +53,7 @@ public sealed class MegaPeerSource(SourceClient client)
             if(!topicMatch.Success||!downloadMatch.Success||topicMatch.Groups[1].Value!=downloadMatch.Groups[1].Value)continue;
             var title=Regex.Replace(HtmlEntity.DeEntitize(titleLink?.InnerText??"").Trim(),@"\s+"," ");
             if(title.Length is 0 or >500)continue;
-            var sizeText=HtmlEntity.DeEntitize(row.SelectSingleNode("./td[3]")?.InnerText??"").Trim();
+            var sizeText=HtmlEntity.DeEntitize(row.SelectSingleNode("./td[last()-1]")?.InnerText??"").Trim();
             var sizeMatch=SizePattern.Match(sizeText);
             long? size=null;
             if(sizeMatch.Success&&double.TryParse(sizeMatch.Groups[1].Value.Replace(',','.'),NumberStyles.Float,CultureInfo.InvariantCulture,out var amount))

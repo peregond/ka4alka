@@ -1,0 +1,33 @@
+name: Publish release audio rules
+on:
+  push:
+    branches: [claude/quirky-hopper-1vlmj6]
+    paths: ['web-index/app/data/release-audio-rules.json', '.github/workflows/release-audio-rules.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: release-audio-rules
+  cancel-in-progress: false
+jobs:
+  rules:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Verify the real desktop rules reader and offline fallback
+        run: dotnet run --project desktop-core-tests/Kachalka.DesktopCoreTests.csproj -c Release -- --release-audio
+      - name: Publish only rules from the current authorized branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          current="$(gh api repos/peregond/ka4alka/branches/claude/quirky-hopper-1vlmj6 --jq .commit.sha)"
+          if [ "$current" != "$GITHUB_SHA" ]; then echo 'Newer source exists; retaining its rules publication.'; exit 0; fi
+          gh release view catalog-data > /dev/null
+          gh release upload catalog-data web-index/app/data/release-audio-rules.json --clobber
+          mkdir -p "$RUNNER_TEMP/rules-readback"
+          gh release download catalog-data --pattern release-audio-rules.json --dir "$RUNNER_TEMP/rules-readback"
+          cmp web-index/app/data/release-audio-rules.json "$RUNNER_TEMP/rules-readback/release-audio-rules.json"

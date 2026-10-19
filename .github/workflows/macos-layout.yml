@@ -1,0 +1,36 @@
+name: Verify macOS audio menus and layout
+on:
+  push:
+    branches: [claude/quirky-hopper-1vlmj6]
+    paths: ['.github/workflows/macos-layout.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: macos-layout-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  layout:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify native layout and combined audio filters
+        working-directory: macos
+        run: |
+          set -o pipefail
+          swift test -c release --jobs 3 --filter 'LayoutTests|ReleaseAudioFilterTests' 2>&1 | tee "$RUNNER_TEMP/layout-tests.log"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: macos-layout-${{ matrix.arch }}-${{ github.sha }}
+          path: ${{ runner.temp }}/layout-tests.log
+          if-no-files-found: error
