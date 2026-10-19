@@ -358,8 +358,11 @@ struct DownloadsView: View {
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
+        .frame(minHeight: 24)
+        .contentShape(Rectangle())
         .fixedSize()
         .accessibilityLabel(tr("Управление загрузками", "Manage downloads"))
+        .settingsLayoutProbe("menu.downloads.controls", kind: .control)
     }
 
     private var controlStrip: some View {
@@ -914,9 +917,12 @@ struct TransferRow: View {
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
+        .frame(minHeight: 24)
+        .contentShape(Rectangle())
         .fixedSize()
         .help(tr("Ещё", "More"))
         .accessibilityLabel(tr("Ещё", "More"))
+        .settingsLayoutProbe("menu.downloads.more." + item.id, kind: .control)
     }
 
     @ViewBuilder private var menuItems: some View {
