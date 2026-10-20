@@ -491,7 +491,8 @@ struct SmokeShot {
     private func inspectBanner(_ section: String) {
         let frames: [String: CGRect] = SettingsLayoutMeasurements.frames
         guard let banner = frames["catalog.banner." + section], let content = MacSmoke.mainWindow()?.contentView else { return }
-        check(banner.width > 280 && banner.height >= 280 && banner.height < 420, section + ": spotlight banner has a complete native layout")
+        let maximumHeight = CatalogHeroMetrics.height(forWidth: banner.width)
+        check(banner.width > 280 && banner.height >= 280 && banner.height <= maximumHeight + 2, section + ": spotlight banner has a complete native layout")
         let inside: Bool = banner.minX >= -2 && banner.maxX <= content.bounds.width + 2 && banner.minY >= -2 && banner.maxY <= content.bounds.height + 2
         check(inside, section + ": spotlight banner is visible at the top of the catalog")
     }

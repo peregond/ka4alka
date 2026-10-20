@@ -12,6 +12,12 @@ final class HeroRotationTests: XCTestCase {
         XCTAssertNil(HeroRotation.next(in: [], selected: "gone", delta: 1))
     }
 
+    func testHeightAdaptsToShortWindowsWithoutChangingBetweenSlides() {
+        XCTAssertEqual(CatalogHeroMetrics.height(forWidth: 1280), 560)
+        XCTAssertEqual(CatalogHeroMetrics.height(forWidth: 1280, viewportHeight: 340), 300)
+        XCTAssertEqual(CatalogHeroMetrics.height(forWidth: 460, viewportHeight: 300), 280)
+    }
+
     func testNoClockRunsWhenItCannotBeUseful() {
         func allowed(count: Int = 5, visible: Bool = true, active: Bool = true,
                      interacting: Bool = false, paused: Bool = false, reduced: Bool = false) -> Bool {

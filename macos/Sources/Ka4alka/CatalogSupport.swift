@@ -76,8 +76,12 @@ struct CatalogPosterLabel: ViewModifier {
 
 /// Stable landscape geometry shared by loading placeholders and real slides.
 enum CatalogHeroMetrics {
-    static func height(forWidth width: CGFloat) -> CGFloat {
-        return min(560, max(380, width * 0.48))
+    static func height(forWidth width: CGFloat, viewportHeight: CGFloat? = nil) -> CGFloat {
+        let landscape = min(560, max(380, width * 0.48))
+        guard let viewportHeight else { return landscape }
+        // Keep the actions in view in a short window; the scroll container already
+        // subtracts its pinned filters. Reserve the catalog's top spacing as well.
+        return min(landscape, max(280, viewportHeight - 40))
     }
     static func backdropWidth(forWidth width: CGFloat, lite: Bool) -> Int {
         if lite { return 640 }

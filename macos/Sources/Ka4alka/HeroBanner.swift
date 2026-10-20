@@ -16,10 +16,11 @@ struct CatalogSpotlightView: View {
     @State private var paused = false
     @FocusState private var focusedControl: String?
     private var selected: MediaCard? { items.first { $0.id == selectedID } ?? items.first }
+    private var reduced: Bool { reduceMotion || voiceOver || model.settings?.liteMode == true }
     private var automatic: Bool {
         HeroRotation.canAdvance(count: items.count, visible: visible, active: scenePhase == .active,
             interacting: hovered || focusedControl != nil, paused: paused,
-            reduced: reduceMotion || voiceOver || model.settings?.liteMode == true)
+            reduced: reduced)
     }
     private var clock: HeroRotation.Clock {
         HeroRotation.Clock(ids: items.map(\.id), selected: selected?.id, running: automatic)
@@ -33,7 +34,9 @@ struct CatalogSpotlightView: View {
                     .id(selected.id)
                     .transition(.opacity)
             }
-                .frame(height: CatalogHeroMetrics.height(forWidth: width))
+                .containerRelativeFrame(.vertical) { length, _ in
+                    CatalogHeroMetrics.height(forWidth: width, viewportHeight: length)
+                }
                 .kdReadWidth($width)
                 .animation(reduceMotion || model.settings?.liteMode == true ? nil : .easeInOut(duration: 0.4), value: selected.id)
                 .overlay { if items.count > 1 { arrows } }
@@ -93,7 +96,11 @@ struct CatalogSpotlightView: View {
         }
         .padding(.bottom, 14)
         .frame(maxWidth: .infinity)
-        .overlay(alignment: .trailing) {
+        .overlay(alignment: .trailing) { if !reduced { pauseButton } }
+        .kdOnBanner()
+    }
+
+    private var pauseButton: some View {
             Button { paused.toggle() } label: {
                 Image(systemName: paused ? "play.fill" : "pause.fill").frame(width: 28, height: 28)
             }
@@ -102,8 +109,6 @@ struct CatalogSpotlightView: View {
             .help(paused ? tr("Продолжить смену баннеров", "Resume slideshow") : tr("Приостановить смену баннеров", "Pause slideshow"))
             .accessibilityLabel(paused ? tr("Продолжить смену баннеров", "Resume slideshow") : tr("Приостановить смену баннеров", "Pause slideshow"))
             .padding(.trailing, 18).padding(.bottom, 14)
-        }
-        .kdOnBanner()
     }
 
     private func advance(_ delta: Int) {
@@ -115,7 +120,10 @@ struct CatalogSpotlightView: View {
 struct HeroPlaceholder: View {
     @State private var width: CGFloat = 0
     var body: some View {
-        KDHeroSkeleton(height: CatalogHeroMetrics.height(forWidth: width > 0 ? width : 900))
+        GeometryReader { geometry in KDHeroSkeleton(height: geometry.size.height) }
+            .containerRelativeFrame(.vertical) { length, _ in
+                CatalogHeroMetrics.height(forWidth: width > 0 ? width : 900, viewportHeight: length)
+            }
             .kdReadWidth($width)
     }
 }
@@ -143,7 +151,8 @@ struct FeaturedHero: View {
             ZStack(alignment: .bottomLeading) {
                 openButton(size: geometry.size)
                 VStack(alignment: .leading, spacing: 20) {
-                    heroText(compact: geometry.size.width < 680, descriptionLines: geometry.size.width < 680 ? 2 : 3)
+                    heroText(compact: geometry.size.width < 680, short: geometry.size.height < 340,
+                             descriptionLines: geometry.size.height < 340 ? 1 : (geometry.size.width < 680 ? 2 : 3))
                         .allowsHitTesting(false)
                     actionRow
                 }
@@ -211,7 +220,7 @@ struct FeaturedHero: View {
         return parts.joined(separator: ", ")
     }
 
-    private func heroText(compact: Bool, descriptionLines: Int) -> some View {
+    private func heroText(compact: Bool, short: Bool, descriptionLines: Int) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             if let eyebrow {
                 Label(eyebrow, systemImage: "sparkles")
@@ -219,7 +228,7 @@ struct FeaturedHero: View {
                     .foregroundStyle(Color.white.opacity(0.9))
             }
             Text(item.title)
-                .font(.system(size: compact ? 32 : 48, weight: .bold))
+                .font(.system(size: short ? 26 : (compact ? 32 : 48), weight: .bold))
                 .tracking(-0.7)
                 .lineLimit(2)
                 .settingsLayoutProbe("catalog.hero.title", kind: .text, group: "catalog.hero")
