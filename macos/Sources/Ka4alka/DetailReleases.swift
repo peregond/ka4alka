@@ -932,15 +932,15 @@ struct DetailReleasesSection: View {
         .accessibilityLabel(tr("Ищем раздачи…", "Searching for releases…"))
     }
 
+    private var hiddenReleasesMessage: String {
+        tr("Экранки и раздачи низкого качества скрыты. Возможно, других пока нет.", "Cam and low-quality releases are hidden. There may be no others yet.")
+    }
     @ViewBuilder private var noReleases: some View {
         if hidesPoorQuality && !isGame {
             KDEmptyState(
                 title: tr("Раздачи не найдены", "No releases found"),
                 systemImage: "tray",
-                message: tr(
-                    "Экранки и раздачи низкого качества скрыты. Возможно, других пока нет.",
-                    "Cam and low-quality releases are hidden. There may be no others yet."
-                ),
+                message: hiddenReleasesMessage,
                 actionTitle: tr("Показать и низкое качество", "Show low quality too"),
                 action: { showLowQuality() }
             )
