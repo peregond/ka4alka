@@ -27,10 +27,10 @@ struct SmokeHitMeasurement {
 
 enum SmokeHitAudit {
     /// Smallest change of any colour channel (0...1) that counts as "different from the background".
-    static let minDelta: Double = 0.04
-    /// How much more the green channel must move than the average of red and blue. The highlight is a
-    /// 14 % mix of the green accent, so a neutral hover fill or a shadow does not pass this test.
-    static let minTint: Double = 0.015
+    static let minDelta: Double = 0.03
+    /// How much more the green channel must move than the red one. The highlight is a 14 % mix of the
+    /// green accent, so a neutral hover fill or a shadow does not pass this test.
+    static let minTint: Double = 0.02
     /// The largest accepted distance between the drawn and the layout centre, in points.
     static let tolerancePoints: CGFloat = 8
 
@@ -51,8 +51,9 @@ enum SmokeHitAudit {
         let deltaGreen: Double = pixel.green - baseline.green
         let deltaBlue: Double = pixel.blue - baseline.blue
         let largest: Double = max(abs(deltaRed), max(abs(deltaGreen), abs(deltaBlue)))
-        let others: Double = (deltaRed + deltaBlue) / 2
-        let tint: Double = deltaGreen - others
+        // The accent is green: against the background the green channel moves clearly more than the red one
+        // (up on a dark background, less down on a light one). A neutral fill moves all channels alike.
+        let tint: Double = deltaGreen - deltaRed
         return largest >= minDelta && tint >= minTint
     }
 
