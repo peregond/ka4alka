@@ -456,6 +456,7 @@ struct SmokeShot {
     // MARK: Layout audit
 
     private func auditLayout(_ spec: SmokePageSpec, width: CGFloat) {
+        SettingsLayoutMeasurements.refreshNativeViews()
         let frames: [String: CGRect] = SettingsLayoutMeasurements.frames
         for id in spec.required where frames[id] == nil {
             violate("layout", "probe " + id + " was not recorded, so the page lost its instrumentation")
@@ -687,7 +688,10 @@ struct SmokeShot {
             region = shot.bounds
         } else {
             let guardWidth: CGFloat = min(260, shot.bounds.width * 0.3)
-            region = CGRect(x: guardWidth, y: 60, width: max(1, shot.bounds.width - guardWidth), height: max(1, shot.bounds.height - 60))
+            // An empty search page intentionally has a large blank lower area. Audit its actual
+            // controls and empty state, rather than diluting them over a tall, empty window.
+            let contentHeight: CGFloat = pageName == "search" ? min(420, shot.bounds.height - 60) : shot.bounds.height - 60
+            region = CGRect(x: guardWidth, y: 60, width: max(1, shot.bounds.width - guardWidth), height: max(1, contentHeight))
         }
         let stats: SmokePixelStats = SmokePixelAudit.measure(shot.bitmap, scale: shot.scale, region: region)
         if stats.samples == 0 {
