@@ -33,7 +33,14 @@ final class SmokeCloseMarker: @unchecked Sendable { var windowClosed = false }
                 let report: [String: Bool] = ["connected": true, "windowClosedBeforeTerminate": marker.windowClosed, "terminated": true]
                 if let data = try? JSONEncoder().encode(report) { try? data.write(to: directory.appendingPathComponent("checks.json")) }
             }
-            window.performClose(nil)
+            guard let close = window.standardWindowButton(.closeButton),
+                  !close.isHiddenOrHasHiddenAncestor, close.isEnabled,
+                  let parent = close.superview,
+                  let hit = parent.hitTest(NSPoint(x: close.frame.midX, y: close.frame.midY)),
+                  hit === close || hit.isDescendant(of: close) else {
+                throw UpdateError("The real red close button must be visible and clickable")
+            }
+            close.performClick(nil)
         } catch {
             try? error.localizedDescription.write(to: directory.appendingPathComponent("error.txt"), atomically: true, encoding: .utf8)
             requestApplicationQuit()
@@ -498,7 +505,23 @@ struct SmokeShot {
         default:
             break
         }
+        inspectWindowControls()
         if spec.toolbar { inspectToolbar(primary: primary) }
+    }
+
+    private func inspectWindowControls() {
+        guard let main = MacSmoke.mainWindow() else { return }
+        for (kind, name) in [(NSWindow.ButtonType.closeButton, "close"), (.miniaturizeButton, "minimize"), (.zoomButton, "zoom")] {
+            guard let button = main.standardWindowButton(kind), let parent = button.superview else {
+                check(false, "window controls: " + name + " is visible and clickable")
+                continue
+            }
+            let point = NSPoint(x: button.frame.midX, y: button.frame.midY)
+            let hit = parent.hitTest(point)
+            let visible = button.window === main && !button.isHiddenOrHasHiddenAncestor && button.alphaValue > 0.9 && button.frame.width > 8 && button.frame.height > 8
+            let clickable = hit.map { $0 === button || $0.isDescendant(of: button) } ?? false
+            check(visible && button.isEnabled && clickable, "window controls: " + name + " is visible and clickable")
+        }
     }
 
     private func inspectBanner(_ section: String) {
@@ -517,12 +540,13 @@ struct SmokeShot {
     private func inspectToolbar(primary: Bool) {
         guard let main = MacSmoke.mainWindow() else { return }
         SettingsLayoutMeasurements.refreshNativeViews()
-        reportToolbar(primary, main.toolbar?.isVisible != true && SettingsLayoutMeasurements.nativeAttached["toolbar.add"] != true, "toolbar: hidden at the top of the page")
+        reportToolbar(primary, SettingsLayoutMeasurements.nativeAttached["toolbar.add"] != true, "toolbar: hidden at the top of the page")
     }
 
     private func inspectExpandedToolbar() {
         SettingsLayoutMeasurements.refreshNativeViews()
         guard let main = MacSmoke.mainWindow() else { return }
+        inspectWindowControls()
         check(SettingsLayoutMeasurements.nativeAttached["toolbar.add"] == true, "toolbar: appears after scrolling")
         for id in ["toolbar.add", "toolbar.refresh", "toolbar.appearance"] {
             guard SettingsLayoutMeasurements.nativeAttached[id] == true, let frame = SettingsLayoutMeasurements.nativeFrames[id], let visible = SettingsLayoutMeasurements.nativeVisibleFrames[id] else {
@@ -899,7 +923,7 @@ struct SmokeShot {
         await settle("after scrolling " + label, timeout: 3)
         if label == "movies" {
             SettingsLayoutMeasurements.refreshNativeViews()
-            check(main.toolbar?.isVisible != true && SettingsLayoutMeasurements.nativeAttached["toolbar.add"] != true, "toolbar: hides again on return to the top")
+            check(SettingsLayoutMeasurements.nativeAttached["toolbar.add"] != true, "toolbar: hides again on return to the top")
         }
     }
 
