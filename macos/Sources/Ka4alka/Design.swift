@@ -214,11 +214,6 @@ enum KDFormat {
         let floored = (clamped * scale).rounded(.down) / scale
         return floored.formatted(.number.precision(.fractionLength(fractionDigits)).locale(locale)) + "%"
     }
-    /// "Среда, 14 октября" for the Актуальное masthead.
-    static func mastheadDate(_ date: Date = Date()) -> String {
-        let text = date.formatted(.dateTime.weekday(.wide).day().month(.wide).locale(locale))
-        return text.prefix(1).uppercased() + String(text.dropFirst())
-    }
 }
 
 // MARK: Surfaces

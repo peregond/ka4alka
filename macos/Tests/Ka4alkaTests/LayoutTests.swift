@@ -216,7 +216,7 @@ private struct LayoutOutcome {
                 }
             }
         }
-        XCTAssertEqual(renders, 100)
+        XCTAssertEqual(renders, 120)
         if scrollViews == 0 { throw XCTSkip("SwiftUI scroll views are not visible to AppKit on this runner, so overflow cannot be measured.") }
         XCTAssertTrue(failures.isEmpty, failures.joined(separator: "\n"))
     }

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Актуальное: a news-portal page. Masthead, banner, three top stories, then rubrics and shelves.
+/// Актуальное starts with the banner, then top stories, rubrics and shelves.
 struct FeaturedView: View {
     @EnvironmentObject private var model: AppModel
     /// The rubric at the top of the visible area. Saved to the model when the page goes away, so Back returns to the same place.
@@ -20,7 +20,6 @@ struct FeaturedView: View {
         let plan = FeaturedPlan(slices: slices)
         ScrollView {
             LazyVStack(alignment: .leading, spacing: KD.Space.xl) {
-                masthead
                 content(slices: slices, plan: plan)
             }
             .scrollTargetLayout()
@@ -32,13 +31,6 @@ struct FeaturedView: View {
         .onAppear { if anchor == nil { anchor = model.featuredAnchor } }
         .onDisappear { model.featuredAnchor = anchor }
         .task(id: model.revision) { await model.loadFeatured() }
-    }
-
-    private var masthead: some View {
-        KDPageHeader(tr("Актуальное", "Featured"), subtitle: KDFormat.mastheadDate() + " · " + tr("Что смотреть и во что играть", "What to watch and play"))
-            .padding(.horizontal, KD.gutter)
-            .id("featured-masthead")
-            .settingsLayoutProbe("featured.masthead")
     }
 
     @ViewBuilder private func content(slices: [FeaturedGroupSlice], plan: FeaturedPlan) -> some View {

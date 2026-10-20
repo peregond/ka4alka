@@ -82,7 +82,7 @@ extension SmokePage {
         case .search:
             return SmokePageSpec(prefixes: ["search."], required: ["search.header", "search.field", "search.scope"], network: false, plain: true, toolbar: false, scansText: true)
         case .featured:
-            return SmokePageSpec(prefixes: ["featured."], required: ["featured.masthead", "featured.hero"], network: false, plain: false, toolbar: false, scansText: false)
+            return SmokePageSpec(prefixes: ["featured."], required: ["featured.hero"], network: false, plain: false, toolbar: false, scansText: false)
         case .movies:
             return SmokePageSpec(prefixes: ["catalog."], required: ["catalog.banner.movies", "catalog.hero"], network: false, plain: false, toolbar: true, scansText: false)
         case .series:

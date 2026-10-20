@@ -39,7 +39,7 @@ struct SearchView: View {
             KDIconButton(systemImage: "chevron.backward", label: tr("Назад", "Back")) { model.back() }
                 .padding(.top, 8)
             ViewThatFits(in: .horizontal) {
-                HStack(spacing: KD.Space.m) { field; scope.frame(width: 220) }
+                HStack(spacing: KD.Space.m) { field; scope.frame(width: 260) }
                 VStack(spacing: KD.Space.s) { field; scope }
             }
         }
@@ -78,6 +78,7 @@ struct SearchView: View {
         }
         .pickerStyle(.segmented)
         .labelsHidden()
+        .frame(minWidth: 245)
         .settingsLayoutProbe("search.scope")
     }
     private var recentSearches: some View {

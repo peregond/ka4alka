@@ -322,17 +322,6 @@ final class FormattingTests: XCTestCase {
         XCTAssertEqual(KDFormat.percent(.nan), "0%")
         XCTAssertEqual(KDFormat.percent(42.78, fractionDigits: 1), "42.7%")
     }
-    func testMastheadDateStartsWithACapital() {
-        let saved = TestLanguage.current()
-        defer { TestLanguage.restore(saved) }
-        let noon = Date(timeIntervalSince1970: 1_792_000_000)
-        for language in ["ru", "en"] {
-            UserDefaults.standard.set(language, forKey: "UiLanguage")
-            let text = KDFormat.mastheadDate(noon)
-            XCTAssertFalse(text.isEmpty)
-            if let first = text.first { XCTAssertTrue(first.isUppercase, text) }
-        }
-    }
 }
 
 // MARK: Localisation lint (reads the sources)

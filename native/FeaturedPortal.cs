@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -6,7 +5,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 namespace Kachalka;
 
-// "Актуальное" reads like a news front page: a masthead with the date, a top story, a digest of three stories, then
+// "Актуальное" reads like a news front page: a top story, a digest of three stories, then
 // rubrics that each have their own shape (a lead story with a list, a poster shelf, a numbered ranking).
 // Everything is built from the cards the page already has; nothing here requests anything extra.
 public partial class MainWindow
@@ -17,13 +16,6 @@ public partial class MainWindow
     StackPanel? featuredDigest;
     double featuredWidth;
 
-    // Wednesday, 14 October: today's date in the interface language.
-    static string FeaturedDateLine()
-    {
-        var culture=CultureInfo.GetCultureInfo(AppLanguage.Current=="en"?"en-US":"ru-RU");
-        var text=DateTime.Now.ToString("dddd, d MMMM",culture);
-        return char.ToUpper(text[0],culture)+text[1..];
-    }
     static string FeaturedKey(IEnumerable<MediaItem> items)=>string.Join(",",items.Select(item=>item.Id))+"|"+AppLanguage.Current;
 
     // Clickable story: one button around its content, opening the normal card like every poster in the app.
