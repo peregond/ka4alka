@@ -1,0 +1,47 @@
+name: Verify native shell on macOS 27
+on:
+  push:
+    branches: [claude/quirky-hopper-1vlmj6]
+    paths: ['macos/**', '.github/workflows/macos-modern.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: macos-modern-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  modern:
+    # Official macOS 27 / Xcode 27 image; the older SDK and Intel checks remain separate.
+    runs-on: xcode-27
+    timeout-minutes: 35
+    env:
+      KACHALKA_DATA: ${{ github.workspace }}/test-output/macos/profile
+      KACHALKA_SKIP_DMG: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Report the actual OS and SDK
+        run: |
+          sw_vers
+          xcodebuild -version
+          swift --version
+      - name: Build the native shell with the packaged engine
+        run: bash scripts/macos/build.sh arm64
+      - name: Verify pages, search focus, scroll chrome, themes and languages
+        run: |
+          bash macos/Tests/run-smoke.sh render \
+            "$PWD/dist/macos-arm64/Ka4alka.app/Contents/MacOS/Ka4alka" \
+            "$PWD/test-output/macos/render" "macOS 27 / Xcode 27"
+      - name: Verify native models, navigation, layout and signed updater
+        working-directory: macos
+        env:
+          KACHALKA_TEST_APP: ${{ github.workspace }}/dist/macos-arm64/Ka4alka.app
+        run: swift test -c release --jobs 3
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: macos-27-${{ github.sha }}
+          path: test-output/macos/render/
+          if-no-files-found: ignore
