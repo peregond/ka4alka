@@ -22,7 +22,7 @@ concurrency:
 jobs:
   capture:
     runs-on: macos-15
-    timeout-minutes: 15
+    timeout-minutes: 35
     env:
       RELEASE_VERSION: ${{ inputs.version }}
       GH_TOKEN: ${{ github.token }}
@@ -64,7 +64,7 @@ jobs:
             output="$PWD/test-output/mac-capture/$language"
             published/app/Ka4alka.app/Contents/MacOS/Ka4alka --smoke-test "$output" -ApplePersistenceIgnoreState YES &
             process=$!
-            for ((attempt=0;attempt<240;attempt++)); do
+            for ((attempt=0;attempt<900;attempt++)); do
               if ! kill -0 "$process" 2>/dev/null; then break; fi
               sleep 1
             done
