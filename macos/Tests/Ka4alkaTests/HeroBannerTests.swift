@@ -35,6 +35,31 @@ final class HeroRotationTests: XCTestCase {
 }
 
 @MainActor final class HeroBannerTests: XCTestCase {
+    func testGameHeroReflowsWhenTheSameWindowShrinks() throws {
+        _ = NSApplication.shared
+        let previousProbe = SettingsLayoutMeasurements.enabledForTests
+        SettingsLayoutMeasurements.enabledForTests = true
+        defer { SettingsLayoutMeasurements.enabledForTests = previousProbe }
+        let model = AppModel()
+        model.bridge.disabled = true
+        model.settings = try TestFixtures.decode(AppSettings.self, TestFixtures.settingsJSON)
+        let card = try TestFixtures.card("games:resize", "Call of Duty: Modern Warfare", section: "games")
+        let host = NSHostingView(rootView: DetailHero(card: card, detail: nil, onChooseRelease: {}).environmentObject(model))
+        host.autoresizingMask = [.width, .height]
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1000, height: 420), styleMask: [.borderless], backing: .buffered, defer: false)
+        window.contentView = host
+        for width in [1000, 496, 1000] as [CGFloat] {
+            window.setContentSize(NSSize(width: width, height: 420))
+            host.layoutSubtreeIfNeeded()
+            RunLoop.main.run(until: Date().addingTimeInterval(0.12))
+            host.layoutSubtreeIfNeeded()
+            let poster = try XCTUnwrap(SettingsLayoutMeasurements.frames["detail.hero.poster"])
+            XCTAssertEqual(poster.width, width < 640 ? 220 : 320, accuracy: 1)
+            XCTAssertLessThanOrEqual(poster.maxX, width)
+        }
+        window.contentView = nil
+    }
+
     func testScrollVisibilityPublishesOnlyOnVisibilityChanges() {
         _ = NSApplication.shared
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 400), styleMask: [.borderless], backing: .buffered, defer: false)

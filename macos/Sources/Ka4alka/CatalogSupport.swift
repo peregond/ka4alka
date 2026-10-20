@@ -94,7 +94,7 @@ func catalogGenreLine(_ genre: String, limit: Int) -> String {
     let parts: [String] = genre.split(separator: ",")
         .map { (part: Substring) -> String in part.trimmingCharacters(in: .whitespaces) }
         .filter { (part: String) -> Bool in !part.isEmpty && part != "Windows" }
-    return parts.prefix(limit).joined(separator: ", ")
+    return parts.prefix(limit).map { tr($0) }.joined(separator: ", ")
 }
 
 /// "1 название", "2 названия", "5 названий" (and the English forms).

@@ -341,17 +341,16 @@ extension View {
     }
     /// Measures the width of this view (use on the detail column, not the window).
     func kdReadWidth(_ width: Binding<CGFloat>) -> some View {
-        background(GeometryReader { proxy in Color.clear.preference(key: KDWidthPreferenceKey.self, value: proxy.size.width) })
-            .onPreferenceChange(KDWidthPreferenceKey.self) { value in
-                if abs(width.wrappedValue - value) > 0.5 { width.wrappedValue = value }
+        background {
+            GeometryReader { proxy in
+                Color.clear.onChange(of: proxy.size.width, initial: true) { _, value in
+                    if abs(width.wrappedValue - value) > 0.5 { width.wrappedValue = value }
+                }
             }
+        }
     }
 }
 
-private struct KDWidthPreferenceKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
-}
 
 struct KDFieldChromeModifier: ViewModifier {
     @Environment(\.colorSchemeContrast) private var contrast

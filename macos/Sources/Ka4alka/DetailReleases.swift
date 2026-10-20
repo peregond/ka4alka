@@ -879,6 +879,7 @@ struct DetailReleasesSection: View {
             header(all: all, shown: rows.count)
             if !all.isEmpty {
                 ReleaseFilterBar(filters: $filters, showsExtras: $showsExtras, facets: facets, card: card, isGame: isGame, isSeries: isSeries)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .settingsLayoutProbe("detail.releases.toolbar")
             }
             SourceStatusView(sources: model.sources(for: card))

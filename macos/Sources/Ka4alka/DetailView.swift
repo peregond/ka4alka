@@ -223,6 +223,7 @@ struct DetailHero: View {
                 .aspectRatio(460.0 / 215.0, contentMode: .fit)
                 .frame(width: compact ? 220 : 320)
                 .clipShape(RoundedRectangle(cornerRadius: KD.Radius.poster, style: .continuous))
+                .settingsLayoutProbe("detail.hero.poster", group: "detail.banner")
         } else {
             Artwork(address: item.poster, width: 400, placeholderSymbol: card.section == "series" ? "tv" : "film")
                 .aspectRatio(2.0 / 3.0, contentMode: .fit)
