@@ -72,6 +72,8 @@ struct ShellCommands: Commands {
             Button(tr("Добавить торрент…", "Add torrent…")) { Task { @MainActor in model.addTorrent = true } }.keyboardShortcut("o")
         }
         CommandMenu(tr("Медиатека", "Library")) {
+            Button(tr("Поиск", "Search")) { Task { @MainActor in model.openSearch() } }.keyboardShortcut("f")
+            Divider()
             ForEach(Section.allCases) { section in
                 Button(section.title) { Task { @MainActor in model.select(section) } }.keyboardShortcut(ShellCommands.key(for: section), modifiers: .command)
             }

@@ -19,7 +19,6 @@
     "^\\[en/light\\] Featured resolves real bundled catalog membership$",
     "^\\[en/light\\] Featured labels use authored English translations$",
     "^\\[ru/dark \\d+x\\d+\\] toolbar: toolbar\\.add is visible and not clipped by its native host$",
-    "^\\[ru/dark \\d+x\\d+\\] toolbar: the search field is visible, inside the window and large enough$",
     {
       "pattern": "^\\[ru/dark \\d+x\\d+\\] movies: spotlight banner has a complete native layout$",
       "min": 4
@@ -57,7 +56,10 @@
       "min": 4
     },
     "^perf: resident memory stays under 600 MB$",
-    "^The layout matrix produced measurements \\(\\d+ cells\\)$"
+    "^The layout matrix produced measurements \\(\\d+ cells\\)$",
+    "^\\[ru/dark \\d+x\\d+\\] toolbar: appears after scrolling$",
+    "^\\[ru/dark \\d+x\\d+\\] toolbar: hides again on return to the top$",
+    "^\\[ru/dark \\d+x\\d+\\] search: opening the page focuses the input$"
   ],
   "matrix": {
     "combinations": [
@@ -83,6 +85,7 @@
     ],
     "requiredPages": [
       "featured",
+      "search",
       "movies",
       "series",
       "games-grid",

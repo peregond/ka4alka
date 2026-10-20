@@ -56,6 +56,7 @@ struct RootView: View {
     @EnvironmentObject private var updater: MacUpdater
     @Environment(\.colorScheme) private var colorScheme
     @State private var dropTargeted = false
+    @State private var chromeScrolled = false
 
     var body: some View {
         NavigationSplitView {
@@ -64,6 +65,7 @@ struct RootView: View {
             detailColumn
         }
         .navigationSplitViewStyle(.balanced)
+        .buttonStyle(KDSecondaryButtonStyle())
         .sheet(item: sheetBinding) { sheet in sheetContent(sheet) }
         .dropDestination(for: URL.self, action: { urls, _ in acceptDrop(urls) }, isTargeted: { targeted in dropTargeted = targeted })
         .overlay { dropOverlay }
@@ -148,10 +150,11 @@ struct RootView: View {
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: KD.Space.xxs) {
+                ShellSearchRow(selected: model.routes.contains(.search)) { model.openSearch() }
                 ForEach(libraryEntries) { (entry: Section) in
                     ShellPinnedRow(
                         section: entry,
-                        selected: model.section == entry,
+                        selected: !model.routes.contains(.search) && model.section == entry,
                         store: nil,
                         badge: entry == .saved ? (model.settings?.savedIds.count ?? 0) : 0
                     ) { pick(entry) }
@@ -231,10 +234,17 @@ struct RootView: View {
             .kdToast($model.toast)
             .navigationTitle(navigationTitle)
             .toolbar { toolbarContent }
-            .searchable(text: $model.query, placement: .toolbar, prompt: tr("Найти фильм, сериал или игру", "Find a movie, series or game"))
-            .onSubmit(of: .search) { model.submitSearch() }
-            .onChange(of: model.query) { _, next in
-                if next.isEmpty, !model.submittedQuery.isEmpty { model.clearSearch() }
+            .toolbar(chromeScrolled && model.route != .search ? .visible : .hidden, for: .windowToolbar)
+            .background {
+                ShellScrollObserver(routeKey: model.route.key) { scrolled in
+                    if chromeScrolled != scrolled { chromeScrolled = scrolled }
+                }
+            }
+            .overlay(alignment: .topLeading) {
+                if !chromeScrolled, model.routes.count > 1, model.route != .search {
+                    KDIconButton(systemImage: "chevron.backward", label: tr("Назад", "Back")) { model.back() }
+                        .padding(KD.Space.m)
+                }
             }
     }
     @ViewBuilder private var detailBody: some View {
@@ -269,6 +279,7 @@ struct RootView: View {
     }
     private var navigationTitle: String {
         switch model.route {
+        case .search: return tr("Поиск", "Search")
         case .section(let section): return section.title
         case .detail(let card): return card.title
         case .person(let person): return person.name
@@ -302,6 +313,7 @@ struct RootView: View {
 
     @ViewBuilder private var content: some View {
         switch model.route {
+        case .search: SearchView()
         case .section(.featured): FeaturedView()
         case .section(.games) where model.submittedQuery.isEmpty && model.filter == CatalogFilter() && model.page == 1: GameHomeView()
         case .section(.movies), .section(.series), .section(.games): CatalogView()
@@ -321,8 +333,31 @@ struct RootView: View {
         case .person(let person): await model.loadPerson(person)
         case .collection: model.revision += 1
         case .section(.featured): await model.loadFeatured(force: true)
-        case .section: model.revision += 1
+        case .section, .search: model.revision += 1
         }
+    }
+}
+
+struct ShellSearchRow: View {
+    var selected: Bool
+    var action: () -> Void
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: KD.Space.xs) {
+                Image(systemName: "magnifyingglass").frame(width: 20).accessibilityHidden(true)
+                Text(tr("Поиск", "Search")).font(selected ? .body.weight(.semibold) : .body)
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(selected ? KDPalette.accent : Color.primary)
+            .padding(.horizontal, KD.Space.s)
+            .frame(height: 32)
+            .background(RoundedRectangle(cornerRadius: KD.Radius.chip).fill(selected ? KDPalette.accentSoft : .clear))
+            .contentShape(RoundedRectangle(cornerRadius: KD.Radius.chip))
+        }
+        .buttonStyle(.plain)
+        .help(tr("Поиск (⌘F)", "Search (⌘F)"))
+        .accessibilityAddTraits(selected ? .isSelected : AccessibilityTraits())
+        .accessibilityIdentifier("nav-search")
     }
 }
 

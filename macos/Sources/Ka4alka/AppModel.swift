@@ -7,9 +7,9 @@ enum Section: String, CaseIterable, Identifiable { case featured, movies, series
     var title: String { switch self { case .featured: return tr("Актуальное", "Featured"); case .movies: return tr("Фильмы", "Movies"); case .series: return tr("Сериалы", "Series"); case .games: return tr("Игры", "Games"); case .saved: return tr("Сохранённое", "Saved"); case .downloads: return tr("Загрузки", "Downloads"); case .settings: return tr("Настройки", "Settings") } }
     var icon: String { switch self { case .featured: return "sparkles"; case .movies: return "film"; case .series: return "tv"; case .games: return "gamecontroller"; case .saved: return "heart"; case .downloads: return "arrow.down.circle"; case .settings: return "gearshape" } }
 }
-enum Route: Equatable { case section(Section), collection(String), detail(MediaCard), person(Person)
+enum Route: Equatable { case section(Section), search, collection(String), detail(MediaCard), person(Person)
     static func == (a: Route, b: Route) -> Bool { a.key == b.key }
-    var key: String { switch self { case .section(let v): return v.rawValue; case .collection(let id): return "collection:" + id; case .detail(let card): return "detail:" + card.id; case .person(let person): return "person:" + person.id } }
+    var key: String { switch self { case .section(let v): return v.rawValue; case .search: return "search"; case .collection(let id): return "collection:" + id; case .detail(let card): return "detail:" + card.id; case .person(let person): return "person:" + person.id } }
 }
 struct CatalogFilter: Equatable {
     var genre = ""; var country = ""; var year = 0; var rating = 0; var sort = "date"; var quality = ""; var kind = ""
@@ -42,6 +42,9 @@ struct CatalogFilter: Equatable {
     @Published var bootstrapping = false
     @Published var query = ""
     @Published var submittedQuery = ""
+    @Published var searchFocus = 0
+    @Published var recentSearches: [RecentSearch] = []
+    private var searchOrigin: SearchOrigin?
     @Published var filter = CatalogFilter() { didSet { if filter != oldValue { page = 1; browseAnchor = nil } } }
     @Published var page = 1
     @Published var routes: [Route] = [.section(.featured)]
@@ -214,9 +217,11 @@ struct CatalogFilter: Equatable {
     // MARK: Navigation
 
     func select(_ next: Section) {
+        let leavingSearch = searchOrigin != nil
+        searchOrigin = nil
         if section == next, route == .section(next) {
             submittedQuery = ""; query = ""; page = 1; filter = CatalogFilter(); revision += 1
-        } else if section != next {
+        } else if section != next || leavingSearch {
             submittedQuery = ""; query = ""; filter = CatalogFilter(); page = 1; browseAnchor = nil; list = nil
         }
         section = next; routes = [.section(next)]; error = nil
@@ -229,7 +234,35 @@ struct CatalogFilter: Equatable {
         awardYears[id] = nil
         list = nil; routes.append(.collection(id)); error = nil
     }
-    func back() { if routes.count > 1 { routes.removeLast(); error = nil } }
+    func back() {
+        guard routes.count > 1 else { return }
+        let leavingSearch = route == .search
+        routes.removeLast(); error = nil
+        if leavingSearch, let origin = searchOrigin {
+            section = origin.section; query = origin.query; submittedQuery = origin.submittedQuery
+            filter = origin.filter; page = origin.page; browseAnchor = origin.anchor; list = origin.list
+            searchOrigin = nil
+        }
+    }
+    /// Search is a navigation destination, not a modal: Back from a result keeps its query and results.
+    func openSearch() {
+        if let index = routes.firstIndex(of: .search) {
+            routes = Array(routes.prefix(index + 1))
+        } else {
+            searchOrigin = SearchOrigin(section: section, query: query, submittedQuery: submittedQuery,
+                                        filter: filter, page: page, anchor: browseAnchor, list: list)
+            section = section == .games ? .games : .movies
+            query = ""; submittedQuery = ""; filter = CatalogFilter(); page = 1; browseAnchor = nil; list = nil
+            routes.append(.search)
+        }
+        error = nil; searchFocus += 1
+    }
+    func setSearchGames(_ games: Bool) {
+        let target: Section = games ? .games : .movies
+        guard section != target else { return }
+        section = target; filter = CatalogFilter(); page = 1; browseAnchor = nil; list = nil
+        if !submittedQuery.isEmpty { revision += 1 }
+    }
     /// Opens a kachalka:// link (the title page) or hands a magnet link / torrent file to the add sheet.
     /// Returns false only when a kachalka:// link could not be opened.
     @discardableResult func openURL(_ url: URL) async -> Bool {
@@ -264,7 +297,15 @@ struct CatalogFilter: Equatable {
         }
         submittedQuery = q; filter = CatalogFilter(); page = 1; browseAnchor = nil
         let target: Section = section == .games ? .games : .movies
-        section = target; routes = [.section(target)]; revision += 1
+        section = target
+        if route != .search { routes = [.section(target)]; searchOrigin = nil }
+        if !q.isEmpty {
+            let entry = RecentSearch(query: q, games: target == .games)
+            recentSearches.removeAll { $0.games == entry.games && $0.query.caseInsensitiveCompare(q) == .orderedSame }
+            recentSearches.insert(entry, at: 0)
+            recentSearches = Array(recentSearches.prefix(8))
+        }
+        revision += 1
     }
     /// The Return key in the search field: does nothing for an empty or blank query.
     func submitSearch() {
@@ -277,6 +318,10 @@ struct CatalogFilter: Equatable {
     func clearSearch() {
         query = ""
         guard !submittedQuery.isEmpty else { return }
+        if route == .search {
+            submittedQuery = ""; filter = CatalogFilter(); page = 1; browseAnchor = nil; list = nil
+            return
+        }
         if case .section = route {
             submit()
         } else {

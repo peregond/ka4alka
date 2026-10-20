@@ -102,6 +102,7 @@ private struct LayoutOutcome {
         model.releases = [row]
         model.section = .movies
         return [
+            LayoutCase(name: "search", build: { (_: AppModel) -> AnyView in AnyView(SearchView()) }),
             LayoutCase(name: "settings", build: { (_: AppModel) -> AnyView in AnyView(SettingsView()) }),
             LayoutCase(name: "downloads", build: { (m: AppModel) -> AnyView in AnyView(DownloadsView(store: m.transfers)) }),
             LayoutCase(name: "featured", build: { (_: AppModel) -> AnyView in AnyView(FeaturedView()) }),

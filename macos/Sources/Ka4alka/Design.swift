@@ -239,6 +239,7 @@ struct KDCardModifier: ViewModifier {
 
 /// Floating chrome: glass on macOS 26, material on 14/15, opaque with Reduce Transparency.
 struct KDSurfaceModifier<S: InsettableShape>: ViewModifier {
+    @Environment(\.kdLite) private var lite
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorSchemeContrast) private var contrast
     var shape: S
@@ -247,7 +248,7 @@ struct KDSurfaceModifier<S: InsettableShape>: ViewModifier {
     var onArtwork: Bool
 
     @ViewBuilder func body(content: Content) -> some View {
-        if reduceTransparency { solid(content) } else { glassOrMaterial(content) }
+        if lite || reduceTransparency { solid(content) } else { glassOrMaterial(content) }
     }
 
     private var lineWidth: CGFloat { contrast == .increased ? 1.5 : 0.5 }
@@ -425,7 +426,7 @@ private struct KDPrimaryButtonBody: View {
         }
     }
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: metrics.r, style: .continuous)
+        let shape = Capsule()
         configuration.label
             .font(.body.weight(.semibold))
             .foregroundStyle(KDPalette.accentInk)
@@ -438,7 +439,8 @@ private struct KDPrimaryButtonBody: View {
     }
 }
 
-/// Quiet bordered action on a card.
+/// Capsule action with native Liquid Glass on supported systems, material before,
+/// and a solid surface in Lite / Reduce Transparency. Poster and sidebar buttons stay flat.
 struct KDSecondaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View { KDSecondaryButtonBody(configuration: configuration) }
 }
@@ -450,14 +452,14 @@ private struct KDSecondaryButtonBody: View {
     @State private var hovered = false
     var body: some View {
         let small = controlSize == .small || controlSize == .mini
-        let shape = RoundedRectangle(cornerRadius: small ? 7 : 9, style: .continuous)
+        let shape = Capsule()
         configuration.label
             .font(small ? Font.callout : Font.body)
             .foregroundStyle(Color.primary)
             .padding(.horizontal, small ? 10 : 14)
             .padding(.vertical, small ? 4 : 6)
-            .background(shape.fill(configuration.isPressed ? Color.primary.opacity(0.14) : (hovered ? Color.primary.opacity(0.09) : Color.primary.opacity(0.05))))
-            .overlay(shape.strokeBorder(KDPalette.hairline, lineWidth: contrast == .increased ? 1.5 : 1).allowsHitTesting(false))
+            .kdSurface(in: shape, interactive: true)
+            .overlay(shape.fill(Color.primary.opacity(configuration.isPressed ? 0.12 : (hovered ? 0.05 : 0))).allowsHitTesting(false))
             .contentShape(shape)
             .onHover { hovered = $0 }
             .opacity(enabled ? 1 : 0.45)
@@ -516,7 +518,8 @@ private struct KDIconButtonBody: View {
             .font(.system(size: 13, weight: .semibold))
             .foregroundStyle(tone == .neutral ? Color.secondary : tone.foreground)
             .frame(width: KD.Size.iconButton, height: KD.Size.iconButton)
-            .background(Circle().fill(Color.primary.opacity(configuration.isPressed ? 0.16 : (hovered ? 0.08 : 0))))
+            .kdSurface(in: Circle(), interactive: true)
+            .overlay(Circle().fill(Color.primary.opacity(configuration.isPressed ? 0.14 : (hovered ? 0.06 : 0))).allowsHitTesting(false))
             .contentShape(Circle())
             .onHover { hovered = $0 }
             .opacity(enabled ? 1 : 0.4)
@@ -574,6 +577,7 @@ struct KDToolbarButton: View {
     var action: () -> Void
     var body: some View {
         let button = Button(action: action) { Label(title, systemImage: systemImage).labelStyle(.iconOnly) }
+            .buttonStyle(KDIconButtonStyle())
             .help(title)
             .disabled(isDisabled)
         if let shortcut { button.keyboardShortcut(shortcut, modifiers: modifiers) } else { button }
@@ -592,7 +596,7 @@ struct KDChipLabel: View {
     @Environment(\.colorSchemeContrast) private var contrast
     @State private var hovered = false
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: KD.Radius.chip, style: .continuous)
+        let shape = Capsule()
         HStack(spacing: 5) {
             if let systemImage { Image(systemName: systemImage).font(.system(size: 11, weight: .semibold)) }
             Text(text).font(.callout.weight(isActive ? .semibold : .regular)).lineLimit(1)

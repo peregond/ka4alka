@@ -276,6 +276,10 @@ struct SmokeShot {
 
     private func prepare(_ page: SmokePage) async throws -> Bool {
         switch page {
+        case .search:
+            model.select(.movies)
+            model.openSearch()
+            return true
         case .featured:
             model.select(.featured)
             await model.loadFeatured()
@@ -397,6 +401,8 @@ struct SmokeShot {
     /// Runs after the last size of a page: back navigation, closing sheets, and cleaning up.
     private func finish(_ page: SmokePage) async throws {
         switch page {
+        case .search:
+            model.back()
         case .detailMovie:
             model.back()
             check(model.route == Route.section(.movies), "Back preserves the catalog route")
@@ -502,27 +508,25 @@ struct SmokeShot {
     }
 
     private func inspectToolbar(primary: Bool) {
+        guard let main = MacSmoke.mainWindow() else { return }
+        reportToolbar(primary, main.toolbar?.isVisible != true, "toolbar: hidden at the top of the page")
+    }
+
+    private func inspectExpandedToolbar() {
         SettingsLayoutMeasurements.refreshNativeViews()
         guard let main = MacSmoke.mainWindow() else { return }
+        check(main.toolbar?.isVisible == true, "toolbar: appears after scrolling")
         for id in ["toolbar.add", "toolbar.refresh", "toolbar.appearance"] {
             guard SettingsLayoutMeasurements.nativeAttached[id] == true, let frame = SettingsLayoutMeasurements.nativeFrames[id], let visible = SettingsLayoutMeasurements.nativeVisibleFrames[id] else {
-                reportToolbar(primary, false, "toolbar: missing native control " + id)
+                check(false, "toolbar: missing native control " + id)
                 continue
             }
             let fits: Bool = frame.width > 12 && frame.height > 12 && frame.minX >= -2 && frame.maxX <= main.frame.width + 2 && frame.minY >= -2 && frame.maxY <= main.frame.height + 2
-            reportToolbar(primary, fits, "toolbar: " + id + " fits the native window")
+            check(fits, "toolbar: " + id + " fits the native window")
             let shown: CGRect = frame.intersection(visible)
             let unclipped: Bool = !shown.isNull && shown.width * shown.height >= frame.width * frame.height * 0.9
-            reportToolbar(primary, unclipped, "toolbar: " + id + " is visible and not clipped by its native host")
+            check(unclipped, "toolbar: " + id + " is visible and not clipped by its native host")
         }
-        guard let field = SmokeViews.searchField(in: main) else {
-            reportToolbar(primary, false, "toolbar: the search field (NSSearchField) is missing from the window")
-            return
-        }
-        let frame: CGRect = field.convert(field.bounds, to: nil)
-        let windowRect: CGRect = CGRect(origin: .zero, size: main.frame.size).insetBy(dx: -2, dy: -2)
-        let usable: Bool = !field.isHiddenOrHasHiddenAncestor && field.window != nil && frame.width >= 24 && frame.height >= 18 && windowRect.contains(frame)
-        reportToolbar(primary, usable, "toolbar: the search field is visible, inside the window and large enough")
     }
 
     // MARK: Settings
@@ -714,11 +718,16 @@ struct SmokeShot {
         dumpLayout(page)
         guard language == "ru" && theme == "dark" else { return }
         switch page {
+        case .search:
+            if let frame = SettingsLayoutMeasurements.frames["search.field"] {
+                check(frame.width >= 220 && frame.height >= 40, "search: the field is visible and large enough")
+            } else { check(false, "search: the field is missing") }
+            check(MacSmoke.mainWindow()?.firstResponder is NSTextView, "search: opening the page focuses the input")
+            keyViewLoop()
         case .featured:
             try await scrollStall("featured")
         case .movies:
             try await scrollStall("movies")
-            keyViewLoop()
         default:
             break
         }
@@ -789,7 +798,7 @@ struct SmokeShot {
             if identities.contains(ObjectIdentifier(view)) { continue }
             identities.insert(ObjectIdentifier(view))
             visited.append(String(describing: type(of: view)))
-            if view is NSSearchField { reachedSearch = true }
+            if let field = view as? NSTextField, field.isEditable { reachedSearch = true }
             if view.alphaValue == 0 || view.isHiddenOrHasHiddenAncestor { hiddenVisited += 1 }
         }
         if let data = try? JSONEncoder().encode(visited) { try? data.write(to: root.appendingPathComponent("keyviews.json")) }
@@ -800,9 +809,9 @@ struct SmokeShot {
         }
         check(hiddenVisited == 0, "keyboard: no invisible view is part of the key-view loop")
         if reachedSearch {
-            check(true, "keyboard: the toolbar search field is part of the key-view loop")
+            check(true, "keyboard: the search page input is part of the key-view loop")
         } else {
-            violate("keyboard", "the toolbar search field was not reached by Tab (keyboard UI mode " + String(UserDefaults.standard.integer(forKey: "AppleKeyboardUIMode")) + ")")
+            violate("keyboard", "the search page input was not reached by Tab (keyboard UI mode " + String(UserDefaults.standard.integer(forKey: "AppleKeyboardUIMode")) + ")")
         }
         if UserDefaults.standard.integer(forKey: "AppleKeyboardUIMode") == 0 {
             notes.append("[" + context + "] not-instrumented:keyview-controls: Full Keyboard Access is off, so only text fields and lists are in the loop")
@@ -834,6 +843,10 @@ struct SmokeShot {
             await pause(16)
         }
         let result = monitor.stop()
+        if label == "movies" {
+            await pause(180)
+            inspectExpandedToolbar()
+        }
         scroll.contentView.scroll(to: NSPoint(x: document.bounds.minX - insets.left, y: topY))
         scroll.reflectScrolledClipView(scroll.contentView)
         metrics["scroll." + label + ".maxGapMs"] = result.maxGap
@@ -844,6 +857,7 @@ struct SmokeShot {
         if !slowRunner && result.over100 >= 8 { violate("perf", "scrolling " + label + " had " + String(result.over100) + " stalls over 100 ms") }
         if result.maxGap < 600 && result.over100 < 8 { check(true, "perf: scrolling " + label + " keeps the main thread responsive") }
         await settle("after scrolling " + label, timeout: 3)
+        if label == "movies" { check(main.toolbar?.isVisible != true, "toolbar: hides again on return to the top") }
     }
 
     // MARK: End of the run

@@ -43,6 +43,7 @@ struct SmokeReport: Codable {
 
 enum SmokePage: String, CaseIterable {
     case featured
+    case search
     case movies
     case series
     case gamesHome = "games-home"
@@ -78,6 +79,8 @@ struct SmokePageSpec {
 extension SmokePage {
     var spec: SmokePageSpec {
         switch self {
+        case .search:
+            return SmokePageSpec(prefixes: ["search."], required: ["search.header", "search.field", "search.scope"], network: false, plain: true, toolbar: false, scansText: true)
         case .featured:
             return SmokePageSpec(prefixes: ["featured."], required: ["featured.masthead", "featured.hero"], network: false, plain: false, toolbar: false, scansText: false)
         case .movies:
