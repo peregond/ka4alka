@@ -51,11 +51,12 @@ private let layoutProbeEnabled: Bool = CommandLine.arguments.contains("--smoke-t
         // The release toolbar may sit below the fold while the window is resized. SwiftUI can
         // retain its last proposed global width there; use its current native host for horizontal
         // bounds, just as for floating toolbar controls. Keep the SwiftUI vertical coordinate.
-        let id = "detail.releases.toolbar"
-        if nativeAttached[id] == true, let native = nativeFrames[id], native.width > 0,
-           var frame = frames[id] {
-            frame.origin.x = native.minX; frame.size.width = native.width
-            frames[id] = frame
+        for id in ["detail.banner", "detail.releases.toolbar"] {
+            if nativeAttached[id] == true, let native = nativeFrames[id], native.width > 0,
+               var frame = frames[id] {
+                frame.origin.x = native.minX; frame.size.width = native.width
+                frames[id] = frame
+            }
         }
     }
     /// A view that appears again after it disappeared (same identity, kept state) records frames again.
@@ -173,7 +174,7 @@ extension View {
                     .onChange(of: frame) { _, next in SettingsLayoutMeasurements.record(id, frame: next, owner: owner, kind: kind, group: group) }
             }
         }.background {
-            if id.hasPrefix("toolbar.") || id == "detail.releases.toolbar" {
+            if id.hasPrefix("toolbar.") || id == "detail.releases.toolbar" || id == "detail.banner" {
                 ToolbarMeasurement(id: id, owner: owner).frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }.onDisappear { SettingsLayoutMeasurements.remove(id, owner: owner) }

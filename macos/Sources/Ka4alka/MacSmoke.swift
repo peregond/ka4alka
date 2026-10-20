@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import QuartzCore
 
 /// Marker shared with the notification observers of the close test.
 final class SmokeCloseMarker: @unchecked Sendable { var windowClosed = false }
@@ -240,6 +241,11 @@ struct SmokeShot {
             currentSize = actual
             requestedText = sizeText(requested)
             await settle(page.rawValue)
+            let main = try window()
+            main.contentView?.layoutSubtreeIfNeeded()
+            main.displayIfNeeded()
+            CATransaction.flush()
+            await pause(50)
             let before: Int = violations.count
             auditLayout(spec, width: actual.width)
             try await inspect(page, spec: spec, width: actual.width, primary: isPrimary(requested))
@@ -659,13 +665,15 @@ struct SmokeShot {
     // MARK: Screenshots and pixels
 
     private func capture(saveAs name: String?) async throws -> SmokeShot {
-        await pause(150)
         let main: NSWindow = try window()
         let target: NSWindow = main.attachedSheet ?? main
         guard let content = target.contentView else { throw UpdateError("The native application window is missing") }
         let view: NSView = content.superview ?? content
-        main.makeKeyAndOrderFront(nil)
+        target.makeKeyAndOrderFront(nil)
         view.layoutSubtreeIfNeeded()
+        target.displayIfNeeded()
+        CATransaction.flush()
+        await pause(150)
         guard var bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { throw UpdateError("Could not capture the native content view") }
         view.cacheDisplay(in: view.bounds, to: bitmap)
         var bounds = view.bounds
@@ -675,7 +683,7 @@ struct SmokeShot {
             let left: CGFloat = target === main ? min(260, bounds.width * 0.3) : 0
             let region = CGRect(x: left, y: 0, width: max(1, bounds.width - left), height: bounds.height)
             let stats = SmokePixelAudit.measure(bitmap, scale: target.backingScaleFactor, region: region)
-            if stats.deviation < 0.001 {
+            if ProcessInfo.processInfo.operatingSystemVersion.majorVersion == 26 || stats.deviation < 0.001 {
                 bitmap = try await SmokeWindowCapture.bitmap(windowNumber: target.windowNumber)
                 bounds = CGRect(origin: .zero, size: target.frame.size)
                 environment["screenshotFallback"] = "composited own window"
@@ -864,6 +872,7 @@ struct SmokeShot {
         if label == "movies" {
             await pause(180)
             inspectExpandedToolbar()
+            _ = try await capture(saveAs: "movies-scrolled-" + theme + "-" + language)
         }
         scroll.contentView.scroll(to: NSPoint(x: document.bounds.minX - insets.left, y: topY))
         scroll.reflectScrolledClipView(scroll.contentView)

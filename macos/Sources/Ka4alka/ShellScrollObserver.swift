@@ -23,14 +23,19 @@ struct ShellScrollObserver: NSViewRepresentable {
         private var shown = false
         override func hitTest(_ point: NSPoint) -> NSView? { nil }
         override func viewDidMoveToWindow() { super.viewDidMoveToWindow(); schedule() }
-        override func layout() { super.layout(); schedule() }
+        override func layout() {
+            super.layout()
+            // Clip bounds notifications already cover scrolling. Walking the whole window on
+            // every layout pass competes with newly visible posters; only find a replacement host.
+            if clip?.window == nil || nativeToolbar !== window?.toolbar { schedule() }
+        }
         func configure(routeKey: String, onChange: @escaping (Bool) -> Void) {
             callback = onChange
             if self.routeKey != routeKey {
                 self.routeKey = routeKey; detach(); shown = false
                 DispatchQueue.main.async { [weak self] in self?.callback?(false) }
             }
-            schedule()
+            if clip?.window == nil || nativeToolbar !== window?.toolbar { schedule() }
         }
         func detach() {
             if let observation { NotificationCenter.default.removeObserver(observation) }
