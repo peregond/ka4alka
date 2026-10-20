@@ -76,7 +76,7 @@ final class HeroRotationTests: XCTestCase {
                 var card = try TestFixtures.card("hero:" + section, language == "ru" ? "Очень длинное название произведения для проверки узкого окна" : "A very long title to check the banner in a compact window", section: section)
                 card.kp = "8.2"; card.imdb = "7.9"
                 card.description = language == "ru" ? "Краткое описание, которое остаётся читаемым и не перекрывает кнопки даже в небольшом окне приложения." : "A short synopsis that stays readable without overlapping the buttons, including in a compact application window."
-                for width: CGFloat in [460, 590, 1000, 1280] {
+                for width in [460, 590, 1000, 1280] as [CGFloat] {
                     SettingsLayoutMeasurements.frames.removeAll()
                     let root = CatalogSpotlightView(items: [card, try TestFixtures.card("other", "Other")])
                         .environmentObject(model)
