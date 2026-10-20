@@ -509,13 +509,14 @@ struct SmokeShot {
 
     private func inspectToolbar(primary: Bool) {
         guard let main = MacSmoke.mainWindow() else { return }
-        reportToolbar(primary, main.toolbar?.isVisible != true, "toolbar: hidden at the top of the page")
+        SettingsLayoutMeasurements.refreshNativeViews()
+        reportToolbar(primary, main.toolbar?.isVisible != true && SettingsLayoutMeasurements.nativeAttached["toolbar.add"] != true, "toolbar: hidden at the top of the page")
     }
 
     private func inspectExpandedToolbar() {
         SettingsLayoutMeasurements.refreshNativeViews()
         guard let main = MacSmoke.mainWindow() else { return }
-        check(main.toolbar?.isVisible == true, "toolbar: appears after scrolling")
+        check(SettingsLayoutMeasurements.nativeAttached["toolbar.add"] == true, "toolbar: appears after scrolling")
         for id in ["toolbar.add", "toolbar.refresh", "toolbar.appearance"] {
             guard SettingsLayoutMeasurements.nativeAttached[id] == true, let frame = SettingsLayoutMeasurements.nativeFrames[id], let visible = SettingsLayoutMeasurements.nativeVisibleFrames[id] else {
                 check(false, "toolbar: missing native control " + id)
@@ -857,7 +858,10 @@ struct SmokeShot {
         if !slowRunner && result.over100 >= 8 { violate("perf", "scrolling " + label + " had " + String(result.over100) + " stalls over 100 ms") }
         if result.maxGap < 600 && result.over100 < 8 { check(true, "perf: scrolling " + label + " keeps the main thread responsive") }
         await settle("after scrolling " + label, timeout: 3)
-        if label == "movies" { check(main.toolbar?.isVisible != true, "toolbar: hides again on return to the top") }
+        if label == "movies" {
+            SettingsLayoutMeasurements.refreshNativeViews()
+            check(main.toolbar?.isVisible != true && SettingsLayoutMeasurements.nativeAttached["toolbar.add"] != true, "toolbar: hides again on return to the top")
+        }
     }
 
     // MARK: End of the run

@@ -233,17 +233,22 @@ struct RootView: View {
             .safeAreaInset(edge: .top, spacing: 0) { errorBanner }
             .kdToast($model.toast)
             .navigationTitle(navigationTitle)
-            .toolbar { toolbarContent }
-            .toolbar(chromeScrolled && model.route != .search ? .visible : .hidden, for: .windowToolbar)
+            .toolbar(.hidden, for: .windowToolbar)
             .background {
                 ShellScrollObserver(routeKey: model.route.key) { scrolled in
                     if chromeScrolled != scrolled { chromeScrolled = scrolled }
                 }
             }
-            .overlay(alignment: .topLeading) {
-                if !chromeScrolled, model.routes.count > 1, model.route != .search {
-                    KDIconButton(systemImage: "chevron.backward", label: tr("Назад", "Back")) { model.back() }
-                        .padding(KD.Space.m)
+            .overlay(alignment: .top) {
+                if model.route != .search {
+                    if chromeScrolled {
+                        floatingChrome.padding(KD.Space.s)
+                    } else if model.routes.count > 1 {
+                        HStack {
+                            KDIconButton(systemImage: "chevron.backward", label: tr("Назад", "Back")) { model.back() }
+                            Spacer()
+                        }.padding(KD.Space.m)
+                    }
                 }
             }
     }
@@ -293,19 +298,25 @@ struct RootView: View {
     // MARK: Toolbar
 
     private var appearanceSymbol: String { colorScheme == .light ? "sun.max" : "moon" }
-    @ToolbarContentBuilder private var toolbarContent: some ToolbarContent {
-        if model.routes.count > 1 {
-            ToolbarItem(placement: .navigation) {
-                KDToolbarButton(title: tr("Назад", "Back"), systemImage: "chevron.backward") { model.back() }
+    /// Overlaying the chrome keeps the scroll viewport and poster geometry unchanged when it appears.
+    private var floatingChrome: some View {
+        KDGlassGroup(spacing: KD.Space.xs) {
+            HStack(spacing: KD.Space.xs) {
+                if model.routes.count > 1 {
+                    KDToolbarButton(title: tr("Назад", "Back"), systemImage: "chevron.backward") { model.back() }
+                }
+                Text(navigationTitle)
+                    .font(.headline).lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                KDToolbarButton(title: tr("Добавить торрент", "Add torrent"), systemImage: "plus") { model.addTorrent = true }
+                    .settingsLayoutProbe("toolbar.add")
+                KDToolbarButton(title: tr("Обновить каталог", "Refresh catalog"), systemImage: "arrow.clockwise", isDisabled: model.refreshing) { Task { await model.refresh() } }
+                    .settingsLayoutProbe("toolbar.refresh")
+                KDToolbarButton(title: tr("Сменить тему", "Change appearance"), systemImage: appearanceSymbol) { model.setAppearance(colorScheme == .dark ? AppearanceMode.light : AppearanceMode.dark) }
+                    .settingsLayoutProbe("toolbar.appearance")
             }
-        }
-        ToolbarItemGroup(placement: .primaryAction) {
-            KDToolbarButton(title: tr("Добавить торрент", "Add torrent"), systemImage: "plus") { model.addTorrent = true }
-                .settingsLayoutProbe("toolbar.add")
-            KDToolbarButton(title: tr("Обновить каталог", "Refresh catalog"), systemImage: "arrow.clockwise", isDisabled: model.refreshing) { Task { await model.refresh() } }
-                .settingsLayoutProbe("toolbar.refresh")
-            KDToolbarButton(title: tr("Сменить тему", "Change appearance"), systemImage: appearanceSymbol) { model.setAppearance(colorScheme == .dark ? AppearanceMode.light : AppearanceMode.dark) }
-                .settingsLayoutProbe("toolbar.appearance")
+            .padding(KD.Space.s)
+            .kdSurface(in: Capsule())
         }
     }
 
