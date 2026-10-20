@@ -44,6 +44,7 @@ struct CatalogFilter: Equatable {
     @Published var submittedQuery = ""
     @Published var searchFocus = 0
     @Published var recentSearches: [RecentSearch] = []
+    @Published private var searchRevision = 0
     private var searchOrigin: SearchOrigin?
     @Published var filter = CatalogFilter() { didSet { if filter != oldValue { page = 1; browseAnchor = nil } } }
     @Published var page = 1
@@ -261,7 +262,6 @@ struct CatalogFilter: Equatable {
         let target: Section = games ? .games : .movies
         guard section != target else { return }
         section = target; filter = CatalogFilter(); page = 1; browseAnchor = nil; list = nil
-        if !submittedQuery.isEmpty { revision += 1 }
     }
     /// Opens a kachalka:// link (the title page) or hands a magnet link / torrent file to the add sheet.
     /// Returns false only when a kachalka:// link could not be opened.
@@ -305,7 +305,7 @@ struct CatalogFilter: Equatable {
             recentSearches.insert(entry, at: 0)
             recentSearches = Array(recentSearches.prefix(8))
         }
-        revision += 1
+        if route == .search { searchRevision += 1 } else { revision += 1 }
     }
     /// The Return key in the search field: does nothing for an empty or blank query.
     func submitSearch() {
@@ -333,7 +333,7 @@ struct CatalogFilter: Equatable {
 
     var requestKey: String {
         let parts: [String] = [section.rawValue, submittedQuery, String(page), String(revision), filter.genre, filter.country, String(filter.year), String(filter.rating), filter.sort, filter.kind, filter.quality]
-        return parts.joined(separator: "|")
+        return parts.joined(separator: "|") + (routes.contains(.search) ? "|search:" + String(searchRevision) : "")
     }
     func loadCatalog() async {
         let key = requestKey

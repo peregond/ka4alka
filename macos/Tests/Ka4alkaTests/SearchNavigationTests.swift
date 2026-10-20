@@ -9,6 +9,7 @@ import XCTest
         model.filter.genre = "comedy"
         model.page = 3
         model.browseAnchor = "series:park"
+        let originalRequest = model.requestKey
         model.openSearch()
         XCTAssertEqual(model.route, .search)
         XCTAssertEqual(model.section, .movies)
@@ -24,6 +25,7 @@ import XCTest
         XCTAssertEqual(model.page, 3)
         XCTAssertEqual(model.browseAnchor, "series:park")
         XCTAssertEqual(model.submittedQuery, "")
+        XCTAssertEqual(model.requestKey, originalRequest, "Returning to the unchanged catalog reuses its existing cache entry")
     }
 
     func testOpeningResultAndReturningKeepsSearchAndDoesNotDuplicateItsRoute() throws {
