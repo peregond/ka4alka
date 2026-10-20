@@ -1097,14 +1097,25 @@ struct KDFlowLayout: Layout {
     var spacing: CGFloat = 8
     var lineSpacing: CGFloat = 8
 
+    /// The size a child takes. A child wider than the whole row is offered the row width instead,
+    /// so a long label truncates rather than pushing the row past the window edge.
+    private func childSize(_ subview: LayoutSubview, maxWidth: CGFloat) -> CGSize {
+        let ideal: CGSize = subview.sizeThatFits(.unspecified)
+        if maxWidth.isFinite, ideal.width > maxWidth {
+            let narrowed: CGSize = subview.sizeThatFits(ProposedViewSize(width: maxWidth, height: nil))
+            return CGSize(width: min(narrowed.width, maxWidth), height: narrowed.height)
+        }
+        return ideal
+    }
+
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let maxWidth = proposal.width ?? .infinity
+        let maxWidth: CGFloat = proposal.width ?? .infinity
         var x: CGFloat = 0
         var y: CGFloat = 0
         var rowHeight: CGFloat = 0
         var usedWidth: CGFloat = 0
         for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
+            let size: CGSize = childSize(subview, maxWidth: maxWidth)
             if x > 0, x + size.width > maxWidth {
                 y += rowHeight + lineSpacing
                 x = 0
@@ -1118,11 +1129,11 @@ struct KDFlowLayout: Layout {
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        var x = bounds.minX
-        var y = bounds.minY
+        var x: CGFloat = bounds.minX
+        var y: CGFloat = bounds.minY
         var rowHeight: CGFloat = 0
         for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
+            let size: CGSize = childSize(subview, maxWidth: bounds.width)
             if x > bounds.minX, x + size.width > bounds.maxX {
                 y += rowHeight + lineSpacing
                 x = bounds.minX
