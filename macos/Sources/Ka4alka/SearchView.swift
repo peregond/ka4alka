@@ -20,15 +20,14 @@ struct SearchOrigin {
 /// Return submits one request, so network work never competes with text input or scrolling.
 struct SearchView: View {
     @EnvironmentObject private var model: AppModel
-    @FocusState private var focused: Bool
+    @State private var focused = false
+    @State private var headerWidth: CGFloat = 0
 
     var body: some View {
         VStack(spacing: 0) {
             header
             if model.submittedQuery.isEmpty { recentSearches } else { CatalogView() }
         }
-        .onAppear { focused = true }
-        .onChange(of: model.searchFocus) { _, _ in focused = true }
         .onChange(of: model.query) { _, query in
             if query.isEmpty { model.clearSearch() }
         }
@@ -38,27 +37,28 @@ struct SearchView: View {
         HStack(alignment: .top, spacing: KD.Space.s) {
             KDIconButton(systemImage: "chevron.backward", label: tr("Назад", "Back")) { model.back() }
                 .padding(.top, 8)
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: KD.Space.m) { field; scope.frame(width: 260) }
-                VStack(spacing: KD.Space.s) { field; scope }
+            // Keep one editor while changing layout; duplicate focus bindings lose the responder.
+            let layout = headerWidth >= 680 ? AnyLayout(HStackLayout(spacing: KD.Space.m)) : AnyLayout(VStackLayout(spacing: KD.Space.s))
+            layout {
+                field
+                scope.frame(maxWidth: headerWidth >= 680 ? 260 : .infinity)
             }
         }
         .padding(KD.gutter)
         .frame(maxWidth: .infinity)
+        .kdReadWidth($headerWidth)
         .background(KDPalette.pageBackground)
         .settingsLayoutProbe("search.header")
     }
     private var field: some View {
         HStack(spacing: KD.Space.xs) {
             Image(systemName: "magnifyingglass").foregroundStyle(.secondary).accessibilityHidden(true)
-            TextField(tr("Найти фильм, сериал или игру", "Find a movie, series or game"), text: $model.query)
-                .textFieldStyle(.plain)
-                .focused($focused)
-                .onSubmit { model.submitSearch(); focused = false }
-                .accessibilityIdentifier("search-field")
+            NativeSearchField(text: $model.query, focused: $focused, focusToken: model.searchFocus,
+                              prompt: tr("Найти фильм, сериал или игру", "Find a movie, series or game")) { model.submitSearch() }
+                .frame(height: 28)
             if !model.query.isEmpty {
                 KDIconButton(systemImage: "xmark.circle.fill", label: tr("Очистить поиск", "Clear search")) {
-                    model.clearSearch(); focused = true
+                    model.clearSearch(); model.searchFocus += 1
                 }
             }
         }
@@ -99,7 +99,7 @@ struct SearchView: View {
                         ForEach(model.recentSearches) { entry in
                             Button {
                                 model.setSearchGames(entry.games); model.query = entry.query
-                                model.submitSearch(); focused = false
+                                model.submitSearch()
                             } label: {
                                 Label(entry.query, systemImage: entry.games ? "gamecontroller" : "clock.arrow.circlepath")
                                     .lineLimit(2).frame(maxWidth: .infinity, alignment: .leading)

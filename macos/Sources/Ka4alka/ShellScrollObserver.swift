@@ -10,13 +10,15 @@ struct ShellScrollObserver: NSViewRepresentable {
     func updateNSView(_ view: Probe, context: Context) {
         view.configure(routeKey: routeKey, onChange: onChange)
     }
-    static func dismantleNSView(_ view: Probe, coordinator: ()) { view.detach() }
+    static func dismantleNSView(_ view: Probe, coordinator: ()) { view.detach(); view.stopToolbarObservation() }
 
     @MainActor final class Probe: NSView {
         private var routeKey = ""
         private var callback: ((Bool) -> Void)?
         private weak var clip: NSClipView?
         private var observation: NSObjectProtocol?
+        private weak var nativeToolbar: NSToolbar?
+        private var toolbarObservation: NSKeyValueObservation?
         private var queued = false
         private var shown = false
         override func hitTest(_ point: NSPoint) -> NSView? { nil }
@@ -34,6 +36,23 @@ struct ShellScrollObserver: NSViewRepresentable {
             if let observation { NotificationCenter.default.removeObserver(observation) }
             observation = nil; clip = nil
         }
+        func stopToolbarObservation() { toolbarObservation?.invalidate(); toolbarObservation = nil; nativeToolbar = nil }
+        /// NavigationSplitView can restore its native toolbar after SwiftUI's visibility modifier.
+        /// The page uses overlay controls, so keep the actual AppKit toolbar hidden as well.
+        private func hideNativeToolbar() {
+            guard let window else { return }
+            if window.titleVisibility != .hidden { window.titleVisibility = .hidden }
+            if !window.titlebarAppearsTransparent { window.titlebarAppearsTransparent = true }
+            guard let toolbar = window.toolbar else { return }
+            if nativeToolbar !== toolbar {
+                stopToolbarObservation(); nativeToolbar = toolbar
+                toolbarObservation = toolbar.observe(\.isVisible, options: [.new]) { [weak self] _, change in
+                    guard change.newValue == true else { return }
+                    DispatchQueue.main.async { self?.hideNativeToolbar() }
+                }
+            }
+            if toolbar.isVisible { toolbar.isVisible = false }
+        }
         private func schedule() {
             guard !queued else { return }
             queued = true
@@ -43,6 +62,7 @@ struct ShellScrollObserver: NSViewRepresentable {
             }
         }
         private func attach() {
+            hideNativeToolbar()
             guard let content = window?.contentView else { return }
             var candidates: [NSScrollView] = []
             func visit(_ view: NSView) {
