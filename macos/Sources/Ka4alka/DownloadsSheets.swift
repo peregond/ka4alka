@@ -77,13 +77,10 @@ struct TransferFilesView: View {
     }
 
     private var searchField: some View {
-        HStack(spacing: KD.Space.xs) {
-            Image(systemName: "magnifyingglass").foregroundStyle(.secondary).accessibilityHidden(true)
-            TextField(tr("Найти файл", "Find a file"), text: $query)
-                .textFieldStyle(.plain)
-                .focused($searchFocused)
-        }
-        .kdFieldChrome(focused: searchFocused)
+        TextField(tr("Найти файл", "Find a file"), text: $query)
+            .textFieldStyle(.roundedBorder)
+            .controlSize(.large)
+            .focused($searchFocused)
     }
 
     @ViewBuilder private var listArea: some View {

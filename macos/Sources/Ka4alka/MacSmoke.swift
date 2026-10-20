@@ -793,6 +793,12 @@ struct SmokeShot {
                 check(frame.width >= 220 && frame.height >= 40, "search: the field is visible and large enough")
             } else { check(false, "search: the field is missing") }
             check(MacSmoke.mainWindow()?.firstResponder is NSTextView, "search: opening the page focuses the input")
+            let nativeSearch = MacSmoke.mainWindow()?.contentView.flatMap { content in
+                SmokeViews.all(in: content).compactMap { $0 as? NSSearchField }.first
+            }
+            let searchCell = nativeSearch?.cell as? NSSearchFieldCell
+            check(nativeSearch?.isBezeled == true && nativeSearch?.focusRingType == .default && searchCell?.searchButtonCell != nil && searchCell?.cancelButtonCell != nil,
+                  "search: the native field provides its search, cancel and keyboard focus controls")
             keyViewLoop()
         case .featured:
             try await scrollStall("featured")

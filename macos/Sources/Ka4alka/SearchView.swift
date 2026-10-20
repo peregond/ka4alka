@@ -20,7 +20,6 @@ struct SearchOrigin {
 /// Return submits one request, so network work never competes with text input or scrolling.
 struct SearchView: View {
     @EnvironmentObject private var model: AppModel
-    @State private var focused = false
     @State private var headerWidth: CGFloat = 0
 
     var body: some View {
@@ -51,21 +50,9 @@ struct SearchView: View {
         .settingsLayoutProbe("search.header")
     }
     private var field: some View {
-        HStack(spacing: KD.Space.xs) {
-            Image(systemName: "magnifyingglass").foregroundStyle(.secondary).accessibilityHidden(true)
-            NativeSearchField(text: $model.query, focused: $focused, focusToken: model.searchFocus,
-                              prompt: tr("Найти фильм, сериал или игру", "Find a movie, series or game")) { model.submitSearch() }
-                .frame(height: 28)
-            if !model.query.isEmpty {
-                KDIconButton(systemImage: "xmark.circle.fill", label: tr("Очистить поиск", "Clear search")) {
-                    model.clearSearch(); model.searchFocus += 1
-                }
-            }
-        }
-        .padding(.horizontal, KD.Space.m)
-        .frame(minWidth: 220, minHeight: 44)
-        .kdSurface(in: Capsule())
-        .overlay(Capsule().strokeBorder(focused ? KDPalette.accent : .clear, lineWidth: 2).allowsHitTesting(false))
+        NativeSearchField(text: $model.query, focusToken: model.searchFocus,
+                          prompt: tr("Найти фильм, сериал или игру", "Find a movie, series or game")) { model.submitSearch() }
+            .frame(minWidth: 220, minHeight: 44)
         .settingsLayoutProbe("search.field")
     }
     private var scope: some View {

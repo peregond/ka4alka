@@ -365,19 +365,16 @@ struct ReleaseFilterBar: View {
         Button {
             showsExtras.toggle()
         } label: {
-            KDChipLabel(text: extrasTitle, systemImage: "slider.horizontal.3", isActive: filters.extraCount > 0, showsChevron: true)
+            KDChipLabel(text: extrasTitle, systemImage: "slider.horizontal.3", isActive: filters.extraCount > 0)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(KDSecondaryButtonStyle())
         .accessibilityLabel(tr("Ещё фильтры", "More filters"))
         .accessibilityValue(showsExtras ? tr("Раскрыто", "Expanded") : tr("Свёрнуто", "Collapsed"))
     }
 
     private var resetButton: some View {
         Button(tr("Сбросить", "Reset")) { filters = DetailReleaseFilters() }
-            .buttonStyle(.plain)
-            .font(.callout.weight(.semibold))
-            .foregroundStyle(KDPalette.accent)
-            .padding(.vertical, 4)
+            .buttonStyle(KDSecondaryButtonStyle())
     }
 
     // MARK: Extra filters
@@ -428,13 +425,9 @@ struct ReleaseFilterBar: View {
     }
 
     private var subtitlesChip: some View {
-        Button {
-            filters.subtitles.toggle()
-        } label: {
-            KDChipLabel(text: tr("С субтитрами", "With subtitles"), systemImage: filters.subtitles ? "checkmark" : nil, isActive: filters.subtitles)
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(filters.subtitles ? .isSelected : [])
+        Toggle(tr("С субтитрами", "With subtitles"), isOn: $filters.subtitles)
+            .toggleStyle(.checkbox)
+            .fixedSize()
     }
 
     private var languageMenu: some View {
@@ -748,11 +741,6 @@ struct ReleaseListRow: View {
 
     private var menuLabel: some View {
         Label(downloadTitle, systemImage: "arrow.down")
-            .font(.callout.weight(.semibold))
-            .foregroundStyle(KDPalette.accentInk)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
-            .background(KDPalette.accentFill, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
     }
 
     private var deviceMenu: some View {
@@ -766,7 +754,7 @@ struct ReleaseListRow: View {
         } primaryAction: {
             start()
         }
-        .menuStyle(.borderlessButton)
+        .menuStyle(.borderedButton)
         .fixedSize()
         .disabled(!release.downloadable)
         .help(noLinkHelp)

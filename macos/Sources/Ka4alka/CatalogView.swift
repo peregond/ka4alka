@@ -842,7 +842,7 @@ struct FilterBar: View {
         Button(action: chip.clear) {
             KDChipLabel(text: chip.text, systemImage: "xmark", isActive: true)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(KDSecondaryButtonStyle())
         .help(tr("Убрать фильтр", "Remove filter"))
         .accessibilityLabel(tr("Убрать фильтр: ", "Remove filter: ") + chip.text)
     }

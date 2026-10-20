@@ -354,10 +354,10 @@ struct DownloadsView: View {
             Divider()
             Button(tr("Ограничения скорости…", "Speed limits…")) { showLimits = true }
         } label: {
-            KDChipLabel(text: tr("Управление", "Controls"), systemImage: "slider.horizontal.3", showsChevron: true)
+            KDChipLabel(text: tr("Управление", "Controls"), systemImage: "slider.horizontal.3")
         }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
+        .menuStyle(.borderedButton)
+        .menuIndicator(.visible)
         .frame(minHeight: 24)
         .contentShape(Rectangle())
         .fixedSize()
@@ -379,7 +379,7 @@ struct DownloadsView: View {
         let selected = tab == effectiveFilter
         let label = tab.title + " " + String(count(tab))
         return Button { filter = tab } label: { KDChipLabel(text: label, isActive: selected) }
-            .buttonStyle(.plain)
+            .buttonStyle(KDSecondaryButtonStyle())
             .accessibilityLabel(label)
             .accessibilityAddTraits(selected ? AccessibilityTraits.isSelected : AccessibilityTraits())
     }
@@ -918,8 +918,8 @@ struct TransferRow: View {
                 .frame(width: KD.Size.iconButton, height: KD.Size.iconButton)
                 .contentShape(Rectangle())
         }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
+        .menuStyle(.borderedButton)
+        .menuIndicator(.visible)
         .frame(minWidth: KD.Size.iconButton, minHeight: KD.Size.iconButton)
         .contentShape(Rectangle())
         .fixedSize()

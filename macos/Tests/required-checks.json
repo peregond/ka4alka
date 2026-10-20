@@ -61,7 +61,8 @@
     "^\\[ru/dark \\d+x\\d+\\] toolbar: hides again on return to the top$",
     "^\\[ru/dark \\d+x\\d+\\] search: opening the page focuses the input$",
     "^\\[ru/dark \\d+x\\d+\\] window controls: close is visible and clickable$",
-    "^\\[en/light \\d+x\\d+\\] window controls: close is visible and clickable$"
+    "^\\[en/light \\d+x\\d+\\] window controls: close is visible and clickable$",
+    "^\\[ru/dark \\d+x\\d+\\] search: the native field provides its search, cancel and keyboard focus controls$"
   ],
   "matrix": {
     "combinations": [

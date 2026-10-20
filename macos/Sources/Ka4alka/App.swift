@@ -25,7 +25,6 @@ import SwiftUI
             .environment(\.locale, interfaceLocale)
             .environment(\.kdLite, model.settings?.liteMode == true)
             .preferredColorScheme(model.appearance.colorScheme)
-            .tint(KDPalette.accent)
             .task { await startUp() }
             .onChange(of: model.appearance) { _, mode in NSApp.appearance = mode.nsAppearance }
             .onOpenURL { url in Task { await model.openURL(url) } }
