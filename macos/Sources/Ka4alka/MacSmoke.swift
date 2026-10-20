@@ -642,6 +642,14 @@ struct SmokeShot {
         }
         guard let found = measurement else {
             notes.append("[" + context + "] not-instrumented:drawn-vs-click:" + id + " (no tinted row found in the screenshot)")
+            if id == "sidebar.nav.movies" {
+                let shot: SmokeShot = try await capture(saveAs: nil)
+                var detail: String = "no frame for the probe"
+                if let frame = SettingsLayoutMeasurements.frames[id] {
+                    detail = SmokeHitAudit.describe(in: shot.bitmap, scale: shot.scale, origin: shot.contentOrigin, layoutFrame: frame)
+                }
+                violate("layout", "DIAG drawn-vs-click " + id + ": " + detail)
+            }
             return
         }
         let drawnText: String = String(format: "%.1f", Double(found.drawnCentre))

@@ -11,17 +11,35 @@ import XCTest
     private let hover: NSColor = NSColor(srgbRed: 40.0 / 255.0, green: 43.0 / 255.0, blue: 47.0 / 255.0, alpha: 1)
 
     private func makeBitmap(width: Int, height: Int) -> NSBitmapImageRep? {
-        return NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: width, pixelsHigh: height, bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)
+        return NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: width, pixelsHigh: height, bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .calibratedRGB, bytesPerRow: width * 4, bitsPerPixel: 32)
     }
 
-    /// A background with one band of `bandColor` on the pixel rows `bandRows`.
+    /// A background with one band of `bandColor` on the pixel rows `bandRows`, drawn the way a window screenshot is
+    /// (through a graphics context), so the pixel format matches what `cacheDisplay` produces.
     private func makeShot(width: Int, height: Int, bandRows: Range<Int>, bandColor: NSColor) -> NSBitmapImageRep? {
         guard let bitmap = makeBitmap(width: width, height: height) else { return nil }
-        for y in 0..<height {
-            let color: NSColor = bandRows.contains(y) ? bandColor : background
-            for x in 0..<width { bitmap.setColor(color, atX: x, y: y) }
+        guard let context = NSGraphicsContext(bitmapImageRep: bitmap) else { return nil }
+        let saved: NSGraphicsContext? = NSGraphicsContext.current
+        NSGraphicsContext.current = context
+        background.setFill()
+        NSRect(x: 0, y: 0, width: width, height: height).fill()
+        if !bandRows.isEmpty {
+            // The context is bottom-up; the helper counts rows from the top.
+            let bottomUpY: Int = height - bandRows.upperBound
+            bandColor.setFill()
+            NSRect(x: 0, y: bottomUpY, width: width, height: bandRows.count).fill()
         }
+        context.flushGraphics()
+        NSGraphicsContext.current = saved
         return bitmap
+    }
+
+    func testSyntheticPixelsReadBackAsDrawn() throws {
+        let bitmap: NSBitmapImageRep = try XCTUnwrap(makeShot(width: 40, height: 100, bandRows: 20..<40, bandColor: tinted))
+        let inside: SmokeRGB = try XCTUnwrap(SmokeHitAudit.color(in: bitmap, x: 6, y: 30))
+        let outside: SmokeRGB = try XCTUnwrap(SmokeHitAudit.color(in: bitmap, x: 6, y: 70))
+        XCTAssertEqual(inside.green, 46.0 / 255.0, accuracy: 0.02)
+        XCTAssertEqual(outside.green, 17.0 / 255.0, accuracy: 0.02)
     }
 
     func testFindsTheTintedBand() throws {

@@ -171,4 +171,34 @@ enum SmokeHitAudit {
         let aligned: Bool = isAligned(offset: offset, tolerance: tolerance)
         return SmokeHitMeasurement(startPx: run.startPx, endPx: run.endPx, drawnCentre: drawnCentre, layoutCentre: layoutCentre, offset: offset, aligned: aligned)
     }
+
+    // MARK: Diagnostics
+
+    private static func rgbText(_ pixel: SmokeRGB?) -> String {
+        guard let pixel else { return "nil" }
+        let red: Int = Int((pixel.red * 255).rounded())
+        let green: Int = Int((pixel.green * 255).rounded())
+        let blue: Int = Int((pixel.blue * 255).rounded())
+        return String(red) + "," + String(green) + "," + String(blue)
+    }
+
+    /// One line that says what the measurement saw, for the case where no tinted row could be found.
+    static func describe(in bitmap: NSBitmapImageRep, scale: CGFloat, origin: CGPoint, layoutFrame: CGRect) -> String {
+        let columnPoints: CGFloat = layoutFrame.minX + 6 + origin.x
+        let columnPx: Int = Int((columnPoints * scale).rounded())
+        let middlePx: Int = Int(((layoutFrame.midY + origin.y) * scale).rounded())
+        var samples: [String] = []
+        for delta in [-160, -80, -40, 0, 40, 80, 160] {
+            let pixel: SmokeRGB? = color(in: bitmap, x: columnPx, y: middlePx + delta)
+            samples.append(String(delta) + ":" + rgbText(pixel))
+        }
+        let size: String = String(bitmap.pixelsWide) + "x" + String(bitmap.pixelsHigh)
+        let frameText: String = String(Int(layoutFrame.minX)) + "," + String(Int(layoutFrame.minY)) + "," + String(Int(layoutFrame.width)) + "x" + String(Int(layoutFrame.height))
+        let originText: String = String(Int(origin.x)) + "," + String(Int(origin.y))
+        let quiet: Int? = quietRow(in: bitmap, columnPx: columnPx, fromPx: 0, toPx: bitmap.pixelsHigh)
+        let quietText: String = quiet.map { String($0) } ?? "nil"
+        let head: String = "bitmap " + size + " scale " + String(Double(scale)) + " origin " + originText + " frame " + frameText
+        let tail: String = " column " + String(columnPx) + " quietRow " + quietText + " samples " + samples.joined(separator: " ")
+        return head + tail
+    }
 }
