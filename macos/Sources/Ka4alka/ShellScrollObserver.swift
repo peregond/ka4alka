@@ -55,7 +55,9 @@ struct ShellScrollObserver: NSViewRepresentable {
             }
             visit(content)
             guard let scroll = candidates.max(by: { $0.bounds.width * $0.bounds.height < $1.bounds.width * $1.bounds.height }) else {
-                detach(); return
+                detach()
+                if shown { shown = false; callback?(false) }
+                return
             }
             let next = scroll.contentView
             if clip !== next {

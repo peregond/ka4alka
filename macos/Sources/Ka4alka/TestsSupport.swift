@@ -114,7 +114,8 @@ extension SmokePage {
 /// A unit test greps the sources for every literal, so a renamed probe fails fast instead of silently weakening the smoke test.
 enum SmokeProbeCatalog {
     static let sourceLiterals: [String] = [
-        "featured.masthead", "featured.hero", "featured.digest", "featured.ranking",
+        "featured.hero", "featured.digest", "featured.ranking",
+        "search.header", "search.field", "search.scope",
         "catalog.banner.", "catalog.hero", "catalog.hero.title", "catalog.hero.actions", "catalog.filters", "catalog.saved.controls",
         "games.hero",
         "downloads.header", "downloads.tiles", "downloads.row.",
@@ -123,7 +124,7 @@ enum SmokeProbeCatalog {
         "toolbar.add", "toolbar.refresh", "toolbar.appearance", "sidebar"
     ]
     /// Accessibility identifiers the smoke test or the UI tests may look for.
-    static let identifiers: [String] = ["nav-", "catalog-spotlight", "hero-open", "downloads-add"]
+    static let identifiers: [String] = ["nav-", "nav-search", "search-field", "catalog-spotlight", "hero-open", "downloads-add"]
 }
 
 // MARK: Text rules
