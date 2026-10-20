@@ -19,8 +19,32 @@ actor CatalogGate {
     }
 }
 
+/// What the catalog remembers between view lifetimes: lazy grids and the banner recreate their views, and without this
+/// the Russian card or the blurred poster would flash before the English card or the backdrop arrives again.
+@MainActor enum CatalogMemo {
+    static var localized: [String: MediaCard] = [:]
+    static var backdrops: [String: String] = [:]
+    private static var stamp = ""
+
+    /// Forgets everything when the language or the catalog revision (refresh, content settings) differs from the last call.
+    static func sync(language: String, revision: Int) {
+        let next: String = language + "|" + String(revision)
+        if next == stamp { return }
+        stamp = next
+        localized = [:]
+        backdrops = [:]
+    }
+}
+
+/// The card to draw: in English mode the English copy (own or remembered) when there is one, otherwise the card itself.
+@MainActor func catalogShownCard(_ card: MediaCard, local: MediaCard?, english: Bool) -> MediaCard {
+    if !english { return card }
+    return local ?? CatalogMemo.localized[card.id] ?? card
+}
+
 /// The English version of a card, or nil when the request failed or was cancelled.
 @MainActor func catalogLocalizedCard(_ card: MediaCard, bridge: EngineBridge) async -> MediaCard? {
+    if let known = CatalogMemo.localized[card.id] { return known }
     await CatalogGate.shared.enter()
     if Task.isCancelled {
         await CatalogGate.shared.leave()
@@ -29,7 +53,25 @@ actor CatalogGate {
     let result = try? await bridge.call("localizedCard", ["id": .string(card.id)], as: MediaCard.self)
     await CatalogGate.shared.leave()
     if Task.isCancelled { return nil }
+    if let result { CatalogMemo.localized[card.id] = result }
     return result
+}
+
+/// Labels a poster for VoiceOver and adds "Downloaded" once the title is in the finished downloads.
+/// It observes the queue, so the label follows a download that completes while the card is on screen.
+struct CatalogPosterLabel: ViewModifier {
+    @ObservedObject var store: TransferStore
+    var cardID: String
+    var text: String
+
+    private var downloaded: Bool {
+        store.items.contains { (item: Transfer) -> Bool in item.mediaId == cardID && item.complete }
+    }
+
+    func body(content: Content) -> some View {
+        let label: String = downloaded ? text + ", " + tr("Скачано", "Downloaded") : text
+        return content.accessibilityLabel(label)
+    }
 }
 
 /// Hero banner geometry. The banner grows with the detail column but stays between 280 and 340 pt.

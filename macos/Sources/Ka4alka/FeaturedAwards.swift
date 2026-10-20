@@ -34,11 +34,20 @@ struct FeaturedAwardsView: View {
     @State private var years: [Int] = []
     @State private var yearsLoaded = false
     @State private var yearsError: String?
-    /// 0 means "all years".
+    /// 0 means "all years". Kept in `model.awardYears` too, so Back returns to the same year.
     @State private var year = 0
     @State private var attempt = 0
-    /// Loaded pages by year. The "all years" list is lazy and discards sections that scroll away; the cache keeps their content.
-    @State private var pages: [Int: AwardPage] = [:]
+    /// Loaded pages by catalog revision and year. The "all years" list is lazy and discards sections that scroll away; the cache keeps their content.
+    @State private var pages: [String: AwardPage] = [:]
+    /// The chip at the centre of the year strip.
+    @State private var stripID: Int?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Restarts the loading task when the collection, a retry or a catalog refresh changes.
+    private var taskKey: String {
+        let revision: String = String(model.revision)
+        let tries: String = String(attempt)
+        return "\(collectionID)|\(tries)|\(revision)"
+    }
 
     private var awardID: String { String(collectionID.dropFirst(6)) }
     private var group: CuratedGroup? { model.curated.first { (value: CuratedGroup) -> Bool in value.id == collectionID } }
@@ -55,7 +64,8 @@ struct FeaturedAwardsView: View {
             .frame(maxWidth: KD.Width.page, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
-        .task(id: collectionID + "|" + String(attempt)) { await loadYears() }
+        .onChange(of: year) { _, next in model.awardYears[collectionID] = next }
+        .task(id: taskKey) { await loadYears() }
     }
 
     @ViewBuilder private var content: some View {
@@ -95,10 +105,13 @@ struct FeaturedAwardsView: View {
         }
     }
 
+    private func pageKey(_ value: Int) -> String { String(model.revision) + "|" + String(value) }
+
     private func pageBinding(for value: Int) -> Binding<AwardPage?> {
-        Binding<AwardPage?>(
-            get: { pages[value] },
-            set: { (next: AwardPage?) in pages[value] = next }
+        let key: String = pageKey(value)
+        return Binding<AwardPage?>(
+            get: { pages[key] },
+            set: { (next: AwardPage?) in pages[key] = next }
         )
     }
 
@@ -118,21 +131,35 @@ struct FeaturedAwardsView: View {
         HStack(spacing: KD.Space.xs) {
             KDIconButton(systemImage: "chevron.backward", label: tr("Следующий год", "Next year"), action: { step(-1) })
                 .disabled(!canGoNewer)
-            ScrollViewReader { proxy in
-                ScrollView(.horizontal) {
-                    HStack(spacing: KD.Space.xs) {
-                        chip(0, title: tr("Все годы", "All years")).id(0)
-                        ForEach(years, id: \.self) { value in
-                            chip(value, title: String(value)).id(value)
-                        }
+            ScrollView(.horizontal) {
+                HStack(spacing: KD.Space.xs) {
+                    chip(0, title: tr("Все годы", "All years")).id(0)
+                    ForEach(years, id: \.self) { value in
+                        chip(value, title: String(value)).id(value)
                     }
-                    .padding(.vertical, 2)
                 }
-                .scrollIndicators(.hidden)
-                .onChange(of: year) { _, next in proxy.scrollTo(next, anchor: .center) }
+                .scrollTargetLayout()
+                .padding(.vertical, 2)
             }
+            .scrollIndicators(.hidden)
+            .scrollPosition(id: $stripID, anchor: .center)
+            .onAppear { stripID = year }
+            .onChange(of: year) { _, next in followYear(next) }
             KDIconButton(systemImage: "chevron.forward", label: tr("Предыдущий год", "Previous year"), action: { step(1) })
                 .disabled(!canGoOlder)
+        }
+    }
+
+    /// Centres the chip of `target` in the strip. When the strip already reports it as its position, the position is reset first so the jump happens again.
+    private func followYear(_ target: Int) {
+        let animation: Animation? = reduceMotion ? nil : Animation.easeInOut(duration: 0.25)
+        if stripID == target {
+            stripID = nil
+            DispatchQueue.main.async {
+                withAnimation(animation) { stripID = target }
+            }
+        } else {
+            withAnimation(animation) { stripID = target }
         }
     }
 
@@ -147,13 +174,16 @@ struct FeaturedAwardsView: View {
     /// A call with a year that matches nothing returns only the list of years, which is all this page needs first.
     private func loadYears() async {
         yearsError = nil
-        pages = [:]
+        let currentPrefix: String = String(model.revision) + "|"
+        pages = pages.filter { (entry: (key: String, value: AwardPage)) -> Bool in entry.key.hasPrefix(currentPrefix) }
         do {
             let result = try await model.bridge.call("awards", ["award": .string(awardID), "year": .number(-1)], as: AwardPage.self)
             if Task.isCancelled { return }
             let sorted: [Int] = result.years.sorted(by: >)
             years = sorted
-            if !yearsLoaded { year = sorted.first ?? 0 }
+            let newest: Int = sorted.first ?? 0
+            let wanted: Int = yearsLoaded ? year : (model.awardYears[collectionID] ?? newest)
+            year = (wanted == 0 || sorted.contains(wanted)) ? wanted : newest
             yearsLoaded = true
         } catch {
             if Task.isCancelled { return }
@@ -173,6 +203,11 @@ struct FeaturedYearSection: View {
     @Binding var page: AwardPage?
     @State private var failure: String?
     @State private var attempt = 0
+    private var taskKey: String {
+        let revision: String = String(model.revision)
+        let tries: String = String(attempt)
+        return "\(awardID)|\(year)|\(tries)|\(revision)"
+    }
 
     private var winners: [MediaCard] { featuredUnique(model.visible(page?.winners ?? [])) }
     private var nominees: [MediaCard] { featuredUnique(model.visible(page?.nominees ?? [])) }
@@ -187,7 +222,7 @@ struct FeaturedYearSection: View {
         VStack(alignment: .leading, spacing: KD.Space.m) {
             sectionContent
         }
-        .task(id: awardID + "|" + String(year) + "|" + String(attempt)) { await load() }
+        .task(id: taskKey) { await load() }
     }
 
     private var heading: some View {
@@ -260,10 +295,21 @@ struct FeaturedAwardGrid: View {
 struct FeaturedCollectionPage: View {
     @EnvironmentObject private var model: AppModel
     var id: String
-    @State private var collectionPage = 1
     @State private var attempt = 0
     @State private var failed = false
     @State private var heading: String?
+    @State private var scrollID: String?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private static let topID = "collection-top"
+    /// The page lives in the model, so Back returns to the page that was open.
+    private var collectionPage: Int { model.collectionPages[id] ?? 1 }
+    private var taskKey: String {
+        let page: String = String(collectionPage)
+        let revision: String = String(model.revision)
+        let tries: String = String(attempt)
+        return "\(id)|\(page)|\(tries)|\(revision)"
+    }
 
     private var isShelf: Bool { id.hasPrefix("steam-shelf:") }
     private var group: CuratedGroup? { model.curated.first { (value: CuratedGroup) -> Bool in value.id == id } }
@@ -281,21 +327,41 @@ struct FeaturedCollectionPage: View {
     }
 
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: KD.Space.l) {
-                    KDPageHeader(title, subtitle: summary).id("collection-top")
-                    listContent
-                    if isShelf, let list = model.list { pager(list) }
-                }
-                .padding(.horizontal, KD.gutter)
-                .padding(.vertical, KD.gutter)
-                .frame(maxWidth: KD.Width.page, alignment: .leading)
-                .frame(maxWidth: .infinity)
+        ScrollView {
+            VStack(alignment: .leading, spacing: KD.Space.l) {
+                KDPageHeader(title, subtitle: summary)
+                    .padding(.top, KD.gutter)
+                    .id(Self.topID)
+                listContent
+                if isShelf, let list = model.list { pager(list) }
             }
-            .onChange(of: collectionPage) { _, _ in proxy.scrollTo("collection-top", anchor: .top) }
+            .scrollTargetLayout()
+            .padding(.horizontal, KD.gutter)
+            .padding(.bottom, KD.gutter)
+            .frame(maxWidth: KD.Width.page, alignment: .leading)
+            .frame(maxWidth: .infinity)
         }
-        .task(id: id + "|" + String(collectionPage) + "|" + String(attempt)) { await load() }
+        .scrollPosition(id: $scrollID, anchor: .top)
+        .onChange(of: collectionPage) { _, _ in jumpToTop() }
+        .task(id: taskKey) { await load() }
+    }
+
+    private func setPage(_ next: Int) {
+        model.collectionPages[id] = max(1, next)
+    }
+
+    /// Scrolls to the title. When the page already reports it as its position, the position is reset first so the jump happens again.
+    private func jumpToTop() {
+        let target: String = Self.topID
+        let animation: Animation? = reduceMotion ? nil : Animation.easeInOut(duration: 0.25)
+        if scrollID == target {
+            scrollID = nil
+            DispatchQueue.main.async {
+                withAnimation(animation) { scrollID = target }
+            }
+        } else {
+            withAnimation(animation) { scrollID = target }
+        }
     }
 
     @ViewBuilder private var listContent: some View {
@@ -327,14 +393,14 @@ struct FeaturedCollectionPage: View {
     private func pager(_ list: CatalogResult) -> some View {
         HStack(spacing: KD.Space.m) {
             Spacer()
-            Button { collectionPage = max(1, collectionPage - 1) } label: {
+            Button { setPage(collectionPage - 1) } label: {
                 Label(tr("Назад", "Previous"), systemImage: "chevron.backward")
             }
             .buttonStyle(KDSecondaryButtonStyle())
             .keyboardShortcut(.leftArrow, modifiers: .command)
             .disabled(collectionPage <= 1)
             Text(tr("Страница ", "Page ") + String(collectionPage)).font(KDFont.meta).monospacedDigit()
-            Button { collectionPage += 1 } label: {
+            Button { setPage(collectionPage + 1) } label: {
                 Label(tr("Далее", "Next"), systemImage: "chevron.forward")
             }
             .buttonStyle(KDSecondaryButtonStyle())

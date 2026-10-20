@@ -9,6 +9,9 @@ struct SettingsView: View {
     @State private var pinnedUntil: Date?
     @State private var pinnedSettledOffset: CGFloat?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// The interface locale follows the language picker. Reading it makes the page rebuild its titles when the language changes,
+    /// because this view has no other input that would change.
+    @Environment(\.locale) private var locale
 
     /// How long after a click the highlight ignores scroll position (covers the 0.25 s animated jump).
     private static let pinDuration: TimeInterval = 0.6
@@ -19,6 +22,7 @@ struct SettingsView: View {
     private static let readingLine: CGFloat = 90
 
     var body: some View {
+        let _ = locale
         GeometryReader { (geometry: GeometryProxy) in
             layout(width: geometry.size.width)
         }

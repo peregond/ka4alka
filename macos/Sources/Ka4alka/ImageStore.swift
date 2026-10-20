@@ -36,7 +36,7 @@ actor ImageSlots {
 final class ArtworkMemory: @unchecked Sendable {
     static let shared = ArtworkMemory()
     private let cache = NSCache<NSString, NSImage>()
-    init() { cache.totalCostLimit = 32 * 1024 * 1024 }
+    init() { cache.totalCostLimit = 96 * 1024 * 1024 }
     func image(forKey key: String) -> NSImage? { cache.object(forKey: key as NSString) }
     func store(_ image: NSImage, forKey key: String, cost: Int) { cache.setObject(image, forKey: key as NSString, cost: cost) }
     func setLimit(_ bytes: Int) { cache.totalCostLimit = bytes }
@@ -52,7 +52,7 @@ final class ArtworkMemory: @unchecked Sendable {
     private var failures: [String: Date] = [:]
     private var failureOrder: [String] = []
     private let failureLimit = 120
-    private let failureLifetime: TimeInterval = 120
+    private let failureLifetime: TimeInterval = 20
     private let slots = ImageSlots(limit: 3)
     private let fallbackSlots = ImageSlots(limit: 1)
     private let session: URLSession
@@ -62,9 +62,17 @@ final class ArtworkMemory: @unchecked Sendable {
         config.urlCache = URLCache(memoryCapacity: 4 * 1024 * 1024, diskCapacity: 128 * 1024 * 1024, diskPath: "Ka4alkaArtwork")
         session = URLSession(configuration: config)
     }
-    func setLite(_ lite: Bool) { ArtworkMemory.shared.setLimit((lite ? 12 : 32) * 1024 * 1024) }
+    /// Decoded pictures are kept in memory up to 24 MB in Lite mode and 96 MB otherwise.
+    func setLite(_ lite: Bool) {
+        let megabytes: Int = lite ? 24 : 96
+        ArtworkMemory.shared.setLimit(megabytes * 1024 * 1024)
+    }
+    /// Forgets which pictures failed, so a retry (catalog refresh, restarted engine) tries them again at once.
+    func clearFailures() {
+        failures.removeAll(); failureOrder.removeAll()
+    }
     func clear() {
-        ArtworkMemory.shared.removeAll(); failures.removeAll(); failureOrder.removeAll()
+        ArtworkMemory.shared.removeAll(); clearFailures()
         session.configuration.urlCache?.removeAllCachedResponses()
     }
     nonisolated static func cacheKey(_ address: String, width: Int) -> String { address + "|" + String(width) }
@@ -113,6 +121,7 @@ final class ArtworkMemory: @unchecked Sendable {
         guard let size = try path.resourceValues(forKeys: [.fileSizeKey]).fileSize, size <= 2 * 1024 * 1024 else { throw URLError(.dataLengthExceedsMaximum) }
         return try Data(contentsOf: path)
     }
+    /// `width` goes to the decoder unchanged as the largest side in pixels; nothing caps it.
     nonisolated private static func thumbnail(_ data: Data, width: Int) -> CGImage? {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
         let options: [CFString: Any] = [kCGImageSourceCreateThumbnailFromImageAlways: true, kCGImageSourceThumbnailMaxPixelSize: width, kCGImageSourceCreateThumbnailWithTransform: true, kCGImageSourceShouldCacheImmediately: true]
@@ -122,6 +131,7 @@ final class ArtworkMemory: @unchecked Sendable {
         if error is CancellationError { return true }
         return (error as? URLError)?.code == .cancelled
     }
+    /// `width` is the largest side of the decoded picture in pixels (a portrait poster is narrower than that).
     func image(_ address: String, width: Int = 400) async -> NSImage? {
         let key = ImageStore.cacheKey(address, width: width); let subscriber = UUID()
         if let ready = ArtworkMemory.shared.image(forKey: key) { return ready }

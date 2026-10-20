@@ -19,6 +19,11 @@ import Foundation
     func start() throws {
         if disabled { throw RPCError(code: "disabled", message: tr("Движок отключён.", "The engine is disabled.")) }
         if process?.isRunning == true { return }
+        // The engine died and its termination notice has not been processed yet: do the exit bookkeeping now,
+        // so the calls waiting for it fail and onExit runs before a new process replaces this one.
+        if let old = process, !old.isRunning {
+            ended(ObjectIdentifier(old), old.terminationStatus, old.terminationReason)
+        }
         let engine = Bundle.main.resourceURL!.appendingPathComponent("engine/Kachalka.Engine")
         let executable = ProcessInfo.processInfo.environment["KACHALKA_ENGINE_PATH"].map { URL(fileURLWithPath: $0) } ?? engine
         guard FileManager.default.isExecutableFile(atPath: executable.path) else { throw RPCError(code: "missing-engine", message: tr("Не найден движок приложения. Переустанови Качалку.", "The application engine is missing. Reinstall Ka4alka.")) }

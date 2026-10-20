@@ -42,9 +42,29 @@ struct SettingsUpdatesCard: View {
                 read: { model.settings?.autoUpdate ?? true }
             )
             Divider()
+            installFailureRow
             statusRow
             progressRow
             actions
+        }
+    }
+
+    /// Why the last install did not happen. It stays until the next install starts, so the "up to date" status that the
+    /// launch check writes afterwards cannot hide it. While the status line still shows the same text there is no second row.
+    @ViewBuilder private var installFailureRow: some View {
+        if let failure = updater.installFailure, failure != shownStatus {
+            HStack(alignment: .top, spacing: KD.Space.s) {
+                Image(systemName: "exclamationmark.octagon.fill")
+                    .foregroundStyle(KDTone.danger.foreground)
+                    .padding(.top, 2)
+                    .accessibilityHidden(true)
+                Text(failure)
+                    .font(KDFont.secondary)
+                    .foregroundStyle(KDTone.danger.foreground)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
+                Spacer(minLength: 0)
+            }
         }
     }
 
@@ -95,8 +115,10 @@ struct SettingsUpdatesCard: View {
 
 struct SettingsCommunityCard: View {
     @State private var notice: SettingsNotice?
+    @Environment(\.locale) private var locale
 
     var body: some View {
+        let _ = locale
         SettingsCard(.community) {
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: KD.Space.s) { buttons }
@@ -231,8 +253,7 @@ struct SettingsHelpCard: View {
 
     @MainActor private func copyLogs() async {
         notice = nil
-        await model.logs()
-        if model.toast == tr("Логи скопированы", "Logs copied") {
+        if await model.logs() {
             notice = SettingsNotice.ok(tr("Диагностический отчёт скопирован.", "The diagnostic report was copied."))
         }
     }

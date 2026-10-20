@@ -8,6 +8,7 @@ struct DetailView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var card: MediaCard
     @State private var detailLoading = true
+    @State private var scrollTarget: String?
     private static let releasesAnchor = "detail-releases"
 
     /// The loaded detail, but only when it belongs to this card.
@@ -18,27 +19,27 @@ struct DetailView: View {
     private var loadKey: String { card.id + "|" + (model.settings?.uiLanguage ?? "ru") }
 
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                page(proxy)
-            }
+        ScrollView {
+            page
         }
+        .scrollPosition(id: $scrollTarget, anchor: .top)
         .task(id: loadKey) { await loadDetail() }
         .task(id: loadKey) { await model.loadReleases(card) }
     }
 
-    private func page(_ proxy: ScrollViewProxy) -> some View {
+    private var page: some View {
         VStack(alignment: .leading, spacing: KD.Space.l) {
-            DetailHero(card: card, detail: detail, onChooseRelease: { scrollToReleases(proxy) })
+            DetailHero(card: card, detail: detail, onChooseRelease: { scrollToReleases() })
             descriptionBlock
             gameBlock
             peopleBlock
             awardsBlock
             VStack(alignment: .leading, spacing: 0) {
-                Color.clear.frame(height: 0).id(DetailView.releasesAnchor)
                 DetailReleasesSection(transfers: model.transfers, card: card).id(card.id)
             }
+            .id(DetailView.releasesAnchor)
         }
+        .scrollTargetLayout()
         .frame(maxWidth: KD.Width.page, alignment: .leading)
         .padding(KD.gutter)
         .frame(maxWidth: .infinity)
@@ -58,11 +59,17 @@ struct DetailView: View {
         Task { @MainActor in await model.loadReleases(card) }
     }
 
-    private func scrollToReleases(_ proxy: ScrollViewProxy) {
-        if reduceMotion {
-            proxy.scrollTo(DetailView.releasesAnchor, anchor: .top)
+    private func scrollToReleases() {
+        let target: String = DetailView.releasesAnchor
+        let animation: Animation? = reduceMotion ? nil : Animation.easeInOut(duration: 0.3)
+        if scrollTarget == target {
+            // The page already reports the releases as its top item; reset the position so the jump happens again.
+            scrollTarget = nil
+            DispatchQueue.main.async {
+                withAnimation(animation) { scrollTarget = target }
+            }
         } else {
-            withAnimation(.easeInOut(duration: 0.3)) { proxy.scrollTo(DetailView.releasesAnchor, anchor: .top) }
+            withAnimation(animation) { scrollTarget = target }
         }
     }
 

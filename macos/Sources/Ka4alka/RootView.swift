@@ -17,29 +17,29 @@ private enum ShellSheet: Identifiable, Equatable {
     }
 }
 
-/// What the "add torrent" entry points accept: a magnet link, an http(s) link or a .torrent file.
+/// What the "add torrent" entry points accept: a magnet link or an existing .torrent file.
 enum ShellTorrentInput {
-    static func isValid(_ text: String) -> Bool {
+    /// The text as the engine receives it: trimmed, a file:// link turned into a path and `~` expanded.
+    /// Magnet links are returned unchanged.
+    static func normalized(_ text: String) -> String {
         let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if value.isEmpty { return false }
-        let lower = value.lowercased()
-        if lower.hasPrefix("magnet:") { return lower.count > "magnet:".count }
-        if lower.hasPrefix("http://") || lower.hasPrefix("https://") {
-            guard let url = URL(string: value), let host = url.host else { return false }
-            return !host.isEmpty
-        }
+        if value.lowercased().hasPrefix("magnet:") { return value }
         var path = value
-        if lower.hasPrefix("file://"), let url = URL(string: value), url.isFileURL { path = url.path }
-        let expanded = NSString(string: path).expandingTildeInPath
-        guard URL(fileURLWithPath: expanded).pathExtension.lowercased() == "torrent" else { return false }
-        var isDirectory: ObjCBool = false
-        return FileManager.default.fileExists(atPath: expanded, isDirectory: &isDirectory) && !isDirectory.boolValue
+        if value.lowercased().hasPrefix("file://"), let url = URL(string: value), url.isFileURL { path = url.path }
+        return NSString(string: path).expandingTildeInPath
     }
-    /// A dropped URL is taken only when it is a .torrent file, a magnet link or a web link.
+    static func isValid(_ text: String) -> Bool {
+        let value = normalized(text)
+        if value.isEmpty { return false }
+        if value.lowercased().hasPrefix("magnet:") { return value.count > "magnet:".count }
+        guard URL(fileURLWithPath: value).pathExtension.lowercased() == "torrent" else { return false }
+        var isDirectory: ObjCBool = false
+        return FileManager.default.fileExists(atPath: value, isDirectory: &isDirectory) && !isDirectory.boolValue
+    }
+    /// A dropped URL is taken only when it is a .torrent file or a magnet link.
     static func isDroppable(_ url: URL) -> Bool {
         if url.isFileURL { return url.pathExtension.lowercased() == "torrent" }
-        let scheme = (url.scheme ?? "").lowercased()
-        return scheme == "magnet" || scheme == "http" || scheme == "https"
+        return (url.scheme ?? "").lowercased() == "magnet"
     }
 }
 
@@ -55,7 +55,6 @@ struct RootView: View {
     @EnvironmentObject private var model: AppModel
     @EnvironmentObject private var updater: MacUpdater
     @Environment(\.colorScheme) private var colorScheme
-    @State private var draft = ""
     @State private var dropTargeted = false
 
     var body: some View {
@@ -102,9 +101,22 @@ struct RootView: View {
     // MARK: Drag and drop
 
     private func acceptDrop(_ urls: [URL]) -> Bool {
-        guard let url = urls.first(where: { ShellTorrentInput.isDroppable($0) }) else { return false }
-        model.magnet = url.isFileURL ? url.path : url.absoluteString
-        model.addTorrent = true
+        let matches: [URL] = urls.filter { ShellTorrentInput.isDroppable($0) }
+        guard let first = matches.first else { return false }
+        if matches.count == 1 {
+            model.magnet = DownloadsInput.source(for: first)
+            model.addTorrent = true
+            return true
+        }
+        let sources: [String] = matches.map { DownloadsInput.source(for: $0) }
+        Task { @MainActor in
+            var failed = 0
+            for source in sources {
+                let added: Bool = await model.add(source: source)
+                if !added { failed += 1 }
+            }
+            if failed > 0, let message = model.addError { model.toast = message }
+        }
         return true
     }
     @ViewBuilder private var dropOverlay: some View {
@@ -223,11 +235,10 @@ struct RootView: View {
             .kdToast($model.toast)
             .navigationTitle(navigationTitle)
             .toolbar { toolbarContent }
-            .searchable(text: $draft, placement: .toolbar, prompt: tr("Найти фильм, сериал или игру", "Find a movie, series or game"))
-            .onSubmit(of: .search) { model.query = draft; model.submit() }
-            .onChange(of: model.query) { _, next in if draft != next { draft = next } }
-            .onChange(of: draft) { _, next in
-                if next.isEmpty, !model.submittedQuery.isEmpty { model.query = ""; model.submit() }
+            .searchable(text: $model.query, placement: .toolbar, prompt: tr("Найти фильм, сериал или игру", "Find a movie, series or game"))
+            .onSubmit(of: .search) { model.submitSearch() }
+            .onChange(of: model.query) { _, next in
+                if next.isEmpty, !model.submittedQuery.isEmpty { model.clearSearch() }
             }
     }
     @ViewBuilder private var detailBody: some View {
@@ -312,7 +323,7 @@ struct RootView: View {
         switch model.route {
         case .detail(let card): await model.loadDetail(card)
         case .person(let person): await model.loadPerson(person)
-        case .collection(let id): await model.loadCollection(id)
+        case .collection: model.revision += 1
         case .section(.featured): await model.loadFeatured(force: true)
         case .section: model.revision += 1
         }
@@ -465,8 +476,13 @@ struct ShellPairingSheet: View {
         }
         .padding(KD.Space.xl)
         .frame(width: 420)
+        .background {
+            Button("") { answer(false) }
+                .keyboardShortcut(.cancelAction)
+                .opacity(0)
+                .accessibilityHidden(true)
+        }
         .interactiveDismissDisabled()
-        .onExitCommand { answer(false) }
     }
     private func answer(_ accepted: Bool) {
         Task { await model.approvePairing(accepted) }
@@ -481,7 +497,7 @@ struct AddTorrentSheet: View {
     private var trimmed: String { model.magnet.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var canAdd: Bool { !busy && ShellTorrentInput.isValid(trimmed) }
     private var inputHint: String {
-        tr("Нужна magnet-ссылка, адрес http(s) или существующий файл .torrent", "Enter a magnet link, an http(s) address or an existing .torrent file")
+        tr("Нужна magnet-ссылка или существующий файл .torrent", "Enter a magnet link or an existing .torrent file")
     }
     private var showsInputHint: Bool { !busy && !trimmed.isEmpty && !ShellTorrentInput.isValid(trimmed) }
     var body: some View {
@@ -508,9 +524,11 @@ struct AddTorrentSheet: View {
             }
             HStack {
                 Button(tr("Выбрать файл…", "Choose file…")) { chooseFile() }
+                    .disabled(busy)
                 Spacer()
                 if busy { ProgressView().controlSize(.small) }
                 Button(tr("Отмена", "Cancel")) { cancel() }
+                    .disabled(busy)
                     .keyboardShortcut(.cancelAction)
                 Button(tr("Добавить", "Add")) { submit() }
                     .buttonStyle(KDPrimaryButtonStyle())
@@ -530,7 +548,7 @@ struct AddTorrentSheet: View {
     private func submit() {
         guard canAdd else { return }
         busy = true
-        model.magnet = trimmed
+        model.magnet = ShellTorrentInput.normalized(trimmed)
         Task { @MainActor in
             await model.add()
             busy = false

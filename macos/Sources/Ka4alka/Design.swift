@@ -201,7 +201,7 @@ enum KDFormat {
         var amount = max(0, value.isFinite ? value : 0)
         let units = isEnglish ? ["B", "KB", "MB", "GB", "TB"] : ["Б", "КБ", "МБ", "ГБ", "ТБ"]
         var index = 0
-        while amount >= 1000, index < units.count - 1 { amount /= 1000; index += 1 }
+        while index < units.count - 1, amount >= 999.5 { amount /= 1000; index += 1 }
         let digits: ClosedRange<Int> = index == 0 ? 0...0 : (amount >= 100 ? 0...0 : 0...1)
         let number = amount.formatted(.number.precision(.fractionLength(digits)).locale(locale))
         return number + " " + units[index]
@@ -233,7 +233,7 @@ struct KDCardModifier: ViewModifier {
         let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
         content
             .background(level == .raised ? KDPalette.surface : Color.primary.opacity(0.04), in: shape)
-            .overlay(shape.strokeBorder(KDPalette.hairline, lineWidth: contrast == .increased ? 1.5 : 1))
+            .overlay(shape.strokeBorder(KDPalette.hairline, lineWidth: contrast == .increased ? 1.5 : 1).allowsHitTesting(false))
     }
 }
 
@@ -255,15 +255,15 @@ struct KDSurfaceModifier<S: InsettableShape>: ViewModifier {
     @ViewBuilder private func solid(_ content: Content) -> some View {
         content
             .background(onArtwork ? Color.black.opacity(0.78) : KDPalette.surface, in: shape)
-            .overlay(shape.strokeBorder(KDPalette.hairline, lineWidth: lineWidth))
+            .overlay(shape.strokeBorder(KDPalette.hairline, lineWidth: lineWidth).allowsHitTesting(false))
     }
 
     @ViewBuilder private func material(_ content: Content) -> some View {
         let style: Material = onArtwork ? .ultraThinMaterial : .regularMaterial
         content
             .background(style, in: shape)
-            .overlay { if let tint { shape.fill(tint.opacity(0.18)) } }
-            .overlay(shape.strokeBorder(KDPalette.hairline, lineWidth: lineWidth))
+            .overlay { if let tint { shape.fill(tint.opacity(0.18)).allowsHitTesting(false) } }
+            .overlay(shape.strokeBorder(KDPalette.hairline, lineWidth: lineWidth).allowsHitTesting(false))
     }
 
     #if compiler(>=6.2)
@@ -308,7 +308,7 @@ extension View {
         safeAreaInset(edge: .top, spacing: 0) {
             header()
                 .background(.bar)
-                .overlay(alignment: .bottom) { Rectangle().fill(KDPalette.hairline).frame(height: 1) }
+                .overlay(alignment: .bottom) { Rectangle().fill(KDPalette.hairline).frame(height: 1).allowsHitTesting(false) }
         }
     }
     /// macOS 26 soft scroll-edge effect under the toolbar; no-op before.
@@ -362,7 +362,7 @@ struct KDFieldChromeModifier: ViewModifier {
             .padding(.horizontal, KD.Space.s)
             .padding(.vertical, 7)
             .background(KDPalette.surface, in: shape)
-            .overlay(shape.strokeBorder(focused ? KDPalette.accent : KDPalette.hairline, lineWidth: focused ? 2 : (contrast == .increased ? 1.5 : 1)))
+            .overlay(shape.strokeBorder(focused ? KDPalette.accent : KDPalette.hairline, lineWidth: focused ? 2 : (contrast == .increased ? 1.5 : 1)).allowsHitTesting(false))
             .contentShape(shape)
     }
 }
@@ -433,7 +433,7 @@ private struct KDPrimaryButtonBody: View {
             .padding(.horizontal, metrics.h)
             .padding(.vertical, metrics.v)
             .background(KDPalette.accentFill.opacity(configuration.isPressed ? 0.78 : 1), in: shape)
-            .overlay(shape.strokeBorder(Color.black.opacity(contrast == .increased ? 0.55 : 0.08), lineWidth: contrast == .increased ? 1.5 : 1))
+            .overlay(shape.strokeBorder(Color.black.opacity(contrast == .increased ? 0.55 : 0.08), lineWidth: contrast == .increased ? 1.5 : 1).allowsHitTesting(false))
             .contentShape(shape)
             .opacity(enabled ? 1 : 0.45)
     }
@@ -458,7 +458,7 @@ private struct KDSecondaryButtonBody: View {
             .padding(.horizontal, small ? 10 : 14)
             .padding(.vertical, small ? 4 : 6)
             .background(shape.fill(configuration.isPressed ? Color.primary.opacity(0.14) : (hovered ? Color.primary.opacity(0.09) : Color.primary.opacity(0.05))))
-            .overlay(shape.strokeBorder(KDPalette.hairline, lineWidth: contrast == .increased ? 1.5 : 1))
+            .overlay(shape.strokeBorder(KDPalette.hairline, lineWidth: contrast == .increased ? 1.5 : 1).allowsHitTesting(false))
             .contentShape(shape)
             .onHover { hovered = $0 }
             .opacity(enabled ? 1 : 0.45)
@@ -594,7 +594,7 @@ struct KDChipLabel: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 5)
         .background(shape.fill(isActive ? KDPalette.accentSoft : Color.primary.opacity(hovered ? 0.09 : 0.05)))
-        .overlay(shape.strokeBorder(isActive ? KDPalette.accentLine : KDPalette.hairline, lineWidth: contrast == .increased ? 1.5 : 1))
+        .overlay(shape.strokeBorder(isActive ? KDPalette.accentLine : KDPalette.hairline, lineWidth: contrast == .increased ? 1.5 : 1).allowsHitTesting(false))
         .contentShape(shape)
         .onHover { hovered = $0 }
     }
@@ -861,9 +861,10 @@ struct KDBanner: View {
             if let onDismiss { KDIconButton(systemImage: "xmark", label: tr("Закрыть", "Dismiss"), action: onDismiss) }
         }
         .padding(KD.Space.s)
+        // A later background sits behind the earlier one, so the tint is added first and the surface goes behind it.
+        .background(shape.fill(tone.foreground.opacity(0.08)))
         .background(KDPalette.surface, in: shape)
-        .overlay(shape.fill(tone.foreground.opacity(0.08)))
-        .overlay(shape.strokeBorder(tone.foreground.opacity(0.4), lineWidth: 1))
+        .overlay(shape.strokeBorder(tone.foreground.opacity(0.4), lineWidth: 1).allowsHitTesting(false))
         .accessibilityElement(children: .contain)
     }
 }
@@ -891,6 +892,8 @@ struct KDToastModifier: ViewModifier {
     @Binding var text: String?
     var seconds: Double
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Changes on every new toast, so showing the same text twice restarts the dismiss timer.
+    @State private var stamp = UUID()
     func body(content: Content) -> some View {
         content
             .overlay(alignment: .bottom) {
@@ -902,7 +905,10 @@ struct KDToastModifier: ViewModifier {
                 }
             }
             .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: text)
-            .task(id: text) {
+            .onChange(of: text) { _, next in
+                if next != nil { stamp = UUID() }
+            }
+            .task(id: stamp) {
                 guard let value = text else { return }
                 AccessibilityNotification.Announcement(value).post()
                 try? await Task.sleep(for: .seconds(seconds))

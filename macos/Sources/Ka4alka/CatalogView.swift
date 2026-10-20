@@ -12,7 +12,7 @@ struct PosterCard: View {
     @FocusState private var focus: CatalogPosterFocus?
 
     private var english: Bool { model.settings?.uiLanguage == "en" }
-    private var item: MediaCard { english ? localized ?? card : card }
+    private var item: MediaCard { catalogShownCard(card, local: localized, english: english) }
     private var wideArt: Bool { wide || card.section == "games" }
     private var saved: Bool { model.isSaved(card) }
     private var showsActions: Bool { hovered || focus != nil }
@@ -44,7 +44,7 @@ struct PosterCard: View {
         Button { model.open(item) } label: { cardLabel }
             .buttonStyle(KDPosterButtonStyle())
             .focused($focus, equals: .card)
-            .accessibilityLabel(accessibilityText)
+            .modifier(CatalogPosterLabel(store: model.transfers, cardID: card.id, text: accessibilityText))
             .accessibilityAction(named: Text(saveTitle)) { Task { await toggleSave() } }
             .accessibilityAction(named: Text(hideTitle)) { Task { await model.hide(card) } }
     }
@@ -66,7 +66,7 @@ struct PosterCard: View {
     private var posterArt: some View {
         Color.clear
             .aspectRatio(KD.posterAspect(wide: wideArt), contentMode: .fit)
-            .overlay { Artwork(address: item.poster, placeholderSymbol: placeholderSymbol) }
+            .overlay { Artwork(address: item.poster, width: wideArt ? 720 : 640, placeholderSymbol: placeholderSymbol) }
             .overlay { CatalogPosterStatus(store: model.transfers, cardID: card.id, saved: saved) }
             .overlay(alignment: .topLeading) { topLeadingBadge.padding(8) }
             .overlay(alignment: .bottomLeading) { bottomLeadingMark.padding(8) }
@@ -219,6 +219,7 @@ struct PosterCard: View {
 
     private func localizeIfNeeded() async {
         guard english, card.section != "games" else { return }
+        CatalogMemo.sync(language: "en", revision: model.revision)
         let result = await catalogLocalizedCard(card, bridge: model.bridge)
         if !Task.isCancelled { localized = result }
     }
@@ -241,8 +242,9 @@ struct PosterGrid: View {
 struct CatalogView: View {
     @EnvironmentObject private var model: AppModel
     var saved = false
-    @State private var savedKind = ""
-    @State private var savedSort = "date"
+    /// The scroll position by item id (cards, or `topID`). It mirrors `model.browseAnchor`, so Back returns to the same place.
+    @State private var scrollID: String?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// True once the load for the current `loadID` has finished (successfully or not).
     @State private var settled = false
     private static let topID = "catalog-top"
@@ -274,18 +276,32 @@ struct CatalogView: View {
     }
 
     private var scroller: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    Color.clear.frame(height: 0).id(Self.topID)
-                    scrollContent
-                }
-                .padding(.horizontal, KD.gutter)
-                .padding(.top, KD.Space.m)
-                .padding(.bottom, KD.gutter)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                Color.clear.frame(height: KD.Space.m).id(Self.topID)
+                scrollContent
             }
-            .scrollPosition(id: Binding(get: { model.browseAnchor }, set: { model.browseAnchor = $0 }))
-            .onChange(of: loadID) { _, _ in proxy.scrollTo(Self.topID, anchor: .top) }
+            .scrollTargetLayout()
+            .padding(.horizontal, KD.gutter)
+            .padding(.bottom, KD.gutter)
+        }
+        .scrollPosition(id: $scrollID, anchor: .top)
+        .onAppear { if scrollID == nil { scrollID = model.browseAnchor } }
+        .onChange(of: scrollID) { _, next in model.browseAnchor = next }
+        .onChange(of: loadID) { _, _ in jumpToTop() }
+    }
+
+    /// Scrolls to the top. When the page already reports the top as its position, the position is reset first so the jump happens again.
+    private func jumpToTop() {
+        let target: String = Self.topID
+        let animation: Animation? = reduceMotion ? nil : Animation.easeInOut(duration: 0.25)
+        if scrollID == target {
+            scrollID = nil
+            DispatchQueue.main.async {
+                withAnimation(animation) { scrollID = target }
+            }
+        } else {
+            withAnimation(animation) { scrollID = target }
         }
     }
 
@@ -492,8 +508,8 @@ struct CatalogView: View {
 
     private func savedRows(_ shown: [MediaCard]) -> [MediaCard] {
         var rows: [MediaCard] = shown
-        if !savedKind.isEmpty { rows = shown.filter { savedGroupKey($0) == savedKind } }
-        if savedSort == "rating" {
+        if !model.savedKind.isEmpty { rows = shown.filter { savedGroupKey($0) == model.savedKind } }
+        if model.savedSort == "rating" {
             rows = rows.sorted { savedRating($0) > savedRating($1) }
         } else {
             rows = Array(rows.reversed())
@@ -508,7 +524,7 @@ struct CatalogView: View {
 
     private func savedControls(_ shown: [MediaCard]) -> some View {
         KDFlowLayout(spacing: KD.Space.xs, lineSpacing: KD.Space.xs) {
-            Picker(tr("Показывать", "Show"), selection: $savedKind) {
+            Picker(tr("Показывать", "Show"), selection: $model.savedKind) {
                 Text(tr("Все", "All") + " · " + String(savedCount(shown, kind: ""))).tag("")
                 Text(tr("Фильмы", "Movies") + " · " + String(savedCount(shown, kind: "movies"))).tag("movies")
                 Text(tr("Сериалы", "Series") + " · " + String(savedCount(shown, kind: "series"))).tag("series")
@@ -529,18 +545,20 @@ struct CatalogView: View {
     }
 
     private var savedSortLabel: String {
-        savedSort == "rating" ? tr("По рейтингу", "Top rated") : tr("Сначала новые", "Newest first")
+        model.savedSort == "rating" ? tr("По рейтингу", "Top rated") : tr("Сначала новые", "Newest first")
     }
 
     private var savedSortMenu: some View {
-        KDChipMenu(title: savedSortLabel, value: savedSort == "rating" ? savedSortLabel : nil) {
-            Picker(tr("Порядок", "Sort"), selection: $savedSort) {
+        KDChipMenu(title: savedSortLabel, value: model.savedSort == "rating" ? savedSortLabel : nil) {
+            Picker(tr("Порядок", "Sort"), selection: $model.savedSort) {
                 Text(tr("Сначала новые", "Newest first")).tag("date")
                 Text(tr("По рейтингу", "Top rated")).tag("rating")
             }
             .pickerStyle(.inline)
             .labelsHidden()
         }
+        .accessibilityLabel(tr("Порядок", "Sort"))
+        .accessibilityValue(savedSortLabel)
     }
 
     @ViewBuilder private func savedGroups(_ rows: [MediaCard]) -> some View {
@@ -551,8 +569,8 @@ struct CatalogView: View {
                 message: tr("В этой категории нет сохранённых названий.", "There are no saved titles in this category.")
             )
             .frame(maxWidth: .infinity, minHeight: 240)
-        } else if !savedKind.isEmpty {
-            PosterGrid(items: rows, wide: savedKind == "games")
+        } else if !model.savedKind.isEmpty {
+            PosterGrid(items: rows, wide: model.savedKind == "games")
         } else {
             savedSection(key: "movies", title: tr("Фильмы", "Movies"), rows: rows)
             savedSection(key: "series", title: tr("Сериалы", "Series"), rows: rows)
@@ -765,6 +783,8 @@ struct FilterBar: View {
             .pickerStyle(.inline)
             .labelsHidden()
         }
+        .accessibilityLabel(tr("Порядок", "Sort"))
+        .accessibilityValue(currentSortLabel)
     }
 
     // MARK: Reset and applied chips

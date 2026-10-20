@@ -138,7 +138,7 @@ sealed class DesktopEngine:IAsyncDisposable
                 var existing=Download(S(p,"id"));var media=DownloadMetadata.Card(existing)??throw new InvalidOperationException("No catalog identity for this download.");
                 var entry=new SourceEntry(existing.ReleaseId??"",existing.ReleaseTitle??existing.Name,existing.ReleaseSource??"",existing.ReleasePageUrl??"",existing.ReleaseUrl,null);
                 if(entry.Source is "RuTor" or "NNM-Club" or "MegaPeer" or "BigFanGroup")entry=await RefreshSourceEntry(entry,media,ct);
-                await downloads.ReplaceTorrentAsync(existing,await source.TorrentFile(entry,ct));return Downloads();
+                var replaced=await downloads.ReplaceTorrentAsync(existing,await source.TorrentFile(entry,ct));return new{items=DownloadItems(),updated=replaced==DownloadService.TorrentUpdate.Updated};
             case "sources":return new{items=configuredSources.Select(x=>new{x.Name,x.Endpoint,hasKey=x.ApiKey.Length>0})};
             case "sourceAdd":
                 var endpoint=SourceClient.WebUri(S(p,"endpoint")).AbsoluteUri;var name=S(p,"name").Trim();
@@ -267,6 +267,7 @@ sealed class DesktopEngine:IAsyncDisposable
     }
     async Task<object> Releases(string request,MediaItem item,CancellationToken ct)
     {
+        var cardKey=Key(item);
         item=MediaIdentity.Enrich(item);
         var cached=await Task.Run(()=>index.CachedReleaseSnapshot(item),ct);
         var saved=cached?.Items??[];
@@ -283,7 +284,7 @@ sealed class DesktopEngine:IAsyncDisposable
         var providers=item.Section=="Игры"?GameReleaseSources.Create(source,item,configuredSources):NativeReleaseSources.Create(source,Resolved,item.Section=="Сериалы",Aliases);
         var sources=providers.ToList();if(item.Section!="Игры")sources.AddRange(configuredSources.Select(config=>new ReleaseSource(config.Name,t=>source.SearchTorznab(config,item.OriginalTitle??item.Title,t,item.Section=="Сериалы"?5000:2000))));if(item.Section!="Игры"&&OnlineIndexClient.IdFor(item)!=null)sources.Insert(0,new("Онлайн-индекс",t=>online.Releases(item,t,true)));
         var rules=releaseAudioRules.Refresh(ct);
-        var result=await ReleaseSearch.RunAsync(sources,new Progress<ReleaseSearchUpdate>(update=>Event("releases",new{request,items=ReleaseDtos(ReleaseSearch.WithSaved(update.Items,saved),item.Section=="Игры"),complete=update.Complete,sources=update.Sources.Select(x=>new{x.Name,state=x.State.ToString(),count=x.Count})})),ct);
+        var result=await ReleaseSearch.RunAsync(sources,new Progress<ReleaseSearchUpdate>(update=>Event("releases",new{request,card=cardKey,items=ReleaseDtos(ReleaseSearch.WithSaved(update.Items,saved),item.Section=="Игры"),complete=update.Complete,sources=update.Sources.Select(x=>new{x.Name,state=x.State.ToString(),count=x.Count})})),ct);
         await rules;
         var combined=ReleaseSearch.WithSaved(result.Items,saved);
         item.SetReleaseQuality(combined,prefs.MinimumReleaseHeight);
@@ -299,10 +300,11 @@ sealed class DesktopEngine:IAsyncDisposable
         {
         var key=Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(entry.Source+"|"+entry.Id+"|"+entry.TorrentUrl)))[..24];
         if(releases.Count>3000)releases.Remove(releases.Keys.First());releases[key]=entry;
-        return (object)new{id=key,title=entry.Title,source=entry.Source,size=entry.Size,seeds=entry.Seeds,leechers=entry.Leechers,quality=entry.Quality,type=entry.Type,audio=entry.Voice,studios=ReleaseAudio.StudioNames(entry),audioTypes=ReleaseAudio.TypeNames(entry),codec=entry.Codec,subs=entry.Subs,hdr=entry.Hdr,poor=ReleaseQuality.Poor(entry,prefs.MinimumReleaseHeight),downloadable=ReleaseAvailability.Downloadable(entry),recommended=choice?.Entry==entry,season=entry.Series.Season,episode=entry.Series.Episode,multipleSeasons=entry.Series.MultipleSeasons,multipleEpisodes=entry.Series.MultipleEpisodes,englishAudio=SearchLanguage.EnglishAudioRank(entry)>=2,russianAudio=RussianAudio.Rank(entry)>=2,russianDub=RussianAudio.Rank(entry)==3,qualityLabel=ReleaseQuality.Label(entry),gameKind=games?GameReleaseInfo.Kind(entry):null,gameGroup=games?GameReleaseInfo.Group(entry):null,gameVersion=games?GameReleaseInfo.Version(entry):null};
+        return (object)new{id=key,entryId=entry.Id,title=entry.Title,source=entry.Source,size=entry.Size,seeds=entry.Seeds,leechers=entry.Leechers,quality=entry.Quality,type=entry.Type,audio=entry.Voice,studios=ReleaseAudio.StudioNames(entry),audioTypes=ReleaseAudio.TypeNames(entry),codec=entry.Codec,subs=entry.Subs,hdr=entry.Hdr,poor=ReleaseQuality.Poor(entry,prefs.MinimumReleaseHeight),downloadable=ReleaseAvailability.Downloadable(entry),recommended=choice?.Entry==entry,season=entry.Series.Season,episode=entry.Series.Episode,multipleSeasons=entry.Series.MultipleSeasons,multipleEpisodes=entry.Series.MultipleEpisodes,englishAudio=SearchLanguage.EnglishAudioRank(entry)>=2,russianAudio=RussianAudio.Rank(entry)>=2,russianDub=RussianAudio.Rank(entry)==3,qualityLabel=ReleaseQuality.Label(entry),gameKind=games?GameReleaseInfo.Kind(entry):null,gameGroup=games?GameReleaseInfo.Group(entry):null,gameVersion=games?GameReleaseInfo.Version(entry):null};
         }).ToArray();
     }
-    object Downloads()=>new{items=downloads.Items.OrderByDescending(x=>x.AddedUtc).Select(item=>new{id=item.Id,title=item.DisplayName,releaseTitle=item.Name,poster=item.ImageUrl,progress=item.Progress,status=AppLanguage.T(item.Status),hint=AppLanguage.T(item.Hint),paused=item.Paused,complete=item.Completed,missing=item.FilesMissing,lowSpace=item.LowSpacePaused,downloadRate=item.DownloadRate,uploadRate=item.UploadRate,totalBytes=item.TotalBytes,addedUtc=item.AddedUtc,folder=item.Folder,mediaId=DownloadMetadata.Card(item) is {} media?Remember([media])[0].id:null,canUpdateRelease=item.CanUpdateRelease,peers=item.PeersText,files=item.Files.Count,statusKind=item.StatusKind.ToString().ToLowerInvariant(),remaining=AppLanguage.T(item.Remaining),indeterminate=item.Indeterminate})};
+    object Downloads()=>new{items=DownloadItems()};
+    object[] DownloadItems()=>downloads.Items.OrderByDescending(x=>x.AddedUtc).Select(item=>(object)new{id=item.Id,title=item.DisplayName,releaseTitle=item.Name,poster=item.ImageUrl,progress=item.Progress,status=AppLanguage.T(item.Status),hint=AppLanguage.T(item.Hint),paused=item.Paused,complete=item.Completed,missing=item.FilesMissing,lowSpace=item.LowSpacePaused,downloadRate=item.DownloadRate,uploadRate=item.UploadRate,totalBytes=item.TotalBytes,addedUtc=item.AddedUtc,folder=item.Folder,mediaId=DownloadMetadata.Card(item) is {} media?Remember([media])[0].id:null,canUpdateRelease=item.CanUpdateRelease,peers=item.PeersText,files=item.Files.Count,statusKind=item.StatusKind.ToString().ToLowerInvariant(),remaining=AppLanguage.T(item.Remaining),indeterminate=item.Indeterminate,releaseId=item.ReleaseId,releaseSource=item.ReleaseSource}).ToArray();
     object Settings()=>new{prefs.Folder,prefs.FolderConfigured,prefs.UiLanguage,prefs.Light,prefs.LiteMode,prefs.AutoResumeDownloads,prefs.AutoRecoverDownloads,prefs.NotifyDownloads,prefs.CheckForUpdates,prefs.AutoUpdate,prefs.HidePoorQuality,prefs.MinimumReleaseHeight,prefs.MaxDownloadKbps,prefs.MaxUploadKbps,prefs.LanEnabled,prefs.DownloadSort,prefs.HomeCountry,hidden=prefs.HiddenTitles.Select(x=>new{id=x.Identity,title=x.Title}),hiddenGenres=prefs.HiddenGenres,savedIds=prefs.LiveFavorites.Select(Key)};
     async Task<object> SetSettings(JsonElement p,CancellationToken ct)
     {

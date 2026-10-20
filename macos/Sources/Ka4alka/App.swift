@@ -14,7 +14,7 @@ import SwiftUI
         Window(tr("Качалка", "Ka4alka"), id: "main") { mainContent }
             .defaultSize(width: 1280, height: 820)
             .windowToolbarStyle(.unified)
-            .commands { ShellCommands(model: model, canGoBack: model.routes.count > 1, refreshing: model.refreshing) }
+            .commands { ShellCommands(model: model, canGoBack: model.routes.count > 1, refreshing: model.refreshing, language: model.settings?.uiLanguage ?? "ru") }
     }
     private var interfaceLocale: Locale { Locale(identifier: model.settings?.uiLanguage == "en" ? "en" : "ru") }
     private var mainContent: some View {
@@ -51,11 +51,12 @@ import SwiftUI
     }
 }
 
-/// Menu bar commands. The two flags are plain values so the menu items refresh when they change.
+/// Menu bar commands. The flags and the language are plain values so the menu items are rebuilt when they change.
 struct ShellCommands: Commands {
     let model: AppModel
     var canGoBack: Bool
     var refreshing: Bool
+    var language: String
     private static let releaseNotes = URL(string: "https://github.com/peregond/ka4alka/releases/latest")
     /// Library section number n opens with Command-n.
     private static func key(for section: Section) -> KeyEquivalent {
