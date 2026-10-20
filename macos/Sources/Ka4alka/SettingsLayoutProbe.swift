@@ -36,6 +36,9 @@ private let layoutProbeEnabled: Bool = CommandLine.arguments.contains("--smoke-t
         init(_ view: NSView) { self.view = view }
     }
     private static var nativeViews: [UUID: WeakView] = [:]
+    static func usesNativeCoordinates(_ id: String) -> Bool {
+        id.hasPrefix("detail.") || id.hasPrefix("featured.") || id.hasPrefix("catalog.") || id.hasPrefix("games.")
+    }
     static func registerNative(_ view: NSView, owner: UUID) { nativeViews[owner] = WeakView(view) }
     static func refreshNativeViews() {
         nativeViews = nativeViews.filter { $0.value.view != nil }
@@ -50,8 +53,8 @@ private let layoutProbeEnabled: Bool = CommandLine.arguments.contains("--smoke-t
             if let content = window.contentView { measure(content.superview ?? content) }
         }
         // Resized SwiftUI parents may report their previous proposal, even after child layout
-        // changed. Measure detail parents and children in the same current native coordinate space.
-        for (id, frame) in nativeLayoutFrames where id.hasPrefix("detail.") {
+        // changed. Measure catalog/detail parents and children in one current native coordinate space.
+        for (id, frame) in nativeLayoutFrames where usesNativeCoordinates(id) {
             if nativeAttached[id] == true, frame.width > 0, frame.height > 0 {
                 frames[id] = frame
             }
@@ -174,7 +177,7 @@ extension View {
                     .onChange(of: frame) { _, next in SettingsLayoutMeasurements.record(id, frame: next, owner: owner, kind: kind, group: group) }
             }
         }.background {
-            if id.hasPrefix("toolbar.") || id.hasPrefix("detail.") {
+            if id.hasPrefix("toolbar.") || SettingsLayoutMeasurements.usesNativeCoordinates(id) {
                 ToolbarMeasurement(id: id, owner: owner).frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }.onDisappear { SettingsLayoutMeasurements.remove(id, owner: owner) }
