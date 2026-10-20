@@ -56,7 +56,6 @@ struct RootView: View {
     @EnvironmentObject private var updater: MacUpdater
     @Environment(\.colorScheme) private var colorScheme
     @State private var dropTargeted = false
-    @State private var chromeScrolled = false
 
     var body: some View {
         NavigationSplitView {
@@ -234,23 +233,7 @@ struct RootView: View {
             .kdToast($model.toast)
             .navigationTitle(navigationTitle)
             .toolbar(.hidden, for: .windowToolbar)
-            .background {
-                ShellScrollObserver(routeKey: model.route.key) { scrolled in
-                    if chromeScrolled != scrolled { chromeScrolled = scrolled }
-                }
-            }
-            .overlay(alignment: .top) {
-                if model.route != .search {
-                    if chromeScrolled {
-                        floatingChrome.padding(KD.Space.s)
-                    } else if model.routes.count > 1 {
-                        HStack {
-                            KDIconButton(systemImage: "chevron.backward", label: tr("Назад", "Back")) { model.back() }
-                            Spacer()
-                        }.padding(KD.Space.m)
-                    }
-                }
-            }
+            .overlay(alignment: .top) { ShellChromeView(title: navigationTitle) }
     }
     @ViewBuilder private var detailBody: some View {
         if model.connected {
@@ -292,31 +275,6 @@ struct RootView: View {
             if let title = model.list?.title { return title }
             if let group = model.curated.first(where: { $0.id == id }) { return group.title }
             return tr("Подборка", "Collection")
-        }
-    }
-
-    // MARK: Toolbar
-
-    private var appearanceSymbol: String { colorScheme == .light ? "sun.max" : "moon" }
-    /// Overlaying the chrome keeps the scroll viewport and poster geometry unchanged when it appears.
-    private var floatingChrome: some View {
-        KDGlassGroup(spacing: KD.Space.xs) {
-            HStack(spacing: KD.Space.xs) {
-                if model.routes.count > 1 {
-                    KDToolbarButton(title: tr("Назад", "Back"), systemImage: "chevron.backward") { model.back() }
-                }
-                Text(navigationTitle)
-                    .font(.headline).lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                KDToolbarButton(title: tr("Добавить торрент", "Add torrent"), systemImage: "plus") { model.addTorrent = true }
-                    .settingsLayoutProbe("toolbar.add")
-                KDToolbarButton(title: tr("Обновить каталог", "Refresh catalog"), systemImage: "arrow.clockwise", isDisabled: model.refreshing) { Task { await model.refresh() } }
-                    .settingsLayoutProbe("toolbar.refresh")
-                KDToolbarButton(title: tr("Сменить тему", "Change appearance"), systemImage: appearanceSymbol) { model.setAppearance(colorScheme == .dark ? AppearanceMode.light : AppearanceMode.dark) }
-                    .settingsLayoutProbe("toolbar.appearance")
-            }
-            .padding(KD.Space.s)
-            .kdSurface(in: Capsule())
         }
     }
 

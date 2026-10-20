@@ -501,19 +501,23 @@ private struct KDOverlayButtonBody: View {
 /// Icon-only button with a 28 pt hit target and hover feedback.
 struct KDIconButtonStyle: ButtonStyle {
     var tone: KDTone = .neutral
-    func makeBody(configuration: Configuration) -> some View { KDIconButtonBody(configuration: configuration, tone: tone) }
+    var surface = true
+    func makeBody(configuration: Configuration) -> some View { KDIconButtonBody(configuration: configuration, tone: tone, surface: surface) }
 }
 private struct KDIconButtonBody: View {
     let configuration: ButtonStyleConfiguration
     let tone: KDTone
+    let surface: Bool
     @Environment(\.isEnabled) private var enabled
     @State private var hovered = false
     var body: some View {
-        configuration.label
+        let label = configuration.label
             .font(.system(size: 13, weight: .semibold))
             .foregroundStyle(tone == .neutral ? Color.secondary : tone.foreground)
             .frame(width: KD.Size.iconButton, height: KD.Size.iconButton)
-            .kdSurface(in: Circle(), interactive: true)
+        Group {
+            if surface { label.kdSurface(in: Circle(), interactive: true) } else { label }
+        }
             .overlay(Circle().fill(Color.primary.opacity(configuration.isPressed ? 0.14 : (hovered ? 0.06 : 0))).allowsHitTesting(false))
             .contentShape(Circle())
             .onHover { hovered = $0 }
@@ -572,7 +576,7 @@ struct KDToolbarButton: View {
     var action: () -> Void
     var body: some View {
         let button = Button(action: action) { Label(title, systemImage: systemImage).labelStyle(.iconOnly) }
-            .buttonStyle(KDIconButtonStyle())
+            .buttonStyle(KDIconButtonStyle(surface: false))
             .help(title)
             .disabled(isDisabled)
         if let shortcut { button.keyboardShortcut(shortcut, modifiers: modifiers) } else { button }

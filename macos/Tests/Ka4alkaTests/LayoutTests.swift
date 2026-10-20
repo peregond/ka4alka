@@ -396,7 +396,9 @@ private struct LayoutOutcome {
             all += file.text + "\n"
         }
         for identifier in SmokeProbeCatalog.identifiers {
-            XCTAssertTrue(all.contains("accessibilityIdentifier(\"" + identifier), "No view sets the accessibility identifier '" + identifier + "'")
+            let swiftUI = all.contains("accessibilityIdentifier(\"" + identifier)
+            let appKit = all.contains("setAccessibilityIdentifier(\"" + identifier)
+            XCTAssertTrue(swiftUI || appKit, "No view sets the accessibility identifier '" + identifier + "'")
         }
     }
 

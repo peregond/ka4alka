@@ -666,13 +666,26 @@ struct SmokeShot {
         let view: NSView = content.superview ?? content
         main.makeKeyAndOrderFront(nil)
         view.layoutSubtreeIfNeeded()
-        guard let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { throw UpdateError("Could not capture the native content view") }
+        guard var bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { throw UpdateError("Could not capture the native content view") }
         view.cacheDisplay(in: view.bounds, to: bitmap)
+        var bounds = view.bounds
+        // Some macOS 26 hosts return an empty cache for GPU-backed SwiftUI layers.
+        // Capture the same application's actual composited window; keep pixel checks strict.
+        if #available(macOS 26.0, *) {
+            let left: CGFloat = target === main ? min(260, bounds.width * 0.3) : 0
+            let region = CGRect(x: left, y: 0, width: max(1, bounds.width - left), height: bounds.height)
+            let stats = SmokePixelAudit.measure(bitmap, scale: target.backingScaleFactor, region: region)
+            if stats.deviation < 0.001 {
+                bitmap = try await SmokeWindowCapture.bitmap(windowNumber: target.windowNumber)
+                bounds = CGRect(origin: .zero, size: target.frame.size)
+                environment["screenshotFallback"] = "composited own window"
+            }
+        }
         if let name {
             guard let png = bitmap.representation(using: .png, properties: [:]) else { throw UpdateError("Could not encode the native screenshot") }
             try png.write(to: root.appendingPathComponent(name + ".png"))
         }
-        return SmokeShot(bitmap: bitmap, scale: target.backingScaleFactor, bounds: view.bounds, isSheet: target !== main)
+        return SmokeShot(bitmap: bitmap, scale: target.backingScaleFactor, bounds: bounds, isSheet: target !== main)
     }
 
     private func auditPixels(_ shot: SmokeShot, spec: SmokePageSpec) -> SmokePixelStats {
