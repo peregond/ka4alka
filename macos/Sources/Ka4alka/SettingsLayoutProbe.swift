@@ -26,6 +26,7 @@ private let layoutProbeEnabled: Bool = CommandLine.arguments.contains("--smoke-t
     static var nativeFrames: [String: CGRect] = [:]
     static var nativeVisibleFrames: [String: CGRect] = [:]
     static var nativeAttached: [String: Bool] = [:]
+    private static var nativeLayoutFrames: [String: CGRect] = [:]
     private static var owners: [String: UUID] = [:]
     /// Owners whose view has disappeared. A resize can report a last frame after `onDisappear`; without this the
     /// stale frame (a layout that is no longer on screen) stayed in `frames` and failed the audit as a phantom overflow.
@@ -38,7 +39,7 @@ private let layoutProbeEnabled: Bool = CommandLine.arguments.contains("--smoke-t
     static func registerNative(_ view: NSView, owner: UUID) { nativeViews[owner] = WeakView(view) }
     static func refreshNativeViews() {
         nativeViews = nativeViews.filter { $0.value.view != nil }
-        nativeFrames.removeAll(); nativeVisibleFrames.removeAll(); nativeAttached.removeAll()
+        nativeFrames.removeAll(); nativeVisibleFrames.removeAll(); nativeAttached.removeAll(); nativeLayoutFrames.removeAll()
         func measure(_ view: NSView) {
             if let probe = view as? ToolbarMeasurementView { probe.measure() }
             for child in view.subviews { measure(child) }
@@ -48,13 +49,10 @@ private let layoutProbeEnabled: Bool = CommandLine.arguments.contains("--smoke-t
         for window in NSApp.windows where window.isVisible {
             if let content = window.contentView { measure(content.superview ?? content) }
         }
-        // The release toolbar may sit below the fold while the window is resized. SwiftUI can
-        // retain its last proposed global width there; use its current native host for horizontal
-        // bounds, just as for floating toolbar controls. Keep the SwiftUI vertical coordinate.
-        for id in ["detail.banner", "detail.releases.toolbar"] {
-            if nativeAttached[id] == true, let native = nativeFrames[id], native.width > 0,
-               var frame = frames[id] {
-                frame.origin.x = native.minX; frame.size.width = native.width
+        // Resized SwiftUI parents may report their previous proposal, even after child layout
+        // changed. Measure detail parents and children in the same current native coordinate space.
+        for (id, frame) in nativeLayoutFrames where id.hasPrefix("detail.") {
+            if nativeAttached[id] == true, frame.width > 0, frame.height > 0 {
                 frames[id] = frame
             }
         }
@@ -69,10 +67,11 @@ private let layoutProbeEnabled: Bool = CommandLine.arguments.contains("--smoke-t
         // its replacement geometry owner. Measure again once ownership exists.
         (nativeViews[owner]?.view as? ToolbarMeasurementView)?.measure()
     }
-    static func recordNative(_ id: String, frame: CGRect, visible: CGRect, attached: Bool, owner: UUID) {
+    static func recordNative(_ id: String, frame: CGRect, visible: CGRect, attached: Bool, owner: UUID, layoutFrame: CGRect? = nil) {
         guard owners[id] == owner else { return }
         if !attached && nativeAttached[id] == true { return }
         nativeFrames[id] = frame; nativeVisibleFrames[id] = visible; nativeAttached[id] = attached
+        if let layoutFrame { nativeLayoutFrames[id] = layoutFrame }
     }
     static func remove(_ id: String, owner: UUID) {
         retiredOwners.insert(owner)
@@ -80,6 +79,7 @@ private let layoutProbeEnabled: Bool = CommandLine.arguments.contains("--smoke-t
         guard owners[id] == owner else { return }
         owners.removeValue(forKey: id); frames.removeValue(forKey: id); kinds.removeValue(forKey: id); groups.removeValue(forKey: id)
         nativeFrames.removeValue(forKey: id); nativeVisibleFrames.removeValue(forKey: id); nativeAttached.removeValue(forKey: id)
+        nativeLayoutFrames.removeValue(forKey: id)
     }
 
     /// Checks the recorded geometry and returns one sentence per violation (empty when everything is fine).
@@ -174,7 +174,7 @@ extension View {
                     .onChange(of: frame) { _, next in SettingsLayoutMeasurements.record(id, frame: next, owner: owner, kind: kind, group: group) }
             }
         }.background {
-            if id.hasPrefix("toolbar.") || id == "detail.releases.toolbar" || id == "detail.banner" {
+            if id.hasPrefix("toolbar.") || id.hasPrefix("detail.") {
                 ToolbarMeasurement(id: id, owner: owner).frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }.onDisappear { SettingsLayoutMeasurements.remove(id, owner: owner) }
@@ -206,6 +206,10 @@ extension View {
     override func layout() { super.layout(); measure() }
     override func viewDidMoveToWindow() { super.viewDidMoveToWindow(); measure() }
     func measure() {
-        SettingsLayoutMeasurements.recordNative(id, frame: convert(bounds, to: nil), visible: convert(visibleRect, to: nil), attached: window != nil && !isHiddenOrHasHiddenAncestor, owner: owner)
+        let frame = convert(bounds, to: nil)
+        let layout = window?.contentView.map { content in
+            CGRect(x: frame.minX, y: content.bounds.height - frame.maxY, width: frame.width, height: frame.height)
+        }
+        SettingsLayoutMeasurements.recordNative(id, frame: frame, visible: convert(visibleRect, to: nil), attached: window != nil && !isHiddenOrHasHiddenAncestor, owner: owner, layoutFrame: layout)
     }
 }

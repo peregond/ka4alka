@@ -685,6 +685,19 @@ struct SmokeShot {
             let stats = SmokePixelAudit.measure(bitmap, scale: target.backingScaleFactor, region: region)
             if ProcessInfo.processInfo.operatingSystemVersion.majorVersion == 26 || stats.deviation < 0.001 {
                 bitmap = try await SmokeWindowCapture.bitmap(windowNumber: target.windowNumber)
+                // macOS 26 composites attached sheets into their parent's window image. Extract
+                // the sheet's real screen rectangle from those pixels, rather than accepting a
+                // parent-window-sized image as a dialog screenshot.
+                let scale = target.backingScaleFactor
+                if target !== main,
+                   abs(CGFloat(bitmap.pixelsWide) - main.frame.width * scale) <= 2,
+                   abs(CGFloat(bitmap.pixelsHigh) - main.frame.height * scale) <= 2 {
+                    let area = CGRect(x: (target.frame.minX - main.frame.minX) * scale,
+                                      y: (main.frame.maxY - target.frame.maxY) * scale,
+                                      width: target.frame.width * scale, height: target.frame.height * scale).integral
+                    guard let cropped = bitmap.cgImage?.cropping(to: area) else { throw UpdateError("Could not capture the attached sheet's actual pixels") }
+                    bitmap = NSBitmapImageRep(cgImage: cropped)
+                }
                 bounds = CGRect(origin: .zero, size: target.frame.size)
                 environment["screenshotFallback"] = "composited own window"
             }
