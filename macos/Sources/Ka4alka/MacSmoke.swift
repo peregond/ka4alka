@@ -55,6 +55,8 @@ struct SmokeShot {
     var scale: CGFloat
     var bounds: CGRect
     var isSheet: Bool
+    /// Where the content view (the origin of SwiftUI's `.global` space) starts inside the bitmap, in points from its top left.
+    var contentOrigin: CGPoint = CGPoint.zero
 }
 
 @MainActor final class SmokeSession {
@@ -221,6 +223,7 @@ struct SmokeShot {
         for page in SmokePage.allCases {
             try await runPage(page, sizes: sizes)
         }
+        try await auditSidebarHits()
     }
 
     private func runPage(_ page: SmokePage, sizes: [CGSize]) async throws {
@@ -586,6 +589,7 @@ struct SmokeShot {
         let hasNavigation: Bool = frames["settings.nav"] != nil
         if width <= 1000 { check(!hasNavigation, "settings: narrow windows use a single column without the section list") }
         if width >= 1500 { check(hasNavigation, "settings: wide windows show the section list") }
+        if hasNavigation { try await auditSettingsListHit(frames: frames) }
         try await scrollSettings(toBottom: true)
         SettingsLayoutMeasurements.refreshNativeViews()
         let scrolled: [String: CGRect] = SettingsLayoutMeasurements.frames
@@ -595,6 +599,72 @@ struct SmokeShot {
         }
         if primary { _ = try await capture(saveAs: "settings-" + theme + "-" + language + "-bottom") }
         try await scrollSettings(toBottom: false)
+    }
+
+    // MARK: Drawn position versus click area
+
+    /// Selects every sidebar section at the primary size and checks that the tinted row is drawn where its click area is.
+    private func auditSidebarHits() async throws {
+        let previousPage: String = pageName
+        let actual: CGSize = try await resize(to: primarySize)
+        currentSize = actual
+        pageName = "sidebar-hit"
+        stage(language + "/" + theme + " sidebar hit areas")
+        for entry in Section.allCases {
+            model.select(entry)
+            await settle("sidebar " + entry.rawValue, timeout: 2.5)
+            await pause(250)
+            try await auditDrawnHit(probe: "sidebar.nav." + entry.rawValue, name: "sidebar row " + entry.rawValue)
+        }
+        currentSize = .zero
+        pageName = previousPage
+    }
+
+    /// The Settings jump list tints the section the page currently reads. The page is at its top when this runs, so the
+    /// active section is the last card whose top is within the reading line (90 pt) of the list top, as `SettingsView.follow` decides.
+    private func auditSettingsListHit(frames: [String: CGRect]) async throws {
+        guard let listTop = frames["settings.nav"]?.minY else { return }
+        var active: SettingsSectionID = SettingsSectionID.downloads
+        for section in SettingsSectionID.allCases {
+            if let card = frames["card." + section.rawValue], card.minY - listTop <= 90 { active = section }
+        }
+        try await auditDrawnHit(probe: "settings.nav." + active.rawValue, name: "settings list row " + active.rawValue)
+    }
+
+    /// Takes a screenshot and measures where the tinted row of `probe` is drawn. A highlight that is not found is a note,
+    /// never a failure; a found highlight that is away from the click area is a violation. Measures twice before reporting
+    /// a mismatch, because the first screenshot can still show the previous selection.
+    private func auditDrawnHit(probe id: String, name: String) async throws {
+        var measurement: SmokeHitMeasurement? = try await measureDrawnHit(probe: id)
+        if measurement?.aligned != true {
+            await pause(400)
+            measurement = try await measureDrawnHit(probe: id)
+        }
+        guard let found = measurement else {
+            notes.append("[" + context + "] not-instrumented:drawn-vs-click:" + id + " (no tinted row found in the screenshot)")
+            return
+        }
+        let drawnText: String = String(format: "%.1f", Double(found.drawnCentre))
+        let clickText: String = String(format: "%.1f", Double(found.layoutCentre))
+        let offsetText: String = String(format: "%.1f", Double(found.offset))
+        let drawnPart: String = "drawn y=" + drawnText + " pt"
+        let clickPart: String = "click area y=" + clickText + " pt"
+        let summary: String = drawnPart + ", " + clickPart + ", offset " + offsetText + " pt"
+        notes.append("[" + context + "] hit-audit " + id + ": " + summary)
+        if found.aligned {
+            check(true, "layout: " + name + " is drawn where it receives clicks")
+        } else {
+            let distance: String = String(Int(abs(found.offset).rounded()))
+            let head: String = name + " is drawn " + distance + " pt away from the area that receives its click"
+            let tail: String = " (drawn y=" + drawnText + ", click area y=" + clickText + ")"
+            violate("layout", head + tail)
+        }
+    }
+
+    private func measureDrawnHit(probe id: String) async throws -> SmokeHitMeasurement? {
+        let shot: SmokeShot = try await capture(saveAs: nil)
+        guard !shot.isSheet, let frame = SettingsLayoutMeasurements.frames[id] else { return nil }
+        return SmokeHitAudit.measureRow(in: shot.bitmap, scale: shot.scale, origin: shot.contentOrigin, layoutFrame: frame)
     }
 
     // MARK: Downloads
@@ -665,7 +735,11 @@ struct SmokeShot {
             guard let png = bitmap.representation(using: .png, properties: [:]) else { throw UpdateError("Could not encode the native screenshot") }
             try png.write(to: root.appendingPathComponent(name + ".png"))
         }
-        return SmokeShot(bitmap: bitmap, scale: target.backingScaleFactor, bounds: view.bounds, isSheet: target !== main)
+        let contentRect: CGRect = view.convert(content.bounds, from: content)
+        let originX: CGFloat = contentRect.minX - view.bounds.minX
+        let originY: CGFloat = view.isFlipped ? contentRect.minY - view.bounds.minY : view.bounds.maxY - contentRect.maxY
+        let origin: CGPoint = CGPoint(x: originX, y: originY)
+        return SmokeShot(bitmap: bitmap, scale: target.backingScaleFactor, bounds: view.bounds, isSheet: target !== main, contentOrigin: origin)
     }
 
     private func auditPixels(_ shot: SmokeShot, spec: SmokePageSpec) -> SmokePixelStats {

@@ -117,7 +117,7 @@ enum SmokeProbeCatalog {
         "downloads.header", "downloads.tiles", "downloads.row.",
         "viewport", "header", "content", "card.", "settings.nav", "appearance.tile.",
         "detail.banner", "detail.actions", "detail.releases.toolbar",
-        "toolbar.add", "toolbar.refresh", "toolbar.appearance", "sidebar"
+        "toolbar.add", "toolbar.refresh", "toolbar.appearance", "sidebar", "sidebar.nav."
     ]
     /// Accessibility identifiers the smoke test or the UI tests may look for.
     static let identifiers: [String] = ["nav-", "catalog-spotlight", "hero-open", "downloads-add"]

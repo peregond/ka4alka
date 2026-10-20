@@ -364,6 +364,9 @@ struct ShellPinnedRow: View {
         .accessibilityLabel(section.title)
         .accessibilityAddTraits(selected ? AccessibilityTraits.isSelected : AccessibilityTraits())
         .accessibilityIdentifier("nav-" + section.rawValue)
+        // No group: the footer rows (Downloads, Settings) may lie outside the "sidebar" scroll view's frame.
+        // The smoke test compares this click area with where the selected row's tint is really drawn.
+        .settingsLayoutProbe("sidebar.nav." + section.rawValue, kind: .control)
     }
 }
 
