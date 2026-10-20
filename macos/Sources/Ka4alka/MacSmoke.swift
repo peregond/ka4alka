@@ -520,7 +520,14 @@ struct SmokeShot {
             let hit = parent.hitTest(point)
             let visible = button.window === main && !button.isHiddenOrHasHiddenAncestor && button.alphaValue > 0.9 && button.frame.width > 8 && button.frame.height > 8
             let clickable = hit.map { $0 === button || $0.isDescendant(of: button) } ?? false
-            check(visible && button.isEnabled && clickable, "window controls: " + name + " is visible and clickable")
+            // AppKit disables the parent's close button while an attached modal sheet
+            // is open. It must stay visible; normal pages must remain clickable.
+            if kind == .closeButton && main.attachedSheet != nil {
+                check(visible, "window controls: close stays visible with modal sheet (" + pageName + ")")
+                check(!button.isEnabled, "window controls: close follows native modal-sheet disabling (" + pageName + ")")
+            } else {
+                check(visible && button.isEnabled && clickable, "window controls: " + name + " is visible and clickable")
+            }
         }
     }
 

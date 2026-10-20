@@ -231,7 +231,7 @@ struct RootView: View {
             .shellPageBackground()
             .safeAreaInset(edge: .top, spacing: 0) { errorBanner }
             .kdToast($model.toast)
-            .navigationTitle(navigationTitle)
+            .navigationTitle("")
             .toolbar(.visible, for: .windowToolbar)
             .overlay(alignment: .top) { ShellChromeView(title: navigationTitle) }
     }
