@@ -27,6 +27,9 @@ private let layoutProbeEnabled: Bool = CommandLine.arguments.contains("--smoke-t
     static var nativeVisibleFrames: [String: CGRect] = [:]
     static var nativeAttached: [String: Bool] = [:]
     private static var owners: [String: UUID] = [:]
+    /// Owners whose view has disappeared. A resize can report a last frame after `onDisappear`; without this the
+    /// stale frame (a layout that is no longer on screen) stayed in `frames` and failed the audit as a phantom overflow.
+    private static var retiredOwners: Set<UUID> = []
     private final class WeakView {
         weak var view: NSView?
         init(_ view: NSView) { self.view = view }
@@ -46,7 +49,10 @@ private let layoutProbeEnabled: Bool = CommandLine.arguments.contains("--smoke-t
             if let content = window.contentView { measure(content.superview ?? content) }
         }
     }
+    /// A view that appears again after it disappeared (same identity, kept state) records frames again.
+    static func activate(owner: UUID) { retiredOwners.remove(owner) }
     static func record(_ id: String, frame: CGRect, owner: UUID, kind: LayoutProbeKind = .container, group: String? = nil) {
+        guard !retiredOwners.contains(owner) else { return }
         owners[id] = owner; frames[id] = frame; kinds[id] = kind
         if let group { groups[id] = group } else { groups.removeValue(forKey: id) }
         // AppKit can lay out a resized toolbar host before SwiftUI announces
@@ -59,6 +65,7 @@ private let layoutProbeEnabled: Bool = CommandLine.arguments.contains("--smoke-t
         nativeFrames[id] = frame; nativeVisibleFrames[id] = visible; nativeAttached[id] = attached
     }
     static func remove(_ id: String, owner: UUID) {
+        retiredOwners.insert(owner)
         nativeViews.removeValue(forKey: owner)
         guard owners[id] == owner else { return }
         owners.removeValue(forKey: id); frames.removeValue(forKey: id); kinds.removeValue(forKey: id); groups.removeValue(forKey: id)
@@ -85,7 +92,18 @@ private let layoutProbeEnabled: Bool = CommandLine.arguments.contains("--smoke-t
             if let windowWidth, frame.maxX > windowWidth + 1 {
                 let maxX: Int = Int(frame.maxX)
                 let win: Int = Int(windowWidth)
-                problems.append("\(id) ends right of the window (maxX=\(maxX), window=\(win))")
+                let startX: Int = Int(frame.minX)
+                let width: Int = Int(frame.width)
+                var context: [String] = []
+                for other in frames.keys.sorted() where other.hasPrefix("menu.") || other.hasPrefix("detail.") || other == "viewport" {
+                    if let box = frames[other] {
+                        let from: Int = Int(box.minX)
+                        let to: Int = Int(box.maxX)
+                        context.append("\(other)=\(from)..\(to)")
+                    }
+                }
+                let around: String = context.joined(separator: " ")
+                problems.append("\(id) ends right of the window (maxX=\(maxX), window=\(win), x=\(startX), w=\(width); \(around))")
             }
             if let group = groups[id], let parent = frames[group] {
                 let outsideX: Bool = frame.minX < parent.minX - 1 || frame.maxX > parent.maxX + 1
@@ -139,7 +157,10 @@ extension View {
             GeometryReader { geometry in
                 let frame = geometry.frame(in: .global)
                 Color.clear
-                    .onAppear { SettingsLayoutMeasurements.record(id, frame: frame, owner: owner, kind: kind, group: group) }
+                    .onAppear {
+                        SettingsLayoutMeasurements.activate(owner: owner)
+                        SettingsLayoutMeasurements.record(id, frame: frame, owner: owner, kind: kind, group: group)
+                    }
                     .onChange(of: frame) { _, next in SettingsLayoutMeasurements.record(id, frame: next, owner: owner, kind: kind, group: group) }
             }
         }.background {
