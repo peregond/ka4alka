@@ -468,11 +468,13 @@ private struct KDSecondaryButtonBody: View {
 /// Controls over artwork (hero, poster actions): glass on 26, dark material before.
 struct KDOverlayButtonStyle: ButtonStyle {
     var circular = false
-    func makeBody(configuration: Configuration) -> some View { KDOverlayButtonBody(configuration: configuration, circular: circular) }
+    var solid = false
+    func makeBody(configuration: Configuration) -> some View { KDOverlayButtonBody(configuration: configuration, circular: circular, solid: solid) }
 }
 private struct KDOverlayButtonBody: View {
     let configuration: ButtonStyleConfiguration
     let circular: Bool
+    let solid: Bool
     @Environment(\.isEnabled) private var enabled
     var body: some View {
         let label = configuration.label
@@ -486,10 +488,17 @@ private struct KDOverlayButtonBody: View {
         }
         .opacity(configuration.isPressed ? 0.8 : (enabled ? 1 : 0.45))
     }
-    private func chrome<V: View, S: InsettableShape>(_ view: V, shape: S) -> some View {
-        view.kdSurface(in: shape, interactive: true, onArtwork: true)
-            .contentShape(shape)
-            .environment(\.colorScheme, .dark)
+    @ViewBuilder private func chrome<V: View, S: InsettableShape>(_ view: V, shape: S) -> some View {
+        if solid {
+            view
+                .background(Color.black.opacity(0.78), in: shape)
+                .overlay(shape.strokeBorder(Color.white.opacity(0.22), lineWidth: 1).allowsHitTesting(false))
+                .contentShape(shape)
+        } else {
+            view.kdSurface(in: shape, interactive: true, onArtwork: true)
+                .contentShape(shape)
+                .environment(\.colorScheme, .dark)
+        }
     }
 }
 

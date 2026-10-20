@@ -80,7 +80,6 @@ final class HeroRotationTests: XCTestCase {
                     SettingsLayoutMeasurements.frames.removeAll()
                     let root = CatalogSpotlightView(items: [card, try TestFixtures.card("other", "Other")])
                         .environmentObject(model)
-                        .environment(\.accessibilityReduceMotion, true)
                         .frame(width: width)
                     let host = NSHostingView(rootView: root)
                     let height = CatalogHeroMetrics.height(forWidth: width)

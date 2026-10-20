@@ -8,7 +8,6 @@ struct CatalogSpotlightView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     var items: [MediaCard]
     @State private var selectedID: String?
     @State private var width: CGFloat = 900
@@ -41,7 +40,6 @@ struct CatalogSpotlightView: View {
                 .overlay(alignment: .bottom) { if items.count > 1 { pager(selected: selected) } }
                 .background(HeroVisibilityProbe { visible = $0 })
                 .onHover { hovered = $0 }
-                .environment(\.accessibilityReduceTransparency, reduceTransparency || model.settings?.liteMode == true)
                 .task(id: clock) {
                     guard automatic else { return }
                     do { try await Task.sleep(for: .seconds(HeroRotation.interval)) } catch { return }
@@ -72,7 +70,7 @@ struct CatalogSpotlightView: View {
         Button { advance(delta) } label: {
             Image(systemName: symbol).font(.system(size: 18, weight: .medium)).frame(width: 40, height: 44)
         }
-        .buttonStyle(KDOverlayButtonStyle(circular: true))
+        .buttonStyle(KDOverlayButtonStyle(circular: true, solid: model.settings?.liteMode == true))
         .focused($focusedControl, equals: symbol)
         .help(title).accessibilityLabel(title)
     }
@@ -99,7 +97,7 @@ struct CatalogSpotlightView: View {
             Button { paused.toggle() } label: {
                 Image(systemName: paused ? "play.fill" : "pause.fill").frame(width: 28, height: 28)
             }
-            .buttonStyle(KDOverlayButtonStyle(circular: true))
+            .buttonStyle(KDOverlayButtonStyle(circular: true, solid: model.settings?.liteMode == true))
             .focused($focusedControl, equals: "pause")
             .help(paused ? tr("Продолжить смену баннеров", "Resume slideshow") : tr("Приостановить смену баннеров", "Pause slideshow"))
             .accessibilityLabel(paused ? tr("Продолжить смену баннеров", "Resume slideshow") : tr("Приостановить смену баннеров", "Pause slideshow"))
@@ -269,7 +267,7 @@ struct FeaturedHero: View {
                         .foregroundStyle(saved ? Color.pink : Color.white)
                         .frame(width: 44, height: 44)
                 }
-                .buttonStyle(KDOverlayButtonStyle(circular: true))
+                .buttonStyle(KDOverlayButtonStyle(circular: true, solid: model.settings?.liteMode == true))
                 .focused(focusedControl, equals: "save")
                 .settingsLayoutProbe("catalog.hero.save", kind: .control, group: "catalog.hero.actions")
                 .help(saveTitle)

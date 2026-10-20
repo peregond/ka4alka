@@ -14,7 +14,10 @@ struct HeroVisibilityProbe: NSViewRepresentable {
         view.changed = changed
         view.report()
     }
-    static func dismantleNSView(_ view: HeroVisibilityView, coordinator: ()) { view.stop() }
+    static func dismantleNSView(_ view: HeroVisibilityView, coordinator: ()) {
+        view.changed = nil
+        view.stop()
+    }
 }
 
 final class HeroVisibilityView: NSView {
