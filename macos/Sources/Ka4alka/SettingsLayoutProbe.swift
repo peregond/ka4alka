@@ -85,7 +85,18 @@ private let layoutProbeEnabled: Bool = CommandLine.arguments.contains("--smoke-t
             if let windowWidth, frame.maxX > windowWidth + 1 {
                 let maxX: Int = Int(frame.maxX)
                 let win: Int = Int(windowWidth)
-                problems.append("\(id) ends right of the window (maxX=\(maxX), window=\(win))")
+                let startX: Int = Int(frame.minX)
+                let width: Int = Int(frame.width)
+                var context: [String] = []
+                for other in frames.keys.sorted() where other.hasPrefix("menu.") || other.hasPrefix("detail.") || other == "viewport" {
+                    if let box = frames[other] {
+                        let from: Int = Int(box.minX)
+                        let to: Int = Int(box.maxX)
+                        context.append("\(other)=\(from)..\(to)")
+                    }
+                }
+                let around: String = context.joined(separator: " ")
+                problems.append("\(id) ends right of the window (maxX=\(maxX), window=\(win), x=\(startX), w=\(width); \(around))")
             }
             if let group = groups[id], let parent = frames[group] {
                 let outsideX: Bool = frame.minX < parent.minX - 1 || frame.maxX > parent.maxX + 1
