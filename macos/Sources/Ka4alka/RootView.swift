@@ -141,19 +141,13 @@ struct RootView: View {
     private var libraryEntries: [Section] {
         Section.allCases.filter { $0 != .downloads && $0 != .settings }
     }
-    /// Every sidebar entry is a plain button that opens its section, so a click always lands. Clicking the open
-    /// section goes back to its page when a title, person or collection is on top, and otherwise resets its
-    /// search, filter and page.
+    /// Every sidebar entry is a plain button that opens its section. The column is a plain stack with the footer
+    /// at the bottom, not a scroll view with a safe-area inset: that arrangement drew the rows lower than the
+    /// area that receives the click, so a click on one entry opened another. Clicking the open section goes back
+    /// to its page when a title, person or collection is on top, and otherwise resets its search, filter and page.
     private var sidebar: some View {
-        ScrollView {
+        VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: KD.Space.xxs) {
-                Text(tr("Медиатека", "Library"))
-                    .font(KDFont.kicker)
-                    .textCase(.uppercase)
-                    .foregroundStyle(Color.secondary)
-                    .padding(.horizontal, KD.Space.s)
-                    .padding(.bottom, KD.Space.xxs)
-                    .accessibilityAddTraits(.isHeader)
                 ForEach(libraryEntries) { (entry: Section) in
                     ShellPinnedRow(
                         section: entry,
@@ -164,11 +158,13 @@ struct RootView: View {
                 }
             }
             .padding(.horizontal, KD.Space.s)
-            .padding(.top, KD.Space.s)
+            .padding(.top, KD.Space.xxs)
+            Spacer(minLength: 0)
+            sidebarFooter
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(colorScheme == .dark ? KDPalette.sidebarBackground : Color.clear)
         .settingsLayoutProbe("sidebar")
-        .safeAreaInset(edge: .bottom, spacing: 0) { sidebarFooter }
         .navigationSplitViewColumnWidth(min: 170, ideal: 200, max: 240)
     }
     private var showsUpdateStatus: Bool {
