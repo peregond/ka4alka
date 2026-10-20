@@ -1,26 +1,54 @@
 import AppKit
 import SwiftUI
 
-/// A single visible hero uses the same bounded artwork cache as poster cards.
-/// No timer preloads the remaining slides or redraws the catalog while scrolling.
+/// Only the selected slide owns artwork tasks. The carousel's clock sleeps while
+/// offscreen, inactive, hovered, keyboard-focused, or in an accessibility/Lite mode.
 struct CatalogSpotlightView: View {
+    @EnvironmentObject private var model: AppModel
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     var items: [MediaCard]
     @State private var selectedID: String?
+    @State private var width: CGFloat = 900
+    @State private var visible = false
+    @State private var hovered = false
+    @State private var paused = false
+    @FocusState private var focusedControl: String?
     private var selected: MediaCard? { items.first { $0.id == selectedID } ?? items.first }
+    private var automatic: Bool {
+        HeroRotation.canAdvance(count: items.count, visible: visible, active: scenePhase == .active,
+            interacting: hovered || focusedControl != nil, paused: paused,
+            reduced: reduceMotion || voiceOver || model.settings?.liteMode == true)
+    }
+    private var clock: HeroRotation.Clock {
+        HeroRotation.Clock(ids: items.map(\.id), selected: selected?.id, running: automatic)
+    }
 
     var body: some View {
         if let selected {
-            VStack(spacing: CatalogHeroMetrics.pagerGap) {
-                FeaturedHero(card: selected, eyebrow: eyebrow(for: selected))
+            ZStack {
+                FeaturedHero(card: selected, eyebrow: eyebrow(for: selected), hasPager: items.count > 1,
+                             focusedControl: $focusedControl)
                     .id(selected.id)
-                if items.count > 1 { pager(selected: selected) }
+                    .transition(.opacity)
             }
-            .onKeyPress(keys: [.leftArrow, .rightArrow]) { (press: KeyPress) -> KeyPress.Result in
-                if !press.modifiers.isEmpty { return .ignored }
-                advance(press.key == .leftArrow ? -1 : 1)
-                return .handled
-            }
-            .accessibilityIdentifier("catalog-spotlight")
+                .frame(height: CatalogHeroMetrics.height(forWidth: width))
+                .kdReadWidth($width)
+                .animation(reduceMotion || model.settings?.liteMode == true ? nil : .easeInOut(duration: 0.4), value: selected.id)
+                .overlay { if items.count > 1 { arrows } }
+                .overlay(alignment: .bottom) { if items.count > 1 { pager(selected: selected) } }
+                .background(HeroVisibilityProbe { visible = $0 })
+                .onHover { hovered = $0 }
+                .environment(\.accessibilityReduceTransparency, reduceTransparency || model.settings?.liteMode == true)
+                .task(id: clock) {
+                    guard automatic else { return }
+                    do { try await Task.sleep(for: .seconds(HeroRotation.interval)) } catch { return }
+                    guard !Task.isCancelled, automatic else { return }
+                    advance(1)
+                }
+                .accessibilityIdentifier("catalog-spotlight")
         }
     }
 
@@ -30,41 +58,58 @@ struct CatalogSpotlightView: View {
         return tr("Стоит посмотреть", "Worth watching")
     }
 
+    private var arrows: some View {
+        HStack {
+            arrow("chevron.left", title: tr("Предыдущий баннер", "Previous banner"), delta: -1)
+            Spacer()
+            arrow("chevron.right", title: tr("Следующий баннер", "Next banner"), delta: 1)
+        }
+        .padding(.horizontal, 12)
+        .kdOnBanner()
+    }
+
+    private func arrow(_ symbol: String, title: String, delta: Int) -> some View {
+        Button { advance(delta) } label: {
+            Image(systemName: symbol).font(.system(size: 18, weight: .medium)).frame(width: 40, height: 44)
+        }
+        .buttonStyle(KDOverlayButtonStyle(circular: true))
+        .focused($focusedControl, equals: symbol)
+        .help(title).accessibilityLabel(title)
+    }
+
     private func pager(selected: MediaCard) -> some View {
         HStack(spacing: 0) {
-            dots(selected: selected)
-            Spacer(minLength: KD.Space.s)
-            KDIconButton(systemImage: "chevron.backward", label: tr("Предыдущий баннер", "Previous banner")) { advance(-1) }
-            KDIconButton(systemImage: "chevron.forward", label: tr("Следующий баннер", "Next banner")) { advance(1) }
+            ForEach(items) { item in
+                Button { selectedID = item.id } label: {
+                    Capsule()
+                        .fill(Color.white.opacity(item.id == selected.id ? 1 : 0.45))
+                        .frame(width: item.id == selected.id ? 24 : 7, height: 7)
+                        .frame(width: 30, height: 28)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .focused($focusedControl, equals: item.id)
+                .help(item.title).accessibilityLabel(item.title)
+                .accessibilityAddTraits(item.id == selected.id ? AccessibilityTraits.isSelected : AccessibilityTraits())
+            }
         }
-    }
-
-    private func dots(selected: MediaCard) -> some View {
-        HStack(spacing: 0) {
-            ForEach(items) { item in dot(item, isSelected: item.id == selected.id) }
+        .padding(.bottom, 14)
+        .frame(maxWidth: .infinity)
+        .overlay(alignment: .trailing) {
+            Button { paused.toggle() } label: {
+                Image(systemName: paused ? "play.fill" : "pause.fill").frame(width: 28, height: 28)
+            }
+            .buttonStyle(KDOverlayButtonStyle(circular: true))
+            .focused($focusedControl, equals: "pause")
+            .help(paused ? tr("Продолжить смену баннеров", "Resume slideshow") : tr("Приостановить смену баннеров", "Pause slideshow"))
+            .accessibilityLabel(paused ? tr("Продолжить смену баннеров", "Resume slideshow") : tr("Приостановить смену баннеров", "Pause slideshow"))
+            .padding(.trailing, 18).padding(.bottom, 14)
         }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(tr("Баннеры", "Banners"))
-    }
-
-    private func dot(_ item: MediaCard, isSelected: Bool) -> some View {
-        Button { selectedID = item.id } label: {
-            Capsule()
-                .fill(isSelected ? KDPalette.accent : Color.primary.opacity(0.35))
-                .frame(width: isSelected ? 24 : 8, height: 8)
-                .frame(minWidth: KD.Size.minHit, minHeight: KD.Size.minHit)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .help(item.title)
-        .accessibilityLabel(item.title)
-        .accessibilityAddTraits(isSelected ? AccessibilityTraits.isSelected : AccessibilityTraits())
+        .kdOnBanner()
     }
 
     private func advance(_ delta: Int) {
-        guard !items.isEmpty else { return }
-        let index = items.firstIndex { $0.id == selected?.id } ?? 0
-        selectedID = items[(index + delta + items.count) % items.count].id
+        selectedID = HeroRotation.next(in: items.map(\.id), selected: selected?.id, delta: delta)
     }
 }
 
@@ -81,16 +126,16 @@ struct FeaturedHero: View {
     @EnvironmentObject private var model: AppModel
     var card: MediaCard
     var eyebrow: String? = nil
+    var hasPager = false
+    var focusedControl: FocusState<String?>.Binding
     @State private var backdrop: String?
     @State private var localized: MediaCard?
-    @State private var width: CGFloat = 0
     private var language: String { model.settings?.uiLanguage ?? "ru" }
     private var item: MediaCard { catalogShownCard(card, local: localized, english: language == "en") }
     /// The loaded address, or the one remembered from an earlier showing, so a banner flip does not restart from the blurred poster.
     private var shownBackdrop: String? { backdrop ?? CatalogMemo.backdrops[card.id] }
     private var lite: Bool { model.settings?.liteMode == true }
     private var requestID: String { card.id + ":" + language }
-    private var heroHeight: CGFloat { CatalogHeroMetrics.height(forWidth: width > 0 ? width : 900) }
     private var saved: Bool { model.isSaved(card) }
     private var saveTitle: String { saved ? tr("Удалить из сохранённого", "Remove from Saved") : tr("Сохранить", "Save") }
     private var heroShape: RoundedRectangle { RoundedRectangle(cornerRadius: KD.Radius.hero, style: .continuous) }
@@ -99,12 +144,17 @@ struct FeaturedHero: View {
         GeometryReader { geometry in
             ZStack(alignment: .bottomLeading) {
                 openButton(size: geometry.size)
-                actionRow
+                VStack(alignment: .leading, spacing: 20) {
+                    heroText(compact: geometry.size.width < 680, descriptionLines: geometry.size.width < 680 ? 2 : 3)
+                        .allowsHitTesting(false)
+                    actionRow
+                }
+                .frame(maxWidth: max(120, min(geometry.size.width - 124, 620)), alignment: .leading)
+                .padding(.horizontal, 62)
+                .padding(.bottom, hasPager ? 58 : 28)
             }
             .kdOnBanner()
         }
-        .frame(height: heroHeight)
-        .kdReadWidth($width)
         .settingsLayoutProbe("catalog.hero")
         .task(id: requestID) {
             CatalogMemo.sync(language: language, revision: model.revision)
@@ -149,10 +199,6 @@ struct FeaturedHero: View {
             )
             .frame(width: size.width, height: size.height)
             KDBannerScrim()
-            heroText(compact: size.width < 580, descriptionLines: size.height >= 330 ? 3 : 2)
-                .frame(maxWidth: max(120, min(size.width - 48, 640)), alignment: .leading)
-                .padding(24)
-                .padding(.bottom, 54)
         }
         .frame(width: size.width, height: size.height)
         .clipShape(heroShape)
@@ -171,13 +217,14 @@ struct FeaturedHero: View {
         VStack(alignment: .leading, spacing: 10) {
             if let eyebrow {
                 Label(eyebrow, systemImage: "sparkles")
-                    .font(KDFont.kicker)
-                    .foregroundStyle(KDPalette.accent)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Color.white.opacity(0.9))
             }
             Text(item.title)
-                .font(compact ? KDFont.displayCompact : KDFont.display)
+                .font(.system(size: compact ? 32 : 48, weight: .bold))
+                .tracking(-0.7)
                 .lineLimit(2)
-                .settingsLayoutProbe("catalog.hero.title")
+                .settingsLayoutProbe("catalog.hero.title", kind: .text, group: "catalog.hero")
             metaRow
             if !item.description.isEmpty {
                 Text(item.description)
@@ -213,18 +260,23 @@ struct FeaturedHero: View {
         KDGlassGroup(spacing: 10) {
             HStack(spacing: 10) {
                 Button { model.open(item) } label: { Label(tr("Подробнее", "Details"), systemImage: "info.circle") }
-                    .buttonStyle(KDPrimaryButtonStyle())
+                    .buttonStyle(HeroPrimaryButtonStyle())
+                    .focused(focusedControl, equals: "details")
+                    .settingsLayoutProbe("catalog.hero.details", kind: .control, group: "catalog.hero.actions")
                 Button { Task { await model.save(card) } } label: {
                     Image(systemName: saved ? "heart.fill" : "heart")
+                        .font(.system(size: 18))
                         .foregroundStyle(saved ? Color.pink : Color.white)
+                        .frame(width: 44, height: 44)
                 }
                 .buttonStyle(KDOverlayButtonStyle(circular: true))
+                .focused(focusedControl, equals: "save")
+                .settingsLayoutProbe("catalog.hero.save", kind: .control, group: "catalog.hero.actions")
                 .help(saveTitle)
                 .accessibilityLabel(saveTitle)
             }
         }
         .controlSize(.large)
-        .padding(24)
         .settingsLayoutProbe("catalog.hero.actions")
     }
 }
@@ -262,5 +314,18 @@ private struct HeroBackground: View {
             if !Task.isCancelled { withAnimation(reduceMotion || lite ? nil : .easeInOut(duration: 0.25)) { image = result } }
         }
         .onDisappear { image = nil }
+    }
+}
+
+/// Apple TV-like white pill; secondary actions use the native glass surface.
+private struct HeroPrimaryButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.body.weight(.semibold))
+            .foregroundStyle(Color.black)
+            .padding(.horizontal, 24)
+            .frame(height: 44)
+            .background(Color.white.opacity(configuration.isPressed ? 0.8 : 1), in: Capsule())
+            .contentShape(Capsule())
     }
 }

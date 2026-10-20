@@ -344,7 +344,7 @@ struct CatalogView: View {
                         .accessibilityAddTraits(.isHeader)
                 }
             } else if !settled {
-                HeroPlaceholder().padding(.bottom, CatalogHeroMetrics.pagerHeight)
+                HeroPlaceholder()
             }
         }
     }

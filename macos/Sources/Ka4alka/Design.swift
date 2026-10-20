@@ -702,6 +702,7 @@ struct KDRatingMark: View {
                 Text(tag)
                     .font(.system(size: compact ? 8 : 9, weight: .heavy))
                     .foregroundStyle(source.ink)
+                    .fixedSize(horizontal: true, vertical: true)
                     .padding(.horizontal, 4)
                     .padding(.vertical, 1.5)
                     .background(source.fill, in: RoundedRectangle(cornerRadius: 3, style: .continuous))

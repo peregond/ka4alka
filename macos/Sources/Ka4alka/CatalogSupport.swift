@@ -74,13 +74,10 @@ struct CatalogPosterLabel: ViewModifier {
     }
 }
 
-/// Hero banner geometry. The banner grows with the detail column but stays between 280 and 340 pt.
+/// Stable landscape geometry shared by loading placeholders and real slides.
 enum CatalogHeroMetrics {
-    static let pagerGap: CGFloat = 12
-    static var pagerHeight: CGFloat { pagerGap + KD.Size.minHit }
     static func height(forWidth width: CGFloat) -> CGFloat {
-        let proportional: CGFloat = width * 0.24
-        return min(340, max(280, proportional))
+        return min(560, max(380, width * 0.48))
     }
     static func backdropWidth(forWidth width: CGFloat, lite: Bool) -> Int {
         if lite { return 640 }

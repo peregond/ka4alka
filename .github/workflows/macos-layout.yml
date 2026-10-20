@@ -1,4 +1,4 @@
-name: Verify macOS audio menus and layout
+name: Verify macOS UI layout and carousel
 on:
   push:
     branches: [claude/quirky-hopper-1vlmj6]
@@ -23,11 +23,11 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - name: Verify native layout and combined audio filters
+      - name: Verify native layout, carousel, localization and audio filters
         working-directory: macos
         run: |
           set -o pipefail
-          swift test -c release --jobs 3 --filter 'LayoutTests|ReleaseAudioFilterTests' 2>&1 | tee "$RUNNER_TEMP/layout-tests.log"
+          swift test -c release --jobs 3 --filter 'LayoutTests|ReleaseAudioFilterTests|HeroBannerTests|HeroRotationTests|LocalizationLintTests' 2>&1 | tee "$RUNNER_TEMP/layout-tests.log"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
