@@ -616,8 +616,10 @@ struct KDChipMenu<Content: View>: View {
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .frame(minHeight: 24)
+            // Not fixedSize: a long value (a release group name) has to be able to truncate instead of pushing
+            // the row past the window edge. The cap keeps an extreme value from taking the whole row.
+            .frame(maxWidth: 320, alignment: .leading)
             .contentShape(Rectangle())
-            .fixedSize()
             .accessibilityLabel(title)
             .accessibilityValue(value ?? "")
             .settingsLayoutProbe("menu." + title, kind: .control)
