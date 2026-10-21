@@ -1,7 +1,7 @@
 using Kachalka;
 
 // One owner for mutable queue and preference state, as in WPF's dispatcher.
-// IPC is over inherited pipes only: there is no localhost listener or web renderer.
+// Native IPC uses inherited pipes. A separate local browser server starts only on explicit user request.
 using var loop=new EngineLoop();
 loop.Run(async()=>
 {

@@ -44,6 +44,7 @@
     <Compile Include="../native/ImdbSuggestions.cs" Link="ImdbSuggestions.cs" />
     <Compile Include="../native/IndexRelays.cs" Link="IndexRelays.cs" />
     <Compile Include="../native/KnabenSource.cs" Link="KnabenSource.cs" />
+    <Compile Include="../native/PhoneRemoteCatalog.cs" Link="PhoneRemoteCatalog.cs" />
     <Compile Include="../native/LanDownloadReceiver.cs" Link="LanDownloadReceiver.cs" />
     <Compile Include="../native/LiveCatalog.cs" Link="LiveCatalog.cs" />
     <Compile Include="../native/MagnetDiscovery.cs" Link="MagnetDiscovery.cs" />

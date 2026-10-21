@@ -1590,5 +1590,15 @@
   "Русский дубляж при больше всего отдающих": "Russian dubbing · most seeders",
   "Русский дубляж при много отдающих": "Russian dubbing · many seeders",
   "Русский дубляж при умеренный размер": "Russian dubbing · moderate size",
-  "Русский дубляж при проверенный источник": "Russian dubbing · verified source"
+  "Русский дубляж при проверенный источник": "Russian dubbing · verified source",
+  "С телефона через браузер": "From your phone browser",
+  "Подключись к той же домашней сети Wi-Fi. Открой адрес на телефоне и введи одноразовый код. Файлы скачает этот компьютер в выбранную папку. Доступ работает до закрытия приложения; используй доверенную сеть.": "Use the same home Wi-Fi. Open the address on your phone and enter the one-time code. Files download to the folder selected on this computer. Access ends when the app closes; use a trusted network.",
+  "Подключить телефон": "Connect phone",
+  "Отключить все телефоны": "Disconnect all phones",
+  "Адрес и код подключения телефона": "Phone connection address and code",
+  "Доступ с телефона выключен.": "Phone access is off.",
+  "Подключи компьютер к домашней сети Wi-Fi.": "Connect your computer to home Wi-Fi.",
+  "Для нового телефона получи новый код кнопкой выше.": "Use the button above to get a new code for another phone.",
+  "Код на 2 минуты: ": "Code, valid for 2 minutes: ",
+  "Не удалось включить доступ с телефона: ": "Could not enable phone access: "
 }

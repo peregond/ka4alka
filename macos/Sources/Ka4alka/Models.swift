@@ -136,6 +136,8 @@ struct DownloadFile: Decodable, Identifiable { var name: String; var fullPath: S
 struct FilesResult: Decodable { var files: [DownloadFile] }
 struct LanDevice: Decodable, Identifiable { var id: String; var name: String; var address: String; var paired: Bool; var fingerprint: String }
 struct LanState: Decodable { var name: String; var devices: [LanDevice] }
+struct PhoneState: Decodable { var urls: [String]; var code: String?; var connected: Int }
+struct PhoneResponse: Decodable { var running: Bool; var state: PhoneState? }
 struct PairingPrompt: Decodable, Identifiable { var id: String; var name: String; var code: String }
 struct RPCError: Decodable, Error, LocalizedError { var code: String; var message: String; var errorDescription: String? { message } }
 struct Envelope: Decodable { var id: String?; var result: JSONValue?; var error: RPCError?; var event: String?; var data: JSONValue? }

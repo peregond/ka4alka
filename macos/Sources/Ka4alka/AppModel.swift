@@ -69,6 +69,7 @@ struct CatalogFilter: Equatable {
     @Published var addError: String?
     @Published var folderRequired = false
     @Published var pairingPrompt: PairingPrompt?
+    @Published var phoneState: PhoneResponse?
     @Published var lanState: LanState?
     @Published var revision = 0
     @Published var refreshing = false
@@ -579,6 +580,12 @@ struct CatalogFilter: Equatable {
             fail(error)
             return false
         }
+    }
+    @discardableResult func phone(_ action: String) async -> Bool {
+        do {
+            phoneState = try await bridge.call("phone", ["action": .string(action)], as: PhoneResponse.self)
+            return true
+        } catch { fail(error); return false }
     }
     func approvePairing(_ accepted: Bool) async { guard let prompt = pairingPrompt else { return }; pairingPrompt = nil; await lan("approve", ["id": .string(prompt.id), "approved": .bool(accepted)]) }
     /// Copies the diagnostic report to the clipboard. Returns false when it could not be built (the failure is in `error`).

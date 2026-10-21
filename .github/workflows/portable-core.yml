@@ -2,7 +2,7 @@ name: Verify shared Windows and Mac engine
 on:
   push:
     branches: [claude/quirky-hopper-1vlmj6]
-    paths: ['desktop-core/**', 'desktop-core-tests/**', 'desktop-host/**', 'mac-update-core/**', 'mac-update-tests/**', 'release-tools/**', 'lan-core/**', 'lan-tests/**', 'native/**', 'scripts/test-desktop-ipc.py', '.github/workflows/portable-core.yml']
+    paths: ['desktop-core/**', 'desktop-core-tests/**', 'desktop-host/**', 'mac-update-core/**', 'mac-update-tests/**', 'release-tools/**', 'lan-core/**', 'lan-tests/**', 'native/**', 'scripts/test-desktop-ipc.py', 'scripts/test-phone-browser.mjs', '.github/workflows/portable-core.yml']
   workflow_dispatch:
   workflow_call:
 permissions:
@@ -33,3 +33,20 @@ jobs:
       - run: dotnet build release-tools/Kachalka.ReleaseTools.csproj -c Release
       - run: dotnet build desktop-host/Kachalka.DesktopHost.csproj -c Release
       - run: python scripts/test-desktop-ipc.py
+      - uses: actions/setup-node@v4
+        if: runner.os == 'Linux'
+        with:
+          node-version: '24'
+      - name: Verify phone browser on a mobile screen
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          npm install --prefix "$RUNNER_TEMP/phone-browser" --no-audit --no-fund playwright@1.64.1
+          "$RUNNER_TEMP/phone-browser/node_modules/.bin/playwright" install --with-deps chromium webkit
+          NODE_PATH="$RUNNER_TEMP/phone-browser/node_modules" node scripts/test-phone-browser.mjs
+      - uses: actions/upload-artifact@v4
+        if: always() && runner.os == 'Linux'
+        with:
+          name: phone-browser-${{ github.sha }}
+          path: test-output/phone-browser
+          if-no-files-found: ignore

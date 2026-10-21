@@ -30,6 +30,12 @@ try:
  s=call('settings');call('unhide',dict(id=s['hidden'][0]['id']))
  assert call('setSettings',dict(uiLanguage='en'))['uiLanguage']=='en'
  assert call('downloads')['items']==[]
+ assert call('phone',dict(action='state'))['running'] is False
+ for _ in range(2):
+  phone=call('phone',dict(action='start'));assert phone['running'] and len(phone['state']['code'])==6
+  assert call('phone',dict(action='state'))['running'] is True
+  assert call('phone',dict(action='stop'))['running'] is False
+ assert call('downloads')['items']==[]
  assert 'text' in call('logs')
  call('shutdown');p.stdin.close();p.wait(timeout=15)
  assert p.returncode==0, f'engine shutdown exited {p.returncode}: {p.stderr.read()[-4000:]}'

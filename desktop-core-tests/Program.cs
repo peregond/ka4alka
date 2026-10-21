@@ -50,6 +50,7 @@ async Task Until(Func<bool> condition,string message){var until=DateTime.UtcNow.
 var seedDir=Path.Combine(root,"seed");Directory.CreateDirectory(seedDir);var payload=RandomNumberGenerator.GetBytes(256*1024);var original=Path.Combine(seedDir,"test.bin");await File.WriteAllBytesAsync(original,payload);
 var torrentPath=Path.Combine(root,"test.torrent");await new TorrentCreator().CreateAsync(new TorrentFileSource(original),torrentPath);
 var port=FreePort();using var seed=new ClientEngine(Settings("seed-cache",port));var seedManager=await seed.AddAsync(torrentPath,seedDir);await seedManager.StartAsync();await Until(()=>seedManager.State==TorrentState.Seeding,"local seeder ready");
+await PhoneDownloadTests.Run(root,seedManager,port,payload);
 var service=new DownloadService(Settings("download-cache",FreePort()));
 try {
  await service.SetLimitsAsync(1024,512);Check(!service.EngineCreated,"speed limits configured without creating idle engine");

@@ -25,6 +25,7 @@ sealed class DesktopEngine:IAsyncDisposable
     readonly SharedAsyncWork<MediaMetadataResult> detailWork=new();
     readonly SemaphoreSlim metadataSlots;
     readonly Dictionary<string,DateTime> localizedAttempts=[];
+    PhoneRemoteServer? phone;PhoneRemoteCatalog? phoneCatalog;
     LanService? lan;Task? ticker;Task? warming;Task? reliability;bool? lastNetwork;string? lastDownloadEvent;bool shuttingDown;
     public DesktopEngine()
     {
@@ -147,6 +148,7 @@ sealed class DesktopEngine:IAsyncDisposable
             case "sourceRemove":configuredSources.RemoveAll(x=>x.Name==S(p,"name"));SaveSources();return new{};
             case "logs":return new{text=await DiagnosticReport.CreateAsync(prefs,downloads,ct)};
             case "refresh":online.RetryNow();await shared.RefreshAsync(ct,true);groups.Clear();return new{};
+            case "phone":return await Phone(p,ct);
             case "lan":return await Lan(p,ct);
             case "prepareUpdate":
                 using(var updater=new MacUpdateClient(UpdateTrust.PublicKey))
@@ -154,7 +156,7 @@ sealed class DesktopEngine:IAsyncDisposable
                     var destination=Path.Combine(Preferences.DataDir,"updates",Guid.NewGuid().ToString("N"));
                     return await Task.Run(()=>updater.PrepareAsync(Convert.FromBase64String(S(p,"manifest")),Convert.FromBase64String(S(p,"signature")),S(p,"architecture"),S(p,"installed"),destination,new Progress<MacUpdateProgress>(value=>Event("updateProgress",value)),ct),ct);
                 }
-            case "shutdown":shuttingDown=true;lifetime.Cancel();foreach(var pending in requests.Values.ToArray())pending.Cancel();await downloads.Close();return new{};
+            case "shutdown":shuttingDown=true;if(phone!=null){await phone.DisposeAsync();phone=null;}phoneCatalog?.Dispose();phoneCatalog=null;lifetime.Cancel();foreach(var pending in requests.Values.ToArray())pending.Cancel();await downloads.Close();return new{};
             default:throw new ArgumentException("Unknown desktop command: "+method);
         }
     }
@@ -325,6 +327,35 @@ sealed class DesktopEngine:IAsyncDisposable
         if(p.TryGetProperty("lanEnabled",out var enabled)){prefs.LanEnabled=enabled.GetBoolean();if(prefs.LanEnabled)await EnsureLan(ct);else if(lan!=null){await lan.DisposeAsync();lan=null;}}
         await downloads.SetLimitsAsync(prefs.MaxDownloadKbps,prefs.MaxUploadKbps);prefs.Save();Event("personal",Settings());return Settings();
     }
+    async Task<object> Phone(JsonElement p,CancellationToken ct)
+    {
+        if(shuttingDown)throw new OperationCanceledException(ct);
+        var action=S(p,"action");
+        if(action=="stop")
+        {
+            var server=phone;phone=null;var catalog=phoneCatalog;phoneCatalog=null;
+            if(server!=null)await server.DisposeAsync();catalog?.Dispose();
+            return new{running=false,urls=Array.Empty<string>(),code=(string?)null,connected=0};
+        }
+        if(action=="start")
+        {
+            if(phone==null)
+            {
+                var context=SynchronizationContext.Current!;
+                var catalog=new PhoneRemoteCatalog(downloads,prefs);
+                var server=new PhoneRemoteServer((method,args,token)=>OnOwner(async()=>
+                {
+                    token.ThrowIfCancellationRequested();
+                    var result=await catalog.Handle(method,args,token);
+                    if(method=="add")Event("downloads",Downloads());return result;
+                },context));
+                try{server.Start();phoneCatalog=catalog;phone=server;}
+                catch{await server.DisposeAsync();catalog.Dispose();throw;}
+            }
+            phone.OpenPairing();
+        }
+        return phone==null?(object)new{running=false,urls=Array.Empty<string>(),code=(string?)null,connected=0}:new{running=true,state=phone.State()};
+    }
     async Task EnsureLan(CancellationToken ct)
     {
         if(lan!=null)return;lan=new(new LanServiceOptions{StateDirectory=Path.Combine(Preferences.DataDir,"lan"),DeviceName=Environment.MachineName});
@@ -430,6 +461,7 @@ sealed class DesktopEngine:IAsyncDisposable
     {
         lifetime.Cancel();foreach(var pending in requests.Values.ToArray())pending.Cancel();
         if(lan!=null)await lan.DisposeAsync();
+        if(phone!=null)await phone.DisposeAsync();phoneCatalog?.Dispose();
         await Task.WhenAll(running.Concat(new[]{ticker,warming,reliability}.OfType<Task>()));
         await downloads.Close();prefs.Save();source.Dispose();lifetime.Dispose();
     }

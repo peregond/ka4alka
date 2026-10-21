@@ -18,6 +18,7 @@ public partial class MainWindow
 
     void RenderLanSettings(StackPanel panel)
     {
+        RenderPhoneSettings(panel);
         var enable=new CheckBox{Name="SettingsLanEnabled",Style=(Style)FindResource("SettingsSwitch"),Content=SwitchTitle("Загрузки на другом компьютере"),IsChecked=prefs.LanEnabled,Margin=new(0,0,0,8)};
         AutomationProperties.SetName(enable,AppLanguage.T("Разрешить загрузки на связанных устройствах в локальной сети"));panel.Children.Add(enable);
         var description=Hint("Включи на обоих компьютерах и свяжи их один раз. Файл скачает выбранный компьютер в свою папку Ka4alka, этот только передаст задачу.");panel.Children.Add(description);
