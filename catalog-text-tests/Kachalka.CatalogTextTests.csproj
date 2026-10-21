@@ -13,6 +13,7 @@
     <Compile Include="../native/PerformanceResources.cs" Link="PerformanceResources.cs" />
     <Compile Include="../tests/PerformanceResourcesTests.cs" Link="PerformanceResourcesTests.cs" />
     <Compile Include="../native/UnifiedSearch.cs" Link="UnifiedSearch.cs" />
+    <Compile Include="../native/CatalogSearch.cs" Link="CatalogSearch.cs" />
     <Compile Include="../native/AppLanguage.cs" Link="AppLanguage.cs" />
     <Compile Include="../native/SearchLanguage.cs" Link="SearchLanguage.cs" />
     <Compile Include="../native/RussianAudio.cs" Link="RussianAudio.cs" />
