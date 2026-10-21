@@ -21,6 +21,7 @@ struct SearchOrigin {
 struct SearchView: View {
     @EnvironmentObject private var model: AppModel
     @FocusState private var searchFocused: Bool
+    @State private var contentWidth: CGFloat = 0
 
     var body: some View {
         if #available(macOS 15.0, *) {
@@ -52,6 +53,7 @@ struct SearchView: View {
             if model.submittedQuery.isEmpty { recentSearches } else { CatalogView() }
         }
         .settingsLayoutProbe("search.content")
+        .kdReadWidth($contentWidth)
         .toolbar {
             ToolbarItem(placement: .navigation) {
                 Button { model.back() } label: {
@@ -67,7 +69,16 @@ struct SearchView: View {
         }
     }
 
-    private var scope: some View {
+    @ViewBuilder private var scope: some View {
+        if contentWidth >= 800 {
+            scopePicker.pickerStyle(.segmented).frame(width: 245)
+                .settingsLayoutProbe("search.scope")
+        } else {
+            scopePicker.pickerStyle(.menu).frame(width: 140)
+                .settingsLayoutProbe("search.scope")
+        }
+    }
+    private var scopePicker: some View {
         Picker(tr("Где искать", "Search in"), selection: Binding(
             get: { model.section == .games },
             set: { model.setSearchGames($0) }
@@ -75,11 +86,8 @@ struct SearchView: View {
             Text(tr("Кино и сериалы", "Movies & series")).tag(false)
             Text(tr("Игры", "Games")).tag(true)
         }
-        .pickerStyle(.segmented)
         .labelsHidden()
-        .frame(width: 245)
         .controlSize(.regular)
-        .settingsLayoutProbe("search.scope")
     }
     private var recentSearches: some View {
         ScrollView {

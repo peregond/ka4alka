@@ -180,7 +180,7 @@ struct RootView: View {
             Spacer(minLength: 0)
             sidebarFooter
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(minWidth: 170, idealWidth: 200, maxWidth: 240, maxHeight: .infinity, alignment: .topLeading)
         .background(colorScheme == .dark ? KDPalette.sidebarBackground : Color.clear)
         .settingsLayoutProbe("sidebar")
         .navigationSplitViewColumnWidth(min: 170, ideal: 200, max: 240)

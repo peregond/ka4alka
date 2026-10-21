@@ -761,7 +761,13 @@ struct SmokeShot {
             // An empty search page intentionally has a large blank lower area. Audit its actual
             // controls and empty state, rather than diluting them over a tall, empty window.
             let contentHeight: CGFloat = pageName == "search" ? min(420, shot.bounds.height - 60) : shot.bounds.height - 60
-            region = CGRect(x: guardWidth, y: 60, width: max(1, shot.bounds.width - guardWidth), height: max(1, contentHeight))
+            if pageName == "search" {
+                // Search now lives in the native titlebar. Include its actual controls rather
+                // than sampling only the intentionally blank lower content of a wide window.
+                region = CGRect(x: 0, y: 0, width: shot.bounds.width, height: min(360, shot.bounds.height))
+            } else {
+                region = CGRect(x: guardWidth, y: 60, width: max(1, shot.bounds.width - guardWidth), height: max(1, contentHeight))
+            }
         }
         let stats: SmokePixelStats = SmokePixelAudit.measure(shot.bitmap, scale: shot.scale, region: region)
         if stats.samples == 0 {
@@ -823,6 +829,9 @@ struct SmokeShot {
     }
 
     private func clickSidebarToggle(in window: NSWindow) -> Bool {
+        (window.contentView?.superview ?? window.contentView)?.layoutSubtreeIfNeeded()
+        window.displayIfNeeded()
+        SettingsLayoutMeasurements.refreshNativeViews()
         guard let frame = SettingsLayoutMeasurements.nativeFrames["toolbar.sidebar"] else { return false }
         let point = NSPoint(x: frame.midX, y: frame.midY)
         let timestamp = ProcessInfo.processInfo.systemUptime
@@ -847,8 +856,7 @@ struct SmokeShot {
         guard clickSidebarToggle(in: main) else {
             check(false, "sidebar: toggle accepts a pointer click"); return
         }
-        await pause(350)
-        SettingsLayoutMeasurements.refreshNativeViews()
+        await waitForSidebar(in: main, visible: false)
         let collapsed = SettingsLayoutMeasurements.nativeFrames["toolbar.sidebar"]
         let sidebarHidden = SettingsLayoutMeasurements.nativeAttached["sidebar"] != true ||
             (SettingsLayoutMeasurements.nativeVisibleFrames["sidebar"]?.width ?? 0) < 1
@@ -862,13 +870,29 @@ struct SmokeShot {
         inspectWindowControls()
         _ = try await capture(saveAs: "sidebar-collapsed-" + theme + "-" + language)
         let restored = clickSidebarToggle(in: main)
-        await pause(350)
-        SettingsLayoutMeasurements.refreshNativeViews()
+        await waitForSidebar(in: main, visible: true)
         let sidebarShown = SettingsLayoutMeasurements.nativeAttached["sidebar"] == true &&
             (SettingsLayoutMeasurements.nativeVisibleFrames["sidebar"]?.width ?? 0) > 100
         check(restored && sidebarShown && SettingsLayoutMeasurements.nativeAttached["toolbar.sidebar"] == true,
               "sidebar: native toggle restores the sidebar")
         check(main.isVisible, "sidebar: changing visibility keeps the window open")
+        _ = try await capture(saveAs: "sidebar-restored-" + theme + "-" + language)
+        // Sidebar animation changes the page proposal. Finish it before measuring unrelated scrolling.
+        await pause(700)
+    }
+
+    private func waitForSidebar(in window: NSWindow, visible: Bool) async {
+        var stable = 0
+        for _ in 0..<30 {
+            await pause(100)
+            (window.contentView?.superview ?? window.contentView)?.layoutSubtreeIfNeeded()
+            SettingsLayoutMeasurements.refreshNativeViews()
+            let attached = SettingsLayoutMeasurements.nativeAttached["sidebar"] == true
+            let width = SettingsLayoutMeasurements.nativeVisibleFrames["sidebar"]?.width ?? 0
+            let matches = visible ? attached && width >= 169 : !attached || width < 1
+            stable = matches ? stable + 1 : 0
+            if stable >= 3 { return }
+        }
     }
 
     private func accessibilityPass(_ spec: SmokePageSpec) {
