@@ -153,7 +153,8 @@ public partial class MainWindow
             check(current==card&&Search.IsKeyboardFocusWithin,"search shortcut focuses the field without leaving the open card");
             ClearSearchButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));UpdateLayout();
             check(current==card&&Search.Text=="","clearing the persistent search retains the open card");
-            Search.Text="Поиск из "+card.Section;SearchSubmitButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await WaitSearch();
+            // Distinct valid queries exercise each entry point without relying on irrelevant provider replies.
+            Search.Text=card.Section=="Фильмы"?"искра поисковая":"Поисковая искра 2024";SearchSubmitButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await WaitSearch();
             check(current==null&&searchCategory==""&&SearchActive&&section==card.Section,"submitting from a card opens unified search results");
         }
         check(contexts.Count==4&&contexts.Count(x=>x=="Фильмы")==2&&contexts.Count(x=>x=="Сериалы")==2,"each card search requests both catalogs");
@@ -450,14 +451,14 @@ public partial class MainWindow
             check(section=="Загрузки"&&current==null&&downloadReturnItem==null&&Queue().Items.Count==fixtures.Length&&fixtures.All(item=>item.Paused),"nested actor and filmography navigation returns to the unchanged paused queue; "+DownloadUiState());
             searchProvider=(kind,query,token)=>Task.FromResult<IReadOnlyList<MediaItem>>(kind=="Фильмы"?films:series);
             await NativeDownloadClick(await DownloadLink("Открыть карточку по постеру"),"search origin card");
-            Search.Text="Новый поиск из карточки загрузки";SearchSubmitButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await WaitSearch();
+            Search.Text="искра 2024";SearchSubmitButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await WaitSearch();
             check(downloadReturnItem==null&&current==null&&SearchActive,"a new explicit search clears the old download navigation ancestor");
             ShowDownloads(this,new RoutedEventArgs());await SettleDownloads();
             Search.Text="Поиск из загрузок";FocusCatalogSearch();UpdateLayout();
             check(section=="Загрузки"&&current==null&&SearchBar.IsVisible&&Search.IsKeyboardFocusWithin,"download search stays visible and focuses without leaving the queue");
             ClearSearchButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));UpdateLayout();
             check(section=="Загрузки"&&Queue().Items.Count==fixtures.Length&&Search.Text=="","clearing download search preserves the queue");
-            Search.Text="Поиск из загрузок";SearchSubmitButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await WaitSearch();
+            Search.Text="поисковая 2024";SearchSubmitButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await WaitSearch();
             check(section is "Фильмы" or "Сериалы"&&current==null&&searchCategory==""&&downloads.Items.Count==fixtures.Length&&fixtures.All(x=>x.Paused),"submitting download search opens both-type results without changing queued tasks");
             searchProvider=null;submittedQuery="";searchCategory="";Search.Text="";section="Загрузки";Render();await SettleDownloads();
             check(!downloads.EngineCreated,"download design and menu fixtures do not start a torrent engine");
