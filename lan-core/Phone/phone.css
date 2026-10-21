@@ -2,3 +2,4 @@
 
 /* iOS Safari: readable controls without focus zoom; safe areas and keyboard scrolling. */
 body{padding-bottom:max(16px,env(safe-area-inset-bottom));min-height:100vh;min-height:100svh}input,textarea,select{font-size:16px}button{touch-action:manipulation}input:focus-visible,textarea:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid #47dab5;outline-offset:3px}
+summary{list-style:none;cursor:pointer;min-height:44px;padding:12px 0}summary::-webkit-details-marker{display:none}summary::before{content:'+';display:inline-block;width:24px;font-weight:600}details[open] summary::before{content:'−'}

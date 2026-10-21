@@ -158,6 +158,23 @@ public sealed class PhoneRemoteServer : IAsyncDisposable
                 // Never return local paths, exception text, credentials or raw tracker responses.
                 try { await Respond(stream, error is UnauthorizedAccessException ? 401 : 400, "application/json", "{\"error\":\"Запрос не выполнен. Проверь папку загрузок и повтори. / Check the download folder and try again.\"}", timeout.Token); } catch (Exception) { }
             }
+            finally
+            {
+                // Windows resets a TCP connection closed with unread request bytes. Send a FIN first
+                // and drain a bounded amount so rejected requests still receive their complete response.
+                try
+                {
+                    client.Client.Shutdown(SocketShutdown.Send);
+                    using var drain = new CancellationTokenSource(TimeSpan.FromMilliseconds(250));
+                    var buffer = new byte[4096]; var remaining = 128 * 1024;
+                    while (remaining > 0)
+                    {
+                        var count = await stream.ReadAsync(buffer.AsMemory(0,Math.Min(buffer.Length,remaining)),drain.Token);
+                        if(count==0)break;remaining-=count;
+                    }
+                }
+                catch(Exception error) when(error is SocketException or IOException or OperationCanceledException or ObjectDisposedException) { }
+            }
         }
     }
     static async Task Respond(NetworkStream stream, int status, string type, string body, CancellationToken ct)
