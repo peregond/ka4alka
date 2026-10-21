@@ -200,6 +200,7 @@ struct RootView: View {
                 .buttonStyle(KDPrimaryButtonStyle())
                 .disabled(updater.busy)
                 .help(updater.buttonTitle)
+                .settingsLayoutProbe("sidebar.update.action")
             }
             if updater.busy, !updater.ready {
                 ProgressView(value: updater.progressValue)
@@ -211,11 +212,13 @@ struct RootView: View {
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
                     .textSelection(.enabled)
+                    .settingsLayoutProbe("sidebar.update.status")
             }
             if !model.version.isEmpty {
                 Text(tr("Версия", "Version") + " " + model.version)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .settingsLayoutProbe("sidebar.update.version")
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

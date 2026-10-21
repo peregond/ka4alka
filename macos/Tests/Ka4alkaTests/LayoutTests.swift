@@ -189,6 +189,45 @@ private struct LayoutOutcome {
 
     // MARK: Tests
 
+    func testReadyUpdateFooterFitsShortWindows() throws {
+        try requireWindowServer()
+        let priorProbeMode = SettingsLayoutMeasurements.enabledForTests
+        let savedLanguage = TestLanguage.current()
+        SettingsLayoutMeasurements.enabledForTests = true
+        defer {
+            SettingsLayoutMeasurements.enabledForTests = priorProbeMode
+            TestLanguage.restore(savedLanguage)
+        }
+        for language in ["ru", "en"] {
+            UserDefaults.standard.set(language, forKey: "UiLanguage")
+            for height: CGFloat in [468, 520, 700] {
+                let model = try makeModel()
+                model.version = "0.44.12"
+                let updater = MacUpdater()
+                updater.available = true; updater.ready = true
+                updater.statusText = tr("Обновление готово к установке", "Update ready to install")
+                SettingsLayoutMeasurements.frames.removeAll()
+                let controller = NSHostingController(rootView: RootView().environmentObject(model).environmentObject(updater))
+                let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 760, height: height), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+                window.contentViewController = controller
+                window.setContentSize(NSSize(width: 760, height: height))
+                controller.view.frame = NSRect(x: 0, y: 0, width: 760, height: height)
+                controller.view.layoutSubtreeIfNeeded()
+                RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+                controller.view.layoutSubtreeIfNeeded()
+                for id in ["sidebar.update.action", "sidebar.update.status", "sidebar.update.version"] {
+                    guard let frame = SettingsLayoutMeasurements.frames[id] else {
+                        XCTFail("Missing " + id + " " + language); continue
+                    }
+                    XCTAssertGreaterThan(frame.height, 0, id)
+                    XCTAssertGreaterThanOrEqual(frame.minY, -2, id + " " + language)
+                    XCTAssertLessThanOrEqual(frame.maxY, height + 2, id + " " + language + " height " + String(Int(height)))
+                }
+                window.contentViewController = nil
+            }
+        }
+    }
+
     func testPagesFitEveryWidthSchemeAndLanguage() throws {
         try requireWindowServer()
         let savedLanguage = TestLanguage.current()
