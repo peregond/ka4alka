@@ -27,7 +27,7 @@ struct SearchView: View {
             page
                 .searchable(text: $model.query, placement: .toolbar,
                             prompt: tr("Найти фильм, сериал или игру", "Find a movie, series or game"))
-                .searchPresentationToolbarBehavior(.expanded)
+                .searchPresentationToolbarBehavior(.avoidHidingContent)
                 .searchFocused($searchFocused)
                 .onSubmit(of: .search) { model.submitSearch() }
                 .task(id: model.searchFocus) {
