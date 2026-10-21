@@ -562,6 +562,10 @@ struct SmokeShot {
             }
             let fits: Bool = frame.width > 12 && frame.height > 12 && frame.minX >= -2 && frame.maxX <= main.frame.width + 2 && frame.minY >= -2 && frame.maxY <= main.frame.height + 2
             check(fits, "toolbar: " + id + " fits the native window")
+            // AppKit window coordinates have their origin at the bottom. Native toolbar
+            // actions belong beside the traffic lights, never in a scrolled content overlay.
+            let topDistance = main.frame.height - frame.midY
+            check(topDistance >= 0 && topDistance <= 80, "toolbar: " + id + " belongs to the native titlebar")
             let shown: CGRect = frame.intersection(visible)
             let unclipped: Bool = !shown.isNull && shown.width * shown.height >= frame.width * frame.height * 0.9
             check(unclipped, "toolbar: " + id + " is visible and not clipped by its native host")

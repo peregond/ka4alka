@@ -39,13 +39,6 @@ struct ShellScrollObserver: NSViewRepresentable {
             if let observation { NotificationCenter.default.removeObserver(observation) }
             observation = nil; clip = nil
         }
-        /// Keep the system titlebar and its window controls. Only the page's overlay
-        /// actions follow scrolling; hiding NSToolbar can hide traffic lights as well.
-        private func configureTitlebar() {
-            guard let window else { return }
-            if window.titleVisibility != .hidden { window.titleVisibility = .hidden }
-            if !window.titlebarAppearsTransparent { window.titlebarAppearsTransparent = true }
-        }
         private func schedule() {
             guard !queued else { return }
             queued = true
@@ -55,7 +48,6 @@ struct ShellScrollObserver: NSViewRepresentable {
             }
         }
         private func attach() {
-            configureTitlebar()
             guard let content = window?.contentView else { return }
             var candidates: [NSScrollView] = []
             func visit(_ view: NSView) {

@@ -236,9 +236,7 @@ struct RootView: View {
             .shellPageBackground()
             .safeAreaInset(edge: .top, spacing: 0) { errorBanner }
             .kdToast($model.toast)
-            .navigationTitle("")
-            .toolbar(.visible, for: .windowToolbar)
-            .overlay(alignment: .top) { ShellChromeView(title: navigationTitle) }
+            .modifier(ShellChromeView(title: navigationTitle))
     }
     @ViewBuilder private var detailBody: some View {
         if model.connected {
