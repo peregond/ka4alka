@@ -59,7 +59,7 @@ struct RootView: View {
 
     var body: some View {
         NavigationSplitView(columnVisibility: $model.sidebarVisibility) {
-            sidebar
+            sidebar.toolbar(removing: .sidebarToggle)
         } detail: {
             detailColumn
         }
