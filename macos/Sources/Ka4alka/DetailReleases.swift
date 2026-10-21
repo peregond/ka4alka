@@ -278,7 +278,7 @@ struct ReleaseFilterBar: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: KD.Space.xs) {
-            KDFlowLayout(spacing: KD.Space.xs, lineSpacing: KD.Space.xs) {
+            KDFlowLayout(spacing: KD.Space.xs, lineSpacing: KD.Space.xs, verticalAlignment: .center) {
                 if showsQualityPicker { qualityPicker }
                 if showsAudio { audioMenu }
                 if showsGameGroup { stringMenu(tr("Сборка", "Release group"), selection: $filters.studio, options: facets.gameGroups) }
@@ -289,6 +289,7 @@ struct ReleaseFilterBar: View {
             }
             if showsExtras && hasExtras { extraPanel }
         }
+        .controlSize(.regular)
     }
 
     // MARK: Primary controls
@@ -343,7 +344,6 @@ struct ReleaseFilterBar: View {
     private var russianToggle: some View {
         Toggle(tr("Только русская озвучка", "Russian audio only"), isOn: $filters.russianOnly)
             .toggleStyle(.switch)
-            .controlSize(.small)
             .fixedSize()
     }
 
@@ -367,14 +367,14 @@ struct ReleaseFilterBar: View {
         } label: {
             KDChipLabel(text: extrasTitle, systemImage: "slider.horizontal.3", isActive: filters.extraCount > 0)
         }
-        .buttonStyle(KDSecondaryButtonStyle())
+        .buttonStyle(.bordered)
         .accessibilityLabel(tr("Ещё фильтры", "More filters"))
         .accessibilityValue(showsExtras ? tr("Раскрыто", "Expanded") : tr("Свёрнуто", "Collapsed"))
     }
 
     private var resetButton: some View {
         Button(tr("Сбросить", "Reset")) { filters = DetailReleaseFilters() }
-            .buttonStyle(KDSecondaryButtonStyle())
+            .buttonStyle(.bordered)
     }
 
     // MARK: Extra filters
@@ -402,7 +402,7 @@ struct ReleaseFilterBar: View {
     }
 
     private var extraPanel: some View {
-        KDFlowLayout(spacing: KD.Space.xs, lineSpacing: KD.Space.xs) {
+        KDFlowLayout(spacing: KD.Space.xs, lineSpacing: KD.Space.xs, verticalAlignment: .center) {
             if showsCodec { stringMenu(tr("Видео", "Video"), selection: $filters.codec, options: facets.codecs) }
             if showsHDR { stringMenu("HDR", selection: $filters.hdr, options: facets.hdrs) }
             if showsSubtitles { subtitlesChip }
@@ -420,7 +420,6 @@ struct ReleaseFilterBar: View {
     private var poorQualityToggle: some View {
         Toggle(tr("Скрывать экранки и низкое качество", "Hide low quality"), isOn: poorQualityBinding)
             .toggleStyle(.switch)
-            .controlSize(.small)
             .fixedSize()
     }
 

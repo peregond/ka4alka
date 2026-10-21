@@ -1035,6 +1035,7 @@ struct KDHeroSkeleton: View {
 struct KDFlowLayout: Layout {
     var spacing: CGFloat = 8
     var lineSpacing: CGFloat = 8
+    var verticalAlignment: VerticalAlignment = .top
 
     /// The size a child takes. A child wider than the whole row is offered the row width instead,
     /// so a long label truncates rather than pushing the row past the window edge.
@@ -1068,20 +1069,32 @@ struct KDFlowLayout: Layout {
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        var x: CGFloat = bounds.minX
-        var y: CGFloat = bounds.minY
+        let sizes = subviews.map { childSize($0, maxWidth: bounds.width) }
+        var rowStart = 0
+        var rowWidth: CGFloat = 0
         var rowHeight: CGFloat = 0
-        for subview in subviews {
-            let size: CGSize = childSize(subview, maxWidth: bounds.width)
-            if x > bounds.minX, x + size.width > bounds.maxX {
-                y += rowHeight + lineSpacing
-                x = bounds.minX
-                rowHeight = 0
+        var y = bounds.minY
+        func placeRow(endingAt end: Int) {
+            var x = bounds.minX
+            for index in rowStart..<end {
+                let size = sizes[index]
+                let offset: CGFloat = verticalAlignment == .center ? (rowHeight - size.height) / 2
+                    : verticalAlignment == .bottom ? rowHeight - size.height : 0
+                subviews[index].place(at: CGPoint(x: x, y: y + offset), anchor: .topLeading, proposal: ProposedViewSize(size))
+                x += size.width + spacing
             }
-            subview.place(at: CGPoint(x: x, y: y), anchor: .topLeading, proposal: ProposedViewSize(size))
-            x += size.width + spacing
+        }
+        for index in sizes.indices {
+            let size = sizes[index]
+            if index > rowStart, rowWidth + spacing + size.width > bounds.width {
+                placeRow(endingAt: index)
+                y += rowHeight + lineSpacing
+                rowStart = index; rowWidth = 0; rowHeight = 0
+            }
+            rowWidth += (index > rowStart ? spacing : 0) + size.width
             rowHeight = max(rowHeight, size.height)
         }
+        placeRow(endingAt: sizes.count)
     }
 }
 
