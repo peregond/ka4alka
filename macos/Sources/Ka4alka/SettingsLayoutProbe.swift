@@ -37,7 +37,7 @@ private let layoutProbeEnabled: Bool = CommandLine.arguments.contains("--smoke-t
     }
     private static var nativeViews: [UUID: WeakView] = [:]
     static func usesNativeCoordinates(_ id: String) -> Bool {
-        id.hasPrefix("detail.") || id.hasPrefix("featured.") || id.hasPrefix("catalog.") || id.hasPrefix("games.")
+        id.hasPrefix("sidebar.") || id.hasPrefix("detail.") || id.hasPrefix("featured.") || id.hasPrefix("catalog.") || id.hasPrefix("games.")
     }
     static func registerNative(_ view: NSView, owner: UUID) { nativeViews[owner] = WeakView(view) }
     static func refreshNativeViews() {

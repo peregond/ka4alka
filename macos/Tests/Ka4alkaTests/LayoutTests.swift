@@ -212,18 +212,24 @@ private struct LayoutOutcome {
                 window.contentViewController = controller
                 window.setContentSize(NSSize(width: 760, height: height))
                 controller.view.frame = NSRect(x: 0, y: 0, width: 760, height: height)
+                window.orderFront(nil)
                 controller.view.layoutSubtreeIfNeeded()
                 RunLoop.main.run(until: Date().addingTimeInterval(0.2))
                 controller.view.layoutSubtreeIfNeeded()
+                SettingsLayoutMeasurements.refreshNativeViews()
                 XCTAssertNil(SettingsLayoutMeasurements.frames["sidebar.update.status"], "Ready status should not duplicate the restart button")
                 for id in ["sidebar.update.action", "sidebar.update.version"] {
-                    guard let frame = SettingsLayoutMeasurements.frames[id] else {
-                        XCTFail("Missing " + id + " " + language); continue
+                    guard let frame = SettingsLayoutMeasurements.nativeFrames[id], let visible = SettingsLayoutMeasurements.nativeVisibleFrames[id] else {
+                        XCTFail("Missing native " + id + " " + language); continue
                     }
                     XCTAssertGreaterThan(frame.height, 0, id)
-                    XCTAssertGreaterThanOrEqual(frame.minY, -2, id + " " + language)
-                    XCTAssertLessThanOrEqual(frame.maxY, height + 2, id + " " + language + " height " + String(Int(height)))
+                    XCTAssertTrue(SettingsLayoutMeasurements.nativeAttached[id] == true, id)
+                    let shown = frame.intersection(visible)
+                    XCTAssertFalse(shown.isNull, id + " is clipped")
+                    XCTAssertGreaterThanOrEqual(shown.width * shown.height, frame.width * frame.height * 0.99,
+                                                id + " " + language + " height " + String(Int(height)))
                 }
+                window.orderOut(nil)
                 window.contentViewController = nil
             }
         }
