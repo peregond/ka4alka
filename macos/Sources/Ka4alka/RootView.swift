@@ -170,7 +170,9 @@ struct RootView: View {
         .navigationSplitViewColumnWidth(min: 170, ideal: 200, max: 240)
     }
     private var showsUpdateStatus: Bool {
-        !updater.statusText.isEmpty && (updater.available || updater.busy || updater.isError)
+        // Ready is already communicated by the restart button. Keep progress/errors here;
+        // the complete ready status and component statistics remain in Settings → Updates.
+        !updater.statusText.isEmpty && (!updater.ready || updater.isError) && (updater.available || updater.busy || updater.isError)
     }
     /// Downloads and Settings sit at the bottom of the sidebar, as in the Windows app. They are plain buttons,
     /// not list rows, so a click always reaches them.

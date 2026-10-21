@@ -205,7 +205,7 @@ private struct LayoutOutcome {
                 model.version = "0.44.12"
                 let updater = MacUpdater()
                 updater.available = true; updater.ready = true
-                updater.statusText = tr("Обновление готово к установке", "Update ready to install")
+                updater.statusText = tr("Обновление готово к установке", "Update ready to install") + " · 7.4 MB · " + tr("Сохранено компонентов: ", "Reused components: ") + "422"
                 SettingsLayoutMeasurements.frames.removeAll()
                 // Exercise actual Glass on modern macOS even when the CI account reduces transparency.
                 let controller = NSHostingController(rootView: RootView().environmentObject(model).environmentObject(updater).environment(\.accessibilityReduceTransparency, false))
@@ -216,7 +216,8 @@ private struct LayoutOutcome {
                 controller.view.layoutSubtreeIfNeeded()
                 RunLoop.main.run(until: Date().addingTimeInterval(0.2))
                 controller.view.layoutSubtreeIfNeeded()
-                for id in ["sidebar.update.action", "sidebar.update.status", "sidebar.update.version"] {
+                XCTAssertNil(SettingsLayoutMeasurements.frames["sidebar.update.status"], "Ready status should not duplicate the restart button")
+                for id in ["sidebar.update.action", "sidebar.update.version"] {
                     guard let frame = SettingsLayoutMeasurements.frames[id] else {
                         XCTFail("Missing " + id + " " + language); continue
                     }
