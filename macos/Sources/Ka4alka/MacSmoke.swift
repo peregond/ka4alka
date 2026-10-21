@@ -253,6 +253,16 @@ struct SmokeShot {
             main.displayIfNeeded()
             CATransaction.flush()
             await pause(50)
+            if page == .search {
+                // A toolbar item is hosted separately from page layout. Wait for its
+                // replacement host after a segmented/menu scope change on resize.
+                _ = await waitUntil("native search scope", timeout: 2) {
+                    (main.contentView?.superview ?? main.contentView)?.layoutSubtreeIfNeeded()
+                    SettingsLayoutMeasurements.refreshNativeViews()
+                    return SettingsLayoutMeasurements.nativeAttached["search.scope"] == true &&
+                        (SettingsLayoutMeasurements.nativeFrames["search.scope"]?.width ?? 0) > 100
+                }
+            }
             let before: Int = violations.count
             auditLayout(spec, width: actual.width)
             try await inspect(page, spec: spec, width: actual.width, primary: isPrimary(requested))
@@ -853,6 +863,9 @@ struct SmokeShot {
         guard let main = MacSmoke.mainWindow() else { return }
         SettingsLayoutMeasurements.refreshNativeViews()
         let expanded = SettingsLayoutMeasurements.nativeFrames["toolbar.sidebar"]
+        check(SettingsLayoutMeasurements.nativeAttached["sidebar"] == true &&
+              (SettingsLayoutMeasurements.nativeVisibleFrames["sidebar"]?.width ?? 0) > 100,
+              "sidebar: expanded content has native visibility measurements")
         guard clickSidebarToggle(in: main) else {
             check(false, "sidebar: toggle accepts a pointer click"); return
         }
