@@ -833,6 +833,9 @@ struct SmokeShot {
         await pause(350)
         SettingsLayoutMeasurements.refreshNativeViews()
         let collapsed = SettingsLayoutMeasurements.nativeFrames["toolbar.sidebar"]
+        let sidebarHidden = SettingsLayoutMeasurements.nativeAttached["sidebar"] != true ||
+            (SettingsLayoutMeasurements.nativeVisibleFrames["sidebar"]?.width ?? 0) < 1
+        check(sidebarHidden, "sidebar: native action hides the sidebar content")
         check(SettingsLayoutMeasurements.nativeAttached["toolbar.sidebar"] == true,
               "sidebar: toggle remains visible when collapsed")
         if let expanded, let collapsed {
@@ -844,7 +847,9 @@ struct SmokeShot {
         let restored = NSApp.sendAction(toggle, to: nil, from: nil)
         await pause(350)
         SettingsLayoutMeasurements.refreshNativeViews()
-        check(restored && SettingsLayoutMeasurements.nativeAttached["toolbar.sidebar"] == true,
+        let sidebarShown = SettingsLayoutMeasurements.nativeAttached["sidebar"] == true &&
+            (SettingsLayoutMeasurements.nativeVisibleFrames["sidebar"]?.width ?? 0) > 100
+        check(restored && sidebarShown && SettingsLayoutMeasurements.nativeAttached["toolbar.sidebar"] == true,
               "sidebar: native toggle restores the sidebar")
         check(main.isVisible, "sidebar: changing visibility keeps the window open")
     }
