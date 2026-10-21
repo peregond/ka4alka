@@ -50,6 +50,15 @@ struct SearchView: View {
 
     private var page: some View {
         VStack(spacing: 0) {
+            if contentWidth < 800 {
+                HStack {
+                    Spacer()
+                    scopePicker.pickerStyle(.menu).frame(width: 160)
+                        .settingsLayoutProbe("search.scope")
+                }
+                .padding(.horizontal, KD.gutter)
+                .padding(.vertical, KD.Space.s)
+            }
             if model.submittedQuery.isEmpty { recentSearches } else { CatalogView() }
         }
         .settingsLayoutProbe("search.content")
@@ -62,16 +71,11 @@ struct SearchView: View {
                 .buttonStyle(.automatic)
                 .help(tr("Назад", "Back"))
             }
-            // Give each native toolbar host its own identifier. Reusing one item while
-            // changing its Picker style leaves the old minimum width cached on Intel macOS.
+            // macOS may put supplementary toolbar items into overflow when narrow.
+            // Keep scope selection explicitly visible in the page at those widths.
             if contentWidth >= 800 {
                 ToolbarItem(id: "search-scope-wide", placement: .primaryAction) {
                     scopePicker.pickerStyle(.segmented).frame(width: 245)
-                        .settingsLayoutProbe("search.scope")
-                }
-            } else {
-                ToolbarItem(id: "search-scope-compact", placement: .primaryAction) {
-                    scopePicker.pickerStyle(.menu).frame(width: 140)
                         .settingsLayoutProbe("search.scope")
                 }
             }
