@@ -207,7 +207,8 @@ private struct LayoutOutcome {
                 updater.available = true; updater.ready = true
                 updater.statusText = tr("Обновление готово к установке", "Update ready to install")
                 SettingsLayoutMeasurements.frames.removeAll()
-                let controller = NSHostingController(rootView: RootView().environmentObject(model).environmentObject(updater))
+                // Exercise actual Glass on modern macOS even when the CI account reduces transparency.
+                let controller = NSHostingController(rootView: RootView().environmentObject(model).environmentObject(updater).environment(\.accessibilityReduceTransparency, false))
                 let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 760, height: height), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
                 window.contentViewController = controller
                 window.setContentSize(NSSize(width: 760, height: height))
