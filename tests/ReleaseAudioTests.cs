@@ -53,7 +53,9 @@ static class ReleaseAudioTests
         Check(!RussianAudio.DubbedAudio(unknownDub)&&ReleaseAudio.TypeNames(unknownDub).Count==0,"the Flarrow Films name alone does not invent dubbing");
         var multiDub=dubbing with{Id="multi",Title="Backrooms 2026 1080p DUB [Flarrow Films] + MVO [HDrezka Studio]"};
         Check(ReleaseAudio.StudioNames(multiDub).Count==2&&ReleaseAudio.TypeNames(multiDub).Count==2,"a release advertising both tracks retains both studios and types");
-        Check(ReleaseRecommendation.Pick([voiceover,dubbing with{Seeds=19}])?.Entry==voiceover,"dubbing priority cannot bypass minimum seeder availability");
+        var low=dubbing with{Seeds=19};
+        Check(ReleaseRecommendation.Pick([voiceover,low])?.Entry==low&&ReleaseRecommendation.Pick([voiceover,low])!.Reason.Contains("мало отдающих"),"an active dub keeps priority with an honest low-seeder explanation");
+        Check(ReleaseRecommendation.Pick([voiceover,dubbing with{Seeds=0}])?.Entry==voiceover&&ReleaseRecommendation.Pick([voiceover,dubbing with{Seeds=null}])?.Entry==voiceover,"a dead or unverified dub cannot replace a healthy recommendation");
         Check(ReleaseRecommendation.Pick([voiceover,dubbing with{TorrentUrl=null}])?.Entry==voiceover,"dubbing priority cannot recommend a metadata-only release");
         Check(ReleaseRecommendation.Pick([voiceover,dubbing with{Title=dubbing.Title+" HDCAM"}])?.Entry==voiceover,"dubbing priority cannot recommend a screen recording");
         var english=dubbing with{Id="english",Source="Test",Title="Backrooms 2026 1080p ENG",Seeds=30};

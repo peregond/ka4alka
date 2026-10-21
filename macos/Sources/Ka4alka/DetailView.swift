@@ -378,7 +378,7 @@ struct DetailPrimaryAction: View {
         return own.first(where: { !$0.complete })
     }
     private var recommended: ReleaseRow? {
-        model.releases(for: card).first(where: { $0.recommended && $0.downloadable })
+        model.recommendedRelease(for: card)
     }
 
     var body: some View {

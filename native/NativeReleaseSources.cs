@@ -6,16 +6,8 @@ public static class NativeReleaseSources
     public static ReleaseSource[] Create(SourceClient client,Func<CancellationToken,Task<MediaItem>> resolve,bool series,Func<CancellationToken,Task<MediaItem>>? resolveAliases=null)
     {
         async Task<IReadOnlyList<SourceEntry>> Resolved(Func<MediaItem,CancellationToken,Task<IReadOnlyList<SourceEntry>>> search,CancellationToken ct,bool aliases=false)=>await search(MediaIdentity.Enrich(await (aliases?(resolveAliases??resolve):resolve)(ct)),ct);
-        async Task<IReadOnlyList<SourceEntry>> Aliases(MediaItem item,Func<string,CancellationToken,Task<IReadOnlyList<SourceEntry>>> search,CancellationToken ct)
-        {
-            var groups=await Task.WhenAll(MediaIdentity.Queries(item).Select(async title=>
-            {
-                try{return (Items:await search(title,ct),Error:(Exception?)null);}
-                catch(Exception error) when(!ct.IsCancellationRequested){return (Items:(IReadOnlyList<SourceEntry>)[],Error:error);}
-            }));
-            if(groups.All(x=>x.Error!=null))throw groups.First().Error!;
-            return groups.SelectMany(x=>x.Items).Where(x=>LiveCatalog.Matches(item,x)).ToArray();
-        }
+        async Task<IReadOnlyList<SourceEntry>> Aliases(MediaItem item,Func<string,CancellationToken,Task<IReadOnlyList<SourceEntry>>> search,CancellationToken ct)=>
+            (await ReleaseAliasSearch.Run(MediaIdentity.Queries(item),search,ct)).Where(x=>LiveCatalog.Matches(item,x)).ToArray();
         var api=new LiveCatalog(client);
         var providers=new List<ReleaseSource>
         {

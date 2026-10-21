@@ -127,7 +127,7 @@ struct DetailReleaseFilters: Equatable {
         if !studio.isEmpty, !(release.studios.contains(studio) || release.gameGroup == studio) { return false }
         if !audio.isEmpty, !release.audioTypes.contains(audio) { return false }
         if !quality.isEmpty, release.quality != quality { return false }
-        if russianOnly, !(release.russianDub ?? release.russianAudio) { return false }
+        if russianOnly, !release.russianAudio { return false }
         if !codec.isEmpty, release.codec != codec { return false }
         if !hdr.isEmpty, release.hdr != hdr { return false }
         if subtitles, !DetailReleaseText.meaningful(release.subs) { return false }
@@ -143,7 +143,12 @@ struct DetailReleaseFilters: Equatable {
 
     /// Filters, then orders. Equal rows keep the order the engine gave them.
     func arrange(_ rows: [ReleaseRow]) -> [ReleaseRow] {
-        let kept: [ReleaseRow] = rows.filter { matches($0) }
+        var kept: [ReleaseRow] = rows.filter { matches($0) }
+        // The shared engine ranks every eligible candidate. Re-select within the visible subset.
+        // Older engines omit this field, in which case their original recommendation is preserved.
+        if let best = kept.filter({ $0.recommendationOrder != nil }).min(by: { $0.recommendationOrder! < $1.recommendationOrder! }) {
+            for index in kept.indices { kept[index].recommended = kept[index].id == best.id }
+        }
         let indexed: [(offset: Int, element: ReleaseRow)] = Array(kept.enumerated())
         let ordered = indexed.sorted { (left: (offset: Int, element: ReleaseRow), right: (offset: Int, element: ReleaseRow)) -> Bool in
             if let result = precedes(left.element, right.element) { return result }
@@ -552,7 +557,9 @@ struct ReleaseListRow: View {
         var parts: [String] = []
         let label = DetailReleaseText.qualityText(release, isGame: false)
         if label != "—" { parts.append(label) }
-        if release.russianDub ?? release.russianAudio { parts.append(tr("русская озвучка", "Russian audio")) }
+        if release.russianDub == true { parts.append(tr("русский дубляж", "Russian dubbing")) }
+        else if release.russianAudio { parts.append(tr("русская озвучка", "Russian audio")) }
+        if let seeds = release.seeds, seeds > 0 && seeds < 20 { parts.append(tr("мало отдающих", "few seeders")) }
         if let seeds = release.seeds, seeds >= 50 { parts.append(tr("много раздающих", "many seeders")) }
         if parts.isEmpty { return tr("Рекомендуем", "Recommended") }
         return tr("Рекомендуем: ", "Recommended: ") + parts.joined(separator: ", ")
@@ -873,6 +880,9 @@ struct DetailReleasesSection: View {
             listContent(all: all, rows: rows)
         }
         .onChange(of: filters) { limit = DetailReleasesSection.pageSize }
+        .onChange(of: ScopedReleaseRecommendation(owner: card.id, id: rows.first(where: { $0.recommended })?.id), initial: true) { _, selection in
+            if model.scopedReleaseRecommendation != selection { model.scopedReleaseRecommendation = selection }
+        }
     }
 
     private func header(all: [ReleaseRow], shown: Int) -> some View {

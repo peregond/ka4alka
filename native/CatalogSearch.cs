@@ -1,0 +1,87 @@
+using System.Text;
+using System.Text.RegularExpressions;
+
+namespace Kachalka;
+
+// Search tolerance never participates in MediaIdentity: a match is not a merge decision.
+public sealed class CatalogSearchQuery
+{
+    readonly (string Term,string[] Words,int Penalty)[] variants;
+    readonly string? imdb;
+    public bool Empty {get;}
+    public CatalogSearchQuery(string query)
+    {
+        var text=query.Trim();if(text.Length>200)text=text[..200];
+        var id=Regex.Match(text,@"^(?:https://(?:www\.)?imdb\.com/title/)?(tt\d{5,10})/?$",RegexOptions.IgnoreCase|RegexOptions.CultureInvariant);
+        if(id.Success)imdb=id.Groups[1].Value.ToLowerInvariant();
+        var primary=MediaIdentity.Normalize(text);Empty=primary.Length==0;
+        var mapped=MediaIdentity.Normalize(Keyboard(text));
+        variants=(mapped.Length>0&&mapped!=primary?new[]{(primary,0),(mapped,450)}:new[]{(primary,0)})
+            .Select(x=>(x.Item1,x.Item1.Split(' ',StringSplitOptions.RemoveEmptyEntries).Distinct().Take(12).ToArray(),x.Item2)).ToArray();
+    }
+    public int Score(MediaItem item,bool typo=false)
+    {
+        if(imdb!=null)return string.Equals(item.ImdbId,imdb,StringComparison.OrdinalIgnoreCase)?2000:0;
+        var best=0;
+        foreach(var variant in variants)
+        {
+            if(variant.Words.Length==0)continue;
+            var names=MediaIdentity.NormalizedNames(item);var words=MediaIdentity.WordNames(item);
+            for(var i=0;i<words.Length;i++)
+            {
+                var year=variant.Words.Length>1?variant.Words.FirstOrDefault(x=>x.Length==4&&int.TryParse(x,out var n)&&n is >=1900 and <=2100&&!words[i].Contains(x)):null;
+                if(year!=null&&item.Year.ToString()!=year)continue;
+                var terms=year==null?variant.Words:variant.Words.Where(x=>x!=year).ToArray();
+                if(terms.Length==0)continue;
+                var edits=0;var matches=true;
+                foreach(var term in terms)
+                {
+                    if(words[i].Any(word=>char.IsDigit(term[0])?word==term:word.StartsWith(term,StringComparison.Ordinal)))continue;
+                    if(typo&&edits==0&&terms.Length<=4&&term.Length>=5&&words[i].Any(word=>OneEdit(term,word))){edits++;continue;}
+                    matches=false;break;
+                }
+                if(!matches)continue;
+                var phrase=year==null?variant.Term:string.Join(" ",terms);
+                var score=edits>0?100:names[i]==phrase?1000:names[i].StartsWith(phrase,StringComparison.Ordinal)?800:600;
+                if(score>variant.Penalty)best=Math.Max(best,score-variant.Penalty);
+            }
+        }
+        return best;
+    }
+    // Common accidental keyboard-layout input, not arbitrary title translation.
+    static string Keyboard(string text)
+    {
+        const string latin="`qwertyuiop[]asdfghjkl;'zxcvbnm,.";
+        const string russian="ёйцукенгшщзхъфывапролджэячсмитьбю";
+        var toRussian=text.Any(c=>c is >= 'a' and <= 'z' or >= 'A' and <= 'Z')&&!text.Any(c=>c is >= '\u0400' and <= '\u04ff');
+        var from=toRussian?latin:russian;var to=toRussian?russian:latin;
+        var result=new StringBuilder(text.Length);
+        foreach(var c in text.ToLowerInvariant()){var position=from.IndexOf(c);result.Append(position>=0?to[position]:c);}
+        return result.ToString();
+    }
+    static bool OneEdit(string a,string b)
+    {
+        if(b.Length<5||a[0]!=b[0]||Math.Abs(a.Length-b.Length)>1)return false;
+        var i=0;while(i<Math.Min(a.Length,b.Length)&&a[i]==b[i])i++;
+        if(i==Math.Min(a.Length,b.Length))return Math.Abs(a.Length-b.Length)==1;
+        if(a.Length==b.Length)
+        {
+            if(a.AsSpan(i+1).SequenceEqual(b.AsSpan(i+1)))return true;
+            return i+1<a.Length&&a[i]==b[i+1]&&a[i+1]==b[i]&&a.AsSpan(i+2).SequenceEqual(b.AsSpan(i+2));
+        }
+        return a.Length>b.Length?a.AsSpan(i+1).SequenceEqual(b.AsSpan(i)):a.AsSpan(i).SequenceEqual(b.AsSpan(i+1));
+    }
+}
+
+public static class CatalogSearch
+{
+    public static MediaItem[] Find(IEnumerable<MediaItem> items,string query,int limit=80,string language="ru")
+    {
+        var parsed=new CatalogSearchQuery(query);var rows=items.ToArray();limit=Math.Clamp(limit,1,200);
+        if(parsed.Empty)return rows.Take(limit).ToArray();
+        var ranked=rows.Select(item=>(Item:item,Score:parsed.Score(item))).Where(x=>x.Score>0).ToArray();
+        // Typos are a bounded fallback; they never crowd out valid exact/prefix/alias results.
+        if(ranked.Length==0)ranked=rows.Select(item=>(Item:item,Score:parsed.Score(item,true))).Where(x=>x.Score>0).ToArray();
+        return ranked.OrderByDescending(x=>x.Score).ThenBy(x=>SearchLanguage.TitleRank(x.Item,language)).ThenBy(x=>x.Item.Title,StringComparer.CurrentCultureIgnoreCase).Take(limit).Select(x=>x.Item).ToArray();
+    }
+}

@@ -6,10 +6,12 @@ namespace Kachalka;
 public static class BundledCatalog
 {
     const int StarterMaxBytes=1024*1024;
-    sealed record SearchRow(MediaItem Item,string[] Words);
-    sealed record Snapshot(MediaItem[] Items,SearchRow[] Search);
-    static string Normalize(string value)=>System.Text.RegularExpressions.Regex.Replace(value.Replace('ё','е').Replace('Ё','Е').ToLowerInvariant(),@"[^\p{L}\p{N}]+"," ").Trim();
-    static Snapshot Index(MediaItem[] items)=>new(items,items.Select(item=>new SearchRow(item,Normalize(string.Join(" ",MediaIdentity.Names(item))+" "+item.Year).Split(' ',StringSplitOptions.RemoveEmptyEntries))).ToArray());
+    sealed record Snapshot(MediaItem[] Items);
+    static Snapshot Index(MediaItem[] items)
+    {
+        foreach(var item in items)_=MediaIdentity.Names(item);
+        return new(items);
+    }
     static Snapshot? loaded;
     static readonly Lazy<Snapshot> starter=new(()=>
     {
@@ -55,10 +57,9 @@ public static class BundledCatalog
     }
     public static IReadOnlyList<MediaItem> Search(string section,string query)
     {
-        var words=Normalize(query).Split(' ',StringSplitOptions.RemoveEmptyEntries);
         _=snapshot.Value;
         var index=Volatile.Read(ref loaded)??starter.Value;
-        return index.Search.Where(row=>row.Item.Section==section&&words.All(word=>row.Words.Any(part=>part.StartsWith(word,StringComparison.Ordinal)))).Take(80).Select(row=>row.Item).ToArray();
+        return CatalogSearch.Find(index.Items.Where(item=>item.Section==section),query,80,AppLanguage.Current);
     }
     public static IReadOnlyList<MediaItem> FindWork(string section,string title,int year,string? originalTitle=null)
     {

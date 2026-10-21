@@ -42,6 +42,8 @@ public static class MediaIdentity
         return new(values,normalized,normalized.Select(x=>x.Split(' ',StringSplitOptions.RemoveEmptyEntries)).ToArray());
     });
     public static string[] Names(MediaItem item)=>Index(item).Names;
+    internal static string[] NormalizedNames(MediaItem item)=>Index(item).Normalized;
+    internal static string[][] WordNames(MediaItem item)=>Index(item).Words;
     public static string OriginalQuery(string query)
     {
         var term=Normalize(query);

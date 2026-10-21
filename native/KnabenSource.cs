@@ -1,7 +1,6 @@
 using System.IO;
 using System.Net.Http;
 using System.Net.Http.Headers;
-using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -11,7 +10,6 @@ namespace Kachalka;
 public static class KnabenSource
 {
     const int MaxResponseBytes=2_000_000;
-    static readonly Uri Endpoint=new("https://api.knaben.org/v1");
     static readonly HttpClient Http=CreateClient();
     static readonly SemaphoreSlim RequestGate=new(1,1);
     static DateTime nextRequest=DateTime.MinValue;
@@ -35,20 +33,15 @@ public static class KnabenSource
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Take(4)
             .ToArray();
-        if(queries.Length==0)return [];
-        var entries=new List<SourceEntry>();
-        Exception? last=null;var answered=false;
-        foreach(var query in queries)
-        {
-            try{entries.AddRange(await SearchQuery(query,item,ct));answered=true;}
-            catch(Exception error) when(!ct.IsCancellationRequested){last=error;/* Keep releases from the other title. */}
-        }
-        ct.ThrowIfCancellationRequested();
-        if(!answered&&last!=null)throw last;
-        return entries
-            .DistinctBy(entry=>entry.Id)
-            .OrderByDescending(entry=>entry.Seeds??-1)
-            .ToArray();
+        return await ReleaseAliasSearch.Run(queries,(query,token)=>SearchQuery(query,item,token),ct);
+    }
+
+    // v2 supports cached GET requests and tracker filtering; unrelated trackers no longer consume the first page.
+    public static Uri QueryUri(string title,bool games=false)
+    {
+        var query=games?"\""+title.Replace("\"","").Trim()+"\"":title.Trim();
+        return new("https://api.knaben.org/v2/search?q="+Uri.EscapeDataString(query)+"&sf=title&t="+
+            (games?"rutracker,thepiratebay":"rutracker")+"&o=seeders&d=desc&s=150");
     }
 
     static async Task<IReadOnlyList<SourceEntry>> SearchQuery(string query,MediaItem item,CancellationToken ct)
@@ -60,20 +53,7 @@ public static class KnabenSource
             var delay=nextRequest-DateTime.UtcNow;
             if(delay>TimeSpan.Zero)await Task.Delay(delay,ct);
             nextRequest=DateTime.UtcNow.AddMilliseconds(2100);
-        using var request=new HttpRequestMessage(HttpMethod.Post,Endpoint)
-        {
-            Content=new StringContent(JsonSerializer.Serialize(new
-            {
-                query=item.Section=="Игры"?"\""+query.Replace("\"","")+"\"":query,
-                search_field="title",
-                search_type="100%",
-                order_by="seeders",
-                order_direction="desc",
-                size=75,
-                hide_unsafe=true,
-                hide_xxx=true
-            }),Encoding.UTF8,"application/json")
-        };
+        using var request=new HttpRequestMessage(HttpMethod.Get,QueryUri(query,item.Section=="Игры"));
         using var response=await Http.SendAsync(request,HttpCompletionOption.ResponseHeadersRead,ct);
         response.EnsureSuccessStatusCode();
         if(response.Content.Headers.ContentLength>MaxResponseBytes)throw new InvalidDataException("Ответ индекса превышает допустимый размер.");
@@ -93,9 +73,9 @@ public static class KnabenSource
     public static IReadOnlyList<SourceEntry> Parse(byte[] data,MediaItem item)
     {
         using var json=JsonDocument.Parse(data);
-        if(!json.RootElement.TryGetProperty("hits",out var hits)||hits.ValueKind!=JsonValueKind.Array)return [];
+        if(!json.RootElement.TryGetProperty("hits",out var hits)||hits.ValueKind!=JsonValueKind.Array)throw new InvalidDataException("Индекс не вернул список раздач.");
         var entries=new List<SourceEntry>();
-        foreach(var row in hits.EnumerateArray().Take(75))
+        foreach(var row in hits.EnumerateArray().Take(150))
         {
             if(row.ValueKind!=JsonValueKind.Object)continue;
             var tracker=String(row,"tracker")?.Trim();

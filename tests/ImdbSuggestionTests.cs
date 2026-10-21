@@ -34,7 +34,7 @@ static class ImdbSuggestionTests
             "an IMDb title becomes a live card with its original name for the release search");
         Check(series.ImageUrl=="https://m.media-amazon.com/images/M/MV5BSolar@._V1_QL75_UX400_.jpg","the poster is requested at card size");
         Check(series.Id<0&&series.Id==ImdbSuggestions.Parse(json,"solar opposites")[0].Id,"the card id is stable between searches");
-        Check(!ImdbSuggestions.Applies("Солнечные противоположности")&&ImdbSuggestions.Applies("solar opposites")&&!ImdbSuggestions.Applies("  "),"only Latin queries ask IMDb");
+        Check(ImdbSuggestions.Applies("Солнечные противоположности")&&ImdbSuggestions.Applies("solar opposites")&&!ImdbSuggestions.Applies("Придуманное название")&&!ImdbSuggestions.Applies("  "),"Latin titles and verified Russian aliases ask IMDb without translating arbitrary queries");
         // The report's second half: the queued Solar Opposites row could not be opened because only Zona pages had a card.
         var queued=new DownloadItem{Name="Solar.Opposites.S06.1080p.WEB-DL.mkv",MediaTitle=series.Title,MediaSection=series.Section,MediaYear=series.Year,MediaPageUrl=series.PageUrl,ImageUrl=series.ImageUrl,
             ReleaseTitle="Солнечные оппозиты / Solar Opposites / Сезон 6 (WEB-DL 1080p)"};
@@ -96,7 +96,7 @@ static class ImdbSuggestionTests
         Check(MediaIdentity.Merge(new[]{zona}.Concat(imdbBreakingBad)).Length==1&&MediaIdentity.Merge(new[]{zona}.Concat(found)).Length==3,"a title the catalog already has is not added twice");
         var merged=await UnifiedSearch.FindAsync("solar opposites",(_,_)=>Task.FromResult<IReadOnlyList<MediaItem>>([]),_=>[],CancellationToken.None,_=>Task.FromResult<IReadOnlyList<MediaItem>>(found));
         Check(merged.Items.Length==2&&merged.Items[0].Title=="Solar Opposites","search results include the IMDb titles the catalog lacks");
-        var failing=await UnifiedSearch.FindAsync("solar opposites",(_,_)=>Task.FromResult<IReadOnlyList<MediaItem>>([zona]),_=>[],CancellationToken.None,_=>throw new HttpRequestException("offline"));
+        var failing=await UnifiedSearch.FindAsync("breaking bad",(_,_)=>Task.FromResult<IReadOnlyList<MediaItem>>([zona]),_=>[],CancellationToken.None,_=>throw new HttpRequestException("offline"));
         Check(failing.Items.Length==1&&!failing.Offline,"an unreachable IMDb never hides catalog results");
         await Kachalka.Tests.MediaIdentityTests.Run();
     }

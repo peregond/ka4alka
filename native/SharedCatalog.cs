@@ -59,9 +59,8 @@ public sealed class SharedCatalog
     }
     public IReadOnlyList<MediaItem> Search(string section,string query)
     {
-        CacheFiles.Touch(path);static string Normalize(string value)=>System.Text.RegularExpressions.Regex.Replace(value.Replace('ё','е').Replace('Ё','Е').ToLowerInvariant(),@"[^\p{L}\p{N}]+"," ").Trim();
-        var words=Normalize(query).Split(' ',StringSplitOptions.RemoveEmptyEntries);
-        return All.Where(item=>item.Section==section&&MediaIdentity.MatchesQuery(item,words)).Take(80).ToArray();
+        CacheFiles.Touch(path);
+        return CatalogSearch.Find(All.Where(item=>item.Section==section),query,80,AppLanguage.Current);
     }
     // Navigation cancellation stops only its wait, never the shared disk load or refresh.
     public Task RestoreAsync(CancellationToken ct=default)

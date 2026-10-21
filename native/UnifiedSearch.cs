@@ -7,16 +7,14 @@ public static class UnifiedSearch
         Func<CancellationToken,Task<IReadOnlyList<MediaItem>>>? supplement=null,Action<SearchResult>? updated=null,string preferredLanguage="ru")
     {
         cancellation.ThrowIfCancellationRequested();
-        var term=query.Trim();
-        int Rank(MediaItem item)=>MediaIdentity.Names(item).Any(name=>name.Equals(term,StringComparison.CurrentCultureIgnoreCase))?0:MediaIdentity.Names(item).Any(name=>name.StartsWith(term,StringComparison.CurrentCultureIgnoreCase))?1:2;
         // Read UI-owned local stores once. Every subsequent merge/rank runs on
         // a worker; publication returns to the caller's synchronization context.
-        var local=new[]{"Фильмы","Сериалы"}.SelectMany(kind=>saved(kind).Where(x=>x.Section==kind)).DistinctBy(x=>(x.Section,x.Id)).ToArray();
-        SearchResult Build(IEnumerable<MediaItem> rows,bool offline)=>new(MediaIdentity.Merge(rows.DistinctBy(x=>(x.Section,x.Id))).OrderBy(Rank).ThenBy(x=>SearchLanguage.TitleRank(x,preferredLanguage)).ThenBy(x=>x.Title,StringComparer.CurrentCultureIgnoreCase).ToArray(),offline);
+        var local=new[]{"Фильмы","Сериалы"}.SelectMany(kind=>saved(kind).Where(x=>x.Section==kind)).ToArray();
+        SearchResult Build(IEnumerable<MediaItem> rows,bool offline)=>new(CatalogSearch.Find(MediaIdentity.Merge(rows.Distinct()),query,200,preferredLanguage),offline);
         if(local.Length>0)updated?.Invoke(Build(local,false));
         async Task<SearchResult> Category(string category)
         {
-            try{return new((await remote(category,cancellation).WaitAsync(cancellation)).Where(x=>x.Section==category).Take(80).ToArray(),false);}
+            try{return new(CatalogSearch.Find(MediaIdentity.Merge((await remote(category,cancellation).WaitAsync(cancellation)).Where(x=>x.Section==category).Distinct()),query,160,preferredLanguage),false);}
             catch(Exception) when(!cancellation.IsCancellationRequested){return new([],true);}
         }
         async Task<SearchResult> Extra()

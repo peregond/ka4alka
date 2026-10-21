@@ -59,6 +59,7 @@ struct CatalogFilter: Equatable {
     @Published var releases: [ReleaseRow] = []
     @Published var sources: [SourceState] = []
     /// The card id `releases` and `sources` belong to. Use `releases(for:)` / `sources(for:)` so another title's rows never show.
+    @Published var scopedReleaseRecommendation: ScopedReleaseRecommendation?
     @Published var releasesOwner: String?
     @Published var releasesLoading = false
     @Published private var loadingKeys: [String: Int] = [:]
@@ -426,6 +427,14 @@ struct CatalogFilter: Equatable {
         } catch { if route == .detail(card) { fail(error) } }
     }
     func releases(for card: MediaCard) -> [ReleaseRow] { releasesOwner == card.id ? releases : [] }
+    func recommendedRelease(for card: MediaCard) -> ReleaseRow? {
+        let rows = releases(for: card)
+        if let selection = scopedReleaseRecommendation, selection.owner == card.id {
+            guard let id = selection.id else { return nil }
+            return rows.first { $0.id == id && $0.downloadable }
+        }
+        return rows.first { $0.recommended && $0.downloadable }
+    }
     func sources(for card: MediaCard) -> [SourceState] { releasesOwner == card.id ? sources : [] }
     func loadPerson(_ value: Person) async {
         person = nil

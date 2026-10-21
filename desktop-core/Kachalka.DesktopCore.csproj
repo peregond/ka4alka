@@ -12,6 +12,7 @@
     <Compile Include="../native/CacheStorage.cs" Link="CacheStorage.cs" />
     <Compile Include="../native/CatalogBatch.cs" Link="CatalogBatch.cs" />
     <Compile Include="../native/CatalogChoices.cs" Link="CatalogChoices.cs" />
+    <Compile Include="../native/CatalogSearch.cs" Link="CatalogSearch.cs" />
     <Compile Include="../native/CatalogIndex.cs" Link="CatalogIndex.cs" />
     <Compile Include="../native/CatalogPaging.cs" Link="CatalogPaging.cs" />
     <Compile Include="../native/CatalogRegions.cs" Link="CatalogRegions.cs" />
@@ -66,6 +67,7 @@
     <Compile Include="../native/ReleaseFreshness.cs" Link="ReleaseFreshness.cs" />
     <Compile Include="../native/ReleaseQuality.cs" Link="ReleaseQuality.cs" />
     <Compile Include="../native/ReleaseRecommendation.cs" Link="ReleaseRecommendation.cs" />
+    <Compile Include="../native/ReleaseAliasSearch.cs" Link="ReleaseAliasSearch.cs" />
     <Compile Include="../native/ReleaseSearch.cs" Link="ReleaseSearch.cs" />
     <Compile Include="../native/RussianAudio.cs" Link="RussianAudio.cs" />
     <Compile Include="../native/SearchLanguage.cs" Link="SearchLanguage.cs" />

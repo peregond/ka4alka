@@ -75,8 +75,10 @@ struct DetailResult: Decodable {
     var originalTitle: String? = nil; var genres: String? = nil; var country: String? = nil; var resolutions: [Int]? = nil
 }
 struct PersonResult: Decodable { var person: Person; var description: String; var items: [MediaCard]; var sourceUrl: String? }
+struct ScopedReleaseRecommendation: Equatable { var owner: String; var id: String? }
 struct ReleaseRow: Decodable, Identifiable, Equatable { var id: String; var title: String; var source: String; var size: Double?; var seeds: Int?; var leechers: Int?; var quality: String; var type: String; var audio: String; var studios: [String]; var audioTypes: [String]; var codec: String; var subs: String; var hdr: String; var poor: Bool; var downloadable: Bool; var recommended: Bool; var season: Int?; var episode: Int?; var multipleSeasons: Bool; var multipleEpisodes: Bool; var englishAudio: Bool; var russianAudio: Bool; var gameKind: String?; var gameGroup: String?; var gameVersion: String?
     var russianDub: Bool? = nil; var qualityLabel: String? = nil
+    var recommendationOrder: Int? = nil
     /// The tracker's own id of the release (matches `Transfer.releaseId` of a queued download); nil from an older engine.
     var entryId: String? = nil
 }

@@ -25,16 +25,8 @@ public sealed class MegaPeerSource(SourceClient client)
         return new Uri(Base,"browse.php?search="+encoded+"&stype=0");
     }
 
-    public async Task<IReadOnlyList<SourceEntry>> Search(MediaItem item,CancellationToken ct)
-    {
-        var groups=await Task.WhenAll(MediaIdentity.Queries(item).Select(async query=>
-        {
-            try{return (Items:Parse(await client.Read(QueryUri(query),2*1024*1024,ct),item),Error:(Exception?)null);}
-            catch(Exception error) when(!ct.IsCancellationRequested){return (Items:(IReadOnlyList<SourceEntry>)[],Error:error);}
-        }));
-        if(groups.Length>0&&groups.All(x=>x.Error!=null))System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(groups.First().Error!).Throw();
-        return groups.SelectMany(x=>x.Items).DistinctBy(entry=>entry.Id).OrderByDescending(entry=>entry.Seeds??-1).Take(100).ToArray();
-    }
+    public Task<IReadOnlyList<SourceEntry>> Search(MediaItem item,CancellationToken ct)=>
+        ReleaseAliasSearch.Run(MediaIdentity.Queries(item),async(query,token)=>Parse(await client.Read(QueryUri(query),2*1024*1024,token),item),ct);
 
     public static IReadOnlyList<SourceEntry> Parse(byte[] data,MediaItem item)
     {

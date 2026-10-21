@@ -18,6 +18,10 @@ assert.equal(identity.catalogQueries('series','Solar Opposites')[0],'Обрат�
 assert.equal(identity.enrichMedia({...solar,year:2021}).imdbId,undefined);
 assert.equal(identity.enrichMedia({...solar,section:'movies'}).imdbId,undefined);
 assert.equal(identity.enrichMedia({...solar,imdbId:'tt0000001'}).originalTitle,undefined);
+const backrooms={id:'movies:backrooms',section:'movies',title:'Закулисье реальности',year:2026,pageUrl:'https://w6.zona.plus/movies/backrooms-2026'};
+assert.equal(identity.enrichMedia(backrooms).imdbId,'tt26657236');
+assert(identity.mediaNames(identity.enrichMedia(backrooms)).includes('Backrooms'));
+assert.equal(identity.enrichMedia({...backrooms,year:2022}).imdbId,undefined);
 const title=load('../lib/title-info.ts');
 const tvdb=load('../lib/tvdb-title.ts',{'@/lib/title-info':title});
 const parsed=tvdb.parseSeries('tt8910922',{id:375892,name:'Solar Opposites',year:'2020',translations:{nameTranslations:[{language:'rus',name:'Обратная сторона Земли'},{language:'rus',name:'Солнечные противоположности',isAlias:true},{language:'eng',name:'Unrelated English alias',isAlias:true}]}});
