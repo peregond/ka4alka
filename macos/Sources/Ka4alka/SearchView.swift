@@ -62,22 +62,25 @@ struct SearchView: View {
                 .buttonStyle(.automatic)
                 .help(tr("Назад", "Back"))
             }
-            ToolbarItem(placement: .primaryAction) { scope }
+            // Give each native toolbar host its own identifier. Reusing one item while
+            // changing its Picker style leaves the old minimum width cached on Intel macOS.
+            if contentWidth >= 800 {
+                ToolbarItem(id: "search-scope-wide", placement: .primaryAction) {
+                    scopePicker.pickerStyle(.segmented).frame(width: 245)
+                        .settingsLayoutProbe("search.scope")
+                }
+            } else {
+                ToolbarItem(id: "search-scope-compact", placement: .primaryAction) {
+                    scopePicker.pickerStyle(.menu).frame(width: 140)
+                        .settingsLayoutProbe("search.scope")
+                }
+            }
         }
         .onChange(of: model.query) { _, query in
             if query.isEmpty { model.clearSearch() }
         }
     }
 
-    @ViewBuilder private var scope: some View {
-        if contentWidth >= 800 {
-            scopePicker.pickerStyle(.segmented).frame(width: 245)
-                .settingsLayoutProbe("search.scope")
-        } else {
-            scopePicker.pickerStyle(.menu).frame(width: 140)
-                .settingsLayoutProbe("search.scope")
-        }
-    }
     private var scopePicker: some View {
         Picker(tr("Где искать", "Search in"), selection: Binding(
             get: { model.section == .games },
