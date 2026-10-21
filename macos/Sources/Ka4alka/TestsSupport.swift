@@ -80,7 +80,7 @@ extension SmokePage {
     var spec: SmokePageSpec {
         switch self {
         case .search:
-            return SmokePageSpec(prefixes: ["search."], required: ["search.header", "search.field", "search.scope"], network: false, plain: true, toolbar: false, scansText: true)
+            return SmokePageSpec(prefixes: ["search."], required: ["search.content", "search.scope"], network: false, plain: true, toolbar: false, scansText: true)
         case .featured:
             return SmokePageSpec(prefixes: ["featured."], required: ["featured.hero"], network: false, plain: false, toolbar: false, scansText: false)
         case .movies:
@@ -115,16 +115,16 @@ extension SmokePage {
 enum SmokeProbeCatalog {
     static let sourceLiterals: [String] = [
         "featured.hero", "featured.digest", "featured.ranking",
-        "search.header", "search.field", "search.scope",
+        "search.content", "search.scope",
         "catalog.banner.", "catalog.hero", "catalog.hero.title", "catalog.hero.actions", "catalog.filters", "catalog.saved.controls",
         "games.hero",
         "downloads.header", "downloads.tiles", "downloads.row.",
         "viewport", "header", "content", "card.", "settings.nav", "appearance.tile.",
         "detail.banner", "detail.actions", "detail.releases.toolbar",
-        "toolbar.add", "toolbar.refresh", "toolbar.appearance", "sidebar"
+        "toolbar.sidebar", "toolbar.add", "toolbar.refresh", "toolbar.appearance", "sidebar"
     ]
     /// Accessibility identifiers the smoke test or the UI tests may look for.
-    static let identifiers: [String] = ["nav-", "nav-search", "search-field", "catalog-spotlight", "hero-open", "downloads-add"]
+    static let identifiers: [String] = ["nav-", "nav-search", "shell-sidebar-toggle", "search-field", "catalog-spotlight", "hero-open", "downloads-add"]
 }
 
 // MARK: Text rules

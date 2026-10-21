@@ -56,14 +56,31 @@ struct RootView: View {
     @EnvironmentObject private var updater: MacUpdater
     @Environment(\.colorScheme) private var colorScheme
     @State private var dropTargeted = false
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             sidebar
         } detail: {
             detailColumn
         }
         .navigationSplitViewStyle(.balanced)
+        .toolbar(removing: .sidebarToggle)
+        .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Button {
+                    columnVisibility = columnVisibility == .detailOnly ? .all : .detailOnly
+                } label: {
+                    Label(tr("Боковое меню", "Sidebar"), systemImage: "sidebar.left")
+                }
+                .labelStyle(.iconOnly)
+                .buttonStyle(.automatic)
+                .controlSize(.regular)
+                .help(tr("Показать или скрыть боковое меню", "Show or hide sidebar"))
+                .accessibilityIdentifier("shell-sidebar-toggle")
+                .settingsLayoutProbe("toolbar.sidebar")
+            }
+        }
         .buttonStyle(KDSecondaryButtonStyle())
         .sheet(item: sheetBinding) { sheet in sheetContent(sheet) }
         .dropDestination(for: URL.self, action: { urls, _ in acceptDrop(urls) }, isTargeted: { targeted in dropTargeted = targeted })

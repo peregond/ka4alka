@@ -20,41 +20,53 @@ struct SearchOrigin {
 /// Return submits one request, so network work never competes with text input or scrolling.
 struct SearchView: View {
     @EnvironmentObject private var model: AppModel
-    @State private var headerWidth: CGFloat = 0
+    @FocusState private var searchFocused: Bool
 
     var body: some View {
+        if #available(macOS 15.0, *) {
+            page
+                .searchable(text: $model.query, placement: .toolbar,
+                            prompt: tr("Найти фильм, сериал или игру", "Find a movie, series or game"))
+                .searchPresentationToolbarBehavior(.expanded)
+                .searchFocused($searchFocused)
+                .onSubmit(of: .search) { model.submitSearch() }
+                .task(id: model.searchFocus) {
+                    await Task.yield()
+                    searchFocused = true
+                }
+        } else {
+            // macOS 14 predates searchFocused. Keep its native AppKit editor and
+            // focus coordinator in the system toolbar rather than in page content.
+            page.toolbar {
+                ToolbarItem(placement: .principal) {
+                    NativeSearchField(text: $model.query, focusToken: model.searchFocus,
+                                      prompt: tr("Найти фильм, сериал или игру", "Find a movie, series or game")) { model.submitSearch() }
+                        .frame(minWidth: 220, idealWidth: 300, maxWidth: 420)
+                }
+            }
+        }
+    }
+
+    private var page: some View {
         VStack(spacing: 0) {
-            header
             if model.submittedQuery.isEmpty { recentSearches } else { CatalogView() }
+        }
+        .settingsLayoutProbe("search.content")
+        .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Button { model.back() } label: {
+                    Label(tr("Назад", "Back"), systemImage: "chevron.backward")
+                }
+                .buttonStyle(.automatic)
+                .help(tr("Назад", "Back"))
+            }
+            ToolbarItem(placement: .primaryAction) { scope }
         }
         .onChange(of: model.query) { _, query in
             if query.isEmpty { model.clearSearch() }
         }
     }
 
-    private var header: some View {
-        HStack(alignment: .top, spacing: KD.Space.s) {
-            KDIconButton(systemImage: "chevron.backward", label: tr("Назад", "Back")) { model.back() }
-                .padding(.top, 8)
-            // Keep one editor while changing layout; duplicate focus bindings lose the responder.
-            let layout = headerWidth >= 680 ? AnyLayout(HStackLayout(spacing: KD.Space.m)) : AnyLayout(VStackLayout(spacing: KD.Space.s))
-            layout {
-                field
-                scope.frame(maxWidth: headerWidth >= 680 ? 260 : .infinity)
-            }
-        }
-        .padding(KD.gutter)
-        .frame(maxWidth: .infinity)
-        .kdReadWidth($headerWidth)
-        .background(KDPalette.pageBackground)
-        .settingsLayoutProbe("search.header")
-    }
-    private var field: some View {
-        NativeSearchField(text: $model.query, focusToken: model.searchFocus,
-                          prompt: tr("Найти фильм, сериал или игру", "Find a movie, series or game")) { model.submitSearch() }
-            .frame(minWidth: 220, minHeight: 44)
-        .settingsLayoutProbe("search.field")
-    }
     private var scope: some View {
         Picker(tr("Где искать", "Search in"), selection: Binding(
             get: { model.section == .games },
@@ -65,7 +77,8 @@ struct SearchView: View {
         }
         .pickerStyle(.segmented)
         .labelsHidden()
-        .frame(minWidth: 245)
+        .frame(width: 245)
+        .controlSize(.regular)
         .settingsLayoutProbe("search.scope")
     }
     private var recentSearches: some View {

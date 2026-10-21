@@ -555,6 +555,7 @@ struct SmokeShot {
         guard let main = MacSmoke.mainWindow() else { return }
         inspectWindowControls()
         check(SettingsLayoutMeasurements.nativeAttached["toolbar.add"] == true, "toolbar: appears after scrolling")
+        check(!main.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, "toolbar: page name uses the native window title")
         for id in ["toolbar.add", "toolbar.refresh", "toolbar.appearance"] {
             guard SettingsLayoutMeasurements.nativeAttached[id] == true, let frame = SettingsLayoutMeasurements.nativeFrames[id], let visible = SettingsLayoutMeasurements.nativeVisibleFrames[id] else {
                 check(false, "toolbar: missing native control " + id)
@@ -793,24 +794,59 @@ struct SmokeShot {
         guard language == "ru" && theme == "dark" else { return }
         switch page {
         case .search:
-            if let frame = SettingsLayoutMeasurements.frames["search.field"] {
-                check(frame.width >= 220 && frame.height >= 40, "search: the field is visible and large enough")
-            } else { check(false, "search: the field is missing") }
-            check(MacSmoke.mainWindow()?.firstResponder is NSTextView, "search: opening the page focuses the input")
-            let nativeSearch = MacSmoke.mainWindow()?.contentView.flatMap { content in
-                SmokeViews.all(in: content).compactMap { $0 as? NSSearchField }.first
+            let main = MacSmoke.mainWindow()
+            let nativeSearch = main?.contentView.flatMap { content in
+                SmokeViews.all(in: content.superview ?? content).compactMap { $0 as? NSSearchField }.first { !$0.isHiddenOrHasHiddenAncestor }
             }
+            if let field = nativeSearch, let main {
+                let frame = field.convert(field.bounds, to: nil)
+                check(frame.width >= 220 && frame.height >= 22, "search: the field is visible and large enough")
+                check(main.frame.height - frame.midY <= 80 && main.frame.height - frame.midY >= 0,
+                      "search: the native field belongs to the window toolbar")
+                let visible = field.visibleRect
+                check(visible.width >= field.bounds.width * 0.99 && visible.height >= field.bounds.height * 0.99,
+                      "search: the toolbar field is not clipped")
+            } else { check(false, "search: the field is missing") }
+            check(main?.firstResponder is NSTextView, "search: opening the page focuses the input")
             let searchCell = nativeSearch?.cell as? NSSearchFieldCell
             check(nativeSearch?.isBezeled == true && nativeSearch?.focusRingType == .default && searchCell?.searchButtonCell != nil && searchCell?.cancelButtonCell != nil,
                   "search: the native field provides its search, cancel and keyboard focus controls")
             keyViewLoop()
         case .featured:
+            try await inspectSidebarToggle()
             try await scrollStall("featured")
         case .movies:
             try await scrollStall("movies")
         default:
             break
         }
+    }
+
+    private func inspectSidebarToggle() async throws {
+        guard let main = MacSmoke.mainWindow() else { return }
+        SettingsLayoutMeasurements.refreshNativeViews()
+        let expanded = SettingsLayoutMeasurements.nativeFrames["toolbar.sidebar"]
+        let toggle = #selector(NSSplitViewController.toggleSidebar(_:))
+        guard NSApp.sendAction(toggle, to: nil, from: nil) else {
+            check(false, "sidebar: native toggle action is available"); return
+        }
+        await pause(350)
+        SettingsLayoutMeasurements.refreshNativeViews()
+        let collapsed = SettingsLayoutMeasurements.nativeFrames["toolbar.sidebar"]
+        check(SettingsLayoutMeasurements.nativeAttached["toolbar.sidebar"] == true,
+              "sidebar: toggle remains visible when collapsed")
+        if let expanded, let collapsed {
+            check(abs(expanded.width - collapsed.width) <= 1 && abs(expanded.height - collapsed.height) <= 1,
+                  "sidebar: toggle keeps the same size in both states")
+        } else { check(false, "sidebar: toggle has native measurements in both states") }
+        inspectWindowControls()
+        _ = try await capture(saveAs: "sidebar-collapsed-" + theme + "-" + language)
+        let restored = NSApp.sendAction(toggle, to: nil, from: nil)
+        await pause(350)
+        SettingsLayoutMeasurements.refreshNativeViews()
+        check(restored && SettingsLayoutMeasurements.nativeAttached["toolbar.sidebar"] == true,
+              "sidebar: native toggle restores the sidebar")
+        check(main.isVisible, "sidebar: changing visibility keeps the window open")
     }
 
     private func accessibilityPass(_ spec: SmokePageSpec) {

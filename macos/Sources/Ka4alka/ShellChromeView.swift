@@ -10,7 +10,9 @@ struct ShellChromeView: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .navigationTitle("")
+            // A window title is text. A custom principal ToolbarItem acquires a
+            // shared Glass background on modern macOS and looks like a button.
+            .navigationTitle(model.route != .search && scrolled ? title : "")
             // Keep the system toolbar alive even when its page actions are absent.
             // Hiding it also hides traffic lights on some macOS versions.
             .toolbar(.visible, for: .windowToolbar)
@@ -22,11 +24,6 @@ struct ShellChromeView: ViewModifier {
                         }
                         .buttonStyle(.automatic)
                         .help(tr("Назад", "Back"))
-                    }
-                }
-                ToolbarItem(placement: .principal) {
-                    if model.route != .search, scrolled {
-                        Text(title).font(.headline).lineLimit(1)
                     }
                 }
                 ToolbarItemGroup(placement: .primaryAction) {
