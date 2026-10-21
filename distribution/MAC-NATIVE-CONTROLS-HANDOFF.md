@@ -1,6 +1,6 @@
 # Native Mac controls
 
-Prepared on `claude/quirky-hopper-1vlmj6` after published 0.44.11. Do not overwrite an existing release. This work does not publish desktop packages or change Windows UI.
+Published as [0.44.12](https://github.com/peregond/ka4alka/releases/tag/v0.44.12), source `df1682865aef97be86afbaf6b7675f21f151393e`, on `claude/quirky-hopper-1vlmj6`. Do not overwrite an existing release. Windows UI is unchanged.
 
 ## Implementation
 
@@ -23,3 +23,7 @@ Application changes: `08732fd27bafd47166a7460e6fac74aeb49f3b92`. Build SDK chang
 - [Mac architecture/compatibility run 39504324398](https://github.com/peregond/ka4alka/actions/runs/39504324398), attempt 2: Apple Silicon and Intel built with Xcode 26.3; the actual-window matrices, native close, shared core, local pairing, IPC and all 64 Swift tests passed. macOS 26 / Xcode 26 and macOS 15 / Xcode 16.4 compatibility checks passed. The first attempt failed because Steam temporarily returned HTML instead of JSON; the same checks passed after the source recovered, without waiving UI requirements.
 
 The macOS 27 runner has Reduce Transparency and Reduce Motion enabled. Its snapshots correctly show solid system controls; its environment report confirms the Glass branch was compiled. Relevant captures: `settings-1280x820-dark-ru.png`, `search-1280x820-dark-ru.png` and English/light equivalents.
+
+## Published release verification
+
+[Release run 39570239297](https://github.com/peregond/ka4alka/actions/runs/39570239297) passed Windows, both Mac packages built with Xcode 26.3, both shared-core jobs, signatures and public update checks. Each Mac package passed 535 actual-window checks and 64 Swift tests. The Windows 0.44.11 → 0.44.12 upgrade preserved settings, downloaded 7,379,082 bytes of a 107,731,518-byte package and reused 422 files. ZIP and DMG assets for both Mac architectures and the Windows installer are public. Screenshot workflows run separately after publication.
