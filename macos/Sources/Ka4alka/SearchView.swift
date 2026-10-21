@@ -53,7 +53,8 @@ struct SearchView: View {
             if compactToolbar {
                 HStack {
                     Spacer()
-                    scopePicker.pickerStyle(.menu).frame(width: 160)
+                    scopePicker.pickerStyle(.menu).frame(width: 160).frame(minHeight: 28)
+                        .settingsLayoutProbe("menu.search.scope", kind: .control)
                         .settingsLayoutProbe("search.scope")
                 }
                 .padding(.horizontal, KD.gutter)

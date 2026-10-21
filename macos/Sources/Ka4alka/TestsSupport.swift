@@ -115,7 +115,7 @@ extension SmokePage {
 enum SmokeProbeCatalog {
     static let sourceLiterals: [String] = [
         "featured.hero", "featured.digest", "featured.ranking",
-        "search.content", "search.scope",
+        "search.content", "search.scope", "menu.search.scope",
         "catalog.banner.", "catalog.hero", "catalog.hero.title", "catalog.hero.actions", "catalog.filters", "catalog.saved.controls",
         "games.hero",
         "downloads.header", "downloads.tiles", "downloads.row.",

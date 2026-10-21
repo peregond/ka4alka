@@ -829,8 +829,10 @@ struct SmokeShot {
                   "search: the native field provides its search, cancel and keyboard focus controls")
             keyViewLoop()
         case .featured:
-            try await inspectSidebarToggle()
+            // Preserve the existing page-scroll scenario. Sidebar collapse/restore changes
+            // image proposals and is a separate interaction test, not part of scroll timing.
             try await scrollStall("featured")
+            try await inspectSidebarToggle()
         case .movies:
             try await scrollStall("movies")
         default:
