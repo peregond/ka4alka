@@ -38,6 +38,8 @@ struct CatalogFilter: Equatable {
     let transfers = TransferStore()
     @Published var settings: AppSettings?
     @Published var version = ""
+    @Published var sidebarVisibility: NavigationSplitViewVisibility = .all
+    func toggleSidebar() { sidebarVisibility = sidebarVisibility == .detailOnly ? .all : .detailOnly }
     @Published var connected = false
     @Published var bootstrapping = false
     @Published var query = ""

@@ -822,13 +822,30 @@ struct SmokeShot {
         }
     }
 
+    private func clickSidebarToggle(in window: NSWindow) -> Bool {
+        guard let frame = SettingsLayoutMeasurements.nativeFrames["toolbar.sidebar"] else { return false }
+        let point = NSPoint(x: frame.midX, y: frame.midY)
+        let timestamp = ProcessInfo.processInfo.systemUptime
+        guard let down = NSEvent.mouseEvent(with: .leftMouseDown, location: point, modifierFlags: [],
+                                           timestamp: timestamp, windowNumber: window.windowNumber,
+                                           context: nil, eventNumber: 1, clickCount: 1, pressure: 1),
+              let up = NSEvent.mouseEvent(with: .leftMouseUp, location: point, modifierFlags: [],
+                                         timestamp: timestamp + 0.01, windowNumber: window.windowNumber,
+                                         context: nil, eventNumber: 2, clickCount: 1, pressure: 0) else { return false }
+        window.makeKeyAndOrderFront(nil)
+        // Queue both events before AppKit enters button tracking; a synchronous mouseDown
+        // could otherwise wait for a mouseUp that the main actor has not posted yet.
+        NSApp.postEvent(down, atStart: false)
+        NSApp.postEvent(up, atStart: false)
+        return true
+    }
+
     private func inspectSidebarToggle() async throws {
         guard let main = MacSmoke.mainWindow() else { return }
         SettingsLayoutMeasurements.refreshNativeViews()
         let expanded = SettingsLayoutMeasurements.nativeFrames["toolbar.sidebar"]
-        let toggle = #selector(NSSplitViewController.toggleSidebar(_:))
-        guard NSApp.sendAction(toggle, to: nil, from: nil) else {
-            check(false, "sidebar: native toggle action is available"); return
+        guard clickSidebarToggle(in: main) else {
+            check(false, "sidebar: toggle accepts a pointer click"); return
         }
         await pause(350)
         SettingsLayoutMeasurements.refreshNativeViews()
@@ -844,7 +861,7 @@ struct SmokeShot {
         } else { check(false, "sidebar: toggle has native measurements in both states") }
         inspectWindowControls()
         _ = try await capture(saveAs: "sidebar-collapsed-" + theme + "-" + language)
-        let restored = NSApp.sendAction(toggle, to: nil, from: nil)
+        let restored = clickSidebarToggle(in: main)
         await pause(350)
         SettingsLayoutMeasurements.refreshNativeViews()
         let sidebarShown = SettingsLayoutMeasurements.nativeAttached["sidebar"] == true &&

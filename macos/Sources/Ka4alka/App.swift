@@ -66,7 +66,11 @@ struct ShellCommands: Commands {
         CommandGroup(replacing: .appSettings) {
             Button(tr("Настройки…", "Settings…")) { Task { @MainActor in model.select(.settings) } }.keyboardShortcut(",")
         }
-        SidebarCommands()
+        CommandGroup(after: .toolbar) {
+            Button(model.sidebarVisibility == .detailOnly ? tr("Показать боковое меню", "Show Sidebar") : tr("Скрыть боковое меню", "Hide Sidebar")) {
+                model.toggleSidebar()
+            }.keyboardShortcut("s", modifiers: [.control, .command])
+        }
         CommandGroup(replacing: .newItem) {
             Button(tr("Добавить торрент…", "Add torrent…")) { Task { @MainActor in model.addTorrent = true } }.keyboardShortcut("o")
         }

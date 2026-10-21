@@ -56,10 +56,9 @@ struct RootView: View {
     @EnvironmentObject private var updater: MacUpdater
     @Environment(\.colorScheme) private var colorScheme
     @State private var dropTargeted = false
-    @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
     var body: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
+        NavigationSplitView(columnVisibility: $model.sidebarVisibility) {
             sidebar
         } detail: {
             detailColumn
@@ -69,7 +68,7 @@ struct RootView: View {
         .toolbar {
             ToolbarItem(placement: .navigation) {
                 Button {
-                    columnVisibility = columnVisibility == .detailOnly ? .all : .detailOnly
+                    model.toggleSidebar()
                 } label: {
                     Label(tr("Боковое меню", "Sidebar"), systemImage: "sidebar.left")
                 }
