@@ -21,7 +21,7 @@ struct SearchOrigin {
 struct SearchView: View {
     @EnvironmentObject private var model: AppModel
     @FocusState private var searchFocused: Bool
-    @State private var contentWidth: CGFloat = 0
+    @State private var compactToolbar = true
 
     var body: some View {
         if #available(macOS 15.0, *) {
@@ -50,7 +50,7 @@ struct SearchView: View {
 
     private var page: some View {
         VStack(spacing: 0) {
-            if contentWidth < 800 {
+            if compactToolbar {
                 HStack {
                     Spacer()
                     scopePicker.pickerStyle(.menu).frame(width: 160)
@@ -62,7 +62,7 @@ struct SearchView: View {
             if model.submittedQuery.isEmpty { recentSearches } else { CatalogView() }
         }
         .settingsLayoutProbe("search.content")
-        .kdReadWidth($contentWidth)
+        .background { SearchToolbarLayoutObserver { compactToolbar = $0 } }
         .toolbar {
             ToolbarItem(placement: .navigation) {
                 Button { model.back() } label: {
@@ -73,7 +73,7 @@ struct SearchView: View {
             }
             // macOS may put supplementary toolbar items into overflow when narrow.
             // Keep scope selection explicitly visible in the page at those widths.
-            if contentWidth >= 800 {
+            if !compactToolbar {
                 ToolbarItem(id: "search-scope-wide", placement: .primaryAction) {
                     scopePicker.pickerStyle(.segmented).frame(width: 245)
                         .settingsLayoutProbe("search.scope")
