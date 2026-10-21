@@ -29,4 +29,23 @@ All checks passed for the exact implementation commit:
 
 The macOS 26 and macOS 27 `movies-scrolled-dark-ru.png` screenshots were visually
 inspected: page title and actions are in the native top window chrome, with no
-floating full-width capsule over the content. These changes are not a release.
+floating full-width capsule over the content. The changes were subsequently published in 0.44.13 (see below).
+
+
+## Published 0.44.13
+
+Published on 2026-10-21 at 11:17:04 UTC from
+`e8240b48a5de1501351deb823ed3d16f258d9d57`:
+https://github.com/peregond/ka4alka/releases/tag/v0.44.13
+
+Release run `39587803520` passed Windows, both Mac architectures, shared-engine,
+Mac asset signing and public publisher verification. Windows upgraded the actual
+published 0.44.12 installation to 0.44.13, preserved settings, downloaded
+7,384,511 of 107,736,947 bytes, and reused 422 files.
+
+The release includes both Mac DMG and ZIP packages, Windows setup and ZIP,
+signed update manifests/component catalogs, SHA-256 checksums and exact-source
+platform validation. Public Windows and Mac update manifests return 0.44.13.
+
+The user requested that future completed, successfully checked changes be
+published without waiting for a separate “publish” instruction.
