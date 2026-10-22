@@ -120,7 +120,7 @@ public partial class MainWindow:Window
     internal int renderCount;internal string? lastRenderCaller;
     void Render()
     {
-        if(!ready)return;renderCount++;if(!MotionAllowed)lastRenderCaller=Environment.StackTrace;BeginCatalogNavigationRender();savedScroll=null;personRequest?.Cancel();personRequest?.Dispose();personRequest=null;
+        if(!ready)return;ResetDetailFranchiseIfLeaving();renderCount++;if(!MotionAllowed)lastRenderCaller=Environment.StackTrace;BeginCatalogNavigationRender();savedScroll=null;personRequest?.Cancel();personRequest?.Dispose();personRequest=null;
         CancelStaleDetailWork();CancelGameWork();CancelFeaturedWork();
         SyncDiscoveryContext();
         if(activePerson!=null&&(section!=personSection||current?.Id!=personOrigin?.Id))activePerson=null;

@@ -1611,5 +1611,10 @@
   "Найти фильм, сериал или игру": "Find a movie, series or game",
   "Поиск фильма, сериала или игры": "Search movies, series and games",
   "Поиск фильма, сериала или игры · Ctrl+K": "Search movies, series and games · Ctrl+K",
-  "Результаты: Игры": "Results: Games"
+  "Результаты: Игры": "Results: Games",
+  "Другие части": "Other parts",
+  "Фильмы в порядке выхода.": "Films in release order.",
+  "Другие части пока не найдены.": "No other parts found yet.",
+  "Не удалось загрузить другие части.": "Could not load other parts.",
+  "Лучшие фильмы по рейтингу": "Top rated movies"
 }

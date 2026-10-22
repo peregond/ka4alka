@@ -8,6 +8,7 @@ struct DetailView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var card: MediaCard
     @State private var detailLoading = true
+    @State private var franchiseExpanded = false
     @State private var scrollTarget: String?
     private static let releasesAnchor = "detail-releases"
 
@@ -29,10 +30,11 @@ struct DetailView: View {
 
     private var page: some View {
         VStack(alignment: .leading, spacing: KD.Space.l) {
-            DetailHero(card: card, detail: detail, onChooseRelease: { scrollToReleases() })
+            DetailHero(card: card, detail: detail, onChooseRelease: { scrollToReleases() }, onOtherParts: card.section == "movies" ? { franchiseExpanded.toggle() } : nil)
             descriptionBlock
             gameBlock
             peopleBlock
+            if franchiseExpanded { DetailFranchiseSection(card: item).id(card.id) }
             awardsBlock
             VStack(alignment: .leading, spacing: 0) {
                 DetailReleasesSection(transfers: model.transfers, card: card).id(card.id)
@@ -136,6 +138,7 @@ struct DetailHero: View {
     var card: MediaCard
     var detail: DetailResult?
     var onChooseRelease: () -> Void
+    var onOtherParts: (() -> Void)? = nil
     @State private var width: CGFloat = 0
 
     private var item: MediaCard { detail?.item ?? card }
@@ -260,7 +263,7 @@ struct DetailHero: View {
                     }
                 }
             }
-            DetailActionRow(item: item, isGame: isGame, onChooseRelease: onChooseRelease)
+            DetailActionRow(item: item, isGame: isGame, onChooseRelease: onChooseRelease, onOtherParts: onOtherParts)
                 .padding(.top, KD.Space.xs)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -274,6 +277,7 @@ struct DetailActionRow: View {
     var item: MediaCard
     var isGame: Bool
     var onChooseRelease: () -> Void
+    var onOtherParts: (() -> Void)? = nil
     @State private var shareURL: URL?
 
     private var saved: Bool { model.isSaved(item) }
@@ -315,6 +319,7 @@ struct DetailActionRow: View {
                 if hidden { model.back() }
             }
         }
+        if let onOtherParts { heroButton(tr("Другие части", "Other parts"), "square.stack", labelled: labelled, action: onOtherParts) }
         shareControl(labelled: labelled)
     }
 
@@ -581,6 +586,8 @@ struct PersonView: View {
             } else {
                 filmographyContent(films)
             }
+        } else if loading {
+            KDShelfSkeleton()
         }
     }
 
@@ -600,13 +607,7 @@ struct PersonView: View {
         let best: [MediaCard] = films.count > 3 ? bestRated(films) : []
         return VStack(alignment: .leading, spacing: KD.Space.l) {
             if best.count >= 3 {
-                VStack(alignment: .leading, spacing: KD.Space.s) {
-                    KDSectionHeader(title: tr("Лучшие по рейтингу", "Top rated"))
-                    KDShelf(best) { card in
-                        PosterCard(card: card).frame(width: KD.Size.posterWidth)
-                    }
-                    .padding(.horizontal, -KD.gutter)
-                }
+                CollapsibleFilmGrid(title: tr("Лучшие по рейтингу", "Top rated"), items: best)
             }
             VStack(alignment: .leading, spacing: KD.Space.s) {
                 KDSectionHeader(

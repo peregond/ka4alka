@@ -1,0 +1,265 @@
+[
+  {
+    "id": 10,
+    "name": "Звёздные Войны (Коллекция)",
+    "englishName": "Star Wars Collection",
+    "items": [
+      {
+        "imdbId": "tt0076759",
+        "title": "Звёздные войны: Эпизод 4 - Новая надежда",
+        "englishTitle": "Star Wars",
+        "originalTitle": "Star Wars",
+        "year": 1977,
+        "description": "Татуин. Планета-пустыня. Уже постаревший рыцарь Джедай Оби Ван Кеноби спасает молодого Люка Скайуокера, когда тот пытается отыскать пропавшего дроида. С этого момента Люк осознает свое истинное назначение: он один из рыцарей Джедай. В то время как гражданская война охватила галактику, а войска повстанцев ведут бои против сил злого Императора, к Люку и Оби Вану присоединяется отчаянный пилот-наемник Хан Соло, и в сопровождении двух дроидов, R2D2 и C-3PO, этот необычный отряд отправляется на поиски предводителя повстанцев — принцессы Леи.",
+        "englishDescription": "Princess Leia is captured and held hostage by the evil Imperial forces in their effort to take over the galactic Empire. Venturesome Luke Skywalker and dashing captain Han Solo team together with the loveable robot duo R2-D2 and C-3PO to rescue the beautiful princess and restore peace and justice in the Empire.",
+        "poster": "https://image.tmdb.org/t/p/w500/jHRn1p1yrtXfKnnzsiF6c96Jh0M.jpg",
+        "englishPoster": "https://image.tmdb.org/t/p/w500/6FfCtAuVAW8XJjZ7eWeLibRLWTw.jpg"
+      },
+      {
+        "imdbId": "tt0080684",
+        "title": "Звёздные войны: Эпизод 5 - Империя наносит ответный удар",
+        "englishTitle": "The Empire Strikes Back",
+        "originalTitle": "The Empire Strikes Back",
+        "year": 1980,
+        "description": "Борьба за Галактику обостряется в пятом эпизоде космической саги.  Войска Императора начинают массированную атаку на повстанцев и их союзников. Хан Соло и принцесса Лейя укрываются в Заоблачном Городе, в котором их и захватывает Дарт Вейдер, в то время как Люк Скайуокер находится на таинственной планете джунглей Дагоба.  Там Мастер Джедай Йода обучает молодого рыцаря навыкам обретения Силы. Люк даже не предполагает, как скоро ему придётся воспользоваться знаниями старого Мастера: впереди битва с превосходящими силами Императора и смертельный поединок с Дартом Вейдером.",
+        "englishDescription": "The epic saga continues as Luke Skywalker, in hopes of defeating the evil Galactic Empire, learns the ways of the Jedi from aging master Yoda. But Darth Vader is more determined than ever to capture Luke. Meanwhile, rebel leader Princess Leia, cocky Han Solo, Chewbacca, and droids C-3PO and R2-D2 are thrown into various stages of capture, betrayal and despair.",
+        "poster": "https://image.tmdb.org/t/p/w500/jgcqwDwTVdO5PcbghbYUaKlTI6t.jpg",
+        "englishPoster": "https://image.tmdb.org/t/p/w500/s12hAKDCui6S8GIyRIaz6oKe5OW.jpg"
+      },
+      {
+        "imdbId": "tt0086190",
+        "title": "Звёздные войны: Эпизод 6 - Возвращение Джедая",
+        "englishTitle": "Return of the Jedi",
+        "originalTitle": "Return of the Jedi",
+        "year": 1983,
+        "description": "В заключительном шестом эпизоде «Звездных войн» Дарт Вейдер создает вторую «Звезду Смерти». Он объединяет все силы зла, чтобы с помощью этого смертоносного оружия нанести последний сокрушительный удар по повстанцам и их союзникам. Люк Скайуокер вместе с принцессой Лейей и верными дроидами R2D2 и C-3PO отправляется спасать своего друга Хана Соло, который попал в плен к отвратительному Джаббе Хатту — могущественному повелителю преступников.",
+        "englishDescription": "Luke Skywalker leads a mission to rescue his friend Han Solo from the clutches of Jabba the Hutt, the Emperor prepares to crush the Rebellion with a more powerful Death Star, and the Rebel fleet mounts a massive attack on the space station. Luke Skywalker confronts Darth Vader in a final climactic duel before the evil Emperor.",
+        "poster": "https://image.tmdb.org/t/p/w500/91bG08Mpa4T7YWFMjsiNi2Fh6jc.jpg",
+        "englishPoster": "https://image.tmdb.org/t/p/w500/xxCnFmRZ83jHTZsBiceG4IBUGoq.jpg"
+      },
+      {
+        "imdbId": "tt0120915",
+        "title": "Звёздные войны: Эпизод 1 - Скрытая угроза",
+        "englishTitle": "Star Wars: Episode I - The Phantom Menace",
+        "originalTitle": "Star Wars: Episode I - The Phantom Menace",
+        "year": 1999,
+        "description": "Мирная и процветающая планета Набу. Торговая федерация, не желая платить налоги, вступает в прямой конфликт с королевой Амидалой, правящей на планете, что приводит к войне. На стороне королевы и республики в ней участвуют два рыцаря-джедая: учитель и ученик, Квай-Гон-Джин и Оби-Ван Кеноби...",
+        "englishDescription": "Anakin Skywalker, a young slave strong with the Force, is discovered on Tatooine. Meanwhile, the evil Sith have returned, enacting their plot for revenge against the Jedi.",
+        "poster": "https://image.tmdb.org/t/p/w500/ettYNNm1eehROqF046LuJ7Ycd4n.jpg",
+        "englishPoster": "https://image.tmdb.org/t/p/w500/6wkfovpn7Eq8dYNKaG5PY3q2oq6.jpg"
+      },
+      {
+        "imdbId": "tt0121765",
+        "title": "Звёздные войны: Эпизод 2 - Атака клонов",
+        "englishTitle": "Star Wars: Episode II - Attack of the Clones",
+        "originalTitle": "Star Wars: Episode II - Attack of the Clones",
+        "year": 2002,
+        "description": "Действие разворачивается через 10 лет после событий, описанных в первом эпизоде знаменитой саги. Республика все глубже погружается в пучину противоречий и хаоса. Движение сепаратистов, представленное сотнями планет и могущественным альянсом корпораций, грозит стать новой угрозой для Галактики, с которой не смогут справиться даже джедаи.",
+        "englishDescription": "Following an assassination attempt on Senator Padmé Amidala, Jedi Knights Anakin Skywalker and Obi-Wan Kenobi investigate a mysterious plot into the heart of the Separatist movement and the beginning of the Clone Wars.",
+        "poster": "https://image.tmdb.org/t/p/w500/zirQkwApjZqys20hwnqTHR3XEU1.jpg",
+        "englishPoster": "https://image.tmdb.org/t/p/w500/oZNPzxqM2s5DyVWab09NTQScDQt.jpg"
+      },
+      {
+        "imdbId": "tt0121766",
+        "title": "Звёздные войны: Эпизод 3 - Месть Ситхов",
+        "englishTitle": "Star Wars: Episode III - Revenge of the Sith",
+        "originalTitle": "Star Wars: Episode III - Revenge of the Sith",
+        "year": 2005,
+        "description": "Идёт третий год Войн клонов. Галактическая Республика, некогда бывшая спокойным и гармоничным государством, превратилась в поле битвы между армиями клонов, возглавляемых канцлером Палпатином, и армадами дроидов, которых ведёт граф Дуку, тёмный лорд ситхов. Республика медленно погружается во тьму. Лишь рыцари-джедаи, защитники мира и справедливости, могут противостоять злу, которое вскоре поглотит галактику. Но настоящая битва идёт в душе у молодого рыцаря-джедая Энакина, который разрывается между долгом джедая и любовью к своей жене, сенатору Падме Амидале. И от того, какое чувство в нём победит, зависит будущее всего мира.",
+        "englishDescription": "When the sinister Sith unveil a thousand-year-old plot to rule the galaxy, the Republic crumbles and from its ashes rises the evil Galactic Empire. Jedi hero Anakin Skywalker must choose a side.",
+        "poster": "https://image.tmdb.org/t/p/w500/lzwn2MMlUybAoV5G2tbjJo6dGeg.jpg",
+        "englishPoster": "https://image.tmdb.org/t/p/w500/duJfdpefRgFBMvMdOJSiTWDD69z.jpg"
+      },
+      {
+        "imdbId": "tt2488496",
+        "title": "Звёздные войны: Эпизод 7 - Пробуждение силы",
+        "englishTitle": "Star Wars: The Force Awakens",
+        "originalTitle": "Star Wars: The Force Awakens",
+        "year": 2015,
+        "description": "Через тридцать лет после гибели Дарта Вейдера и Императора галактика по-прежнему в опасности. Государственное образование Новый Порядок во главе с их таинственным верховным лидером Сноуком и его правой рукой Кайло Реном идёт по стопам Империи, пытаясь захватить всю власть. В это нелёгкое время судьба сводит юную девушку Рей и бывшего штурмовика Нового Порядка Финна с героями времён войны с Империей — Ханом Соло, Чубаккой и Королевой Леей. Вместе они должны дать бой Новому Порядку, однако настаёт тот момент, когда становится очевидно, что лишь джедаи могут остановить Сноука и Кайло Рена. И в галактике в живых остаётся только один.",
+        "englishDescription": "Thirty years after defeating the Galactic Empire, Han Solo and his allies face a new threat from the evil Kylo Ren and his army of Stormtroopers.",
+        "poster": "https://image.tmdb.org/t/p/w500/oEgWuOgVmrPUgqHJlhQnDzs2CKS.jpg",
+        "englishPoster": "https://image.tmdb.org/t/p/w500/wqnLdwVXoBjKibFRR5U3y0aDUhs.jpg"
+      },
+      {
+        "imdbId": "tt2527336",
+        "title": "Звёздные войны: Эпизод 8 - Последние джедаи",
+        "englishTitle": "Star Wars: The Last Jedi",
+        "originalTitle": "Star Wars: The Last Jedi",
+        "year": 2017,
+        "description": "Новая история о противостоянии света и тьмы, добра и зла начинается после гибели Хана Соло. В Галактике, где Первый Орден и Сопротивление яростно сражаются друг с другом в войне, героиня Рей пробудила в себе Силу. Но что произойдет, когда она встретится с единственным оставшимся в живых рыцарем-джедаем - Люком Скайуокером? Кайло Рен перешел на Темную сторону Силы и убил собственного отца, заняв высокую позицию в Первом Ордене. Но куда приведут его неуемные амбиции, подаренные по наследству грозным дедом Дартом Вейдером? Ситуация обострится еще больше, когда мать Кайло, лидер Сопротивления Лея, вместе с По, Финном и BB-8 приступит к новой миссии.",
+        "englishDescription": "Rey develops her newly discovered abilities with the guidance of Luke Skywalker, who is unsettled by the strength of her powers. Meanwhile, the Resistance prepares to do battle with the First Order.",
+        "poster": "https://image.tmdb.org/t/p/w500/1vwfcOhwZGLfQXVRLfC3jOnU9jq.jpg",
+        "englishPoster": "https://image.tmdb.org/t/p/w500/kOVEVeg59E0wsnXmF9nrh6OmWII.jpg"
+      },
+      {
+        "imdbId": "tt2527338",
+        "title": "Звёздные войны: Эпизод 9 - Скайуокер. Восход",
+        "englishTitle": "Star Wars: The Rise of Skywalker",
+        "originalTitle": "Star Wars: The Rise of Skywalker",
+        "year": 2019,
+        "description": "Фильм завершает невероятную историю семьи Скайуокеров, длящуюся уже более сорока лет, и обещает дать ответы на все загадки из предыдущих серий. Зрителя ожидают старые и новые герои, уникальные миры, увлекательные путешествия на край Галактики и грандиозный финал фантастической саги.",
+        "englishDescription": "The surviving Resistance faces the First Order once again as the journey of Rey, Finn and Poe Dameron continues. With the power and knowledge of generations behind them, the final battle begins.",
+        "poster": "https://image.tmdb.org/t/p/w500/6uU4zk1AMZX3j9Mfl9Oy1ALXXzW.jpg",
+        "englishPoster": "https://image.tmdb.org/t/p/w500/db32LaOibwEliAmSL2jjDF6oDdj.jpg"
+      }
+    ]
+  },
+  {
+    "id": 1241,
+    "name": "Гарри Поттер (Коллекция)",
+    "englishName": "Harry Potter Collection",
+    "items": [
+      {
+        "imdbId": "tt0241527",
+        "title": "Гарри Поттер и философский камень",
+        "englishTitle": "Harry Potter and the Philosopher's Stone",
+        "originalTitle": "Harry Potter and the Philosopher's Stone",
+        "year": 2001,
+        "description": "Жизнь десятилетнего Гарри Поттера нельзя назвать сладкой: родители умерли, едва ему исполнился год, а от дяди и тёти, взявших сироту на воспитание, достаются лишь тычки да подзатыльники. Но в одиннадцатый день рождения Гарри всё меняется. Странный гость, неожиданно появившийся на пороге, приносит письмо, из которого мальчик узнаёт, что на самом деле он - волшебник и зачислен в школу магии под названием Хогвартс. А уже через пару недель Гарри будет мчаться в поезде Хогвартс-экспресс навстречу новой жизни, где его ждут невероятные приключения, верные друзья и самое главное — ключ к разгадке тайны смерти его родителей.",
+        "englishDescription": "Harry Potter has lived under the stairs at his aunt and uncle's house his whole life. But on his 11th birthday, he learns he's a powerful wizard—with a place waiting for him at the Hogwarts School of Witchcraft and Wizardry. As he learns to harness his newfound powers with the help of the school's kindly headmaster, Harry uncovers the truth about his parents' deaths—and about the villain who's to blame.",
+        "poster": "https://image.tmdb.org/t/p/w500/q3LZNzwW7ZWu4kSFIPGcB5CYFE4.jpg",
+        "englishPoster": "https://image.tmdb.org/t/p/w500/wuMc08IPKEatf9rnMNXvIDxqP4W.jpg"
+      },
+      {
+        "imdbId": "tt0295297",
+        "title": "Гарри Поттер и Тайная комната",
+        "englishTitle": "Harry Potter and the Chamber of Secrets",
+        "originalTitle": "Harry Potter and the Chamber of Secrets",
+        "year": 2002,
+        "description": "Гарри Поттер переходит на второй курс Школы чародейства и волшебства Хогвартс. Эльф Добби предупреждает Гарри об опасности, которая поджидает его там, и просит больше не возвращаться в школу. Юный волшебник не следует совету эльфа и становится свидетелем таинственных событий, разворачивающихся в Хогвартсе. Вскоре Гарри и его друзья узнают о существовании Тайной Комнаты и сталкиваются с новыми приключениями, пытаясь победить темные силы.",
+        "englishDescription": "Cars fly, trees fight back, and a mysterious house-elf comes to warn Harry Potter at the start of his second year at Hogwarts. Adventure and danger await when bloody writing on a wall announces: The Chamber Of Secrets Has Been Opened. To save Hogwarts will require all of Harry, Ron and Hermione's magical abilities and courage.",
+        "poster": "https://image.tmdb.org/t/p/w500/33Wj3LSyoAqtqkeh7YXcVMvTQzc.jpg",
+        "englishPoster": "https://image.tmdb.org/t/p/w500/sdEOH0992YZ0QSxgXNIGLq1ToUi.jpg"
+      },
+      {
+        "imdbId": "tt0304141",
+        "title": "Гарри Поттер и узник Азкабана",
+        "englishTitle": "Harry Potter and the Prisoner of Azkaban",
+        "originalTitle": "Harry Potter and the Prisoner of Azkaban",
+        "year": 2004,
+        "description": "Гарри, Рон и Гермиона возвращаются на третий курс школы чародейства и волшебства Хогвартс. На этот раз они должны раскрыть тайну узника, сбежавшего из тюрьмы Азкабан, чье пребывание на воле создает для Гарри смертельную опасность.",
+        "englishDescription": "Harry Potter's life is in danger once more as dangerous wizard Sirius Black has escaped from Azkaban Prison and is heading to Hogwarts.",
+        "poster": "https://image.tmdb.org/t/p/w500/mncDize7FLO9RBovXKZ7LefUkbu.jpg",
+        "englishPoster": "https://image.tmdb.org/t/p/w500/aWxwnYoe8p2d2fcxOqtvAtJ72Rw.jpg"
+      },
+      {
+        "imdbId": "tt0330373",
+        "title": "Гарри Поттер и Кубок огня",
+        "englishTitle": "Harry Potter and the Goblet of Fire",
+        "originalTitle": "Harry Potter and the Goblet of Fire",
+        "year": 2005,
+        "description": "Гарри Поттер, Рон и Гермиона возвращаются на четвёртый курс школы чародейства и волшебства «Хогвартс». При таинственных обстоятельствах Гарри отобран в число участников опасного соревнования — Турнира Трёх Волшебников, однако проблема в том, что все его соперники — намного старше и сильнее. К тому же, знаки указывают на возвращение Лорда Волдеморта. Вскоре Гарри предстоит побороться не только за победу в соревновании, но и, прежде всего, за свою жизнь...",
+        "englishDescription": "When his name emerges from the Goblet of Fire, Harry Potter becomes a competitor in a grueling battle for glory among three wizarding schools. Signs of Voldemort's return emerge as Harry's friends help him prepare for the Triwizard Tournament.",
+        "poster": "https://image.tmdb.org/t/p/w500/wWlSRexsjrdTWBYY84s671dYde5.jpg",
+        "englishPoster": "https://image.tmdb.org/t/p/w500/7VRkmVB23rloRbZHsCRPscXlgQp.jpg"
+      },
+      {
+        "imdbId": "tt0373889",
+        "title": "Гарри Поттер и Орден Феникса",
+        "englishTitle": "Harry Potter and the Order of the Phoenix",
+        "originalTitle": "Harry Potter and the Order of the Phoenix",
+        "year": 2007,
+        "description": "Гарри проводит свой пятый год в школе Хогвартс и обнаруживает, что многие из членов волшебного сообщества отрицают факт недавнего состязания юного волшебника с воплощением вселенского зла Волдемортом. Все делают вид, что не имеют ни малейшего представления, что злодей вернулся. Однако впереди волшебников ждет необычная схватка.",
+        "englishDescription": "When a new professor's methods leave Hogwarts unprepared to fight the rising tide of evil, Harry teaches students how to defend against the dark arts.",
+        "poster": "https://image.tmdb.org/t/p/w500/AvftUghR5CZT1VCYbWATs01Et1M.jpg",
+        "englishPoster": "https://image.tmdb.org/t/p/w500/sMMjm3NCC3qiDxwVJZd554nCt98.jpg"
+      },
+      {
+        "imdbId": "tt0417741",
+        "title": "Гарри Поттер и Принц-полукровка",
+        "englishTitle": "Harry Potter and the Half-Blood Prince",
+        "originalTitle": "Harry Potter and the Half-Blood Prince",
+        "year": 2009,
+        "description": "Теперь не только мир волшебников, но и мир маглов ощущает на себе всевозрастающую силу Волан-де-Морта, а Хогвартс уже никак не назовешь надежным убежищем. Гарри подозревает, что в самом замке затаилась некая опасность, но Дамблдор больше сосредоточен на том, чтобы подготовить его к финальной схватке, которая, как он знает, уже не за горами. Вместе они пытаются разгадать секрет бессмертия Волан-де-Морта, а для этого Дамблдор приглашает на должность преподавателя по зельеварению своего старинного друга и коллегу — профессора Горация Слизнорта.",
+        "englishDescription": "Dumbledore tries to prepare Harry for the final battle with Voldemort while Death Eaters wreak havoc in both Muggle and Wizard worlds.",
+        "poster": "https://image.tmdb.org/t/p/w500/DFXFVLEHMcCjem4inUbIL2888H.jpg",
+        "englishPoster": "https://image.tmdb.org/t/p/w500/z7uo9zmQdQwU5ZJHFpv2Upl30i1.jpg"
+      },
+      {
+        "imdbId": "tt0926084",
+        "title": "Гарри Поттер и Дары Смерти: Часть I",
+        "englishTitle": "Harry Potter and the Deathly Hallows: Part 1",
+        "originalTitle": "Harry Potter and the Deathly Hallows: Part 1",
+        "year": 2010,
+        "description": "Гарри Поттера ждёт самое страшное испытание в жизни — смертельная схватка с Волан-де-Мортом. Друзья и враги Гарри предстают в совершенно неожиданном свете. Граница между добром и злом становится всё призрачнее.",
+        "englishDescription": "Harry, Ron and Hermione walk away from their last year at Hogwarts to find and destroy the remaining Horcruxes, putting an end to Voldemort's bid for immortality. But with Harry's beloved Dumbledore dead and Voldemort's unscrupulous Death Eaters on the loose, the world is more dangerous than ever.",
+        "poster": "https://image.tmdb.org/t/p/w500/2M6jaFgspjqGNLW7nrpaItRTBst.jpg",
+        "englishPoster": "https://image.tmdb.org/t/p/w500/iGoXIpQb7Pot00EEdwpwPajheZ5.jpg"
+      },
+      {
+        "imdbId": "tt1201607",
+        "title": "Гарри Поттер и Дары Смерти: Часть II",
+        "englishTitle": "Harry Potter and the Deathly Hallows: Part 2",
+        "originalTitle": "Harry Potter and the Deathly Hallows: Part 2",
+        "year": 2011,
+        "description": "Битва между добрыми и злыми силами мира волшебников перерастает во всеобщую войну. Ставки ещё никогда не были так высоки, а поиск убежища — столь сложен. И, быть может, именно Гарри Поттеру придется пожертвовать всем в финальном сражении с Волан-де-Мортом.",
+        "englishDescription": "Harry, Ron and Hermione continue their quest to vanquish the evil Voldemort once and for all. Just as things begin to look hopeless for the young wizards, Harry discovers a trio of magical objects that endow him with powers to rival Voldemort's formidable skills.",
+        "poster": "https://image.tmdb.org/t/p/w500/vOod9K0uygsACgtEDuwF5gqgpf7.jpg",
+        "englishPoster": "https://image.tmdb.org/t/p/w500/da22ZBmrDOXOCDRvr8Gic8ldhv4.jpg"
+      }
+    ]
+  },
+  {
+    "id": 87096,
+    "name": "Аватар (Коллекция)",
+    "englishName": "Avatar Collection",
+    "items": [
+      {
+        "imdbId": "tt0499549",
+        "title": "Аватар",
+        "englishTitle": "Avatar",
+        "originalTitle": "Avatar",
+        "year": 2009,
+        "description": "Джейк Салли, бывший морской пехотинец, прикованный к инвалидному креслу. Несмотря на немощное тело, Джейк в душе по-прежнему остаётся воином. Он получает задание совершить путешествие в несколько световых лет к базе землян на планете Пандора, где корпорации добывают редкий минерал, имеющий огромное значение для выхода Земли из энергетического кризиса.",
+        "englishDescription": "In the 22nd century, a paraplegic Marine is dispatched to the moon Pandora on a unique mission, but becomes torn between following orders and protecting an alien civilization.",
+        "poster": "https://image.tmdb.org/t/p/w500/lUKcrcO3wEPhNnzGq06JIX7GIEb.jpg",
+        "englishPoster": "https://image.tmdb.org/t/p/w500/6EiRUJpuoeQPghrs3YNktfnqOVh.jpg"
+      },
+      {
+        "imdbId": "tt1630029",
+        "title": "Аватар: Путь воды",
+        "englishTitle": "Avatar: The Way of Water",
+        "originalTitle": "Avatar: The Way of Water",
+        "year": 2022,
+        "description": "Джейк становится предводителем народа на’ви и берёт на себя миссию по защите новых друзей от корыстных бизнесменов с Земли. Теперь ему есть за кого бороться - с Джейком его прекрасная возлюбленная Нейтири. Когда на Пандору возвращаются до зубов вооружённые земляне, Джейк готов дать им отпор.",
+        "englishDescription": "Set more than a decade after the events of the first film, learn the story of the Sully family (Jake, Neytiri, and their kids), the trouble that follows them, the lengths they go to keep each other safe, the battles they fight to stay alive, and the tragedies they endure.",
+        "poster": "https://image.tmdb.org/t/p/w500/yFNn7uWudLLWDJqfj3fwh5CcUdR.jpg",
+        "englishPoster": "https://image.tmdb.org/t/p/w500/t6HIqrRAclMCA60NsSmeqe9RmNV.jpg"
+      },
+      {
+        "imdbId": "tt1757678",
+        "title": "Аватар: Пламя и пепел",
+        "englishTitle": "Avatar: Fire and Ash",
+        "originalTitle": "Avatar: Fire and Ash",
+        "year": 2025,
+        "description": "Джейк Салли, Нейтири и их дети переживают смерть Нетейама. Противостояние с корпорацией RDA обостряется, и теперь семье предстоит столкнуться с враждебным племенем На`ви во главе с Варанг.",
+        "englishDescription": "In the wake of the devastating war against the RDA and the loss of their eldest son, Jake Sully and Neytiri face a new threat on Pandora: the Ash People, a violent and power-hungry Na'vi tribe led by the ruthless Varang. Jake's family must fight for their survival and the future of Pandora in a conflict that pushes them to their emotional and physical limits.",
+        "poster": "https://image.tmdb.org/t/p/w500/kpxYvaCnbRi7btNnpLCJrehy77e.jpg",
+        "englishPoster": "https://image.tmdb.org/t/p/w500/cf7hE1ifY4UNbS25tGnaTyyDrI2.jpg"
+      },
+      {
+        "imdbId": "tt3095356",
+        "title": "Аватар 4",
+        "englishTitle": "Avatar 4",
+        "originalTitle": "Avatar 4",
+        "year": 2029,
+        "description": "Четвертая глава эпопеи, продолжающая историю землянина-отступника Джейка Салли и его возлюбленной Нейтири, дочери прекрасной планеты Пандоры.",
+        "englishDescription": "The fourth installment of the franchise. Plot TBA.",
+        "poster": "https://image.tmdb.org/t/p/w500/qzMYKnT4MG1d0gnhwytr4cKhUvS.jpg",
+        "englishPoster": "https://image.tmdb.org/t/p/w500/qzMYKnT4MG1d0gnhwytr4cKhUvS.jpg"
+      },
+      {
+        "imdbId": "tt5637536",
+        "title": "Аватар 5",
+        "englishTitle": "Avatar 5",
+        "originalTitle": "Avatar 5",
+        "year": 2031,
+        "description": "Пятая часть картины \"Аватар\"",
+        "englishDescription": "The fifth installment of the franchise. Plot TBA.",
+        "poster": "https://image.tmdb.org/t/p/w500/rtmmvqkIC5zDMEd638Es2woxbz8.jpg",
+        "englishPoster": "https://image.tmdb.org/t/p/w500/vAvLQOyFoire5x8AmRNfvgkvrMZ.jpg"
+      }
+    ]
+  }
+]

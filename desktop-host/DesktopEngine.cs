@@ -88,6 +88,9 @@ sealed class DesktopEngine:IAsyncDisposable
                 return new{url=artId==null?null:FeatureBackdrop.ReadResponse(await online.ReadSite(FeatureBackdrop.RequestPath(artId,prefs.UiLanguage),128*1024,ct),artId)};
             case "localizedCard":
                 var localized=Card(S(p,"id"));await Localize(localized,ct);return CardDto(localized);
+            case "franchise":
+                var franchiseCard=Card(S(p,"id"));var franchise=await MovieFranchiseCatalog.Load(franchiseCard,online,prefs.UiLanguage,ct);
+                return new{name=prefs.UiLanguage=="en"?franchise?.EnglishName??franchise?.Name??"":franchise?.Name??"",items=Remember(MovieFranchiseCatalog.OtherParts(franchise,franchiseCard,prefs.UiLanguage).Where(Visible))};
             case "detail":return await Detail(Card(S(p,"id")),ct);
             case "releases":return await Releases(request,Card(S(p,"id")),ct);
             case "person":

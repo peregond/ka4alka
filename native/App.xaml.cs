@@ -84,6 +84,7 @@ public partial class App : Application
         RegisterSmoke("--feature-summary-smoke-test",window.FeatureSummarySmokeTest);
         RegisterSmoke("--catalog-navigation-smoke-test",window.CatalogNavigationSmokeTest);
         RegisterSmoke("--release-freshness-smoke-test",window.ReleaseFreshnessSmokeTest);
+        RegisterSmoke("--franchise-smoke-test",window.FranchiseSmokeTest);
         RegisterSmoke("--interface-polish-smoke-test",window.InterfacePolishSmokeTest);
         RegisterSmoke("--language-smoke-test",window.LanguageSmokeTest);
         RegisterSmoke("--queue-virtualization-smoke-test",window.QueueVirtualizationSmokeTest);

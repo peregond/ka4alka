@@ -53,8 +53,16 @@ public partial class MainWindow
         }
         if(FindVisual<ItemsControl>(Body,element=>element.Name=="PersonTopFilms") is {IsVisible:true} top)
         {
+            if(top.Items.Count>1)throw new Exception("Top films must initially occupy one row.");
+            if(FindVisual<Button>(Body,element=>element.Name=="PersonTopFilmsMore") is {IsVisible:true} more)
+            {
+                more.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));UpdateLayout();
+                if(top.Items.Count<=1)throw new Exception("More must expand the best films inside the same page.");
+                more.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));UpdateLayout();
+                if(top.Items.Count!=1)throw new Exception("Collapse must restore one row of best films.");
+            }
             var movies=top.Items.OfType<CatalogRow>().SelectMany(row=>row.Items).ToArray();
-            if(movies.Any(movie=>CinemaMetadata.Rating(movie)<=0)||!movies.Select(CinemaMetadata.Rating).SequenceEqual(movies.Select(CinemaMetadata.Rating).OrderByDescending(rating=>rating)))throw new Exception("Person ranking uses unavailable scores or ignores real ratings.");
+            if(movies.Any(movie=>CinemaMetadata.BestRating(movie)<=0)||!movies.Select(CinemaMetadata.BestRating).SequenceEqual(movies.Select(CinemaMetadata.BestRating).OrderByDescending(rating=>rating)))throw new Exception("Person ranking uses unavailable scores or ignores real ratings.");
         }
     }
 }

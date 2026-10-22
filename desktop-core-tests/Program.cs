@@ -12,6 +12,7 @@ SearchLanguageTests.Run();
 await UnifiedSearchTests.Run();
 await ImdbSuggestionTests.Run();
 await SearchIndexerTests.Run();
+await MovieFranchiseTests.Run();
 if(args.Contains("--indexer"))return;
 if(args.Contains("--release-audio"))return;
 var root=Path.Combine(Path.GetTempPath(),"kachalka-portable-"+Guid.NewGuid().ToString("N"));

@@ -532,3 +532,59 @@ struct GameGalleryView: View {
         .accessibilityAddTraits(offset == index ? .isSelected : [])
     }
 }
+
+
+/// A real poster grid with one row initially; expansion stays inside the current page.
+struct CollapsibleFilmGrid: View {
+    var title: String
+    var items: [MediaCard]
+    @State private var expanded = false
+    @State private var width: CGFloat = 0
+    static func columns(for width: CGFloat) -> Int { max(1, Int((width + KD.posterSpacing) / (145 + KD.posterSpacing))) }
+    private var perRow: Int { Self.columns(for: width) }
+    var body: some View {
+        VStack(alignment: .leading, spacing: KD.Space.s) {
+            HStack {
+                Text(title).font(KDFont.section).accessibilityAddTraits(.isHeader)
+                Spacer()
+                if items.count > perRow {
+                    Button(expanded ? tr("Свернуть", "Collapse") : tr("Ещё \(items.count - perRow)", "\(items.count - perRow) more")) { expanded.toggle() }
+                        .buttonStyle(KDSecondaryButtonStyle())
+                }
+            }
+            PosterGrid(items: expanded ? items : Array(items.prefix(perRow)))
+        }
+        .kdReadWidth($width)
+    }
+}
+
+struct DetailFranchiseSection: View {
+    @EnvironmentObject private var model: AppModel
+    var card: MediaCard
+    @State private var result: FranchiseResult?
+    @State private var loading = true
+    @State private var failed = false
+    @State private var attempt = 0
+    var body: some View {
+        VStack(alignment: .leading, spacing: KD.Space.s) {
+            KDSectionHeader(title: result?.name.isEmpty == false ? result!.name : tr("Другие части", "Other parts"))
+            if let result, !result.items.isEmpty {
+                PosterGrid(items: model.visible(result.items))
+            } else if loading {
+                KDShelfSkeleton()
+            } else {
+                Text(failed ? tr("Не удалось загрузить другие части.", "Could not load other parts.") : tr("Другие части пока не найдены.", "No other parts found yet."))
+                    .font(KDFont.secondary).foregroundStyle(.secondary)
+                if failed { Button(tr("Повторить", "Retry")) { attempt += 1 }.buttonStyle(KDSecondaryButtonStyle()) }
+            }
+        }
+        .task(id: card.id + "|" + (model.settings?.uiLanguage ?? "ru") + "|" + String(attempt)) {
+            loading = true; failed = false
+            do {
+                let value = try await model.bridge.call("franchise", ["id": .string(card.id)], as: FranchiseResult.self)
+                if !Task.isCancelled { result = value }
+            } catch { if !Task.isCancelled { failed = true } }
+            if !Task.isCancelled { loading = false }
+        }
+    }
+}
