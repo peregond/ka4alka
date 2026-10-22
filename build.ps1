@@ -14,7 +14,7 @@ if($LASTEXITCODE -ne 0){throw 'Publish failed'}
 if($LASTEXITCODE -ne 0){throw 'Updater publish failed'}
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot '.tools/updater-publish/Kachalka.Updater.exe') -Destination $publishPath -Force
 New-Item -ItemType Directory -Force (Join-Path $publishPath 'licenses') | Out-Null
-foreach($package in @('monotorrent','mono.nat','reusabletasks','htmlagilitypack','microsoft.netcore.app.runtime.win-x64','microsoft.windowsdesktop.app.runtime.win-x64')){
+foreach($package in @('monotorrent','mono.nat','reusabletasks','htmlagilitypack','qrcoder','microsoft.netcore.app.runtime.win-x64','microsoft.windowsdesktop.app.runtime.win-x64')){
  $packageRoot=Join-Path $env:NUGET_PACKAGES $package
  if(Test-Path -LiteralPath $packageRoot){foreach($version in Get-ChildItem -LiteralPath $packageRoot -Directory){foreach($notice in Get-ChildItem -LiteralPath $version.FullName -File | Where-Object {$_.Name -match '^(LICENSE|ThirdPartyNotices)'}){Copy-Item -LiteralPath $notice.FullName -Destination (Join-Path $publishPath 'licenses' ($package+'-'+$notice.Name))}}}
 }

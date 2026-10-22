@@ -60,8 +60,11 @@ static class SearchIndexerTests
         }
         var catalog=Enumerable.Range(1,15000).Select(id=>Item(id,"Каталожная запись номер "+id)).Append(exact).ToArray();
         _=CatalogSearch.Find(catalog,"Backrooms");
-        timer.Restart();for(var i=0;i<8;i++)Check(CatalogSearch.Find(catalog,"Backrooms").Single().Id==1,"large catalog keeps exact match");
+        var allocated=GC.GetAllocatedBytesForCurrentThread();
+        timer.Restart();for(var i=0;i<8;i++)if(CatalogSearch.Find(catalog,"Backrooms").Single().Id!=1)throw new Exception("Large catalog lost exact match.");
         var average=timer.Elapsed.TotalMilliseconds/8;
+        var bytes=GC.GetAllocatedBytesForCurrentThread()-allocated;
+        Check(bytes<2_000_000,"eight warm 15000-item searches keep temporary allocation below 2 MB: "+bytes+" bytes");
         Check(average<120,"warm 15000-item search stays bounded: "+average.ToString("F1")+" ms");
     }
 }

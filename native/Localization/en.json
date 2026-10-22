@@ -1601,5 +1601,10 @@
   "Для нового телефона получи новый код кнопкой выше.": "Use the button above to get a new code for another phone.",
   "Код на 2 минуты: ": "Code, valid for 2 minutes: ",
   "Не удалось включить доступ с телефона: ": "Could not enable phone access: ",
-  "Русский дубляж при мало отдающих": "Russian dubbing · few seeders"
+  "Русский дубляж при мало отдающих": "Russian dubbing · few seeders",
+  "Подключись к той же домашней сети Wi-Fi и отсканируй QR-код камерой телефона. Подключение произойдёт автоматически. Файлы скачает этот компьютер в выбранную папку.": "Use the same home Wi-Fi and scan the QR code with your phone camera to connect automatically. Files download to the folder selected on this computer.",
+  "Отсканируй камерой телефона. QR-код действует 2 минуты и только для одного подключения.": "Scan with your phone camera. The QR code expires in 2 minutes and can be used once.",
+  "QR-код подключения телефона": "Phone pairing QR code",
+  "Адрес для подключения": "Connection address",
+  "Копировать ссылку": "Copy link"
 }

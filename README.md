@@ -60,7 +60,7 @@ Windows 10/11 x64 или macOS 14+. В Mac-пакетах пока исполь�
 
 ## С телефона в домашней сети
 
-Настройки → Устройства в сети → **Подключить телефон**. Открой показанный адрес в браузере телефона (включая Safari на iPhone), введи одноразовый код и запускай загрузки на компьютере. Доступны поиск фильмов, сериалов и игр, выбор раздачи, magnet-ссылки и состояние очереди. Приложение должно оставаться запущенным; доступ можно отозвать одной кнопкой. [Инструкция и устройство локального доступа](distribution/PHONE-REMOTE-HANDOFF.md).
+Настройки → Устройства в сети → **Подключить телефон**. Отсканируй QR-код камерой телефона в той же домашней Wi-Fi сети: браузер (включая Safari на iPhone) подключится без ручного ввода. QR одноразовый, действует две минуты; обычная ссылка и ручной код тоже доступны. Ищи фильмы, сериалы и игры, выбирай раздачи или вставляй magnet-ссылки. Во вкладке «Загрузки» можно поставить задачу на паузу, продолжить или явно подтвердить повторное скачивание удалённых файлов. Приложение должно оставаться запущенным; доступ отзывается одной кнопкой. [Инструкция и устройство локального доступа](distribution/PHONE-REMOTE-HANDOFF.md).
 
 ## Источники и ограничения
 
@@ -82,4 +82,4 @@ Windows CI проверяет установщик, сохранение нас�
 
 [История выпусков](https://github.com/peregond/ka4alka/releases) · [Документация сайта](web-index/README.md) · [Получение скриншотов](scripts/screenshots/README.md)
 
-Качалка использует [MonoTorrent](https://github.com/alanmcgovern/monotorrent), шрифты [Onest](native/Fonts/Onest-OFL.txt), [Unbounded](native/Fonts/Unbounded-OFL.txt) и [JetBrains Mono](native/Fonts/JetBrainsMono-OFL.txt) по SIL OFL 1.1 и официальные [некоммерческие наборы оценок IMDb](https://developer.imdb.com/non-commercial-datasets/). Лицензии зависимостей включены в сборку.
+Качалка использует [MonoTorrent](https://github.com/alanmcgovern/monotorrent), [QRCoder](https://github.com/Shane32/QRCoder) для Windows, шрифты [Onest](native/Fonts/Onest-OFL.txt), [Unbounded](native/Fonts/Unbounded-OFL.txt) и [JetBrains Mono](native/Fonts/JetBrainsMono-OFL.txt) по SIL OFL 1.1 и официальные [некоммерческие наборы оценок IMDb](https://developer.imdb.com/non-commercial-datasets/). Лицензии зависимостей включены в сборку.

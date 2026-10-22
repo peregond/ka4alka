@@ -42,14 +42,15 @@ static class PhoneRemoteTests
         }
         foreach(var path in new[]{"/app.js","/style.css"})using(var response=await client.GetAsync(path))Check(response.IsSuccessStatusCode,"bundled browser asset "+path);
         using(var denied=await Post("/api/add",new{source="magnet:?xt=urn:btih:test"}))Check(denied.StatusCode==HttpStatusCode.Unauthorized&&calls==0,"unauthenticated download never reaches desktop");
+        using(var denied=await Post("/api/control",new{id="task",action="pause"}))Check(denied.StatusCode==HttpStatusCode.Unauthorized&&calls==0,"unauthenticated control never reaches desktop");
         var firstCode=Code();
         using(var cross=await Post("/pair",new{code=firstCode},origin:"https://evil.example"))Check(cross.StatusCode==HttpStatusCode.Forbidden,"cross-origin pairing rejected");
         var token=await Pair(firstCode);
         using(var reused=await Post("/pair",new{code=firstCode}))Check(reused.StatusCode==HttpStatusCode.Unauthorized,"pairing code cannot be reused");
         using(var cross=await Post("/api/add",new{},token,"null"))Check(cross.StatusCode==HttpStatusCode.Forbidden&&calls==0,"opaque origin cannot issue commands");
-        foreach(var method in new[]{"catalog","releases","downloads","add"})
+        foreach(var method in new[]{"catalog","releases","downloads","add","control"})
             using(var response=await Post("/api/"+method,new{},token))Check(response.IsSuccessStatusCode,"paired browser dispatches "+method);
-        using(var denied=await Post("/api/setSettings",new{},token))Check(denied.StatusCode==HttpStatusCode.NotFound&&calls==4,"desktop settings API is not remotely exposed");
+        using(var denied=await Post("/api/setSettings",new{},token))Check(denied.StatusCode==HttpStatusCode.NotFound&&calls==5,"desktop settings API is not remotely exposed");
         using(var denied=await client.PostAsync("/api/add",new FormUrlEncodedContent(new[]{KeyValuePair.Create("source","test")})))Check(denied.StatusCode==HttpStatusCode.BadRequest,"HTML form cannot submit a download");
         using(var denied=await Post("/api/add",new{data=new string('x',65536)},token))Check(denied.StatusCode==HttpStatusCode.BadRequest,"oversized body rejected before dispatch");
         using(var request=new HttpRequestMessage(HttpMethod.Get,"/"))

@@ -139,7 +139,7 @@ public sealed class PhoneRemoteServer : IAsyncDisposable
                     lock(sync) sessions.Remove(bearer[7..]);
                     await Respond(stream,200,"application/json","{}",timeout.Token);return;
                 }
-                var method = request[1] switch { "/api/catalog" => "catalog", "/api/releases" => "releases", "/api/add" => "add", "/api/downloads" => "downloads", _ => "" };
+                var method = request[1] switch { "/api/catalog" => "catalog", "/api/releases" => "releases", "/api/add" => "add", "/api/downloads" => "downloads", "/api/control" => "control", _ => "" };
                 if (method.Length == 0) { await Respond(stream, 404, "text/plain", "Not found", timeout.Token); return; }
                 timeout.CancelAfter(TimeSpan.FromSeconds(90));
                 // One browser operation at a time. Never accumulate expensive searches on the desktop UI.

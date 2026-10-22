@@ -29,7 +29,7 @@ jobs:
         working-directory: macos
         run: |
           set -o pipefail
-          swift test -c release --jobs 3 --filter 'LayoutTests|SearchNavigationTests|ReleaseAudioFilterTests|ReleaseRecommendationTests|HeroBannerTests|HeroRotationTests|LocalizationLintTests|SidebarLintTests' 2>&1 | tee "$RUNNER_TEMP/layout-tests.log"
+          swift test -c release --jobs 3 --filter 'LayoutTests|SearchNavigationTests|ReleaseAudioFilterTests|ReleaseRecommendationTests|PhonePairingQRCodeTests|HeroBannerTests|HeroRotationTests|LocalizationLintTests|SidebarLintTests' 2>&1 | tee "$RUNNER_TEMP/layout-tests.log"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -349,7 +349,7 @@ sealed class DesktopEngine:IAsyncDisposable
                 {
                     token.ThrowIfCancellationRequested();
                     var result=await catalog.Handle(method,args,token);
-                    if(method=="add")Event("downloads",Downloads());return result;
+                    if(method is "add" or "control")Event("downloads",Downloads());return result;
                 },context));
                 try{server.Start();phoneCatalog=catalog;phone=server;}
                 catch{await server.DisposeAsync();catalog.Dispose();throw;}

@@ -41,6 +41,14 @@ static class PhoneDownloadTests
             var added=await Call("/api/add",new{source=magnet});
             var repeated=await Call("/api/add",new{source=magnet});
             if(added.GetProperty("id").GetString()!=repeated.GetProperty("id").GetString()||downloads.Items.Count!=1)throw new Exception("Phone retry duplicated queue.");
+            var id=added.GetProperty("id").GetString();
+            await Call("/api/control",new{id,action="pause"});await Call("/api/control",new{id,action="pause"});
+            if(!downloads.Items.Single().Paused)throw new Exception("Repeated phone pause toggled the task back on.");
+            await Call("/api/control",new{id,action="resume"});await Call("/api/control",new{id,action="resume"});
+            if(downloads.Items.Single().Paused)throw new Exception("Repeated phone resume paused the task.");
+            await Call("/api/control",new{id="unknown",action="pause"},false);
+            await Call("/api/control",new{id,action="delete"},false);
+            await Call("/api/control",new{id,action="redownload"},false);
             var managers=(Dictionary<string,TorrentManager>)typeof(DownloadService).GetField("managers",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(downloads)!;
             var manager=managers.Values.Single();await manager.AddPeerAsync(new PeerInfo(new Uri($"ipv4://127.0.0.1:{port}")));
             var deadline=DateTime.UtcNow.AddSeconds(30);while(manager.Progress<100&&DateTime.UtcNow<deadline)await Task.Delay(100);
@@ -50,6 +58,18 @@ static class PhoneDownloadTests
             if(!SHA256.HashData(await File.ReadAllBytesAsync(file)).SequenceEqual(SHA256.HashData(expected)))throw new Exception("Phone download bytes differ.");
             var transfers=await Call("/api/downloads",new{});
             if(transfers.GetProperty("items").GetArrayLength()!=1||transfers.ToString().Contains(folder))throw new Exception("Phone transfer list invalid or reveals local path.");
+            File.Delete(file);
+            transfers=await Call("/api/downloads",new{});
+            if(!transfers.GetProperty("items")[0].GetProperty("filesMissing").GetBoolean())throw new Exception("Phone does not show externally deleted files.");
+            await Call("/api/control",new{id,action="resume"});
+            if(!downloads.Items.Single().Paused||!downloads.Items.Single().FilesMissing)throw new Exception("Phone resume silently redownloaded missing files.");
+            await Call("/api/control",new{id,action="redownload",confirmed=true});
+            await Call("/api/control",new{id,action="redownload",confirmed=true});
+            manager=managers.Values.Single();await manager.AddPeerAsync(new PeerInfo(new Uri($"ipv4://127.0.0.1:{port}")));
+            deadline=DateTime.UtcNow.AddSeconds(30);while(manager.Progress<100&&DateTime.UtcNow<deadline)await Task.Delay(100);
+            await downloads.SetPausedAsync(downloads.Items.Single(),true);
+            if(manager.Progress<100||!SHA256.HashData(await File.ReadAllBytesAsync(file)).SequenceEqual(SHA256.HashData(expected)))throw new Exception("Explicit phone redownload did not recover missing bytes.");
+            Console.WriteLine("PASS: phone pause/resume retries are idempotent; missing files require explicit redownload confirmation; recovered bytes match SHA-256");
             prefs.FolderConfigured=false;await Call("/api/add",new{source=magnet},false);
             Console.WriteLine("PASS: paired phone starts actual torrent transfer, SHA-256 matches, retries deduplicate, invalid paths/URLs and unconfigured folder rejected");
         }

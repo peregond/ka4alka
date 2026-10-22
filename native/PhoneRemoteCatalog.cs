@@ -73,8 +73,25 @@ public sealed class PhoneRemoteCatalog(DownloadService downloads, Preferences pr
                 if(existing!=null)return new{id=existing.Id}; // A retried phone request never restarts missing/deleted files.
                 var added=await downloads.Add(target,prefs.Folder,media,media?.DisplayImageUrl,release);
                 return new{id=added.Id};
+            case "control":
+                var task=downloads.Items.FirstOrDefault(x=>x.Id==S(p,"id"))??throw new ArgumentException("Unknown download.");
+                var action=S(p,"action");
+                if(task.Busy)throw new InvalidOperationException("Download busy.");
+                switch(action)
+                {
+                    case "pause":await downloads.SetPausedAsync(task,true);break;
+                    case "resume":await downloads.SetPausedAsync(task,false);break;
+                    case "redownload":
+                        if(!p.TryGetProperty("confirmed",out var confirmed)||confirmed.ValueKind!=JsonValueKind.True)throw new ArgumentException("Confirmation required.");
+                        await downloads.CheckCompletedFilesAsync(true);
+                        if(task.FilesMissing)await downloads.RedownloadAsync(task);
+                        break;
+                    default:throw new ArgumentException("Unknown download action.");
+                }
+                return new{id=task.Id};
             case "downloads":
-                downloads.Update();return new{items=downloads.Items.OrderByDescending(x=>x.AddedUtc).Take(200).Select(x=>new{id=x.Id,title=x.DisplayName,status=AppLanguage.T(x.Status),progress=x.Progress}).ToArray()};
+                await downloads.CheckCompletedFilesAsync(true);
+                downloads.Update();return new{items=downloads.Items.OrderByDescending(x=>x.AddedUtc).Take(200).Select(x=>new{id=x.Id,title=x.DisplayName,status=AppLanguage.T(x.Status),progress=x.Progress,paused=x.Paused,filesMissing=x.FilesMissing,busy=x.Busy,complete=x.Completed}).ToArray()};
             default:throw new ArgumentException("Unknown phone operation.");
         }
     }
