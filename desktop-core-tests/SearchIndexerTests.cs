@@ -66,13 +66,16 @@ static class SearchIndexerTests
         Check(partial.Count==1&&timer.Elapsed<TimeSpan.FromSeconds(2),"a stalled alias cannot erase a successful answer or keep its source alive");
         never.SetResult([]);
         var active=0;var peak=0;var calls=0;
+        var twoActive=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var collected=await ReleaseAliasSearch.Run(["a","b","c","d","e"],async(query,ct)=>
         {
-            calls++;var count=Interlocked.Increment(ref active);peak=Math.Max(peak,count);
-            try{await Task.Delay(10,ct);return (IReadOnlyList<SourceEntry>)[new(query,"Fixture","Fixture","https://example.test/"+query,null,null)];}
+            Interlocked.Increment(ref calls);var count=Interlocked.Increment(ref active);
+            int previous;do{previous=Volatile.Read(ref peak);}while(count>previous&&Interlocked.CompareExchange(ref peak,count,previous)!=previous);
+            if(count==2)twoActive.TrySetResult();
+            try{await twoActive.Task.WaitAsync(ct);await Task.Delay(10,ct);return (IReadOnlyList<SourceEntry>)[new(query,"Fixture","Fixture","https://example.test/"+query,null,null)];}
             finally{Interlocked.Decrement(ref active);}
         },default);
-        Check(collected.Count==4&&calls==4&&peak==2,"all alternate-name batches are retained with at most two concurrent requests and four queries");
+        Check(collected.Count==4&&calls==4&&peak==2,"all alternate-name batches are retained with at most two concurrent requests and four queries: results="+collected.Count+", calls="+calls+", peak="+peak);
         using(var cancel=new CancellationTokenSource())
         {
             cancel.Cancel();try{await ReleaseAliasSearch.Run(["a"],(_,_)=>Task.FromResult<IReadOnlyList<SourceEntry>>([]),cancel.Token);throw new Exception("Cancellation swallowed.");}catch(OperationCanceledException){}
