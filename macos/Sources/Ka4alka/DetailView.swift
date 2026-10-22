@@ -582,7 +582,7 @@ struct PersonView: View {
         if let profile {
             let films: [MediaCard] = newestFirst(model.visible(profile.items))
             if films.isEmpty {
-                emptyFilmography
+                if loading { KDShelfSkeleton() } else { emptyFilmography }
             } else {
                 filmographyContent(films)
             }

@@ -429,7 +429,7 @@ public partial class MainWindow
                 do
                 {
                     await SettleDownloads();
-                    if(FindVisual<Button>(root,predicate) is {IsVisible:true} button)
+                    if(VisualElements<Button>(root).FirstOrDefault(button=>button.IsVisible&&predicate(button)) is {} button)
                     {
                         button.BringIntoView();await SettleDownloads();return button;
                     }
