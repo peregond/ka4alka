@@ -1,0 +1,74 @@
+name: Mac screenshots for design review
+on:
+  workflow_dispatch:
+  push:
+    branches: ['claude/mac-screens', 'claude/mac-design-polish']
+    paths: ['.github/workflows/mac-screens.yml']
+permissions:
+  contents: write
+concurrency:
+  group: mac-screens-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  shots:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            xcode: '16.4'
+          - runner: macos-26
+            xcode: '26'
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    env:
+      KACHALKA_DATA: ${{ github.workspace }}/test-output/macos/profile
+      KACHALKA_SKIP_DMG: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-arm64-${{ hashFiles('**/*.csproj') }}
+      - name: Select Xcode
+        run: |
+          version='${{ matrix.xcode }}'
+          for candidate in "/Applications/Xcode_${version}.app" "/Applications/Xcode_${version}.0.app"; do
+            if [ -d "$candidate" ]; then sudo xcode-select -s "$candidate/Contents/Developer"; break; fi
+          done
+          xcodebuild -version
+      - name: Build
+        run: bash scripts/macos/build.sh arm64
+      - name: Run the app while the screen is captured
+        run: |
+          mkdir -p shots/frames shots/smoke
+          ( i=0; while true; do screencapture -x -t png "shots/frames/f$(printf %04d $i).png" 2>> shots/capture-errors.log; i=$((i+1)); sleep 5; done ) &
+          loop=$!
+          SMOKE_TIMEOUT=1200 bash macos/Tests/run-smoke.sh render \
+            "$PWD/dist/macos-arm64/Ka4alka.app/Contents/MacOS/Ka4alka" \
+            "$PWD/test-output/macos/render" "screens ${{ matrix.runner }}" || true
+          kill "$loop" 2>/dev/null || true
+          cp test-output/macos/render/*.png shots/smoke/ 2>/dev/null || true
+          ls test-output/macos/render | head -80 > shots/render-listing.txt || true
+          cp test-output/macos/render/checks.json shots/ 2>/dev/null || true
+      - name: Shrink and publish the pictures to a branch
+        run: |
+          cd shots
+          for f in frames/*.png smoke/*.png; do
+            [ -f "$f" ] || continue
+            sips -Z 1500 "$f" >/dev/null 2>&1 || true
+          done
+          for f in frames/*.png; do
+            [ -f "$f" ] || continue
+            sips -s format jpeg -s formatOptions 60 "$f" --out "${f%.png}.jpg" >/dev/null 2>&1 && rm -f "$f"
+          done
+          du -sh . ; ls frames | wc -l; ls smoke | wc -l
+          git init -q -b main
+          git config user.name "github-actions"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Mac screenshots from ${{ matrix.runner }} ($GITHUB_SHA)"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" HEAD:refs/heads/mac-screens-${{ matrix.runner }}
