@@ -180,10 +180,10 @@ struct RootView: View {
             Spacer(minLength: 0)
             sidebarFooter
         }
-        .frame(minWidth: 170, idealWidth: 200, maxWidth: 240, maxHeight: .infinity, alignment: .topLeading)
+        .frame(minWidth: 196, idealWidth: 210, maxWidth: 250, maxHeight: .infinity, alignment: .topLeading)
         .background(colorScheme == .dark ? KDPalette.sidebarBackground : Color.clear)
         .settingsLayoutProbe("sidebar")
-        .navigationSplitViewColumnWidth(min: 170, ideal: 200, max: 240)
+        .navigationSplitViewColumnWidth(min: 196, ideal: 210, max: 250)
     }
     private var showsUpdateStatus: Bool {
         // Ready is already communicated by the restart button. Keep progress/errors here;
@@ -236,6 +236,7 @@ struct RootView: View {
                 Text(tr("Версия", "Version") + " " + model.version)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .padding(.leading, KD.Space.xs)
                     .settingsLayoutProbe("sidebar.update.version")
             }
         }
