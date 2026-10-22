@@ -51,6 +51,23 @@ static class UnifiedSearchTests
         Check(early?.Items.Single().Id==51&&!preferredStreaming.IsCompleted,"cached alternatives remain usable without waiting for English sources");
         slowEnglish.SetResult([english]);
         Check((await preferredStreaming).Items.Select(x=>x.Id).SequenceEqual([50,51]),"an arriving English result is promoted without losing fallback rows");
+        // A fresh install has no saved Potter films. The Russian upstream returns
+        // only a documentary, although all eight films are known by the franchise.
+        var documentary=Item("Фильмы",9001,"Мир Гарри Поттера: Мастерство, стоящее за магией") with{Year=2026};
+        var potterIds=new[]{"tt0241527","tt0295297","tt0304141","tt0330373","tt0373889","tt0417741","tt0926084","tt1201607"};
+        var remotePotter=new TaskCompletionSource<IReadOnlyList<MediaItem>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        SearchResult? earlyPotter=null;
+        var russianPotter=UnifiedSearch.FindAsync("гарри поттер",(_,_)=>remotePotter.Task,_=>[],default,updated:value=>earlyPotter=value);
+        Check(earlyPotter?.Items.Select(x=>x.ImdbId).ToHashSet().SetEquals(potterIds)==true&&!russianPotter.IsCompleted,"a fresh Russian search immediately finds all eight franchise films before remote sources answer");
+        remotePotter.SetResult([documentary]);
+        var russianParts=await russianPotter;
+        Check(russianParts.Items.Length==9&&russianParts.Items.Any(x=>x.Id==documentary.Id),"a partial Russian source cannot replace the eight known films with a documentary");
+        var englishParts=await UnifiedSearch.FindAsync("Harry Potter",(_,_)=>Task.FromResult<IReadOnlyList<MediaItem>>([]),_=>[],default,preferredLanguage:"en");
+        Check(englishParts.Items.Select(x=>x.ImdbId).ToHashSet().SetEquals(potterIds),"Russian and English franchise searches find the same movie identities without IMDb suggestions");
+        var localizedPotter=Item("Фильмы",9002,"Гарри Поттер и философский камень") with{Year=2001,PageUrl="https://w6.zona.plus/movies/potter-search-fixture"};
+        var mergedPotter=await UnifiedSearch.FindAsync("гарри поттер",(kind,_)=>Task.FromResult<IReadOnlyList<MediaItem>>(kind=="Фильмы"?[localizedPotter]:[]),_=>[],default);
+        Check(mergedPotter.Items.Length==8&&mergedPotter.Items.Single(x=>x.ImdbId=="tt0241527").PageUrl==localizedPotter.PageUrl,"a real catalog result merges with its verified franchise film without duplicate cards or lost page links");
+        Check(UnifiedSearch.Filter(mergedPotter.Items,"Игры").Length==0,"known movie franchises do not leak into the Games search filter");
         using var obsolete=new CancellationTokenSource();var never=new TaskCompletionSource<IReadOnlyList<MediaItem>>(TaskCreationOptions.RunContinuationsAsynchronously);var publishes=0;
         var obsoleteSearch=UnifiedSearch.FindAsync("Искра",(_,_)=>never.Task,_=>[],obsolete.Token,updated:_=>publishes++);
         obsolete.Cancel();try{await obsoleteSearch.WaitAsync(TimeSpan.FromSeconds(2));throw new Exception("Obsolete search remained alive");}catch(OperationCanceledException){}

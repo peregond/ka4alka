@@ -9,7 +9,8 @@ public static class UnifiedSearch
         cancellation.ThrowIfCancellationRequested();
         // Read UI-owned local stores once. Every subsequent merge/rank runs on
         // a worker; publication returns to the caller's synchronization context.
-        var local=(games==null?new[]{"Фильмы","Сериалы"}:new[]{"Фильмы","Сериалы","Игры"}).SelectMany(kind=>saved(kind).Where(x=>x.Section==kind)).ToArray();
+        var local=(games==null?new[]{"Фильмы","Сериалы"}:new[]{"Фильмы","Сериалы","Игры"}).SelectMany(kind=>saved(kind).Where(x=>x.Section==kind))
+            .Concat(MovieFranchiseCatalog.Search(query,preferredLanguage)).ToArray();
         SearchResult Build(IEnumerable<MediaItem> rows,bool offline)=>new(CatalogSearch.Find(MediaIdentity.Merge(rows.Distinct()),query,200,preferredLanguage),offline);
         if(local.Length>0)updated?.Invoke(Build(local,false));
         async Task<SearchResult> Category(string category)

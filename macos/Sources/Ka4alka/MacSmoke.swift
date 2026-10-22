@@ -425,6 +425,21 @@ struct SmokeShot {
     private func finish(_ page: SmokePage) async throws {
         switch page {
         case .search:
+            model.query = language == "ru" ? "гарри поттер" : "Harry Potter"
+            model.submitSearch()
+            await model.loadCatalog()
+            let expectedYears = [2001, 2002, 2004, 2005, 2007, 2009, 2010, 2011]
+            let parts = (model.list?.items ?? []).filter {
+                $0.section == "movies" && expectedYears.contains($0.year) &&
+                    ($0.title.lowercased().hasPrefix("гарри поттер и ") || $0.title.lowercased().hasPrefix("harry potter and "))
+            }
+            check(parts.map(\.year).sorted() == expectedYears && Set(parts.map(\.id)).count == 8,
+                  "search: Russian and English queries find all eight Potter films on a fresh profile")
+            check(parts.allSatisfy { $0.title.hasPrefix(language == "ru" ? "Гарри Поттер" : "Harry Potter") },
+                  "search: franchise titles follow the interface language")
+            await pause(500)
+            _ = try await capture(saveAs: "search-potter-" + theme + "-" + language)
+            model.clearSearch()
             model.back()
         case .detailMovie:
             model.back()

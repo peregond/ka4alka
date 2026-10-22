@@ -1,7 +1,19 @@
 using Kachalka;
+using System.Net;
+using System.Net.Http;
 using System.Text;
 static class MovieFranchiseTests
 {
+    sealed class FranchiseHandler(byte[] payload):HttpMessageHandler
+    {
+        public int Calls;
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken ct)
+        {
+            Calls++;
+            if(request.RequestUri?.AbsolutePath!="/api/franchise")throw new Exception("Unexpected franchise search network request.");
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK){Content=new ByteArrayContent(payload)});
+        }
+    }
     public static async Task Run()
     {
         void Check(bool value,string name){if(!value)throw new Exception(name);Console.WriteLine("PASS: franchise "+name);}
@@ -27,6 +39,15 @@ static class MovieFranchiseTests
         try{MovieFranchiseCatalog.Parse(bytes,"tt0123456");throw new Exception("Wrong identity accepted");}catch(System.IO.InvalidDataException){}
         var parsed=MovieFranchiseCatalog.Parse(bytes,identity);var empty=harry with{ImdbId="tt0123456"};
         Check(MovieFranchiseCatalog.OtherParts(parsed,empty,"ru").Single().ImageUrl==null,"foreign poster addresses are refused");
+        Check(MovieFranchiseCatalog.Search("звёздные войны","ru").Length==9&&MovieFranchiseCatalog.Search("аватар","ru").Length==5,"the search index covers other verified franchises as well as Harry Potter");
+        Check(MovieFranchiseCatalog.Search("гарри поттер 2001","ru") is [var first]&&first.ImdbId=="tt0241527","a release year still selects the exact film instead of the whole franchise");
+        Check(MovieFranchiseCatalog.Search("Несуществующее название проверки","ru").Length==0&&MovieFranchiseCatalog.Search(" ","ru").Length==0,"unrelated and empty queries do not inject franchise cards");
+        var cachedBytes=Encoding.UTF8.GetBytes("""{"id":"tt1234567","item":{"id":987654,"name":"Хроники проверки","items":[{"imdbId":"tt1234567","title":"Хроники проверки: Начало","originalTitle":"Search Fixture Begins","year":2001,"description":"","poster":null},{"imdbId":"tt7654321","title":"Хроники проверки: Продолжение","originalTitle":"Search Fixture Continues","year":2003,"description":"","poster":null}]}}""");
+        using var cachedHandler=new FranchiseHandler(cachedBytes);using var cachedClient=new SourceClient(cachedHandler);
+        var cachedOnline=new OnlineIndexClient(cachedClient,new Uri("https://franchise.test/"));
+        var cachedItem=ImdbSuggestions.Card("tt1234567","Хроники проверки: Начало","Search Fixture Begins","Фильмы",2001,null);
+        await MovieFranchiseCatalog.Load(cachedItem,cachedOnline,"ru",default);
+        Check(MovieFranchiseCatalog.Search("хроники проверки","ru").Length==2&&MovieFranchiseCatalog.Search("Search Fixture","en").Length==2&&cachedHandler.Calls==1,"already loaded remote collections also enter bilingual search without another request");
         using var cancelled=new CancellationTokenSource();cancelled.Cancel();
         try{await MovieFranchiseCatalog.Load(harry,online,"ru",cancelled.Token);throw new Exception("Cancellation swallowed");}catch(OperationCanceledException){}
     }

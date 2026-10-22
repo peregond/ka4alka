@@ -16,6 +16,29 @@ public static class MovieFranchiseCatalog
     });
     static readonly ConcurrentDictionary<string,(DateTime Expires,MovieFranchise? Value)> memory=new();
     static readonly SharedAsyncWork<MovieFranchise?> work=new();
+    static readonly Lazy<MediaItem[]> russianSearch=new(()=>bundled.Value.SelectMany(row=>row.Items).DistinctBy(part=>part.ImdbId).Select(part=>Card(part,"ru")).ToArray());
+    static readonly Lazy<MediaItem[]> englishSearch=new(()=>bundled.Value.SelectMany(row=>row.Items).DistinctBy(part=>part.ImdbId).Select(part=>Card(part,"en")).ToArray());
+    static MediaItem Card(FranchisePart part,string language)
+    {
+        var card=ImdbSuggestions.Card(part.ImdbId,part.Title,part.OriginalTitle,"Фильмы",part.Year,EnglishMedia.PosterUrl(part.Poster)) with
+        {
+            Description=part.Description,TitleAliases=new[]{part.Title,part.OriginalTitle,part.EnglishTitle??""}.Where(name=>!string.IsNullOrWhiteSpace(name)).DistinctBy(MediaIdentity.Normalize).ToArray()
+        };
+        if(language=="en")card.SetEnglish(new("en",part.EnglishTitle??part.Title,part.EnglishDescription??part.Description,EnglishMedia.PosterUrl(part.EnglishTitle!=null?part.EnglishPoster:part.Poster),null,[],[],[],[]));
+        return card;
+    }
+    // Franchise membership already identifies these movies. Search the same
+    // bilingual cards locally instead of depending on IMDb's Latin-only search.
+    public static MediaItem[] Search(string query,string language)
+    {
+        if(string.IsNullOrWhiteSpace(query))return [];
+        var now=DateTime.UtcNow;
+        var cached=memory.Where(entry=>entry.Value.Expires>now&&entry.Value.Value!=null)
+            .OrderByDescending(entry=>entry.Key.StartsWith(language+"|",StringComparison.Ordinal))
+            .SelectMany(entry=>entry.Value.Value!.Items).Select(part=>Card(part,language));
+        var rows=(language=="en"?englishSearch.Value:russianSearch.Value).Concat(cached);
+        return CatalogSearch.Find(MediaIdentity.Merge(rows),query,80,language);
+    }
     static bool Same(FranchisePart part,MediaItem item)=>item.ImdbId!=null?part.ImdbId==item.ImdbId:
         item.Year>0&&item.Year==part.Year&&MediaIdentity.Names(item).Select(MediaIdentity.Normalize).Intersect(new[]{part.Title,part.OriginalTitle,part.EnglishTitle??""}.Select(MediaIdentity.Normalize)).Any();
     public static MovieFranchise? Bundled(MediaItem item)=>item.Section=="Фильмы"?bundled.Value.FirstOrDefault(row=>row.Items.Any(part=>Same(part,item))):null;
@@ -24,12 +47,7 @@ public static class MovieFranchiseCatalog
     public static MediaItem[] OtherParts(MovieFranchise? row,MediaItem current,string language)
     {
         if(row==null)return [];
-        return row.Items.Where(part=>!Same(part,current)).DistinctBy(part=>part.ImdbId).OrderBy(part=>part.Year==0?9999:part.Year).Select(part=>
-        {
-            var card=ImdbSuggestions.Card(part.ImdbId,part.Title,part.OriginalTitle,"Фильмы",part.Year,EnglishMedia.PosterUrl(part.Poster)) with{Description=part.Description};
-            if(language=="en")card.SetEnglish(new("en",part.EnglishTitle??part.Title,part.EnglishDescription??part.Description,EnglishMedia.PosterUrl(part.EnglishTitle!=null?part.EnglishPoster:part.Poster),null,[],[],[],[]));
-            return card;
-        }).ToArray();
+        return row.Items.Where(part=>!Same(part,current)).DistinctBy(part=>part.ImdbId).OrderBy(part=>part.Year==0?9999:part.Year).Select(part=>Card(part,language)).ToArray();
     }
     public static MovieFranchise? Parse(byte[] bytes,string identity)
     {
