@@ -6,6 +6,7 @@ namespace Kachalka;
 
 public sealed record EnglishMedia(string Language,string Title,string Description,string? Poster,string? Backdrop,string[] Genres,string[] Countries,string[] Actors,string[] Directors)
 {
+    public static bool NeedsLookup(EnglishMedia? current,bool requireCredits=false)=>current==null||requireCredits&&current.Actors.Length==0&&current.Directors.Length==0;
     public static async Task<EnglishMedia?> LoadAsync(OnlineIndexClient online,MediaItem item,bool force,CancellationToken ct)
     {
         var id=OnlineIndexClient.IdFor(item)??item.ImdbId;if(id==null)return null;

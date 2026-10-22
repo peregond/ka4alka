@@ -247,15 +247,15 @@ sealed class DesktopEngine:IAsyncDisposable
             item=await Metadata(item,ct);
             if(prefs.UiLanguage=="en")
             {
-                await Localize(item,ct);backdrop=item.English?.Backdrop;
+                await Localize(item,ct,requireCredits:true);backdrop=item.English?.Backdrop;
             }
             if(backdrop==null)try{var id=FeatureBackdrop.IdentityFor(item);if(id!=null)backdrop=FeatureBackdrop.ReadResponse(await online.ReadSite(FeatureBackdrop.RequestPath(id,prefs.UiLanguage),128*1024,ct),id);}catch(Exception)when(!ct.IsCancellationRequested){}
         }
         Remember([item]);return new{item=CardDto(item),backdrop,people=item.DisplayPeople,awards=item.Awards,originalTitle=item.OriginalTitle,genres=item.AllGenres,country=item.DisplayCountry,resolutions=item.ReleaseResolutions.OrderByDescending(x=>x).ToArray(),game=game==null?null:new{game.Requirements,game.Developers,game.Publishers,game.Price,game.Metacritic,gallery=game.Gallery,game.Traits,game.OriginalPrice,game.Discount,game.ReleaseDate,game.Age,game.Review,russian=game.Russian.ToString(),steamUrl=item.PageUrl,steamDbUrl=GameCatalog.TryId(item.PageUrl,out var steamId)?"https://steamdb.info/app/"+steamId:null,platform="Windows"}};
     }
-    async Task Localize(MediaItem item,CancellationToken ct)
+    async Task Localize(MediaItem item,CancellationToken ct,bool requireCredits=false)
     {
-        if(prefs.UiLanguage!="en"||!item.Cinema||item.English!=null)return;
+        if(prefs.UiLanguage!="en"||!item.Cinema||!EnglishMedia.NeedsLookup(item.English,requireCredits))return;
         var key=Key(item);
         if(localizedAttempts.TryGetValue(key,out var attempt)&&attempt>DateTime.UtcNow.AddMinutes(-5))return;
         try
