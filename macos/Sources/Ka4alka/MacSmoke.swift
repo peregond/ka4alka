@@ -255,12 +255,12 @@ struct SmokeShot {
             await pause(50)
             if page == .search {
                 // A toolbar item is hosted separately from page layout. Wait for its
-                // replacement host after a segmented/menu scope change on resize.
-                _ = await waitUntil("native search scope", timeout: 2) {
+                // replacement toolbar host after a window resize.
+                _ = await waitUntil("native search field", timeout: 2) {
                     (main.contentView?.superview ?? main.contentView)?.layoutSubtreeIfNeeded()
                     SettingsLayoutMeasurements.refreshNativeViews()
-                    return SettingsLayoutMeasurements.nativeAttached["search.scope"] == true &&
-                        (SettingsLayoutMeasurements.nativeFrames["search.scope"]?.width ?? 0) > 100
+                    return SettingsLayoutMeasurements.nativeAttached["search.field"] == true &&
+                        (SettingsLayoutMeasurements.nativeFrames["search.field"]?.width ?? 0) > 100
                 }
             }
             let before: Int = violations.count

@@ -83,9 +83,9 @@ sealed class DesktopEngine:IAsyncDisposable
                 await CoverCache.Load(coverPath,2*1024*1024,token=>online.ReadSite(proxy,2*1024*1024,token),bytes=>bytes.Length,ct);
                 return new{path=coverPath};
             case "artwork":
-                var artCard=Card(S(p,"id"));var artId=OnlineIndexClient.IdFor(artCard);
+                var artCard=Card(S(p,"id"));var artId=FeatureBackdrop.IdentityFor(artCard);
                 if(artCard.Section=="Игры")return new{url=GameCatalog.HeroImage(artCard)};
-                return new{url=artId==null?null:FeatureBackdrop.FromResponse(await online.ReadSite("api/backdrop?id="+Uri.EscapeDataString(artId)+"&language="+prefs.UiLanguage,128*1024,ct),artId)};
+                return new{url=artId==null?null:FeatureBackdrop.ReadResponse(await online.ReadSite(FeatureBackdrop.RequestPath(artId,prefs.UiLanguage),128*1024,ct),artId)};
             case "localizedCard":
                 var localized=Card(S(p,"id"));await Localize(localized,ct);return CardDto(localized);
             case "detail":return await Detail(Card(S(p,"id")),ct);
@@ -175,7 +175,7 @@ sealed class DesktopEngine:IAsyncDisposable
     async Task<object> Catalog(JsonElement p,CancellationToken ct)
     {
         var section=S(p,"section","movies");var page=Math.Clamp(I(p,"page",1),1,500);var query=S(p,"query");
-        if(section=="games")
+        if(section=="games"&&query.Length==0)
         {
             var result=await new GameCatalog(source,prefs.UiLanguage).Browse(new(query,S(p,"sort","popular"),S(p,"genre")=="all"?"":S(p,"genre"),page),ct);
             return new{items=Remember(result.Items.Where(Visible)),hasNext=result.HasNext,offline=false};
@@ -186,8 +186,10 @@ sealed class DesktopEngine:IAsyncDisposable
         if(query.Length>0)
         {
             var result=await UnifiedSearch.FindAsync(query,(kind,t)=>online.Browse(kind,query,1,t),kind=>shared.Search(kind,query),ct,
-                ImdbSuggestions.Applies(query)?t=>ImdbSuggestions.SearchAsync(query,t):null,preferredLanguage:prefs.UiLanguage);
-            var filtered=result.Items.Where(Visible).Where(selection.Matches).Where(item=>S(p,"kind").Length==0||item.Section==(S(p,"kind")=="series"?"Сериалы":"Фильмы")).Where(item=>qualityHeight==0||QualityMatches(item,qualityHeight)).ToArray();
+                ImdbSuggestions.Applies(query)?t=>ImdbSuggestions.SearchAsync(query,t):null,preferredLanguage:prefs.UiLanguage,
+                games:async t=>(await new GameCatalog(source,prefs.UiLanguage).Browse(new(query,GameBrowse.Popular,"",1),t)).Items);
+            var kind=S(p,"kind") switch{"games"=>"Игры","series"=>"Сериалы","movies"=>"Фильмы",_=>""};
+            var filtered=result.Items.Where(Visible).Where(selection.Matches).Where(item=>kind.Length==0||item.Section==kind).Where(item=>qualityHeight==0||QualityMatches(item,qualityHeight)).ToArray();
             return new{items=Remember(filtered),hasNext=false,offline=result.Offline};
         }
         var candidates=await Task.Run(()=>shared.All.Where(item=>item.Section==category&&Visible(item)&&selection.Matches(item)).ToArray(),ct);
@@ -244,7 +246,7 @@ sealed class DesktopEngine:IAsyncDisposable
             {
                 await Localize(item,ct);backdrop=item.English?.Backdrop;
             }
-            if(backdrop==null)try{var id=OnlineIndexClient.IdFor(item);if(id!=null)backdrop=FeatureBackdrop.FromResponse(await online.ReadSite("api/backdrop?id="+Uri.EscapeDataString(id),128*1024,ct),id);}catch(Exception)when(!ct.IsCancellationRequested){}
+            if(backdrop==null)try{var id=FeatureBackdrop.IdentityFor(item);if(id!=null)backdrop=FeatureBackdrop.ReadResponse(await online.ReadSite(FeatureBackdrop.RequestPath(id,prefs.UiLanguage),128*1024,ct),id);}catch(Exception)when(!ct.IsCancellationRequested){}
         }
         Remember([item]);return new{item=CardDto(item),backdrop,people=item.DisplayPeople,awards=item.Awards,originalTitle=item.OriginalTitle,genres=item.AllGenres,country=item.DisplayCountry,resolutions=item.ReleaseResolutions.OrderByDescending(x=>x).ToArray(),game=game==null?null:new{game.Requirements,game.Developers,game.Publishers,game.Price,game.Metacritic,gallery=game.Gallery,game.Traits,game.OriginalPrice,game.Discount,game.ReleaseDate,game.Age,game.Review,russian=game.Russian.ToString(),steamUrl=item.PageUrl,steamDbUrl=GameCatalog.TryId(item.PageUrl,out var steamId)?"https://steamdb.info/app/"+steamId:null,platform="Windows"}};
     }

@@ -1,5 +1,42 @@
 [
-  {"imdbId":"tt0121955","section":"series","year":1997,"originalTitle":"South Park","aliases":["Южный Парк","South Park"],"source":"TheTVDB","sourceId":75897},
-  {"imdbId":"tt26657236","section":"movies","year":2026,"originalTitle":"Backrooms","aliases":["Закулисье реальности","Backrooms"],"source":"TMDB","sourceId":1083381},
-  {"imdbId":"tt8910922","section":"series","year":2020,"originalTitle":"Solar Opposites","aliases":["Обратная сторона Земли","Солнечные противоположности","Solar Opposites"],"source":"TheTVDB","sourceId":375892}
+  {
+    "imdbId": "tt0121955",
+    "section": "series",
+    "year": 1997,
+    "originalTitle": "South Park",
+    "aliases": [
+      "Южный Парк",
+      "South Park"
+    ],
+    "source": "TheTVDB",
+    "sourceId": 75897,
+    "russianTitle": "Южный парк"
+  },
+  {
+    "imdbId": "tt26657236",
+    "section": "movies",
+    "year": 2026,
+    "originalTitle": "Backrooms",
+    "aliases": [
+      "Закулисье реальности",
+      "Backrooms"
+    ],
+    "source": "TMDB",
+    "sourceId": 1083381,
+    "russianTitle": "Закулисье реальности"
+  },
+  {
+    "imdbId": "tt8910922",
+    "section": "series",
+    "year": 2020,
+    "originalTitle": "Solar Opposites",
+    "aliases": [
+      "Обратная сторона Земли",
+      "Солнечные противоположности",
+      "Solar Opposites"
+    ],
+    "source": "TheTVDB",
+    "sourceId": 375892,
+    "russianTitle": "Обратная сторона Земли"
+  }
 ]

@@ -6,6 +6,21 @@ namespace Kachalka;
 // Public server response only: no TMDB credential is shipped in the desktop app.
 public static class FeatureBackdrop
 {
+    // IMDb search cards have no Zona/catalog id. Reuse the exact-identity metadata endpoint,
+    // whose text-free/English landscape is also suitable behind the Russian title.
+    public static string? IdentityFor(MediaItem item)=>OnlineIndexClient.IdFor(item)??
+        (item.Cinema&&Regex.IsMatch(item.ImdbId??"",@"^tt\d{5,10}$")?"imdb:"+(item.Section=="Сериалы"?"series":"movies")+":"+item.ImdbId:null);
+    public static string RequestPath(string id,string language)
+    {
+        if(id.StartsWith("imdb:",StringComparison.Ordinal))
+        {var parts=id.Split(':');return "api/localized-media?language=en&imdb="+Uri.EscapeDataString(parts[2])+"&section="+parts[1];}
+        return "api/backdrop?id="+Uri.EscapeDataString(id)+"&language="+AppLanguage.Normalize(language);
+    }
+    public static string? ReadResponse(byte[] bytes,string id)
+    {
+        if(!id.StartsWith("imdb:",StringComparison.Ordinal))return FromResponse(bytes,id);
+        var parts=id.Split(':');return EnglishMedia.Parse(bytes,parts[2],parts[1])?.Backdrop;
+    }
     public static string? ValidUrl(string? value)
     {
         if(!Uri.TryCreate(value,UriKind.Absolute,out var uri)||uri.Scheme!="https"||uri.Host!="image.tmdb.org"||!uri.IsDefaultPort||uri.UserInfo.Length>0||uri.Query.Length>0||uri.Fragment.Length>0)return null;

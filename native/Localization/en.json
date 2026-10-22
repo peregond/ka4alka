@@ -414,6 +414,7 @@
   "Ищем раздачи… · найдено ": "Searching torrents… · found ",
   "Ищем участников": "Finding peers",
   "Ищем фильмы и сериалы…": "Searching movies and series…",
+  "Ищем фильмы, сериалы и игры…": "Searching movies, series and games…",
   "К результатам поиска": "Back to search results",
   "К этой задаче сейчас никто не подключён. Число отдающих в поиске может быть устаревшим: оно не подтверждает доступность раздачи.": "No peers are currently connected to this task. Seeder counts in search may be outdated and do not confirm availability.",
   "КАЧЕСТВО": "QUALITY",
@@ -1606,5 +1607,9 @@
   "Отсканируй камерой телефона. QR-код действует 2 минуты и только для одного подключения.": "Scan with your phone camera. The QR code expires in 2 minutes and can be used once.",
   "QR-код подключения телефона": "Phone pairing QR code",
   "Адрес для подключения": "Connection address",
-  "Копировать ссылку": "Copy link"
+  "Копировать ссылку": "Copy link",
+  "Найти фильм, сериал или игру": "Find a movie, series or game",
+  "Поиск фильма, сериала или игры": "Search movies, series and games",
+  "Поиск фильма, сериала или игры · Ctrl+K": "Search movies, series and games · Ctrl+K",
+  "Результаты: Игры": "Results: Games"
 }

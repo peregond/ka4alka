@@ -222,13 +222,17 @@ public partial class MainWindow
         try{ToggleSaved(current!);Check(SavedItems().Any(item=>item.Section=="Игры"&&item.Id==game.Id),"saved collection includes a game alongside films and series");}
         finally{prefs.LiveFavorites=old;prefs.Favorites=oldIds;prefs.Save();}
         GameBack();await Settle();Check(GameHome,"going back from a game returns to the home page");
-        Search.Text="Portal";SubmitSearch(SearchSubmitButton,new RoutedEventArgs());await Settle();Check(gameQuery=="Portal"&&queries.Last()=="popular||1|Portal"&&section=="Игры"&&!GameHome&&FindVisual<TextBlock>(PageHeader,x=>x.Name=="GameListHeading")?.Text=="Результаты поиска","game search stays in Games and does not start a film/series search");
-        ClearSearch(ClearSearchButton,new RoutedEventArgs());await Settle();Check(gameQuery==""&&Search.Text==""&&GameHome,"clearing game search restores the home page");
+        searchProvider=(_,_,_)=>Task.FromResult<IReadOnlyList<MediaItem>>([]);
+        Search.Text="Portal";SubmitSearch(SearchSubmitButton,new RoutedEventArgs());
+        for(var attempt=0;attempt<50&&liveLoading;attempt++)await Settle();
+        Check(section!="Игры"&&SearchActive&&liveItems.Any(x=>x.Section=="Игры")&&queries.Contains("popular||1|Portal"),"search from Games queries the unified catalog and keeps matching games");
+        ClearSearch(ClearSearchButton,new RoutedEventArgs());await Settle();
+        ShowCatalogSection("Игры");await Settle();Check(GameHome,"leaving global search restores the games home page");
 
         var blocked=new TaskCompletionSource<GameCatalogPage>(TaskCreationOptions.RunContinuationsAsynchronously);CancellationToken gameToken=default;
         gameCatalogProvider=(_,ct)=>{gameToken=ct;return blocked.Task.WaitAsync(ct);};RefreshGames();await Settle();
         Check(gameShelfLoading.Count>0,"refreshing the home page requests the shelves again");
         ShowCatalogSection("Фильмы");await Settle();Check(gameToken.IsCancellationRequested&&gameShelfLoading.Count==0&&gameShelfViews.Count==0,"leaving Games cancels its unfinished shelf requests");
-        await File.WriteAllTextAsync(Path.Combine(output,"checks.json"),JsonSerializer.Serialize(new{Checks=checks,WindowsGames=true,GamepadIcon=true,HomeBanner=true,Shelves=true,Genres=true,Prices=true,Reviews=true,Gallery=true,GameCardLikeFilm=true,SeparateSearch=true,ResponsiveInput=true,DownloadAction=true,SavedGames=true}));Close();
+        await File.WriteAllTextAsync(Path.Combine(output,"checks.json"),JsonSerializer.Serialize(new{Checks=checks,WindowsGames=true,GamepadIcon=true,HomeBanner=true,Shelves=true,Genres=true,Prices=true,Reviews=true,Gallery=true,GameCardLikeFilm=true,UnifiedSearch=true,ResponsiveInput=true,DownloadAction=true,SavedGames=true}));Close();
     }
 }

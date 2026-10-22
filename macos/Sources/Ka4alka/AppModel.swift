@@ -256,16 +256,11 @@ struct CatalogFilter: Equatable {
         } else {
             searchOrigin = SearchOrigin(section: section, query: query, submittedQuery: submittedQuery,
                                         filter: filter, page: page, anchor: browseAnchor, list: list)
-            section = section == .games ? .games : .movies
+            section = .movies
             query = ""; submittedQuery = ""; filter = CatalogFilter(); page = 1; browseAnchor = nil; list = nil
             routes.append(.search)
         }
         error = nil; searchFocus += 1
-    }
-    func setSearchGames(_ games: Bool) {
-        let target: Section = games ? .games : .movies
-        guard section != target else { return }
-        section = target; filter = CatalogFilter(); page = 1; browseAnchor = nil; list = nil
     }
     /// Opens a kachalka:// link (the title page) or hands a magnet link / torrent file to the add sheet.
     /// Returns false only when a kachalka:// link could not be opened.
@@ -300,12 +295,12 @@ struct CatalogFilter: Equatable {
             return
         }
         submittedQuery = q; filter = CatalogFilter(); page = 1; browseAnchor = nil
-        let target: Section = section == .games ? .games : .movies
+        let target: Section = .movies
         section = target
         if route != .search { routes = [.section(target)]; searchOrigin = nil }
         if !q.isEmpty {
-            let entry = RecentSearch(query: q, games: target == .games)
-            recentSearches.removeAll { $0.games == entry.games && $0.query.caseInsensitiveCompare(q) == .orderedSame }
+            let entry = RecentSearch(query: q)
+            recentSearches.removeAll { $0.query.caseInsensitiveCompare(q) == .orderedSame }
             recentSearches.insert(entry, at: 0)
             recentSearches = Array(recentSearches.prefix(8))
         }

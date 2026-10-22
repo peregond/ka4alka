@@ -11,6 +11,25 @@ static class SearchIndexerTests
         var verified=MediaIdentity.Enrich(Item(90,"Закулисье реальности"));
         Check(verified.ImdbId=="tt26657236"&&MediaIdentity.Queries(verified).Contains("Backrooms")&&MediaIdentity.Queries(verified).Contains("Закулисье реальности"),"Backrooms has verified Russian/English queries tied to the same 2026 film");
         Check(MediaIdentity.Enrich(Item(91,"Закулисье реальности",2022)).ImdbId==null,"the verified Backrooms alias cannot identify a different year's film");
+        var imdbCard=Item(92,"Backrooms") with{PageUrl="https://www.imdb.com/title/tt26657236/",ImdbId="tt26657236",OriginalTitle="Backrooms"};
+        var priorLanguage=AppLanguage.Current;
+        try
+        {
+            AppLanguage.Set("ru");Check(imdbCard.DisplayTitle=="Закулисье реальности","IMDb Backrooms displays its verified Russian title immediately");
+            var link=ShareLink.Create(imdbCard);var target=ShareLink.Parse(link);
+            Check(target?.ImdbId==imdbCard.ImdbId&&target.Section=="Фильмы"&&target.PageUrl==imdbCard.PageUrl&&target.Title==imdbCard.DisplayTitle,"an IMDb-only card creates a share link that preserves exact identity and localized title");
+            AppLanguage.Set("en");Check(imdbCard.DisplayTitle=="Backrooms","English presentation retains the original Backrooms title");
+        }
+        finally{AppLanguage.Set(priorLanguage);}
+        Check(ShareLink.Parse("kachalka://movie-imdb/not-an-imdb-id")==null&&ShareLink.Create(imdbCard with{PageUrl="https://evil.test/title/tt26657236/"})==null,"IMDb share links reject malformed identities and foreign hosts");
+        var backdropId=FeatureBackdrop.IdentityFor(imdbCard)!;
+        Check(backdropId=="imdb:movies:tt26657236"&&FeatureBackdrop.RequestPath(backdropId,"ru")=="api/localized-media?language=en&imdb=tt26657236&section=movies","IMDb backdrop requests use the exact identity endpoint without a catalog id");
+        var response=System.Text.Encoding.UTF8.GetBytes("""{"id":"tt26657236","section":"movies","item":{"language":"en","title":"Backrooms","description":"A fixture","poster":null,"backdrop":"https://image.tmdb.org/t/p/w1280/backrooms.jpg","genres":[],"countries":[],"actors":[],"directors":[]}}""");
+        Check(FeatureBackdrop.ReadResponse(response,backdropId)=="https://image.tmdb.org/t/p/w1280/backrooms.jpg","IMDb banner accepts a validated landscape from the existing public metadata API");
+        try{FeatureBackdrop.ReadResponse(response,"imdb:series:tt26657236");throw new Exception("Wrong type accepted");}catch(System.IO.InvalidDataException){}
+        Check(FeatureBackdrop.IdentityFor(imdbCard with{Section="Игры"})==null,"games cannot be mistaken for IMDb movie artwork");
+        var localized=MediaMetadata.Merge(imdbCard,imdbCard with{Title="Закулисье реальности"});
+        Check(localized.Title=="Закулисье реальности"&&localized.OriginalTitle=="Backrooms"&&localized.ImdbId==imdbCard.ImdbId,"localized metadata improves a Latin source title without changing its identity");
         var related=Item(2,"Backrooms: Behind the Scenes");var wrong=Item(3,"The Courier");var old=Item(4,"Backrooms",2022);
         var rows=new[]{wrong,related,old,exact};
         Check(CatalogSearch.Find(rows,"Закулисье реальности").Single()==exact,"verified translated title finds canonical work");

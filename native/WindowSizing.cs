@@ -122,6 +122,9 @@ public partial class MainWindow
         compactLayouts++;
         if(!ready)return;
         var narrow=ActualWidth>0&&ActualWidth<950;
+        Grid.SetColumn(SearchBar,narrow?1:0);Grid.SetColumnSpan(SearchBar,narrow?1:3);
+        var searchInset=narrow?0:176;
+        SearchBar.Margin=narrow?new Thickness(0,0,ActualWidth<780?8:12,0):new Thickness(searchInset,0,searchInset,0);
         var tiny=ActualWidth>0&&ActualWidth<780;
         var shortView=ActualHeight>0&&ActualHeight<560;
         var veryShort=ActualHeight>0&&ActualHeight<360;
@@ -159,10 +162,10 @@ public partial class MainWindow
         HeaderArea.Margin=new Thickness(gutter,CaptionBand+(veryShort?2:shortView?6:10),gutter,veryShort?6:shortView?8:20);
         if(ReferenceEquals(FiltersPanel.Parent,HeaderArea))FiltersPanel.Margin=new Thickness(0,shortView?6:12,0,0);
         CenterRegion.Margin=new Thickness(gutter,0,gutter,0);StatusToast.Margin=new Thickness(gutter,0,gutter,20);
-        SearchBar.Margin=new Thickness(0,0,tiny?8:12,0);SearchBar.Height=control;Search.MinHeight=control;
+        SearchBar.Height=control;Search.MinHeight=control;
         Search.Padding=new Thickness(narrowSearch?12:48,0,narrowSearch?72:110,0);
         SearchMagnifier.Visibility=narrowSearch?Visibility.Collapsed:Visibility.Visible;
-        SearchPlaceholder.Text=AppLanguage.T(narrowSearch?"Поиск":section=="Игры"?"Найти игру для Windows":"Найти фильм, сериал или человека");SearchPlaceholder.Margin=new Thickness(narrowSearch?12:48,0,narrowSearch?72:110,0);
+        SearchPlaceholder.Text=AppLanguage.T(narrowSearch?"Поиск":"Найти фильм, сериал или игру");SearchPlaceholder.Margin=new Thickness(narrowSearch?12:48,0,narrowSearch?72:110,0);
         foreach(var subtitle in PageHeader.Children.OfType<TextBlock>().Where(x=>Equals(x.Tag,"CatalogSubtitle")))subtitle.Visibility=shortView?Visibility.Collapsed:Visibility.Visible;
         RenderNavSelection();
         UpdateSavedCount();UpdateDownloadsWidget();
@@ -230,7 +233,7 @@ public partial class MainWindow
         UpdateCatalogColumns(true);
     }
     // Games, and the saved games tab, lay out wide capsules instead of portrait posters.
-    bool GameGrid=>section=="Игры"||section=="Сохранённое"&&savedCategory=="Игры"||section=="Актуальное"&&FeaturedGameGrid;
+    bool GameGrid=>SearchActive&&searchCategory=="Игры"||section=="Игры"||section=="Сохранённое"&&savedCategory=="Игры"||section=="Актуальное"&&FeaturedGameGrid;
     void UpdateCatalogColumns(bool force=false)
     {
         // The games home has shelves but no list, so it still follows the window width.

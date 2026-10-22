@@ -42,6 +42,7 @@ public partial class MainWindow
     readonly OnlineIndexClient onlineIndex;
     Task<MediaItem> Metadata(MediaItem item,bool priority=false,CancellationToken ct=default,Action<MediaItem>? updated=null,bool force=false)
     {
+        if(item.Section=="Игры")return Task.FromResult(item);
         if(prefs.UiLanguage=="en"&&item.Cinema)return EnglishMetadata(item,priority,ct,updated,force);
         // A title found only on IMDb has no catalog page to read. An opened card asks the site for its text and cast, TheTVDB for series and TMDB for films (shelf cards do not); TVmaze backs up series.
         if(ImdbSuggestions.IsImdbOnly(item))return priority?ImdbMetadata(item,ct,updated,force):Task.FromResult(item);
@@ -390,7 +391,8 @@ public partial class MainWindow
                         if(!IsCurrent())return;
                         liveItems=updated.Items;
                         if(!closed&&current==null&&activePerson==null&&section==category&&!favoritesOnly)RenderCatalogKeepingPosition();
-                    },preferredLanguage:searchLanguage);
+                    },preferredLanguage:searchLanguage,games:searchProvider!=null&&gameCatalogProvider==null?null:async t=>
+                        (await (gameCatalogProvider?.Invoke(new(query,GameBrowse.Popular,"",1),t)??new GameCatalog(sourceClient,searchLanguage).Browse(new(query,GameBrowse.Popular,"",1),t))).Items);
                 items=result.Items;if(result.Offline)liveError="Часть источников недоступна · добавлены результаты из сохранённого каталога";
             }
             try{await catalogIndex.AddAsync(items,token);}catch(IOException){}catch(UnauthorizedAccessException){}

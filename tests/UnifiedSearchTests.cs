@@ -12,6 +12,14 @@ static class UnifiedSearchTests
         Check(UnifiedSearch.Filter(result.Items,"").Length==2&&UnifiedSearch.Filter(result.Items,"Сериалы").Single()==series,"result type filters do not run another search");
         var partial=await UnifiedSearch.FindAsync("Искра",(kind,_)=>kind=="Сериалы"?throw new IOException("offline"):Task.FromResult<IReadOnlyList<MediaItem>>([film]),kind=>kind=="Сериалы"?[series]:[],default);
         Check(partial.Offline&&partial.Items.Length==2,"one catalog failure retains working and saved search results");
+        var game=Item("Игры",1,"Искра");var gameCalls=0;called.Clear();
+        var global=await UnifiedSearch.FindAsync("Искра",(kind,_)=>{called.Add(kind);return Task.FromResult<IReadOnlyList<MediaItem>>([kind=="Фильмы"?film:series]);},_=>[],default,
+            games:_=>{gameCalls++;return Task.FromResult<IReadOnlyList<MediaItem>>([game]);});
+        Check(global.Items.Length==3&&global.Items.Select(x=>x.Section).Distinct().Count()==3&&gameCalls==1&&called.Count==2,"one submission searches movies, series and games without merging equal ids across types");
+        Check(UnifiedSearch.Filter(global.Items,"Игры").Single()==game&&gameCalls==1,"the Games result filter reuses the unified response without another Steam request");
+        var gameOffline=await UnifiedSearch.FindAsync("Искра",(kind,_)=>Task.FromResult<IReadOnlyList<MediaItem>>([kind=="Фильмы"?film:series]),kind=>kind=="Игры"?[game]:[],default,
+            games:_=>throw new IOException("Steam unavailable"));
+        Check(gameOffline.Offline&&gameOffline.Items.Length==3,"a failed game source retains video results and cached games");
         using var cancel=new CancellationTokenSource();cancel.Cancel();bool cancelled=false;
         try{await UnifiedSearch.FindAsync("Искра",(_,token)=>Task.FromCanceled<IReadOnlyList<MediaItem>>(token),_=>[],cancel.Token);}catch(OperationCanceledException){cancelled=true;}
         Check(cancelled,"cancelled query cannot publish fallback results");

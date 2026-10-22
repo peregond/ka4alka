@@ -11,7 +11,6 @@ public partial class MainWindow
     void SubmitSearch(object sender,RoutedEventArgs e)
     {
         if(OpenShareLink(Search.Text))return;
-        if(section=="Игры"||current?.Section=="Игры"){section="Игры";SubmitGameSearch();return;}
         featuredReturn=null;ResetCatalogNavigationPosition();
         searchDelay.Stop();
         if(section is not ("Фильмы" or "Сериалы"))section=current?.Section is "Фильмы" or "Сериалы"?current.Section:lastCatalogSection;
@@ -21,7 +20,7 @@ public partial class MainWindow
     void SearchKeyDown(object sender,KeyEventArgs e){if(e.Key==Key.Enter){SubmitSearch(sender,e);e.Handled=true;}}
     void SearchTabs(Panel panel)
     {
-        foreach(var choice in new[]{("","Все"),("Фильмы","Фильмы"),("Сериалы","Сериалы"),("Люди","Люди")})
+        foreach(var choice in new[]{("","Все"),("Фильмы","Фильмы"),("Сериалы","Сериалы"),("Игры","Игры"),("Люди","Люди")})
         {
             var count=choice.Item1=="Люди"?peopleSearchItems.Length:UnifiedSearch.Filter(liveItems,choice.Item1).Length+(choice.Item1==""?peopleSearchItems.Length:0);
             var loading=choice.Item1=="Люди"?PeopleSearchLoading:choice.Item1==""?liveLoading||PeopleSearchLoading:liveLoading;
@@ -38,6 +37,6 @@ public partial class MainWindow
         // A film page shows breathing placeholders in place of its synopsis and releases instead of this bar.
         var loading=activePerson!=null||current!=null?false:section is "Фильмы" or "Сериалы"?liveLoading&&!favoritesOnly:section=="Источники"?searching:section=="Игры"?gameLoading||gameShelfLoading.Count>0:section is "Музыка" or "Программы"?archiveLoading:section is "ТВ-каналы" or "Радио" or "Спорт"?broadcastLoading:false;
         LoadingIndicator.Visibility=loading?Visibility.Visible:Visibility.Collapsed;
-        LoadingLabel.Text=AppLanguage.T(details?"Загружаем информацию…":SearchActive&&(section is "Фильмы" or "Сериалы")?"Ищем фильмы и сериалы…":"Загружаем страницу…");
+        LoadingLabel.Text=AppLanguage.T(details?"Загружаем информацию…":SearchActive&&(section is "Фильмы" or "Сериалы")?"Ищем фильмы, сериалы и игры…":"Загружаем страницу…");
     }
 }

@@ -660,10 +660,11 @@ struct FilterBar: View {
             Text(tr("Все", "All")).tag("")
             Text(tr("Фильмы", "Movies")).tag("movies")
             Text(tr("Сериалы", "Series")).tag("series")
+            Text(tr("Игры", "Games")).tag("games")
         }
         .pickerStyle(.segmented)
         .labelsHidden()
-        .frame(width: 260)
+        .frame(minWidth: 220, idealWidth: 320, maxWidth: 360)
         .accessibilityLabel(tr("Показывать", "Show"))
     }
 

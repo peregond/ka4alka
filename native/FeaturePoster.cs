@@ -35,7 +35,7 @@ public partial class MainWindow
                     saved=await Task.Run(()=>File.Exists(path)&&new FileInfo(path).Length<=32768?File.ReadAllBytes(path):null,token);
                     if(saved!=null)
                     {
-                        var value=FeatureBackdrop.FromResponse(saved,id);
+                        var value=FeatureBackdrop.ReadResponse(saved,id);
                         var age=DateTime.UtcNow-File.GetLastWriteTimeUtc(path);
                         if(age<(value!=null?TimeSpan.FromDays(7):TimeSpan.FromHours(1))){lookup.Expires=File.GetLastWriteTimeUtc(path).Add(value!=null?TimeSpan.FromDays(7):TimeSpan.FromHours(1));return value;}
                     }
@@ -44,7 +44,7 @@ public partial class MainWindow
                 string? Retained()
                 {
                     if(saved==null||DateTime.UtcNow-File.GetLastWriteTimeUtc(path)>=TimeSpan.FromDays(30))return null;
-                    var value=FeatureBackdrop.FromResponse(saved,id);if(value!=null)lookup.Expires=File.GetLastWriteTimeUtc(path).AddDays(30);return value;
+                    var value=FeatureBackdrop.ReadResponse(saved,id);if(value!=null)lookup.Expires=File.GetLastWriteTimeUtc(path).AddDays(30);return value;
                 }
                 if(client==null&&DateTime.UtcNow<backdropRetryAfterUtc)
                 {
@@ -53,9 +53,9 @@ public partial class MainWindow
                 }
                 try
                 {
-                    var request="api/backdrop?id="+Uri.EscapeDataString(id)+"&language="+language;
+                    var request=FeatureBackdrop.RequestPath(id,language);
                     var bytes=client!=null?await client.Read(new Uri(OnlineIndexClient.PublishedSite,request),32768,token):await onlineIndex.ReadSite(request,32768,token);
-                    var value=await Task.Run(()=>FeatureBackdrop.FromResponse(bytes,id),token);
+                    var value=await Task.Run(()=>FeatureBackdrop.ReadResponse(bytes,id),token);
                     lookup.Expires=DateTime.UtcNow.Add(value!=null?TimeSpan.FromDays(7):TimeSpan.FromHours(1));
                     try{await Task.Run(()=>Directory.CreateDirectory(Path.GetDirectoryName(path)!),token);await CacheFiles.WriteAllBytesAsync(path,bytes,token);}catch(IOException){}catch(UnauthorizedAccessException){}
                     return value;
@@ -100,7 +100,7 @@ public partial class MainWindow
         }
         else
         {
-            var id=OnlineIndexClient.IdFor(item);
+            var id=FeatureBackdrop.IdentityFor(item);
             if(id==null)return;
             url=AppLanguage.Current=="en"?(await Metadata(item,ct:metadataLifetime.Token).WaitAsync(ct)).English?.Backdrop:await FeaturePosterUrl(id,ct);
             if(url!=null){var proxy="api/backdrop-image?file="+Uri.EscapeDataString(new Uri(url).Segments.Last().Insert(0,"/"));fetch=c=>onlineIndex.ReadSite(proxy,2*1024*1024,c);}

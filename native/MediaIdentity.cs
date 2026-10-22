@@ -7,8 +7,8 @@ namespace Kachalka;
 // Names are aliases of an exact work, never a fuzzy translation of an arbitrary title.
 public static class MediaIdentity
 {
-    sealed record Known(string ImdbId,string Section,int Year,string OriginalTitle,string[] Aliases);
-    sealed record SearchNames(string[] Names,string[] Normalized,string[][] Words);
+    sealed record Known(string ImdbId,string Section,int Year,string OriginalTitle,string[] Aliases,string? RussianTitle=null);
+    sealed record SearchNames(string[] Names,string[] Normalized,string[][] Words,string? RussianTitle);
     static readonly ConditionalWeakTable<MediaItem,SearchNames> names=new();
     static readonly Lazy<Known[]> known=new(()=>
     {
@@ -39,9 +39,10 @@ public static class MediaIdentity
         var row=Find(key);
         var values=Clean(new[]{key.Title,key.OriginalTitle}.Concat(key.TitleAliases).Concat(row?.Aliases??[]));
         var normalized=values.Select(Normalize).ToArray();
-        return new(values,normalized,normalized.Select(x=>x.Split(' ',StringSplitOptions.RemoveEmptyEntries)).ToArray());
+        return new(values,normalized,normalized.Select(x=>x.Split(' ',StringSplitOptions.RemoveEmptyEntries)).ToArray(),row?.RussianTitle);
     });
     public static string[] Names(MediaItem item)=>Index(item).Names;
+    public static string RussianTitle(MediaItem item)=>Index(item).RussianTitle??item.Title;
     internal static string[] NormalizedNames(MediaItem item)=>Index(item).Normalized;
     internal static string[][] WordNames(MediaItem item)=>Index(item).Words;
     public static string OriginalQuery(string query)

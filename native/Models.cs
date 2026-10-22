@@ -9,7 +9,7 @@ public partial record MediaItem(int Id, string Title, string Section, string Gen
 {
     EnglishMedia? english;
     [JsonIgnore] public EnglishMedia? English {get=>english;init=>english=value;}
-    [JsonIgnore] public string DisplayTitle=>AppLanguage.Current=="en"?(english?.Title??(SearchLanguage.LatinTitle(OriginalTitle??"")?OriginalTitle!:Title)):Title;
+    [JsonIgnore] public string DisplayTitle=>AppLanguage.Current=="en"?(english?.Title??(SearchLanguage.LatinTitle(OriginalTitle??"")?OriginalTitle!:Title)):Section!="Игры"&&SearchLanguage.LatinTitle(Title)?MediaIdentity.RussianTitle(this):Title;
     [JsonIgnore] public string? DisplayImageUrl=>AppLanguage.Current=="en"&&Cinema?english?.Poster:ImageUrl;
     [JsonIgnore] public string? DisplayDescription=>AppLanguage.Current=="en"&&Cinema?english?.Description:Description;
     [JsonIgnore] public CinemaPerson[] DisplayPeople=>AppLanguage.Current=="en"&&Cinema?english?.People??[]:People;

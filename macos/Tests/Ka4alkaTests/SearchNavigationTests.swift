@@ -38,7 +38,7 @@ import XCTest
         model.open(try TestFixtures.card("games:portal", "Portal", section: "games"))
         model.back()
         XCTAssertEqual(model.route, .search)
-        XCTAssertEqual(model.section, .games)
+        XCTAssertEqual(model.section, .movies)
         XCTAssertEqual(model.submittedQuery, "Portal")
         let count = model.routes.count
         let focus = model.searchFocus
@@ -61,7 +61,7 @@ import XCTest
         XCTAssertNil(model.list)
     }
 
-    func testHistoryIsBoundedDeduplicatedAndScopedAndBlankIsNotRecorded() {
+    func testHistoryIsBoundedDeduplicatedAcrossOriginsAndBlankIsNotRecorded() {
         let model = AppModel()
         model.bridge.disabled = true
         model.openSearch()
@@ -70,10 +70,11 @@ import XCTest
         model.query = "title 11"; model.submitSearch()
         XCTAssertEqual(model.recentSearches.count, 8)
         XCTAssertEqual(model.recentSearches.first?.query, "title 11")
-        model.setSearchGames(true)
+        model.select(.games)
+        model.openSearch()
+        model.query = "title 11"
         model.submitSearch()
-        XCTAssertEqual(model.recentSearches.first?.games, true)
-        XCTAssertEqual(model.recentSearches.filter { $0.query == "title 11" }.count, 2)
+        XCTAssertEqual(model.recentSearches.filter { $0.query == "title 11" }.count, 1)
         model.query = "  "
         model.submitSearch()
         XCTAssertFalse(model.recentSearches.contains { $0.query.trimmingCharacters(in: .whitespaces).isEmpty })

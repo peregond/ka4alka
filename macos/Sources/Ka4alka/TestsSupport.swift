@@ -80,7 +80,7 @@ extension SmokePage {
     var spec: SmokePageSpec {
         switch self {
         case .search:
-            return SmokePageSpec(prefixes: ["search."], required: ["search.content", "search.scope"], network: false, plain: true, toolbar: false, scansText: true)
+            return SmokePageSpec(prefixes: ["search."], required: ["search.content", "search.field"], network: false, plain: true, toolbar: false, scansText: true)
         case .featured:
             return SmokePageSpec(prefixes: ["featured."], required: ["featured.hero"], network: false, plain: false, toolbar: false, scansText: false)
         case .movies:
@@ -115,7 +115,7 @@ extension SmokePage {
 enum SmokeProbeCatalog {
     static let sourceLiterals: [String] = [
         "featured.hero", "featured.digest", "featured.ranking",
-        "search.content", "search.scope", "menu.search.scope",
+        "search.content", "search.field",
         "catalog.banner.", "catalog.hero", "catalog.hero.title", "catalog.hero.actions", "catalog.filters", "catalog.saved.controls",
         "games.hero",
         "downloads.header", "downloads.tiles", "downloads.row.",
