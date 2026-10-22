@@ -6,7 +6,7 @@ export type Media = {
 };
 
 const ZONA="https://w6.zona.plus";
-export const normalize=(value:string)=>value.toLocaleLowerCase("ru").replaceAll("ё","е").replace(/[^\p{L}\p{N}]+/gu," ").trim();
+export const normalize=(value:string)=>value.normalize("NFC").toLocaleLowerCase("ru").replaceAll("ё","е").replace(/[^\p{L}\p{N}]+/gu," ").trim();
 export function decodeHtml(value:string) {
   return value.replace(/&#(\d+);/g,(_,n)=>String.fromCodePoint(Number(n)))
     .replace(/&#x([0-9a-f]+);/gi,(_,n)=>String.fromCodePoint(parseInt(n,16)))
@@ -53,7 +53,7 @@ async function sourceText(url:string,timeout=8000) {
 
 export async function fetchCatalog(section:Section,query:string,page:number):Promise<Media[]> {
   const path=section==="movies"?"movies":"tvseries";
-  if(query)return parseCatalog(await sourceText(`${ZONA}/search-form?query=${encodeURIComponent(query)}`),section);
+  if(query)return parseCatalog(await sourceText(`${ZONA}/search-form?query=${encodeURIComponent(query.normalize("NFC"))}`),section);
   // Source pages contain 60 entries; API pages contain 40. Preserve every entry across the boundary.
   const offset=(page-1)*40,sourcePage=Math.floor(offset/60)+1,within=offset%60;
   const first=parseCatalog(await sourceText(`${ZONA}/${path}/filter/sort-date?page=${sourcePage}`),section);

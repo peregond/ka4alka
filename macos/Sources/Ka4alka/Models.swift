@@ -34,6 +34,7 @@ struct StoreCard: Codable, Equatable {
 struct MediaCard: Codable, Identifiable, Equatable {
     var id: String; var title: String; var section: String; var year: Int; var rating: String; var poster: String?; var description: String; var genre: String; var quality: String?; var saved: Bool; var platform: String?; var store: StoreCard? = nil
     var kp: String? = nil; var imdb: String? = nil; var ratingSource: String? = nil
+    var imdbId: String? = nil
     /// Kinopoisk then IMDb when the engine sent both; otherwise the single card rating with its source (never a guessed one).
     var ratings: [KDRating] {
         var rows: [KDRating] = []

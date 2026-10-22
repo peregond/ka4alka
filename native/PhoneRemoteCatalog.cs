@@ -33,7 +33,8 @@ public sealed class PhoneRemoteCatalog(DownloadService downloads, Preferences pr
                 {
                     await BundledCatalog.EnsureLoadedAsync(ct);
                     var matches=await UnifiedSearch.FindAsync(query,(kind,t)=>online.Browse(kind,query,1,t),kind=>BundledCatalog.Search(kind,query),ct,
-                        ImdbSuggestions.Applies(query)?t=>ImdbSuggestions.SearchAsync(query,t):null,preferredLanguage:prefs.UiLanguage);
+                        ImdbSuggestions.Applies(query)?t=>ImdbSuggestions.SearchAsync(query,t):null,preferredLanguage:prefs.UiLanguage,
+                        additional:(kind,t)=>new LiveCatalog(source).Browse(kind,query,1,t));
                     return new{items=Remember(matches.Items.Where(x=>x.Section==category)),hasNext=false};
                 }
                 var catalog=await online.BrowsePage(category,Page(p),ct);

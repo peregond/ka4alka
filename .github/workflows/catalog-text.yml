@@ -5,8 +5,14 @@ on:
       - 'native/**'
       - 'tests/**'
       - 'catalog-text-tests/**'
+      - 'catalog-audit/**'
       - 'scripts/**'
+      - 'web-index/lib/catalog-*.ts'
       - 'web-index/lib/shared-catalog.ts'
+      - 'web-index/app/api/catalog/**'
+      - 'web-index/tests/catalog-*.mjs'
+      - 'web-index/tests/audit-catalog-search.mjs'
+      - 'web-index/tests/helpers/**'
       - 'web-index/tests/shared-catalog-limit.mjs'
       - '.github/workflows/catalog-*.yml'
       - '.github/workflows/release.yml'
@@ -16,8 +22,14 @@ on:
       - 'native/**'
       - 'tests/**'
       - 'catalog-text-tests/**'
+      - 'catalog-audit/**'
       - 'scripts/**'
+      - 'web-index/lib/catalog-*.ts'
       - 'web-index/lib/shared-catalog.ts'
+      - 'web-index/app/api/catalog/**'
+      - 'web-index/tests/catalog-*.mjs'
+      - 'web-index/tests/audit-catalog-search.mjs'
+      - 'web-index/tests/helpers/**'
       - 'web-index/tests/shared-catalog-limit.mjs'
       - '.github/workflows/catalog-*.yml'
       - '.github/workflows/release.yml'
@@ -44,6 +56,18 @@ jobs:
           python3 scripts/test-catalog-collections.py
           python3 scripts/test-bundle-catalog.py
       - name: Verify bounded web catalog reads
-        run: node web-index/tests/shared-catalog-limit.mjs
+        run: |
+          cd web-index
+          npm ci --ignore-scripts --no-audit --no-fund
+          node tests/shared-catalog-limit.mjs
+          node tests/catalog-search.mjs
+          node tests/audit-catalog-search.mjs --report ../test-output/server-search-audit.json
       - name: Verify transport and local catalog scheduling
         run: dotnet run --project catalog-text-tests/Kachalka.CatalogTextTests.csproj --configuration Release
+      - name: Audit every indexed title and known alias with the real desktop matcher
+        run: dotnet run --project catalog-audit/Kachalka.CatalogAudit.csproj -c Release -- --report test-output/native-search-audit.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: catalog-search-audit
+          path: test-output/*search-audit.json

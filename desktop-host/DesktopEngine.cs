@@ -190,7 +190,8 @@ sealed class DesktopEngine:IAsyncDisposable
         {
             var result=await UnifiedSearch.FindAsync(query,(kind,t)=>online.Browse(kind,query,1,t),kind=>shared.Search(kind,query),ct,
                 ImdbSuggestions.Applies(query)?t=>ImdbSuggestions.SearchAsync(query,t):null,preferredLanguage:prefs.UiLanguage,
-                games:async t=>(await new GameCatalog(source,prefs.UiLanguage).Browse(new(query,GameBrowse.Popular,"",1),t)).Items);
+                games:async t=>(await new GameCatalog(source,prefs.UiLanguage).Browse(new(query,GameBrowse.Popular,"",1),t)).Items,
+                additional:(kind,t)=>new LiveCatalog(source).Browse(kind,query,1,t));
             var kind=S(p,"kind") switch{"games"=>"Игры","series"=>"Сериалы","movies"=>"Фильмы",_=>""};
             var filtered=result.Items.Where(Visible).Where(selection.Matches).Where(item=>kind.Length==0||item.Section==kind).Where(item=>qualityHeight==0||QualityMatches(item,qualityHeight)).ToArray();
             return new{items=Remember(filtered),hasNext=false,offline=result.Offline};
@@ -454,7 +455,7 @@ sealed class DesktopEngine:IAsyncDisposable
     CardView CardDto(MediaItem item)
     {
         ApplyKnownQuality(item);
-        return new(Key(item),item.DisplayTitle,item.Section=="Игры"?"games":item.Section=="Сериалы"?"series":"movies",item.Year,item.CardRating,item.DisplayImageUrl??(prefs.UiLanguage=="en"?null:item.ImageUrl),item.DisplayDescription??"",item.CardGenre,item.HasPosterQuality?item.PosterQuality:null,IsSaved(item),item.Section=="Игры"?"Windows":null,item.Store,item.KpAvailable?item.KpValue:null,item.ImdbAvailable?item.ImdbValue:null,item.CardRatingSource);
+        return new(Key(item),item.DisplayTitle,item.Section=="Игры"?"games":item.Section=="Сериалы"?"series":"movies",item.Year,item.CardRating,item.DisplayImageUrl??(prefs.UiLanguage=="en"?null:item.ImageUrl),item.DisplayDescription??"",item.CardGenre,item.HasPosterQuality?item.PosterQuality:null,IsSaved(item),item.Section=="Игры"?"Windows":null,item.Store,item.KpAvailable?item.KpValue:null,item.ImdbAvailable?item.ImdbValue:null,item.CardRatingSource,item.ImdbId);
     }
     MediaItem Card(string id)=>cards.GetValueOrDefault(id)??throw new KeyNotFoundException("Карточка устарела. Обнови страницу.");
     DownloadItem Download(string id)=>downloads.Items.Single(item=>item.Id==id);
@@ -473,4 +474,4 @@ sealed class DesktopEngine:IAsyncDisposable
         await downloads.Close();prefs.Save();source.Dispose();lifetime.Dispose();
     }
 }
-sealed record CardView(string id,string title,string section,int year,string rating,string? poster,string description,string genre,string? quality,bool saved,string? platform,GameStoreInfo? store,string? kp,string? imdb,string? ratingSource);
+sealed record CardView(string id,string title,string section,int year,string rating,string? poster,string description,string genre,string? quality,bool saved,string? platform,GameStoreInfo? store,string? kp,string? imdb,string? ratingSource,string? imdbId);

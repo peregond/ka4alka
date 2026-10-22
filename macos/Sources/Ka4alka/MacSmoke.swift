@@ -429,9 +429,9 @@ struct SmokeShot {
             model.submitSearch()
             await model.loadCatalog()
             let expectedYears = [2001, 2002, 2004, 2005, 2007, 2009, 2010, 2011]
+            let expectedIds: Set<String> = ["tt0241527", "tt0295297", "tt0304141", "tt0330373", "tt0373889", "tt0417741", "tt0926084", "tt1201607"]
             let parts = (model.list?.items ?? []).filter {
-                $0.section == "movies" && expectedYears.contains($0.year) &&
-                    $0.title.lowercased().hasPrefix(tr("гарри поттер и ", "harry potter and "))
+                $0.section == "movies" && expectedIds.contains($0.imdbId ?? "")
             }
             check(parts.map(\.year).sorted() == expectedYears && Set(parts.map(\.id)).count == 8,
                   "search: Russian and English queries find all eight Potter films on a fresh profile")

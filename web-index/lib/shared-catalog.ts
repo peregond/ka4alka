@@ -1,4 +1,5 @@
-import { normalize, type Media, type Section } from "./catalog-source";
+import type { Media, Section } from "./catalog-source";
+import { catalogSearchScore } from "./catalog-search";
 
 const FEED="https://github.com/peregond/ka4alka/releases/download/catalog-data/catalog.json";
 export const MAX_SHARED_CATALOG_BYTES=32*1024*1024;
@@ -68,9 +69,8 @@ export async function sharedCatalogPage(section:Section,query:string,page:number
     await checking;
   }
   if(!cached)return null;
-  const words=normalize(query).split(" ").filter(Boolean);
   const all=cached.items.filter(item=>item.section===section);
-  const rows=all.filter(item=>words.every(word=>normalize(`${item.title} ${item.originalTitle??""} ${item.year}`).split(" ").some(part=>part.startsWith(word))));
+  const rows=all.filter(item=>!query.trim()||catalogSearchScore(item,query)>0);
   if(query&&rows.length===0)return null;
   const offset=query?0:(page-1)*40;
   return {items:rows.slice(offset,offset+(query?80:40)),indexCount:all.length,hasMore:!query&&offset+40<rows.length,updatedAt:cached.generatedAtUtc};

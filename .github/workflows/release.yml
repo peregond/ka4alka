@@ -14,7 +14,7 @@ on:
       version:
         description: Version matching native/Kachalka.csproj
         required: true
-        default: '0.44.20'
+        default: '0.44.21'
       publish:
         description: Publish the release as soon as every release check passes
         type: boolean
@@ -37,7 +37,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 25
     env:
-      RELEASE_VERSION: ${{ inputs.version || '0.44.20' }}
+      RELEASE_VERSION: ${{ inputs.version || '0.44.21' }}
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
     steps:
       - uses: actions/checkout@v4
@@ -68,6 +68,10 @@ jobs:
           if($LASTEXITCODE -ne 0){throw 'Title lookup checks failed'}
           node tests/movie-franchise.mjs
           if($LASTEXITCODE -ne 0){throw 'Movie franchise checks failed'}
+          node tests/catalog-search.mjs
+          if($LASTEXITCODE -ne 0){throw 'Complete catalog search checks failed'}
+          node tests/audit-catalog-search.mjs --report ../test-output/server-search-audit.json
+          if($LASTEXITCODE -ne 0){throw 'Indexed server titles must remain searchable'}
           node tests/localized-media.mjs
           if($LASTEXITCODE -ne 0){throw 'Localized media checks failed'}
           node tests/tmdb-backdrop.mjs
@@ -102,6 +106,11 @@ jobs:
           $changed=$before -ne $after
           "changed=$($changed.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
           "Bundled verified daily text catalog. Embedded resources changed: $changed." >> $env:GITHUB_STEP_SUMMARY
+      - name: Audit every title in the exact bundled desktop catalog
+        shell: pwsh
+        run: |
+          dotnet run --project catalog-audit/Kachalka.CatalogAudit.csproj -c Release -- --catalog web-index/app/data/seed.json --report test-output/native-search-audit.json
+          if($LASTEXITCODE -ne 0){throw 'Bundled titles must remain searchable'}
       # A passed suite for HEAD can be reused only when the bundled resources
       # still match that checkout. A newer daily snapshot requires every check.
       - name: Find a passed Windows validation of this exact tree
@@ -182,9 +191,9 @@ jobs:
           $process=Start-Process $application -ArgumentList @('--cinema-smoke-test',$output) -PassThru
           if(-not $process.WaitForExit(60000)){$process.Kill();throw 'Person card UI smoke timed out'}
           if($process.ExitCode -ne 0 -or (Test-Path "$output/error.txt") -or -not (Test-Path "$output/checks.json")){throw 'Person card UI smoke failed'}
-      - name: Verify upgrade from previously published 0.44.19
+      - name: Verify upgrade from previously published 0.44.20
         shell: pwsh
-        run: ./tests/WindowsPublishedUpgrade.ps1 -FromVersion 0.44.19 -ReleaseDirectory ('dist/release-'+$env:RELEASE_VERSION)
+        run: ./tests/WindowsPublishedUpgrade.ps1 -FromVersion 0.44.20 -ReleaseDirectory ('dist/release-'+$env:RELEASE_VERSION)
       - name: Upload verified files to draft GitHub Release
         shell: pwsh
         env:
@@ -289,6 +298,7 @@ jobs:
             test-output/download-end-to-end/*.json
             test-output/download-end-to-end/error.txt
             test-output/published-site/checks.json
+            test-output/*search-audit.json
             test-output/transfer-*/backdrop-source/*
             test-output/published-upgrade/checks.txt
             test-output/published-upgrade/data/updates/*/result.txt
@@ -299,7 +309,7 @@ jobs:
     timeout-minutes: 15
     env:
       GH_TOKEN: ${{ github.token }}
-      RELEASE_VERSION: ${{ inputs.version || '0.44.20' }}
+      RELEASE_VERSION: ${{ inputs.version || '0.44.21' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4

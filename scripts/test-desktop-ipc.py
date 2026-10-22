@@ -29,12 +29,14 @@ try:
  call('hide',dict(id=card['id']));assert all(c['id']!=card['id'] for c in call('catalog',dict(section='movies',page=1))['items'])
  s=call('settings');call('unhide',dict(id=s['hidden'][0]['id']))
  potter_years=[2001,2002,2004,2005,2007,2009,2010,2011]
+ potter_ids={'tt0241527','tt0295297','tt0304141','tt0330373','tt0373889','tt0417741','tt0926084','tt1201607'}
  for language,query in [('ru','гарри поттер'),('en','Harry Potter')]:
   call('setSettings',dict(uiLanguage=language))
   found=call('catalog',dict(section='movies',query=query))['items']
-  parts=[c for c in found if c['section']=='movies' and c['title'].lower().startswith(('гарри поттер и ','harry potter and ')) and c['year'] in potter_years]
+  parts=[c for c in found if c['section']=='movies' and c.get('imdbId') in potter_ids]
   assert sorted(c['year'] for c in parts)==potter_years,(language,[(c['title'],c['year']) for c in parts])
   assert len({c['id'] for c in parts})==8
+  assert {c['imdbId'] for c in parts}==potter_ids
   assert all(c['title'].startswith('Гарри Поттер' if language=='ru' else 'Harry Potter') for c in parts)
  print('PASS: fresh shared-engine Russian and English searches return all eight Potter films with localized titles and distinct identities')
  assert call('setSettings',dict(uiLanguage='en'))['uiLanguage']=='en'

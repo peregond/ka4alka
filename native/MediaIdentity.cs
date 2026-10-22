@@ -15,7 +15,11 @@ public static class MediaIdentity
         using var stream=typeof(MediaIdentity).Assembly.GetManifestResourceStream("Kachalka.title-aliases.json");
         return stream==null?[]:JsonSerializer.Deserialize<Known[]>(stream,new JsonSerializerOptions{PropertyNameCaseInsensitive=true})??[];
     });
-    public static string Normalize(string value)=>Regex.Replace(value.Replace('ё','е').Replace('Ё','Е').ToLowerInvariant(),@"[^\p{L}\p{N}]+"," ").Trim();
+    public static string CanonicalText(string value)
+    {
+        try{return value.Normalize(System.Text.NormalizationForm.FormC);}catch(ArgumentException){return value;}
+    }
+    public static string Normalize(string value)=>Regex.Replace(CanonicalText(value).Replace('ё','е').Replace('Ё','Е').ToLowerInvariant(),@"[^\p{L}\p{N}]+"," ").Trim();
     static string Section(Known row)=>row.Section=="series"?"Сериалы":"Фильмы";
     static readonly Lazy<Dictionary<string,Known>> byId=new(()=>known.Value.ToDictionary(x=>Section(x)+"|"+x.ImdbId));
     static readonly Lazy<Dictionary<string,Known>> byName=new(()=>known.Value.SelectMany(row=>row.Aliases.Select(name=>(Key:Section(row)+"|"+row.Year+"|"+Normalize(name),Row:row))).GroupBy(x=>x.Key).Where(group=>group.Select(x=>x.Row.ImdbId).Distinct().Count()==1).ToDictionary(group=>group.Key,group=>group.First().Row));
@@ -49,7 +53,7 @@ public static class MediaIdentity
     {
         var term=Normalize(query);
         var matches=known.Value.Where(row=>row.Aliases.Any(name=>Normalize(name)==term)).Select(row=>row.OriginalTitle).Distinct().Take(2).ToArray();
-        return matches.Length==1?matches[0]:query;
+        return matches.Length==1?matches[0]:CanonicalText(query);
     }
     public static string[] Queries(MediaItem item)=>(AppLanguage.Current=="en"?new[]{item.English?.Title,item.OriginalTitle}.Where(x=>!string.IsNullOrWhiteSpace(x)).Cast<string>().Concat(Names(item)).Distinct(StringComparer.OrdinalIgnoreCase):Names(item)).Take(4).ToArray();
     public static bool MatchesQuery(MediaItem item,string[] words)=>Index(item).Words.Any(title=>words.All(word=>title.Any(part=>part.StartsWith(word,StringComparison.Ordinal))||item.Year>0&&item.Year.ToString().StartsWith(word,StringComparison.Ordinal)));

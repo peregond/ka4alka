@@ -384,7 +384,7 @@ public partial class MainWindow
             {
                 await Task.WhenAll(sharedCatalog.RestoreAsync(token),catalogIndex.RestoreAsync(token));
                 var result=await UnifiedSearch.FindAsync(query,
-                    (kind,t)=>searchProvider!=null?searchProvider(kind,query,t):CatalogBatches.ReadPage(c=>onlineIndex.Browse(kind,query,1,c),c=>new LiveCatalog(sourceClient).Browse(kind,query,1,c),false,t),
+                    (kind,t)=>searchProvider!=null?searchProvider(kind,query,t):onlineIndex.Browse(kind,query,1,t),
                     kind=>catalogIndex.Search(kind,query).Concat(sharedCatalog.Search(kind,query)).Concat(BundledCatalog.Search(kind,query)).ToArray(),token,
                     searchProvider!=null?null:t=>SearchSupplement(query,t),updated=>
                     {
@@ -392,7 +392,8 @@ public partial class MainWindow
                         liveItems=updated.Items;
                         if(!closed&&current==null&&activePerson==null&&section==category&&!favoritesOnly)RenderCatalogKeepingPosition();
                     },preferredLanguage:searchLanguage,games:searchProvider!=null&&gameCatalogProvider==null?null:async t=>
-                        (await (gameCatalogProvider?.Invoke(new(query,GameBrowse.Popular,"",1),t)??new GameCatalog(sourceClient,searchLanguage).Browse(new(query,GameBrowse.Popular,"",1),t))).Items);
+                        (await (gameCatalogProvider?.Invoke(new(query,GameBrowse.Popular,"",1),t)??new GameCatalog(sourceClient,searchLanguage).Browse(new(query,GameBrowse.Popular,"",1),t))).Items,
+                    additional:searchProvider==null?(kind,t)=>new LiveCatalog(sourceClient).Browse(kind,query,1,t):null);
                 items=result.Items;if(result.Offline)liveError="Часть источников недоступна · добавлены результаты из сохранённого каталога";
             }
             try{await catalogIndex.AddAsync(items,token);}catch(IOException){}catch(UnauthorizedAccessException){}

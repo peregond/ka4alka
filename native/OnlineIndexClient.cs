@@ -142,7 +142,7 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null,Inde
     async Task<IReadOnlyList<MediaItem>> BrowseCore(string section,string query,int page,CancellationToken ct)
     {
         var key=SectionKey(section)??throw new ArgumentOutOfRangeException(nameof(section));
-        var path="api/catalog?section="+key+"&q="+Uri.EscapeDataString(query.Trim())+"&page="+Math.Clamp(page,1,CatalogPaging.Limit);
+        var path="api/catalog?section="+key+"&q="+Uri.EscapeDataString(MediaIdentity.CanonicalText(query.Trim()))+"&page="+Math.Clamp(page,1,CatalogPaging.Limit);
         using var json=await Get(path,ct);
         if(!json.RootElement.TryGetProperty("items",out var items)||items.ValueKind!=JsonValueKind.Array)throw new InvalidDataException("Онлайн-индекс вернул неверный каталог.");
         return items.EnumerateArray().Take(80).Where(x=>x.ValueKind==JsonValueKind.Object).Select(x=>Media(x,section)).OfType<MediaItem>().DistinctBy(x=>x.Id).ToArray();

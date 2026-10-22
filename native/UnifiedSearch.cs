@@ -4,7 +4,8 @@ public record SearchResult(MediaItem[] Items,bool Offline);
 public static class UnifiedSearch
 {
     public static async Task<SearchResult> FindAsync(string query,Func<string,CancellationToken,Task<IReadOnlyList<MediaItem>>> remote,Func<string,IReadOnlyList<MediaItem>> saved,CancellationToken cancellation,
-        Func<CancellationToken,Task<IReadOnlyList<MediaItem>>>? supplement=null,Action<SearchResult>? updated=null,string preferredLanguage="ru",Func<CancellationToken,Task<IReadOnlyList<MediaItem>>>? games=null)
+        Func<CancellationToken,Task<IReadOnlyList<MediaItem>>>? supplement=null,Action<SearchResult>? updated=null,string preferredLanguage="ru",Func<CancellationToken,Task<IReadOnlyList<MediaItem>>>? games=null,
+        Func<string,CancellationToken,Task<IReadOnlyList<MediaItem>>>? additional=null)
     {
         cancellation.ThrowIfCancellationRequested();
         // Read UI-owned local stores once. Every subsequent merge/rank runs on
@@ -13,15 +14,15 @@ public static class UnifiedSearch
             .Concat(MovieFranchiseCatalog.Search(query,preferredLanguage)).ToArray();
         SearchResult Build(IEnumerable<MediaItem> rows,bool offline)=>new(CatalogSearch.Find(MediaIdentity.Merge(rows.Distinct()),query,200,preferredLanguage),offline);
         if(local.Length>0)updated?.Invoke(Build(local,false));
-        async Task<SearchResult> Category(string category)
+        async Task<SearchResult> Category(string category,bool secondary=false)
         {
             try
             {
                 using var deadline=CancellationTokenSource.CreateLinkedTokenSource(cancellation);deadline.CancelAfter(TimeSpan.FromSeconds(10));
-                var batch=category=="Игры"?await games!(deadline.Token).WaitAsync(deadline.Token):await remote(category,deadline.Token).WaitAsync(deadline.Token);
+                var batch=secondary?await additional!(category,deadline.Token).WaitAsync(deadline.Token):category=="Игры"?await games!(deadline.Token).WaitAsync(deadline.Token):await remote(category,deadline.Token).WaitAsync(deadline.Token);
                 return new(CatalogSearch.Find(MediaIdentity.Merge(batch.Where(x=>x.Section==category).Distinct()),query,160,preferredLanguage),false);
             }
-            catch(Exception) when(!cancellation.IsCancellationRequested){return new([],true);}
+            catch(Exception) when(!cancellation.IsCancellationRequested){return new([],!secondary);}
         }
         async Task<SearchResult> Extra()
         {
@@ -30,6 +31,7 @@ public static class UnifiedSearch
             catch(Exception) when(!cancellation.IsCancellationRequested){return new([],false);}
         }
         var pending=new List<Task<SearchResult>>{Category("Фильмы"),Category("Сериалы"),Extra()};
+        if(additional!=null){pending.Add(Category("Фильмы",true));pending.Add(Category("Сериалы",true));}
         if(games!=null)pending.Add(Category("Игры"));
         var rows=new List<MediaItem>();var offline=false;var result=Build(local,false);
         while(pending.Count>0)

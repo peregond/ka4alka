@@ -33,6 +33,12 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
       - name: Check collector
         run: |
           python scripts/test-refresh-library.py
@@ -72,6 +78,24 @@ jobs:
           CATALOG_DETAIL_LIMIT: ${{ inputs.detail_limit || '1000' }}
           CATALOG_METADATA_BUDGET: ${{ inputs.metadata_budget_seconds || '600' }}
         run: python scripts/refresh-library.py --previous catalog-previous/catalog.json --output catalog-output/catalog.json --detail-limit $env:CATALOG_DETAIL_LIMIT --metadata-budget-seconds $env:CATALOG_METADATA_BUDGET
+      - name: Audit every collected title before publication
+        shell: pwsh
+        run: |
+          dotnet run --project catalog-audit/Kachalka.CatalogAudit.csproj -c Release -- --catalog catalog-output/catalog.json --report test-output/native-search-audit.json
+          if($LASTEXITCODE -ne 0){throw 'The collected library contains unsearchable desktop titles'}
+          Push-Location web-index
+          npm ci --ignore-scripts --no-audit --no-fund
+          if($LASTEXITCODE -ne 0){throw 'Audit dependencies failed'}
+          node tests/audit-catalog-search.mjs --catalog ../catalog-output/catalog.json --report ../test-output/server-search-audit.json
+          if($LASTEXITCODE -ne 0){throw 'The collected library contains unsearchable server titles'}
+          Pop-Location
+      - name: Compare a bounded rotating sample with the live source
+        run: python scripts/audit-catalog-live.py --catalog catalog-output/catalog.json --report test-output/live-search-audit.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: daily-search-audit
+          path: test-output/*search-audit.json
       - name: Publish complete library independently of application updates
         shell: pwsh
         env:

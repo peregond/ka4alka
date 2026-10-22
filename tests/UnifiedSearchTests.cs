@@ -68,6 +68,21 @@ static class UnifiedSearchTests
         var mergedPotter=await UnifiedSearch.FindAsync("гарри поттер",(kind,_)=>Task.FromResult<IReadOnlyList<MediaItem>>(kind=="Фильмы"?[localizedPotter]:[]),_=>[],default);
         Check(mergedPotter.Items.Length==8&&mergedPotter.Items.Single(x=>x.ImdbId=="tt0241527").PageUrl==localizedPotter.PageUrl,"a real catalog result merges with its verified franchise film without duplicate cards or lost page links");
         Check(UnifiedSearch.Filter(mergedPotter.Items,"Игры").Length==0,"known movie franchises do not leak into the Games search filter");
+        var newer=Item("Фильмы",9101,"Матрица: Воскрешение") with{Year=2021};
+        var older=Item("Фильмы",9102,"Матрица") with{Year=1999};
+        var directGate=new TaskCompletionSource<IReadOnlyList<MediaItem>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var gotNewer=new TaskCompletionSource<SearchResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var directCalls=new List<string>();
+        var complete=UnifiedSearch.FindAsync("матрица",(kind,_)=>Task.FromResult<IReadOnlyList<MediaItem>>(kind=="Фильмы"?[newer]:[]),_=>[],default,
+            updated:r=>{if(r.Items.Any(x=>x.Id==newer.Id))gotNewer.TrySetResult(r);},
+            additional:(kind,_)=>{directCalls.Add(kind);return kind=="Фильмы"?directGate.Task:Task.FromResult<IReadOnlyList<MediaItem>>([]);});
+        await gotNewer.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Check(!complete.IsCompleted,"a partial recent catalog is shown while the independent source continues looking for older films");
+        directGate.SetResult([older,newer]);var completed=await complete;
+        Check(completed.Items.Length==2&&completed.Items.Any(x=>x.Id==older.Id)&&directCalls.Count==2,"a nonempty partial answer never suppresses older source results and duplicate cards merge");
+        var directOffline=await UnifiedSearch.FindAsync("матрица",(kind,_)=>Task.FromResult<IReadOnlyList<MediaItem>>(kind=="Фильмы"?[newer]:[]),_=>[],default,
+            additional:(_,_)=>throw new IOException("direct source unavailable"));
+        Check(directOffline.Items.Single().Id==newer.Id&&!directOffline.Offline,"an unavailable optional source preserves working catalog results without a false offline warning");
         using var obsolete=new CancellationTokenSource();var never=new TaskCompletionSource<IReadOnlyList<MediaItem>>(TaskCreationOptions.RunContinuationsAsynchronously);var publishes=0;
         var obsoleteSearch=UnifiedSearch.FindAsync("Искра",(_,_)=>never.Task,_=>[],obsolete.Token,updated:_=>publishes++);
         obsolete.Cancel();try{await obsoleteSearch.WaitAsync(TimeSpan.FromSeconds(2));throw new Exception("Obsolete search remained alive");}catch(OperationCanceledException){}

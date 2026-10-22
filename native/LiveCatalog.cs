@@ -69,6 +69,7 @@ public sealed class LiveCatalog(SourceClient client)
     public Task<IReadOnlyList<MediaItem>> Browse(string section,string query,int page,CancellationToken ct)=>Task.Run(()=>BrowseCore(section,query,page,ct),ct);
     async Task<IReadOnlyList<MediaItem>> BrowseCore(string section,string query,int page,CancellationToken ct)
     {
+        query=MediaIdentity.CanonicalText(query);
         var path=section=="Сериалы"?"/tvseries":"/movies";
         var url=string.IsNullOrWhiteSpace(query)?Base+path+"/filter/sort-date?page="+page:Base+"/search-form?query="+Uri.EscapeDataString(query);
         var cache=System.IO.Path.Combine(Preferences.DataDir,"catalog",Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(url)))+".html");
