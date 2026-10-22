@@ -79,7 +79,18 @@ export async function relayTorrent(request:Request):Promise<Response> {
   if(!source)return failure(400,"Этот torrent-файл нельзя получить через сайт.");
   let upstream:Response;
   try {
-    upstream=await fetch(source.href,{headers:{"Accept":"application/x-bittorrent,*/*","User-Agent":"KachalkaIndex/0.4"},signal:AbortSignal.timeout(12_000),cache:"no-store"});
+    // Redirects are followed by hand: every hop must stay on the tracker before it is requested.
+    let target=source;
+    const signal=AbortSignal.timeout(12_000);
+    for(let hop=0;;hop++) {
+      upstream=await fetch(target.href,{headers:{"Accept":"application/x-bittorrent,*/*","User-Agent":"KachalkaIndex/0.4"},signal,cache:"no-store",redirect:"manual"});
+      const location=upstream.status>=300&&upstream.status<400?upstream.headers.get("location"):null;
+      if(!location)break;
+      let next:URL;
+      try{next=new URL(location,target);}catch{return failure(502,"Трекер перенаправил на другой сайт.");}
+      if(hop>=3||!sameTracker(source,next.href))return failure(502,"Трекер перенаправил на другой сайт.");
+      target=next;
+    }
   } catch {return failure(502,"Трекер не ответил.");}
   if(!upstream.ok)return failure(502,`Трекер вернул ${upstream.status}.`);
   if(!sameTracker(source,upstream.url||source.href))return failure(502,"Трекер перенаправил на другой сайт.");

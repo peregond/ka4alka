@@ -117,3 +117,19 @@ pages={};
 reply=await search.searchReleases(new Request('https://relay.test/api/search?id=movies:interstellar&title=x&original=y&year=2014'));
 assert.equal(reply.status,200);assert.deepEqual((await reply.json()).items,[]);
 console.log('torrent relay, stateless search and BigFanGroup checks passed');
+
+// Redirects are followed by hand: a hop to another site is refused before it is requested.
+{
+  const before=requested.length;
+  upstream=()=>new Response(null,{status:302,headers:{Location:'https://evil.example/x.torrent'}});
+  const redirected=await get('https://megapeer.vip/download/5');
+  assert.equal(redirected.status,502);assert.match((await redirected.json()).error,/другой сайт/);
+  assert.equal(requested.length-before,1,'the foreign address is never requested');
+  assert.equal(requested.at(-1).init.redirect,'manual');
+  let hops=0;
+  upstream=()=>{hops++;return hops===1?new Response(null,{status:301,headers:{Location:'https://dl.megapeer.vip/download/5'}}):withUrl(new Response(torrent),'https://dl.megapeer.vip/download/5');};
+  const followed=await get('https://megapeer.vip/download/5');
+  assert.equal(followed.status,200);assert.equal(requested.at(-1).url,'https://dl.megapeer.vip/download/5');
+  upstream=()=>new Response(null,{status:302,headers:{Location:'/download/5'}});
+  assert.equal((await get('https://megapeer.vip/download/5')).status,502,'a redirect loop stops after a few hops');
+}
