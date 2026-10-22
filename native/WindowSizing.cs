@@ -122,9 +122,6 @@ public partial class MainWindow
         compactLayouts++;
         if(!ready)return;
         var narrow=ActualWidth>0&&ActualWidth<950;
-        Grid.SetColumn(SearchBar,narrow?1:0);Grid.SetColumnSpan(SearchBar,narrow?1:3);
-        var searchInset=narrow?0:176;
-        SearchBar.Margin=narrow?new Thickness(0,0,ActualWidth<780?8:12,0):new Thickness(searchInset,0,searchInset,0);
         var tiny=ActualWidth>0&&ActualWidth<780;
         var shortView=ActualHeight>0&&ActualHeight<560;
         var veryShort=ActualHeight>0&&ActualHeight<360;
@@ -133,6 +130,7 @@ public partial class MainWindow
         // threshold is expressed in those units: 200 % on a 1080p laptop leaves roughly 960 x 520.
         var gutter=narrow?(tiny?16d:24d):ActualWidth<1180?24d:32d;
         FitDownloadsToolbar();
+        CenterHeaderSearch(narrow,gutter);
         ThemeButton.Visibility=RefreshCatalogButton.Visibility=ActualWidth>0&&ActualWidth<480?Visibility.Collapsed:Visibility.Visible;
         if(activeCatalogFilterScroll!=null)activeCatalogFilterScroll.MaxHeight=shortView?68:double.PositiveInfinity;
         if(layoutInitialized&&narrow==compactWidth&&tiny==tinyWidth&&shortView==compactHeight&&veryShort==veryCompactHeight&&narrowSearch==compactSearch&&gutter==contentGutter){UpdateFilterRail();UpdateDownloadsWidget();return;}
@@ -162,7 +160,7 @@ public partial class MainWindow
         HeaderArea.Margin=new Thickness(gutter,CaptionBand+(veryShort?2:shortView?6:10),gutter,veryShort?6:shortView?8:20);
         if(ReferenceEquals(FiltersPanel.Parent,HeaderArea))FiltersPanel.Margin=new Thickness(0,shortView?6:12,0,0);
         CenterRegion.Margin=new Thickness(gutter,0,gutter,0);StatusToast.Margin=new Thickness(gutter,0,gutter,20);
-        SearchBar.Height=control;Search.MinHeight=control;
+        SearchBar.Height=control;Search.MinHeight=control;CenterHeaderSearch(narrow,gutter);
         Search.Padding=new Thickness(narrowSearch?12:48,0,narrowSearch?72:110,0);
         SearchMagnifier.Visibility=narrowSearch?Visibility.Collapsed:Visibility.Visible;
         SearchPlaceholder.Text=AppLanguage.T(narrowSearch?"Поиск":"Найти фильм, сериал или игру");SearchPlaceholder.Margin=new Thickness(narrowSearch?12:48,0,narrowSearch?72:110,0);
@@ -171,6 +169,17 @@ public partial class MainWindow
         UpdateSavedCount();UpdateDownloadsWidget();
         UpdateFilterRail();
         UpdateCatalogColumns();RefreshSidebarUpdate();
+    }
+    void CenterHeaderSearch(bool narrow,double gutter)
+    {
+        // Reserve the actual action width on both sides. At small sizes use the
+        // remaining grid column instead of overlapping the Add/Refresh buttons.
+        HeaderActions.Measure(new Size(double.PositiveInfinity,double.PositiveInfinity));
+        var inset=HeaderActions.DesiredSize.Width+12;
+        var available=Math.Max(0,ActualWidth-(narrow?64:236)-2*gutter);
+        var centered=!narrow&&available-2*inset>=260;
+        Grid.SetColumn(SearchBar,centered?0:1);Grid.SetColumnSpan(SearchBar,centered?3:1);
+        SearchBar.Margin=centered?new Thickness(inset,0,inset,0):new Thickness(0,0,ActualWidth<780?8:12,0);
     }
     void UpdateFilterRail()
     {
