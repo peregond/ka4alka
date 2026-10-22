@@ -32,5 +32,6 @@ public sealed class BroadcastCatalog(SourceClient http)
     static bool Bool(JsonElement x,string name)=>x.TryGetProperty(name,out var v)&&v.ValueKind==JsonValueKind.True;
     static IEnumerable<string> Categories(JsonElement x)=>x.TryGetProperty("categories",out var v)&&v.ValueKind==JsonValueKind.Array?v.EnumerateArray().Select(y=>y.GetString()??""):[];
     static string? Image(JsonElement x,string name){var v=Get(x,name);return Uri.TryCreate(v,UriKind.Absolute,out var u)&&u.Scheme=="https"?v:null;}
-    static bool ValidStream(string? url)=>Uri.TryCreate(url,UriKind.Absolute,out var u)&&u.Scheme is "http" or "https";
+    // The address is written into an .m3u line as is, so a line break or space in it must not pass for a valid stream.
+    static bool ValidStream(string? url)=>url!=null&&!url.Any(c=>char.IsControl(c)||char.IsWhiteSpace(c))&&Uri.TryCreate(url,UriKind.Absolute,out var u)&&u.Scheme is "http" or "https";
 }
