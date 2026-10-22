@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const upstream = await fetch(source.href, { signal: AbortSignal.timeout(8000) });
+    const upstream = await fetch(source.href, { signal: AbortSignal.timeout(8000), redirect: "manual" });
     if (!upstream.ok) {
       return new Response(null, { status: 404 });
     }
