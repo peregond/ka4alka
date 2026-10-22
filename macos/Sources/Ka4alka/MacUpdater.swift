@@ -87,7 +87,7 @@ private let updateFailurePathKey = "Ka4alkaUpdateFailurePath"
         return "x64"
 #endif
     }
-    var buttonTitle: String { ready ? tr("Обновить и перезапустить", "Update and restart") : busy ? tr("Загрузка…", "Loading…") : available ? tr("Скачать обновление", "Download update") : tr("Проверить обновления", "Check for updates") }
+    var buttonTitle: String { ready ? tr("Обновить", "Update") : busy ? tr("Загрузка…", "Loading…") : available ? tr("Скачать обновление", "Download update") : tr("Проверить обновления", "Check for updates") }
     private func setStatus(_ text: String, error: Bool = false) { statusText = text; isError = error }
     private func setFailure(_ error: Error) { setStatus(error.localizedDescription, error: true) }
     /// Forgets a prepared update that can no longer be installed, so the button offers to download it again.

@@ -1,5 +1,5 @@
 param(
- [string]$Version='0.44.16',
+ [string]$Version='0.44.17',
  [string]$SigningKeyPath=$env:KACHALKA_SIGNING_KEY,
  [string]$MakeNsis='makensis'
 )
