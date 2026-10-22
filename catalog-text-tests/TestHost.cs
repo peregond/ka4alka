@@ -14,12 +14,18 @@ public record MediaItem(int Id, string Title, string Section, string Genre, int 
     public string? Description { get; init; }
     public string? OriginalTitle { get; init; }
     public string? ImdbId { get; init; }
-    public EnglishMedia? English {get;init;}
+    public string? ImageUrl { get; init; }
+    public EnglishMedia? English {get;set;}
+    public void SetEnglish(EnglishMedia value)=>English=value;
     public string[] TitleAliases { get; init; }=[];
 }
 
 // Presentation adapters used by the real identity and language ranking helpers.
-public sealed record EnglishMedia(string Title);
+public sealed record EnglishMedia(string Title)
+{
+    public EnglishMedia(string language,string title,string description,string? poster,string? backdrop,string[] actors,string[] directors,string[] genres,string[] countries):this(title){}
+    public static string? PosterUrl(string? url)=>url;
+}
 public sealed record SourceEntry(string Title,string Source,int? Seeds=null);
 
 public static class Preferences
@@ -67,8 +73,10 @@ public sealed class SourceClient(HttpMessageHandler handler) : IDisposable
     public void Dispose() => http.Dispose();
 }
 
-public static class OnlineIndexClient
+public sealed class OnlineIndexClient
 {
+    public static string? IdFor(MediaItem item)=>item.OnlineId;
+    public Task<byte[]> ReadSite(string path,int limit,CancellationToken ct,bool restSites=true)=>throw new InvalidOperationException("Franchise search fixtures must stay offline.");
     public static Action? BeforeMedia;
     public static MediaItem? Media(JsonElement row, string section)
     {
@@ -113,6 +121,11 @@ public static class CatalogPaging
 public static class ImdbSuggestions
 {
     public static bool IsImdbOnly(MediaItem item)=>item.PageUrl?.StartsWith("https://www.imdb.com/title/")==true;
+    public static MediaItem Card(string imdbId,string title,string? originalTitle,string section,int year,string? image)
+    {
+        var id=-(BitConverter.ToInt32(SHA256.HashData(Encoding.UTF8.GetBytes("imdb:"+imdbId)),0)&int.MaxValue);
+        return new(id,title,section,"",year,"—","—","#526B69"){PageUrl="https://www.imdb.com/title/"+imdbId+"/",ImdbId=imdbId,OriginalTitle=originalTitle,ImageUrl=image};
+    }
 }
 public static class MediaMetadata
 {
