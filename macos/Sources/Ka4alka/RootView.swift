@@ -231,6 +231,8 @@ struct RootView: View {
             .kdToast($model.toast)
             .navigationTitle(navigationTitle)
             .toolbar { toolbarContent }
+            .toolbarBackground(toolbarTint, for: .windowToolbar)
+            .toolbarBackground(colorScheme == .dark ? Visibility.visible : Visibility.automatic, for: .windowToolbar)
             .searchable(text: $model.query, placement: .toolbar, prompt: tr("Найти фильм, сериал или игру", "Find a movie, series or game"))
             .onSubmit(of: .search) { model.submitSearch() }
             .onChange(of: model.query) { _, next in
@@ -266,6 +268,11 @@ struct RootView: View {
             .padding(.horizontal, KD.Space.m)
             .padding(.top, KD.Space.xs)
         }
+    }
+    /// The dark theme uses a near-black page; the system title bar over it was a lighter grey slab.
+    /// The title bar takes the page colour there, and the light theme keeps the standard bar.
+    private var toolbarTint: AnyShapeStyle {
+        colorScheme == .dark ? AnyShapeStyle(KDPalette.pageBackground) : AnyShapeStyle(Material.bar)
     }
     private var navigationTitle: String {
         switch model.route {
