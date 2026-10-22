@@ -75,6 +75,30 @@ public partial class MainWindow
                 finally{release.Set();}
                 await task;
             }
+            // A cached batch may finish every file read synchronously. A blocked
+            // producer must still leave WPF input running, including the first read.
+            using(var release=new ManualResetEventSlim())
+            {
+                var started=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);var worker=0;var timedOut=false;
+                var knownCountry=new MediaItem(-987403,"Страна из кэша","Фильмы","",2026,"—","—","#123456"){CountryKeys=["ssha"]};
+                IEnumerable<MediaItem> ColdBatch()
+                {
+                    worker=Environment.CurrentManagedThreadId;started.TrySetResult();timedOut=!release.Wait(TimeSpan.FromSeconds(5));
+                    yield return knownCountry;
+                }
+                var task=RegionalCatalog.WithCachedCountries(ColdBatch(),CancellationToken.None);
+                try
+                {
+                    await started.Task.WaitAsync(TimeSpan.FromSeconds(6));var before=beats;
+                    await Task.Delay(150);await Dispatcher.InvokeAsync(()=>beats++,DispatcherPriority.Input);
+                    if(worker==ui||timedOut||task.IsCompleted||beats-before<3)throw new Exception("Cached regional metadata blocks window input.");
+                }
+                finally{release.Set();}
+                if((await task).Single()!=knownCountry)throw new Exception("Regional worker lost cached countries.");
+                using var cancelled=new CancellationTokenSource();cancelled.Cancel();
+                try{await RegionalCatalog.WithCachedCountries([knownCountry],cancelled.Token);throw new Exception("Cancelled regional loading completed.");}
+                catch(OperationCanceledException)when(cancelled.IsCancellationRequested){}
+            }
             var indexFolder=Path.Combine(output,"catalog-index-fixture");
             var original=new CatalogIndex(indexFolder);
             var known=new MediaItem(-987401,"Проверка сохранённого каталога","Фильмы","",2026,"—","—","#123456"){PageUrl="https://w6.zona.plus/movies/startup-performance"};
@@ -104,7 +128,7 @@ public partial class MainWindow
                 return new {PreviousMs=oldMs,PreparedMs=watch.Elapsed.TotalMilliseconds,PreviousAllocatedBytes=oldBytes,PreparedAllocatedBytes=GC.GetAllocatedBytesForCurrentThread()-allocated};
             });
             if(measurements.PreparedAllocatedBytes>=measurements.PreviousAllocatedBytes/2)throw new Exception("Prepared title search still repeatedly allocates normalized names.");
-            await File.WriteAllTextAsync(Path.Combine(output,"checks.json"),JsonSerializer.Serialize(new {DeferredCatalogPreserved=true,ClearNotRepopulated=true,CatalogWorker=true,ReleaseWorker=true,QualityApiWorker=true,NativeInputWhileLoading=true,HeartbeatTicks=beats,SearchResultsUnchanged=true,Queries=queries.Length,Records=BundledCatalog.All.Count,Search=measurements}));
+            await File.WriteAllTextAsync(Path.Combine(output,"checks.json"),JsonSerializer.Serialize(new {DeferredCatalogPreserved=true,ClearNotRepopulated=true,CatalogWorker=true,ReleaseWorker=true,QualityApiWorker=true,RegionalCacheWorker=true,RegionalCancellation=true,NativeInputWhileLoading=true,HeartbeatTicks=beats,SearchResultsUnchanged=true,Queries=queries.Length,Records=BundledCatalog.All.Count,Search=measurements}));
         }
         finally{heartbeat.Stop();}
         Close();

@@ -15,7 +15,11 @@ public sealed class RegionalCatalog(SourceClient client)
     public static string CachePath(MediaItem item)=>Path.Combine(Preferences.DataDir,"regions",Key(item.PageUrl??item.Id.ToString())+".json");
     static string DetailPath(MediaItem item)=>Path.Combine(Preferences.DataDir,"details",Key(item.PageUrl!)+".json");
 
-    public static async Task<MediaItem[]> WithCachedCountries(IEnumerable<MediaItem> items,CancellationToken ct)
+    // Opening files, checking their attributes and parsing a cached JSON document
+    // can all complete synchronously. Keep the whole batch off the Dispatcher,
+    // including the first pass over files that are not yet cached by Windows.
+    public static Task<MediaItem[]> WithCachedCountries(IEnumerable<MediaItem> items,CancellationToken ct)=>Task.Run(()=>WithCachedCountriesCore(items,ct),ct);
+    static async Task<MediaItem[]> WithCachedCountriesCore(IEnumerable<MediaItem> items,CancellationToken ct)
     {
         var result=new List<MediaItem>();
         foreach(var item in items)
@@ -113,14 +117,16 @@ public sealed class RegionalCatalog(SourceClient client)
             .Select(row=>row.TryGetProperty("id",out var id)?id.ValueKind==JsonValueKind.String?id.GetString():id.ValueKind==JsonValueKind.Number?id.GetRawText():null:null).OfType<string>().ToHashSet(StringComparer.Ordinal);
         return ids.IsSubsetOf(known);
     }
-    public async Task<CatalogPage> BrowsePage(string section,int page,string region,string? homeCountry,CancellationToken ct,CatalogSelection? selection=null,bool forceRefresh=false,Action<CatalogPage>? progress=null)
+    public Task<CatalogPage> BrowsePage(string section,int page,string region,string? homeCountry,CancellationToken ct,CatalogSelection? selection=null,bool forceRefresh=false,Action<CatalogPage>? progress=null)=>
+        Task.Run(()=>BrowsePageCore(section,page,region,homeCountry,ct,selection,forceRefresh,progress),ct);
+    async Task<CatalogPage> BrowsePageCore(string section,int page,string region,string? homeCountry,CancellationToken ct,CatalogSelection? selection,bool forceRefresh,Action<CatalogPage>? progress)
     {
         if(region is not ("native" or "foreign"))throw new ArgumentException("Invalid catalog region",nameof(region));
         var home=CatalogRegions.HomeCountry(homeCountry);
         var filters=(selection??new CatalogSelection()) with{Region=region,HomeCountry=home};
         using var budget=CancellationTokenSource.CreateLinkedTokenSource(ct);budget.CancelAfter(TimeSpan.FromSeconds(18));
         var source=await new LiveCatalog(client).BrowsePage(section,page,filters,budget.Token,forceRefresh);
-        var rows=await WithCachedCountries(source.Items,budget.Token);
+        var rows=await WithCachedCountriesCore(source.Items,budget.Token);
         CatalogPage Snapshot()=>source with{Items=rows.Where(item=>CatalogRegions.Matches(item,region,home)).ToArray()};
         progress?.Invoke(Snapshot());
         var work=Enumerable.Range(0,rows.Length).Where(index=>
