@@ -594,14 +594,16 @@ struct SmokeShot {
     }
 
     private func inspectDetailBanner(_ page: String) {
-        guard let scroll = SettingsLayoutMeasurements.enclosingScrollView(for: "detail.banner"),
+        guard let clip = SettingsLayoutMeasurements.scrollViewportFrame(for: "detail.banner"),
+              let column = SettingsLayoutMeasurements.frames["shell.detail"],
               let banner = SettingsLayoutMeasurements.frames["detail.banner"] else {
             check(false, page + ": full-width detail banner is measured")
             return
         }
-        check(abs(banner.width - scroll.contentView.bounds.width) <= 2,
-              page + ": detail artwork fills the scroll viewport without side gutters (banner " + String(Int(banner.width)) +
-              ", viewport " + String(Int(scroll.contentView.bounds.width)) + ", document " + String(Int(scroll.documentView?.bounds.width ?? 0)) + ")")
+        let viewport = column.intersection(clip)
+        check(!viewport.isNull && abs(banner.minX - viewport.minX) <= 2 && abs(banner.maxX - viewport.maxX) <= 2,
+              page + ": detail artwork fills the visible content column without side gutters (banner " + String(Int(banner.minX)) + "..." + String(Int(banner.maxX)) +
+              ", viewport " + String(Int(viewport.minX)) + "..." + String(Int(viewport.maxX)) + ")")
         if let body = SettingsLayoutMeasurements.frames["detail.body"] {
             check(body.width <= KD.Width.page + 2 && body.width < banner.width,
                   page + ": description and releases keep their inset reading column")
@@ -613,7 +615,7 @@ struct SmokeShot {
     }
 
     private func inspectToolbar(primary: Bool) {
-        guard let main = MacSmoke.mainWindow() else { return }
+        guard MacSmoke.mainWindow() != nil else { return }
         SettingsLayoutMeasurements.refreshNativeViews()
         reportToolbar(primary, SettingsLayoutMeasurements.nativeAttached["toolbar.add"] == true, "toolbar: the page actions are present at the top of the page")
     }

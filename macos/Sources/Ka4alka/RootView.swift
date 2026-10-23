@@ -259,6 +259,7 @@ struct RootView: View {
         detailBody
             .environment(\.kdSafeTop, safeTop)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .settingsLayoutProbe("shell.detail")
             .kdReadSafeTop($safeTop)
             .shellPageBackground()
             .safeAreaInset(edge: .top, spacing: 0) { errorBanner }

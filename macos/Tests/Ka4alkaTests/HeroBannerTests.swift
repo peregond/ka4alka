@@ -96,6 +96,41 @@ final class HeroRotationTests: XCTestCase {
         }
     }
 
+    func testDetailArtworkFillsVisibleSplitViewColumnWithSidebarShownOrHidden() throws {
+        _ = NSApplication.shared
+        let previousProbe = SettingsLayoutMeasurements.enabledForTests
+        SettingsLayoutMeasurements.enabledForTests = true
+        defer { SettingsLayoutMeasurements.enabledForTests = previousProbe }
+        let model = AppModel()
+        model.bridge.disabled = true
+        model.settings = try TestFixtures.decode(AppSettings.self, TestFixtures.settingsJSON)
+        model.connected = true
+        model.route = .detail(try TestFixtures.card("movies:split-width", "A film"))
+        let controller = NSHostingController(rootView: RootView().environmentObject(model).environmentObject(MacUpdater()))
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1280, height: 700), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+        window.contentViewController = controller
+        window.orderFront(nil)
+        defer { window.orderOut(nil); window.contentViewController = nil }
+        for visibility: NavigationSplitViewVisibility in [.all, .detailOnly] {
+            model.sidebarVisibility = visibility
+            for width: CGFloat in [760, 1280] {
+                window.setContentSize(NSSize(width: width, height: 700))
+                controller.view.layoutSubtreeIfNeeded()
+                RunLoop.main.run(until: Date().addingTimeInterval(0.4))
+                controller.view.layoutSubtreeIfNeeded()
+                SettingsLayoutMeasurements.refreshNativeViews()
+                let column = try XCTUnwrap(SettingsLayoutMeasurements.frames["shell.detail"])
+                let clip = try XCTUnwrap(SettingsLayoutMeasurements.scrollViewportFrame(for: "detail.banner"))
+                let banner = try XCTUnwrap(SettingsLayoutMeasurements.frames["detail.banner"])
+                let visible = column.intersection(clip)
+                XCTAssertFalse(visible.isNull)
+                XCTAssertGreaterThan(visible.width, 300)
+                XCTAssertEqual(banner.minX, visible.minX, accuracy: 2)
+                XCTAssertEqual(banner.maxX, visible.maxX, accuracy: 2)
+            }
+        }
+    }
+
     func testScrollVisibilityPublishesOnlyOnVisibilityChanges() {
         _ = NSApplication.shared
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 400), styleMask: [.borderless], backing: .buffered, defer: false)

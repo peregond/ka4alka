@@ -37,7 +37,7 @@ private let layoutProbeEnabled: Bool = CommandLine.arguments.contains("--smoke-t
     }
     private static var nativeViews: [UUID: WeakView] = [:]
     static func usesNativeCoordinates(_ id: String) -> Bool {
-        id == "sidebar" || id.hasPrefix("search.") || id.hasPrefix("sidebar.") || id.hasPrefix("detail.") || id.hasPrefix("featured.") || id.hasPrefix("catalog.") || id.hasPrefix("games.")
+        id == "sidebar" || id == "shell.detail" || id.hasPrefix("search.") || id.hasPrefix("sidebar.") || id.hasPrefix("detail.") || id.hasPrefix("featured.") || id.hasPrefix("catalog.") || id.hasPrefix("games.")
     }
     static func registerNative(_ view: NSView, owner: UUID) { nativeViews[owner] = WeakView(view) }
     static func refreshNativeViews() {
@@ -70,6 +70,16 @@ private let layoutProbeEnabled: Bool = CommandLine.arguments.contains("--smoke-t
             if let scroll = probe.enclosingScrollView { return scroll }
         }
         return nil
+    }
+
+    /// AppKit on macOS 27 may extend the native scroll view underneath the
+    /// sidebar. Return its clip rectangle in the probes' window coordinates so
+    /// callers can intersect it with the actual SwiftUI detail column.
+    static func scrollViewportFrame(for id: String) -> CGRect? {
+        guard let scroll = enclosingScrollView(for: id), let content = scroll.window?.contentView else { return nil }
+        let clip = scroll.contentView
+        let frame = clip.convert(clip.bounds, to: nil)
+        return CGRect(x: frame.minX, y: content.bounds.height - frame.maxY, width: frame.width, height: frame.height)
     }
 
     /// A view that appears again after it disappeared (same identity, kept state) records frames again.
