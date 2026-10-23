@@ -7,6 +7,7 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
@@ -20,6 +21,7 @@ internal static class Program
     const BindingFlags Members=BindingFlags.Instance|BindingFlags.Public|BindingFlags.NonPublic;
     static string releaseDirectory="",outputDirectory="";
     static readonly string CaptureLanguage=Environment.GetEnvironmentVariable("KACHALKA_SCREENSHOT_LANGUAGE")??"ru";
+    static readonly bool SettingsOnly=Environment.GetEnvironmentVariable("KACHALKA_SCREENSHOT_SCOPE")=="settings";
     static readonly List<object> captures=[];
     static readonly List<string> skipped=[];
     static readonly DateTime Deadline=DateTime.UtcNow.AddSeconds(510);
@@ -221,6 +223,12 @@ internal static class Program
         window.Topmost=true;window.Activate();
         window.WindowState=WindowState.Normal;window.MaxWidth=1920;window.MaxHeight=1200;window.Width=1440;window.Height=900;window.Left=0;window.Top=0;
         await Settle(window);
+        if(SettingsOnly)
+        {
+            await CaptureSettings(window);
+            WriteCaptureInfo();
+            return;
+        }
         await Until(()=>Field(window,"liveLoading") is false&&Field(window,"liveItems") is IEnumerable rows&&rows.Cast<object>().Any(),TimeSpan.FromSeconds(80),"Actual default source catalogue did not load.");
         await Task.Delay(2000);await WaitPosters(window,"Film catalogue");await Task.Delay(8000);await WaitPosters(window,"Final film catalogue");await WaitFeature(window);await WaitPosters(window,"Settled film catalogue");Save(window,"catalog-dark.png");
         Call(window,"ToggleTheme",window,new RoutedEventArgs());await Settle(window);await WaitPosters(window,"Light film catalogue");Save(window,"catalog-light.png");
@@ -255,8 +263,41 @@ internal static class Program
         await Until(()=>Field(window,"gameReleasesLoading") is false,TimeSpan.FromSeconds(30),"Real game source search did not complete.");
         await WaitPosters(window,"Steam game detail",1);Save(window,"game-detail-dark.png");
         Call(window,"ShowDownloads",window,new RoutedEventArgs());await Settle(window);Save(window,"downloads-dark.png");
+        await CaptureSettings(window);
+        WriteCaptureInfo();
+    }
+
+    static async Task CaptureSettings(MainWindow window)
+    {
         var settings=Visuals<Button>(window).FirstOrDefault(button=>button.Name=="SettingsButton")??throw new InvalidOperationException("Actual settings navigation is missing.");
-        settings.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await Settle(window);Save(window,"settings-dark.png");
+        settings.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await Settle(window);
+        if(!SettingsOnly)Save(window,"settings-dark.png");
+        foreach(var (section,filename,controls) in new[]
+        {
+            ("Внешний вид","settings-lite-dark.png",new[]{"SettingsLiteMode"}),
+            ("Устройства в сети","settings-lan-dark.png",new[]{"PhoneRemoteStart","SettingsLanEnabled"})
+        })
+        {
+            var jump=Visuals<Button>(window).SingleOrDefault(button=>AutomationProperties.GetName(button)==AppLanguage.T("Раздел: "+section))
+                ??throw new InvalidOperationException("Actual settings section navigation is missing: "+section);
+            jump.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await Settle(window);
+            foreach(var name in controls)
+            {
+                var control=Visuals<FrameworkElement>(window).SingleOrDefault(element=>element.Name==name)
+                    ??throw new InvalidOperationException("Actual released settings control is missing: "+name);
+                DependencyObject? ancestor=control;
+                while(ancestor!=null&&ancestor is not ScrollViewer)ancestor=VisualTreeHelper.GetParent(ancestor);
+                var scroll=ancestor as ScrollViewer??throw new InvalidOperationException("Settings scroll viewport is missing: "+name);
+                var bounds=control.TransformToAncestor(scroll).TransformBounds(new Rect(control.RenderSize));
+                if(!control.IsVisible||bounds.Top<0||bounds.Bottom>scroll.ActualHeight||bounds.Left<0||bounds.Right>scroll.ActualWidth)
+                    throw new InvalidOperationException("Settings control is clipped or hidden: "+name);
+            }
+            Save(window,filename);
+        }
+    }
+
+    static void WriteCaptureInfo()
+    {
         var releasedDll=Path.Combine(releaseDirectory,"Kachalka.dll");
         File.WriteAllText(Path.Combine(outputDirectory,"capture-info.json"),JsonSerializer.Serialize(new
         {

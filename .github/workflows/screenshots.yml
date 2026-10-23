@@ -8,12 +8,19 @@ on:
       publish_reviewed:
         type: boolean
         default: false
+      settings_only:
+        type: boolean
+        default: false
   workflow_dispatch:
     inputs:
       version:
         description: Published version to capture
         required: true
-        default: '0.44.1'
+        default: '0.44.27'
+      settings_only:
+        description: Capture only Lite mode and LAN phone settings
+        type: boolean
+        default: false
       publish_reviewed:
         description: Publish reviewed repository screenshots instead of capturing again
         type: boolean
@@ -21,7 +28,7 @@ on:
 permissions:
   contents: write
 concurrency:
-  group: documentation-preview-${{ github.ref_name }}
+  group: documentation-preview-${{ github.ref_name }}-${{ inputs.settings_only && 'settings' || 'all' }}
   cancel-in-progress: true
 jobs:
   publish-reviewed:
@@ -43,6 +50,7 @@ jobs:
       RELEASE_VERSION: ${{ inputs.version }}
       KACHALKA_SCREENSHOT_VERSION: ${{ inputs.version }}
       KACHALKA_SCREENSHOT_LANGUAGE: ${{ matrix.language }}
+      KACHALKA_SCREENSHOT_SCOPE: ${{ inputs.settings_only && 'settings' || 'all' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -101,7 +109,9 @@ jobs:
           $dllHash=(Get-FileHash -LiteralPath (Join-Path $env:KACHALKA_SCREENSHOT_RELEASE 'Kachalka.dll') -Algorithm SHA256).Hash.ToLowerInvariant()
           if($info.Version -ne $env:RELEASE_VERSION -or $info.ReleaseDllSha256 -ne $dllHash){throw 'Screenshots were not captured from the verified published DLL'}
           if($info.Language -ne $env:KACHALKA_SCREENSHOT_LANGUAGE){throw 'Capture language mismatch'}
-          foreach($name in @('catalog-dark.png','catalog-light.png','series-dark.png','detail-dark.png','games-dark.png','games-light.png','game-detail-dark.png','downloads-dark.png','settings-dark.png')){
+          $required=@('settings-lite-dark.png','settings-lan-dark.png')
+          if($env:KACHALKA_SCREENSHOT_SCOPE -ne 'settings'){$required+=@('catalog-dark.png','catalog-light.png','series-dark.png','detail-dark.png','games-dark.png','games-light.png','game-detail-dark.png','downloads-dark.png','settings-dark.png')}
+          foreach($name in $required){
             if(-not(Test-Path -LiteralPath (Join-Path $output $name))){throw ('Missing required screenshot: '+$name)}
           }
           # Persist only public screenshot metadata, never the isolated profile or keys.
@@ -122,7 +132,9 @@ jobs:
           python -m pip install Pillow==11.3.0
           if($LASTEXITCODE -ne 0){throw 'Image encoder install failed'}
           $output='test-output/gallery-${{ matrix.language }}'
-          python scripts/screenshots/package-windows.py $env:RELEASE_VERSION '${{ matrix.language }}' 'test-output/documentation-${{ matrix.language }}' $output
+          $scope=@()
+          if($env:KACHALKA_SCREENSHOT_SCOPE -eq 'settings'){$scope=@('settings')}
+          python scripts/screenshots/package-windows.py $env:RELEASE_VERSION '${{ matrix.language }}' 'test-output/documentation-${{ matrix.language }}' $output @scope
           if($LASTEXITCODE -ne 0){throw 'Screenshot verification failed'}
           $files=@(Get-ChildItem $output -File | ForEach-Object {$_.FullName})
           gh release upload ('v'+$env:RELEASE_VERSION) @files --clobber
