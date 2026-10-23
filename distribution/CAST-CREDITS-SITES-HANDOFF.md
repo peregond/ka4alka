@@ -1,8 +1,10 @@
 # Публикация имён персонажей для Windows и Mac
 
-Приложение 0.44.25 опубликовано; дополнительные поля API подготовлены и проверены в GitHub. Текущий Sites ещё возвращает HTTP 400 для русского `/api/localized-media`, поэтому этот сервер нужно опубликовать отдельно.
+Обновление API опубликовано и проверено 23 октября 2026 года. Sites и Railway-каталог возвращают HTTP 200 и `cast` для Adam Scott → Mark Scout (`tt11280740`) и Timothée Chalamet → Paul Atreides (`tt1160419`) на русском и английском. На Sites также проверены оба языка для `series:razdelenie-2022`; Railway `/api/health` вернул HTTP 200 и `status: ok`. Приложения начиная с 0.44.25 поддерживают эти поля. Достаточно перезапуска приложения; очищать настройки и данные не требуется.
 
-Передать в Sites:
+Проверенный адрес каталога Railway: https://catalog-production-e329.up.railway.app/ . По предпочтению владельца `ka4alka.cc` оставлен на Railway; настройки домена в рамках 0.44.26 не менялись. Приведённые ниже инструкции сохранены для повторной публикации при необходимости.
+
+Запрос для повторной публикации Sites:
 
 > Обнови существующий сайт из коммита `d8690411798ca29916db1df7da898d57bd7c33f3` ветки `peregond/ka4alka` `claude/quirky-hopper-1vlmj6`, используя проверенный архив **Prepare verified Sites source**, run **39998921142**. Сохрани D1, привязку DB, секреты, домен и дизайн. Прогони обязательные тесты, TypeScript и сборку. Проверь русский и английский `/api/localized-media?language=ru&imdb=tt11280740&section=series`: HTTP 200, id=tt11280740, section=series, item.cast содержит Adam Scott → Mark Scout (в русском ответе имя актёра может быть «Адам Скотт», originalName=Adam Scott). Проверь оба языка для `/api/localized-media?language=ru&imdb=tt1160419&section=movies`: Timothée Chalamet → Paul Atreides. Дополнительно проверь `/api/localized-media?language=ru&id=series:razdelenie-2022` и английский вариант: правильный id, section и персонаж. Проверь `/api/health`, затем опубликуй существующий сайт.
 
