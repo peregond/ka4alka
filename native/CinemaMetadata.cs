@@ -4,7 +4,10 @@ using System.Text.RegularExpressions;
 using HtmlAgilityPack;
 namespace Kachalka;
 
-public record CinemaPerson(string Name,string Role,string PageUrl,string? ProfileUrl=null,string? PhotoUrl=null,string? OriginalName=null,string? SourcePersonId=null);
+public record CinemaPerson(string Name,string Role,string PageUrl,string? ProfileUrl=null,string? PhotoUrl=null,string? OriginalName=null,string? SourcePersonId=null,string? Character=null)
+{
+    [System.Text.Json.Serialization.JsonIgnore] public string CreditLabel=>Role=="Актёры"&&!string.IsNullOrWhiteSpace(Character)?Character:AppLanguage.T(Role switch{"Актёры"=>"В ролях","Режиссёры"=>"Режиссёр","Операторы"=>"Оператор",_=>Role});
+}
 public record CinemaAward(string Name,int Year,string Category,bool Winner,string? PersonUrl=null)
 {
     public string Label=>$"{Name} · {Year} · {Category} · {(Winner?"Победитель":"Номинация")}";

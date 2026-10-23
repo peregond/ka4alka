@@ -16,8 +16,8 @@ public partial class MainWindow
     readonly Dictionary<int,GameDetails> gameDetails=[];
     readonly Dictionary<int,SourceEntry[]> gameReleaseCache=[];
     TextBlock? gameTitle;Image? gameCover;
-    // Capsules keep the 460:215 shape of Steam's own store header.
-    void GamePosterSized(object sender,SizeChangedEventArgs args){if(sender is Border border){if(args.WidthChanged&&args.NewSize.Width>0){var height=args.NewSize.Width*215/460;if(double.IsNaN(border.Height)||Math.Abs(border.Height-height)>1)border.Height=height;}ClipPoster(border);}}
+    // The stable 2:3 frame matches film cards even when a game has only a landscape fallback.
+    void GamePosterSized(object sender,SizeChangedEventArgs args){if(sender is Border border){if(args.WidthChanged&&args.NewSize.Width>0){var height=args.NewSize.Width*1.5;if(double.IsNaN(border.Height)||Math.Abs(border.Height-height)>1)border.Height=height;}ClipPoster(border);}}
     SourceEntry[] gameReleases=[];SourceCheck[] gameSourceChecks=[];bool gameReleasesLoading;
     TextBlock? gameDescription;
 

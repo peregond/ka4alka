@@ -53,6 +53,7 @@ struct DetailView: View {
         detailLoading = true
         await model.loadDetail(card)
         if !Task.isCancelled { detailLoading = false }
+        if !Task.isCancelled && !isGame { await model.loadCast(card) }
     }
 
     /// Retry runs both requests, so a failed page and an empty release list recover together.
@@ -222,9 +223,9 @@ struct DetailHero: View {
 
     @ViewBuilder private var posterView: some View {
         if isGame {
-            Artwork(address: item.poster, width: 640, placeholderSymbol: "gamecontroller")
-                .aspectRatio(460.0 / 215.0, contentMode: .fit)
-                .frame(width: compact ? 220 : 320)
+            Artwork(address: item.poster, width: 400, placeholderSymbol: "gamecontroller", fallbackAddress: item.posterFallback)
+                .aspectRatio(2.0 / 3.0, contentMode: .fit)
+                .frame(width: compact ? 100 : 135)
                 .clipShape(RoundedRectangle(cornerRadius: KD.Radius.poster, style: .continuous))
                 .settingsLayoutProbe("detail.hero.poster", group: "detail.banner")
         } else {

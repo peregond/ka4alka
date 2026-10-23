@@ -66,7 +66,7 @@ struct PosterCard: View {
     private var posterArt: some View {
         Color.clear
             .aspectRatio(KD.posterAspect(wide: wideArt), contentMode: .fit)
-            .overlay { Artwork(address: item.poster, width: wideArt ? 720 : 640, placeholderSymbol: placeholderSymbol) }
+            .overlay { Artwork(address: item.poster, width: 640, placeholderSymbol: placeholderSymbol, fallbackAddress: item.posterFallback) }
             .overlay { CatalogPosterStatus(store: model.transfers, cardID: card.id, saved: saved) }
             .overlay(alignment: .topLeading) { topLeadingBadge.padding(8) }
             .overlay(alignment: .bottomLeading) { bottomLeadingMark.padding(8) }

@@ -188,10 +188,13 @@ struct Artwork: View {
     var address: String?; var width: Int = 400; var fill = true
     /// SF Symbol shown faintly while the picture is missing (film, tv, gamecontroller).
     var placeholderSymbol: String? = nil
+    var fallbackAddress: String? = nil
     @State private var image: NSImage?
+    @State private var usingFallback = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    init(address: String?, width: Int = 400, fill: Bool = true, placeholderSymbol: String? = nil) {
+    init(address: String?, width: Int = 400, fill: Bool = true, placeholderSymbol: String? = nil, fallbackAddress: String? = nil) {
         self.address = address; self.width = width; self.fill = fill; self.placeholderSymbol = placeholderSymbol
+        self.fallbackAddress = fallbackAddress
         _image = State(initialValue: ImageStore.cachedImage(address, width: width))
     }
     private var fade: Animation? { reduceMotion ? nil : Animation.easeOut(duration: 0.2) }
@@ -203,19 +206,25 @@ struct Artwork: View {
                 Image(systemName: placeholderSymbol).font(.system(size: 30)).foregroundStyle(Color.secondary).opacity(0.3)
             }
             if let image {
-                Image(nsImage: image).resizable().aspectRatio(contentMode: fill ? .fill : .fit).transition(.opacity)
+                Image(nsImage: image).resizable().aspectRatio(contentMode: fill && !usingFallback ? .fill : .fit).transition(.opacity)
             }
         }
         .animation(fade, value: hasImage)
         .clipped()
         .accessibilityHidden(true)
         .onAppear { if image == nil, let ready = ImageStore.cachedImage(address, width: width) { image = ready } }
-        .task(id: address) {
+        .task(id: (address ?? "") + "|" + (fallbackAddress ?? "")) {
+            usingFallback = false
             guard let address, !address.isEmpty else { image = nil; return }
             if let ready = ImageStore.cachedImage(address, width: width) { image = ready; return }
             image = nil
-            let next = await ImageStore.shared.image(address, width: width)
-            if !Task.isCancelled { image = next }
+            var next = await ImageStore.shared.image(address, width: width)
+            var fallback = false
+            if next == nil, !Task.isCancelled, let fallbackAddress, fallbackAddress != address {
+                next = await ImageStore.shared.image(fallbackAddress, width: width)
+                fallback = next != nil
+            }
+            if !Task.isCancelled { usingFallback = fallback; image = next }
         }
         .onDisappear { image = nil }
     }

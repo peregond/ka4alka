@@ -105,6 +105,8 @@ HiddenCatalogTests.Run();
 await UXReliabilityTests.Run(root);
 await WindowsIntegrationTests.Run();
 MiddleEastReleaseTests.Run();
+CharacterCreditsTests.Run();
+await CharacterCreditsTests.LoadTests();
 await ShareLinkTests.Run();
 await WindowsNotificationTests.Run();
 DownloadDiagnosticsTests.Run();

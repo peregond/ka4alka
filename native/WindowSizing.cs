@@ -24,8 +24,8 @@ public static class WindowSizing
     }
     // A poster cell is 144 wide plus a 16 gap, so rows hold as many whole cards as fit.
     public static int PosterColumns(double contentWidth)=>Math.Clamp((int)Math.Floor(contentWidth/160),1,10);
-    // Game cards are wide capsules, so a cell is 190 wide plus the same 16 gap.
-    public static int GameColumns(double contentWidth)=>Math.Clamp((int)Math.Floor(contentWidth/190),1,8);
+    // Games use the same portrait columns and gaps as films.
+    public static int GameColumns(double contentWidth)=>PosterColumns(contentWidth);
 }
 
 public partial class MainWindow
@@ -241,7 +241,7 @@ public partial class MainWindow
         Body.Children.Add(catalogList);
         UpdateCatalogColumns(true);
     }
-    // Games, and the saved games tab, lay out wide capsules instead of portrait posters.
+    // Games retain their own price/review template with the same portrait sizing as films.
     bool GameGrid=>SearchActive&&searchCategory=="Игры"||section=="Игры"||section=="Сохранённое"&&savedCategory=="Игры"||section=="Актуальное"&&FeaturedGameGrid;
     void UpdateCatalogColumns(bool force=false)
     {

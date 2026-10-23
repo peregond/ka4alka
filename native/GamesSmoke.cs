@@ -70,6 +70,7 @@ public partial class MainWindow
             var url="https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/"+entry.Item1+"/capsule_231x87.jpg";
             var item=GameCatalog.Item(entry.Item1,entry.Item2,url) with{Store=stores[index],Genre=genres[index],Year=GameRelease.Parse(stores[index].Released,new DateTime(2026,10,12)).Year};
             CacheArt(url+"|"+PosterDecodeWidth,Art(entry.Item2,palette[index].Item1,palette[index].Item2,460,215));
+            CacheArt(GameCatalog.PosterImage(item)+"|"+PosterDecodeWidth,Art(entry.Item2,palette[index].Item1,palette[index].Item2,600,900));
             CacheArt(GameCatalog.HeroImage(item)!,Art(entry.Item2,palette[index].Item1,palette[index].Item2,1280,413));
             return item;
         }).ToArray();
@@ -108,7 +109,7 @@ public partial class MainWindow
         Check(carousel is {} banner&&banner.Slides[0].Id==spotlight.Id&&banner.Slides.Length==5&&banner.Slides[4].Id==game.Id&&banner.Eyebrow.Text=="В центре внимания"&&Equals(banner.About.Tag,spotlight),"the popular shelf becomes a five-slide banner with its first game in the spotlight");
         Check(carousel!.Meta.Children.OfType<StackPanel>().Any(x=>x.Name=="GameReview")&&carousel.Meta.Children.OfType<FrameworkElement>().Any(x=>x.Name=="GamePrice"),"the banner shows Steam's verdict and the price straight from the list row");
         Check(games.Take(5).All(x=>x.CardMeta.Length>0&&x.CardMeta!="Windows")&&games[5].CardMeta=="28 окт. 2026"&&(games[0] with{Store=null,Year=0,Genre="Windows"}).CardMeta=="","a game card shows its year and genre, a coming game its date, and no placeholder caption");
-        Check(gameShelfViews["popular"].Row.Content is CatalogRow popularRow&&popularRow.Items.Any(x=>x.Id==game.Id)&&gameShelfViews["popular"].Row.ContentTemplate==FindResource("GameRow"),"the popular shelf lists games on wide capsule cards");
+        Check(gameShelfViews["popular"].Row.Content is CatalogRow popularRow&&popularRow.Items.Any(x=>x.Id==game.Id)&&gameShelfViews["popular"].Row.ContentTemplate==FindResource("GameRow"),"the popular shelf lists games with Steam library posters");
         Check(gameShelfViews["new"].Row.Visibility!=Visibility.Visible&&FindVisual<TextBlock>(Body,x=>x.Text=="Новинки")!=null,"the new releases shelf waits for its own request under its own title");
         if(!prefs.LiteMode)
         {
@@ -121,7 +122,7 @@ public partial class MainWindow
         Check(GameShelves.Home.All(spec=>queries.Count(x=>x==spec.Sort+"|"+spec.Genre+"|1|")==1)&&peak<=3,"each shelf is requested once, at most three at a time, and fills in without rebuilding the page");
         Check(gameShelfViews.Values.All(view=>view.Row.Content is CatalogRow row&&row.Items.Length>0)&&new[]{"Популярное","Со скидкой","Новинки","Скоро выйдут","Экшены","Ролевые игры","Стратегии","Играть вместе"}.All(title=>FindVisual<TextBlock>(Body,x=>x.Text==title)!=null),"eight shelves are titled and filled: the four main ones and four genres");
         var arts=VisualElements<Border>(Body).Where(x=>x.Name=="GameCardArt"&&x.ActualWidth>0).ToArray();
-        Check(arts.Length>0&&arts.All(x=>Math.Abs(x.ActualHeight-x.ActualWidth*215/460)<2),"capsules keep the 460 by 215 shape of Steam's store header");
+        Check(arts.Length>0&&arts.All(x=>Math.Abs(x.ActualHeight-x.ActualWidth*1.5)<2),"game posters keep the same 2:3 frame as film cards");
         bool Shown(string name)=>VisualElements<FrameworkElement>(Body).Any(x=>x.Name==name&&x.IsVisible&&x.ActualWidth>0);
         Check(Shown("GamePriceChip")&&Shown("GameDiscount")&&Shown("GameSoon")&&Shown("GameReviewText"),"cards show the price, the discount, a coming-soon mark and the review score where Steam gives them");
         Check(VisualElements<TextBlock>(Body).Any(x=>x.Name=="GameReviewText"&&x.IsVisible&&x.Text=="👍 93%")&&VisualElements<TextBlock>(Body).Any(x=>x.Name=="GameReviewText"&&x.IsVisible&&x.Text=="👍 41%"),"the review score names the share of positive reviews");

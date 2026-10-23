@@ -1,6 +1,6 @@
 // Films the Russian catalog lacks (found through IMDb search in the app) get Russian text, genres and credits
 // from TMDB by exact IMDb id. Runs on the server; the token never leaves it.
-import { clean, readJson, unique, yearOf, type TitleInfo } from "@/lib/title-info";
+import { castCredits, clean, readJson, unique, yearOf, type TitleInfo } from "@/lib/title-info";
 
 type Row = Record<string, unknown>;
 export function parseMovie(imdbId: string, detail: Row): TitleInfo | null {
@@ -18,6 +18,7 @@ export function parseMovie(imdbId: string, detail: Row): TitleInfo | null {
     overview: clean(detail.overview, 4000) || null,
     genres: unique(list(detail.genres), 4).map(name => name.toLowerCase()), countries: unique(list(detail.production_countries), 3),
     actors: unique(list(cast), 12), directors: unique(list(crew), 2),
+    cast: castCredits(cast.map(row => ({ name: row?.name, originalName: row?.original_name, character: row?.character }))),
     aliases: unique([title,original,...list(((detail.alternative_titles??{}) as Row).titles, row=>row.iso_3166_1==="RU"?row.title:null)],16),
   };
 }

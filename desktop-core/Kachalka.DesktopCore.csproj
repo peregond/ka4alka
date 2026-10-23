@@ -17,6 +17,7 @@
     <Compile Include="../native/CatalogPaging.cs" Link="CatalogPaging.cs" />
     <Compile Include="../native/CatalogRegions.cs" Link="CatalogRegions.cs" />
     <Compile Include="../native/CinemaMetadata.cs" Link="CinemaMetadata.cs" />
+    <Compile Include="../native/CharacterCredits.cs" Link="CharacterCredits.cs" />
     <Compile Include="../native/CinemaPeople.cs" Link="CinemaPeople.cs" />
     <Compile Include="../native/CinemaPortraits.cs" Link="CinemaPortraits.cs" />
     <Compile Include="../native/CoverSource.cs" Link="CoverSource.cs" />

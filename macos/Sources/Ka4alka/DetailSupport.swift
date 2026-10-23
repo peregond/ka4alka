@@ -4,7 +4,8 @@ import SwiftUI
 // MARK: Small helpers
 
 /// Windows shows "В ролях / Режиссёр / Оператор" under the portraits; the engine sends the plural group names.
-func detailRoleTitle(_ role: String) -> String {
+func detailRoleTitle(_ role: String, character: String? = nil) -> String {
+    if role == "Актёры", let character = character?.trimmingCharacters(in: .whitespacesAndNewlines), !character.isEmpty { return character }
     switch role {
     case "Актёры": return tr("В ролях", "Cast")
     case "Режиссёры": return tr("Режиссёр", "Director")
@@ -117,16 +118,17 @@ struct DetailPersonCell: View {
                     .font(Font.callout.weight(.medium))
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
-                Text(detailRoleTitle(person.role))
+                Text(detailRoleTitle(person.role, character: person.character))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                    .help(detailRoleTitle(person.role, character: person.character))
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
         }
         .buttonStyle(KDPosterButtonStyle(radius: KD.Radius.thumb))
-        .accessibilityLabel(person.name + ", " + detailRoleTitle(person.role))
+        .accessibilityLabel(person.name + ", " + detailRoleTitle(person.role, character: person.character))
     }
 }
 

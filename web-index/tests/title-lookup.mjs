@@ -16,7 +16,8 @@ const tvdb = load('../lib/tvdb-title.ts', { '@/lib/title-info': info });
 // ----- TMDB: films -----
 const film = tmdb.parseMovie('tt1160419', { id: 438631, title: ' Дюна ', original_title: 'Dune', release_date: '2021-09-15', overview: 'Пол  Атрейдес\nпопадает на Арракис.',
   genres: [{ name: 'Фантастика' }, { name: 'Приключения' }], production_countries: [{ name: 'США' }],
-  credits: { cast: [{ name: 'Зендея', order: 3 }, { name: 'Тимоти Шаламе', order: 0 }, { name: 'Тимоти Шаламе', order: 9 }], crew: [{ name: 'Дени Вильнёв', job: 'Director' }, { name: 'Кто-то', job: 'Writer' }] } });
+  credits: { cast: [{ name: 'Зендея', order: 3 }, { name: 'Тимоти Шаламе', original_name: 'Timothée Chalamet', character: 'Paul Atreides', order: 0 }, { name: 'Тимоти Шаламе', order: 9 }], crew: [{ name: 'Дени Вильнёв', job: 'Director' }, { name: 'Кто-то', job: 'Writer' }] } });
+assert.equal(film.cast[0].character, 'Paul Atreides'); assert.equal(film.cast[0].originalName, 'Timothée Chalamet');
 assert.equal(film.title, 'Дюна'); assert.equal(film.originalTitle, 'Dune'); assert.equal(film.year, 2021); assert.equal(film.source, 'TMDB');
 assert.equal(film.overview, 'Пол Атрейдес попадает на Арракис.'); same(film.genres, ['фантастика', 'приключения']);
 same(film.actors, ['Тимоти Шаламе', 'Зендея']); same(film.directors, ['Дени Вильнёв']);
@@ -68,6 +69,7 @@ const extended = {
     {
       "peopleType": "Actor",
       "personName": "Sean Giambrone",
+      "name": "Yumyulack",
       "sort": 3,
       "type": 3
     },
@@ -279,3 +281,7 @@ assert.equal((await route.GET(req('imdb=tt1160419&section=movies'))).status, 503
 env.TMDB_READ_TOKEN = 'fixture-token';
 const filmAnswer = await route.GET(req('imdb=tt1160419&section=movies')); assert.equal((await filmAnswer.json()).item.source, 'TMDB'); assert.equal(tmdbCalls, 1);
 console.log('PASS: IMDb title lookup — TheTVDB for series, TMDB for films, bounded and secret-free');
+
+same(info.castCredits([{name:'Actor',character:'First'},{name:'Actor',character:'Second'},{name:'Actor',character:'First'},{name:'Unknown'}]).map(row=>row.character),['First / Second',null]);
+
+assert.equal(tvdb.parseSeries("tt8910922",extended).cast.find(row=>row.name==="Sean Giambrone").character,"Yumyulack");

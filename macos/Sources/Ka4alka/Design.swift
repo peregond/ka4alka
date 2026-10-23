@@ -45,7 +45,7 @@ enum KD {
         static let minHit: CGFloat = 24
         static let iconButton: CGFloat = 28
         static let posterWidth: CGFloat = 155
-        static let wideCardWidth: CGFloat = 230
+        static let wideCardWidth: CGFloat = posterWidth
         static let rowPoster: CGFloat = 48
         static let digestPoster: CGFloat = 92
         static let heroHeight: CGFloat = 300
@@ -68,10 +68,10 @@ enum KD {
     static let titleBlockHeight: CGFloat = 36
 
     static func gutter(forWidth width: CGFloat) -> CGFloat { width < Width.compactContent ? compactGutter : gutter }
-    /// Tall posters are 2:3, Steam capsules are 460:215.
-    static func posterAspect(wide: Bool) -> CGFloat { wide ? 460.0 / 215.0 : 2.0 / 3.0 }
+    /// Film and game posters share a stable 2:3 frame.
+    static func posterAspect(wide: Bool) -> CGFloat { 2.0 / 3.0 }
     static func posterColumns(wide: Bool) -> [GridItem] {
-        [GridItem(.adaptive(minimum: wide ? 220 : 145, maximum: wide ? 360 : 220), spacing: posterSpacing)]
+        [GridItem(.adaptive(minimum: 145, maximum: 220), spacing: posterSpacing)]
     }
 }
 

@@ -35,6 +35,7 @@ struct MediaCard: Codable, Identifiable, Equatable {
     var id: String; var title: String; var section: String; var year: Int; var rating: String; var poster: String?; var description: String; var genre: String; var quality: String?; var saved: Bool; var platform: String?; var store: StoreCard? = nil
     var kp: String? = nil; var imdb: String? = nil; var ratingSource: String? = nil
     var imdbId: String? = nil
+    var posterFallback: String? = nil
     /// Kinopoisk then IMDb when the engine sent both; otherwise the single card rating with its source (never a guessed one).
     var ratings: [KDRating] {
         var rows: [KDRating] = []
@@ -66,7 +67,7 @@ struct Bootstrap: Decodable { var version: String; var settings: AppSettings; va
 struct CatalogResult: Decodable { var items: [MediaCard]; var hasNext: Bool; var offline: Bool?; var title: String?; var description: String? }
 struct CuratedGroup: Decodable, Identifiable { var id: String; var title: String; var description: String; var layout: String; var items: [MediaCard]; var count: Int }
 struct FeaturedResult: Decodable { var groups: [CuratedGroup] }
-struct Person: Codable, Identifiable { var name: String; var role: String; var pageUrl: String; var profileUrl: String?; var photoUrl: String?; var originalName: String?; var sourcePersonId: String?; var id: String { pageUrl.isEmpty ? name + role : pageUrl } }
+struct Person: Codable, Identifiable { var name: String; var role: String; var pageUrl: String; var profileUrl: String?; var photoUrl: String?; var originalName: String?; var sourcePersonId: String?; var character: String? = nil; var id: String { pageUrl.isEmpty ? name + role : pageUrl } }
 struct CinemaAward: Decodable, Identifiable { var name: String; var year: Int; var category: String; var winner: Bool; var personUrl: String?; var id: String { "\(name)-\(year)-\(category)" } }
 struct GameShot: Decodable, Identifiable { var thumb: String; var full: String; var id: String { full } }
 struct GameDetail: Decodable { var requirements: String; var developers: String; var publishers: String; var price: String; var metacritic: Int; var gallery: [GameShot]; var traits: [String]; var platform: String; var originalPrice: String; var discount: Int; var releaseDate: String; var age: Int; var russian: String; var steamUrl: String?; var steamDbUrl: String?; var review: GameReviews? }

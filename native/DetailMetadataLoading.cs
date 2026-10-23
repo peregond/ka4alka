@@ -58,6 +58,9 @@ public partial class MainWindow
                 if(!IsCurrent())return data;
                 view.Failed=prefs.UiLanguage=="en"?data.English==null:!ImdbSuggestions.IsImdbOnly(data)&&(!MediaMetadata.HasDescription(data)||data.People.Length==0);
                 view.Loading=false;Publish(data);
+                var withCast=await CharacterCredits.Load(onlineIndex,data,prefs.UiLanguage,view.Request.Token,force);
+                if(!IsCurrent())return data;
+                if(!data.People.SequenceEqual(withCast.People)){data=withCast;Publish(data);}
                 if(prefs.LiveFavorites.Any(x=>x.Id==data.Id)){prefs.LiveFavorites=prefs.LiveFavorites.Select(x=>x.Id==data.Id?MediaMetadata.Merge(x,data):x).ToList();prefs.Save();}
                 try{await catalogIndex.AddAsync([data],view.Request.Token);}catch(IOException){}catch(UnauthorizedAccessException){}
             }

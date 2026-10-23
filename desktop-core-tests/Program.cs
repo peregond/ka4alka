@@ -7,6 +7,8 @@ using MonoTorrent;
 using MonoTorrent.Client;
 if(args.Contains("--probe-middle-east")){await MiddleEastReleaseTests.Probe();return;}
 MiddleEastReleaseTests.Run();
+CharacterCreditsTests.Run();
+await CharacterCreditsTests.LoadTests();
 ReleaseAudioTests.Run();
 BackroomsAudioTests.Run();
 await ReleaseAudioRulesTests.Run();

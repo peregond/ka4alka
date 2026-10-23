@@ -411,6 +411,13 @@ struct CatalogFilter: Equatable {
             if route == .detail(card), !Task.isCancelled { detail = result }
         } catch { if route == .detail(card) { fail(error) } }
     }
+    func loadCast(_ card: MediaCard) async {
+        let language = settings?.uiLanguage
+        do {
+            let people = try await bridge.call("cast", ["id": .string(card.id)], as: [Person].self)
+            if route == .detail(card), !Task.isCancelled, settings?.uiLanguage == language, detail?.item.id == card.id { detail?.people = people }
+        } catch { /* Character names are optional; keep the loaded cast and page. */ }
+    }
     func loadReleases(_ card: MediaCard) async {
         pendingReleaseCard = card.id
         if releasesOwner != card.id { releases = []; sources = []; releasesOwner = card.id }

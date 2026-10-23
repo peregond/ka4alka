@@ -98,7 +98,7 @@ public partial class MainWindow
     // Poster cards in as many columns as the real grid would use at this width.
     FrameworkElement PosterSkeleton(int rows,string name)
     {
-        // Games show wide capsules, so their placeholders use the capsule columns and shape.
+        // Game placeholders match the final portrait cards and keep their cells stable.
         var games=section=="Игры";
         Func<double,int> columnsFor=games?WindowSizing.GameColumns:WindowSizing.PosterColumns;
         var grid=new UniformGrid{Name=name,Columns=Math.Max(1,columnsFor(Math.Max(0,Body.ActualWidth))),Margin=new(0,5,-16,0),IsHitTestVisible=false};
