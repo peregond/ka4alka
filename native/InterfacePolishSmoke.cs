@@ -63,10 +63,12 @@ public partial class MainWindow
                 prefs.Light=light;ApplyTheme();Render();await Settle();SearchSubmitButton.Focus();await Settle();
                 Check(InterfacePalette.For(light).All(pair=>pair.Value.IsFrozen&&ReferenceEquals(FindResource(pair.Key),pair.Value)),"Theme reuses its frozen palette: "+(light?"light":"dark"));
                 Check(SearchShortcutHint.IsVisible&&SearchPlaceholder.Margin.Right>=70,"Wide idle search shows its keyboard hint with reserved text space: "+(light?"light":"dark"));
-                Check(SearchBar.ActualWidth>1000&&Math.Abs(SearchBar.ActualWidth-HeaderArea.ActualWidth)<2,"Wide search fills the page reading width: "+(light?"light":"dark"));
+                Check(SearchBar.ActualWidth>800,"Wide search uses the remaining header width without the old 680 px cap: "+(light?"light":"dark"));
                 var searchBounds=SearchBar.TransformToAncestor(HeaderArea).TransformBounds(new Rect(SearchBar.RenderSize));
                 var actionsBounds=HeaderActions.TransformToAncestor(HeaderArea).TransformBounds(new Rect(HeaderActions.RenderSize));
-                Check(searchBounds.Top>=actionsBounds.Bottom,"Wide search and header actions do not overlap.");
+                Check(searchBounds.Right<=actionsBounds.Left+.5,"Wide search and header actions do not overlap.");
+                Check(Math.Abs(searchBounds.Top-actionsBounds.Top)<1&&Math.Abs(searchBounds.Bottom-actionsBounds.Bottom)<1,"Search, Add, Refresh and Theme share one header row.");
+                Check(Math.Abs(searchBounds.Right+SearchBar.Margin.Right-actionsBounds.Left)<1,"Search fills all available space before the header actions.");
                 await WaitForPosterRealization();CheckCards(light?"light":"dark");Shot("interface-"+(light?"light":"dark"));
             }
             // A RenderTargetBitmap can capture a viewport larger than the actual

@@ -173,13 +173,11 @@ public partial class MainWindow
     }
     void CenterHeaderSearch(bool narrow,double gutter)
     {
-        // Give search the page's whole reading width. On short windows retain a
-        // single compact row so controls do not take space from the viewport.
-        var fullRow=ActualHeight>=640&&SearchBar.Visibility==Visibility.Visible;
-        Grid.SetRow(SearchBar,fullRow?1:0);
-        Grid.SetColumn(SearchBar,fullRow?0:1);Grid.SetColumnSpan(SearchBar,fullRow?3:1);
-        Grid.SetRow(FiltersPanel,fullRow?2:1);
-        SearchBar.Margin=fullRow?new Thickness(0,10,0,0):new Thickness(0,0,ActualWidth<780?8:12,0);
+        // Search consumes the remaining row between Back and the trailing actions.
+        // No mirrored action inset or fixed width cap: all controls share one row.
+        Grid.SetRow(SearchBar,0);Grid.SetColumn(SearchBar,1);Grid.SetColumnSpan(SearchBar,1);
+        Grid.SetRow(FiltersPanel,1);
+        SearchBar.Margin=new Thickness(0,0,ActualWidth<780?8:12,0);
         UpdateHeroPageLayout();
     }
     void UpdateFilterRail()
