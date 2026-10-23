@@ -149,15 +149,15 @@ public partial class MainWindow
     FrameworkElement PeopleSkeleton()
     {
         var wave=NewShimmer();
-        var grid=new UniformGrid{Name="CinemaPeopleSkeleton",Columns=6,Margin=new(0,0,-8,0),IsHitTestVisible=false};AutomationProperties.SetName(grid,AppLanguage.T("Загружаем участников"));
-        for(var index=0;index<6;index++)
+        var grid=new UniformGrid{Name="CinemaPeopleSkeleton",Columns=8,Margin=new(0,0,-12,0),IsHitTestVisible=false};AutomationProperties.SetName(grid,AppLanguage.T("Загружаем участников"));
+        for(var index=0;index<8;index++)
         {
-            var cell=new StackPanel{Margin=new(0,0,8,8),HorizontalAlignment=HorizontalAlignment.Center};
-            var portrait=new Border{Width=96,Height=120,CornerRadius=new(11),Margin=new(0,10,0,10),HorizontalAlignment=HorizontalAlignment.Center};wave.Paint(portrait,index);cell.Children.Add(portrait);
-            var name=SkeletonBar(11,new(0,0,0,6),1,wave,index);name.Width=84;cell.Children.Add(name);var role=SkeletonBar(9,new(0),.7,wave,index);role.Width=52;cell.Children.Add(role);grid.Children.Add(cell);
+            var cell=new StackPanel{Margin=new(10,10,18,8)};
+            var portrait=new Border{Height=200,CornerRadius=new(11),Margin=new(0,0,0,8)};portrait.SizeChanged+=(_,e)=>{if(e.WidthChanged&&e.NewSize.Width>0)portrait.Height=e.NewSize.Width*1.25;};wave.Paint(portrait,index);cell.Children.Add(portrait);
+            var name=SkeletonBar(11,new(0),1,wave,index);name.VerticalAlignment=VerticalAlignment.Top;cell.Children.Add(new Border{Height=28,Child=name});var role=SkeletonBar(12,new(0,3,0,0),.7,wave,index);cell.Children.Add(role);grid.Children.Add(cell);
         }
         var measured=0d;
-        grid.SizeChanged+=(_,e)=>{if(!e.WidthChanged||Math.Abs(e.NewSize.Width-measured)<48)return;measured=e.NewSize.Width;var columns=Math.Clamp((int)Math.Floor(e.NewSize.Width/124),1,6);if(grid.Columns!=columns)grid.Columns=columns;};
+        grid.SizeChanged+=(_,e)=>{if(!e.WidthChanged||Math.Abs(e.NewSize.Width-measured)<1)return;measured=e.NewSize.Width;var columns=Math.Clamp((int)Math.Floor(e.NewSize.Width/124),1,8);if(grid.Columns!=columns)grid.Columns=columns;for(var index=0;index<grid.Children.Count;index++)grid.Children[index].Visibility=index<columns?Visibility.Visible:Visibility.Collapsed;};
         return wave.Run(grid);
     }
 }

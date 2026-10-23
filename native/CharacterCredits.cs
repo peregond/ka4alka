@@ -32,7 +32,7 @@ public static class CharacterCredits
         if(!item.Cinema||item.People.Length==0||language=="en")return item;
         var id=OnlineIndexClient.IdFor(item)??item.ImdbId;if(id==null)return item;
         var section=item.Section=="Сериалы"?"series":"movies";
-        var file=Path.Combine(Preferences.DataDir,"cast-v1",section+"-"+Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(id)))+".json");
+        var file=Path.Combine(Preferences.DataDir,"people","cast-v1-"+section+"-"+Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(id)))+".json");
         CastCredit[] Parse(byte[] bytes)
         {
             using var json=JsonDocument.Parse(bytes);var root=json.RootElement;
@@ -42,7 +42,9 @@ public static class CharacterCredits
         try
         {
             byte[]? bytes=null;
-            if(!force&&File.Exists(file)&&DateTime.UtcNow-File.GetLastWriteTimeUtc(file)<TimeSpan.FromDays(7))bytes=await CacheFiles.ReadAllBytesAsync(file,ct);
+            if(!force&&File.Exists(file)&&DateTime.UtcNow-File.GetLastWriteTimeUtc(file)<TimeSpan.FromDays(7))
+                try{bytes=await CacheFiles.ReadAllBytesAsync(file,ct);_ = Parse(bytes);}
+                catch(Exception error)when(error is IOException or UnauthorizedAccessException or JsonException or KeyNotFoundException or InvalidOperationException){bytes=null;}
             if(bytes==null)
             {
                 var query=OnlineIndexClient.IdFor(item)!=null?"id="+Uri.EscapeDataString(id):"imdb="+Uri.EscapeDataString(id)+"&section="+section;

@@ -54,7 +54,8 @@ final class HeroRotationTests: XCTestCase {
             RunLoop.main.run(until: Date().addingTimeInterval(0.12))
             host.layoutSubtreeIfNeeded()
             let poster = try XCTUnwrap(SettingsLayoutMeasurements.frames["detail.hero.poster"])
-            XCTAssertEqual(poster.width, width < 640 ? 220 : 320, accuracy: 1)
+            XCTAssertEqual(poster.width, width < 640 ? 100 : 135, accuracy: 1)
+            XCTAssertEqual(poster.height / poster.width, 1.5, accuracy: 0.02)
             XCTAssertLessThanOrEqual(poster.maxX, width)
         }
         window.contentView = nil

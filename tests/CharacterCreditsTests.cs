@@ -46,6 +46,10 @@ static class CharacterCreditsTests
             Check(enriched.People[0].Character=="Mark Scout","optional character enrichment reaches the displayed actor without replacing the card");
             await CharacterCredits.Load(online,movie,"ru",CancellationToken.None);
             Check(handler.Calls==1,"reopening a card reuses its cached character credits without per-actor requests");
+            var cache=Directory.GetFiles(Path.Combine(root,"people"),"cast-v1-*.json").Single();
+            Check(new CacheStorage(root).Owns(cache),"character credits participate in the existing cache limit and clear-cache action");
+            await File.WriteAllTextAsync(cache,"{}");
+            Check((await CharacterCredits.Load(online,movie,"ru",CancellationToken.None)).People[0].Character=="Mark Scout"&&handler.Calls==2,"an invalid cached identity is refreshed rather than hiding roles for a week");
             var wrong=new Handler(answer.Replace("tt11280740","tt0000001"));using var wrongSource=new SourceClient(wrong);
             Check((await CharacterCredits.Load(new OnlineIndexClient(wrongSource,new Uri("https://index.example.test/")),movie,"ru",CancellationToken.None,true)).People[0].Character==null,"credits from another title are refused even when the actor's name matches");
             var old=new Handler("{}",HttpStatusCode.NotFound);using var oldSource=new SourceClient(old);
