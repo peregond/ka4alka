@@ -23,7 +23,9 @@ struct ShellChromeView: ViewModifier {
             .toolbar(.visible, for: .windowToolbar)
             .kdToolbarBarHidden(heroPage)
             .toolbar {
+                #if compiler(>=6.2)
                 ShellBackLeadingGap(visible: model.sidebarVisibility == .detailOnly && model.route != .search && model.routes.count > 1)
+                #endif
                 ToolbarItem(placement: .navigation) {
                     if model.route != .search, model.routes.count > 1 {
                         Button { model.back() } label: {
@@ -64,6 +66,7 @@ struct ShellChromeView: ViewModifier {
     }
 }
 
+#if compiler(>=6.2)
 /// With the sidebar hidden its toggle sits next to Back in the window toolbar. A fixed gap keeps Back a separate
 /// control instead of one glass group with the toggle (macOS 26 and later).
 struct ShellBackLeadingGap: ToolbarContent {
@@ -76,6 +79,7 @@ struct ShellBackLeadingGap: ToolbarContent {
         #endif
     }
 }
+#endif
 
 /// A page with a banner shows no title in the toolbar (the banner runs under it), but the window still has a name for
 /// assistive technology and Mission Control: the open section, title or person.
