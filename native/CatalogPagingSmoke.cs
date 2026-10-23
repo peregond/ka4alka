@@ -124,7 +124,7 @@ public partial class MainWindow
 
     void CheckCatalogFilterLine(Action<bool,string> check,string stage)
     {
-        check(RootGrid.ColumnDefinitions.Count==2&&FiltersPanel.IsVisible&&(ReferenceEquals(FiltersPanel.Parent,HeaderArea)&&Grid.GetRow(FiltersPanel)==1||FiltersPanel.Parent is StackPanel&&DiscoveryCatalog),"catalog filters sit below the search (pinned) or between the banner and the shelves, without a right column ("+stage+")");
+        check(RootGrid.ColumnDefinitions.Count==2&&FiltersPanel.IsVisible&&(ReferenceEquals(FiltersPanel.Parent,HeaderArea)&&Grid.GetRow(FiltersPanel)==Grid.GetRow(SearchBar)+1||FiltersPanel.Parent is StackPanel&&DiscoveryCatalog),"catalog filters sit below the search (pinned) or between the banner and the shelves, without a right column ("+stage+")");
         check(inlineCatalogFilters is StackPanel {Orientation:Orientation.Horizontal}&&ReferenceEquals(inlineCatalogFilterScroll?.Parent,catalogToolbar)&&ReferenceEquals(catalogToolbar?.Parent,FilterControls),"catalog filters remain one horizontal line ("+stage+")");
         var searchBounds=SearchBar.TransformToAncestor(RootGrid).TransformBounds(new Rect(new Point(),SearchBar.RenderSize));
         var filterBounds=FiltersPanel.TransformToAncestor(RootGrid).TransformBounds(new Rect(new Point(),FiltersPanel.RenderSize));
