@@ -310,7 +310,7 @@ struct DetailActionRow: View {
     }
 
     @ViewBuilder private func secondaryButtons(labelled: Bool) -> some View {
-        heroButton(saved ? tr("Сохранено", "Saved") : tr("Сохранить", "Save"), saved ? "heart.fill" : "heart", labelled: labelled) {
+        heroButton(saved ? tr("Сохранено", "Saved") : tr("Сохранить", "Save"), saved ? "heart.fill" : "heart", iconTint: saved ? KDPalette.like : nil, labelled: labelled) {
             Task { @MainActor in await model.save(item) }
         }
         heroButton(tr("Не интересно", "Not interested"), "eye.slash", labelled: labelled) {
@@ -323,12 +323,19 @@ struct DetailActionRow: View {
         shareControl(labelled: labelled)
     }
 
-    @ViewBuilder private func heroButton(_ title: String, _ systemImage: String, labelled: Bool, action: @escaping () -> Void) -> some View {
+    /// `iconTint` colours the icon alone (the filled heart of a saved title is red); the label keeps its colour.
+    @ViewBuilder private func heroButton(_ title: String, _ systemImage: String, iconTint: Color? = nil, labelled: Bool, action: @escaping () -> Void) -> some View {
         if labelled {
-            Button(action: action) { Label(title, systemImage: systemImage) }
-                .buttonStyle(KDOverlayButtonStyle())
+            Button(action: action) {
+                if let iconTint {
+                    Label { Text(title) } icon: { Image(systemName: systemImage).foregroundStyle(iconTint) }
+                } else {
+                    Label(title, systemImage: systemImage)
+                }
+            }
+            .buttonStyle(KDOverlayButtonStyle())
         } else {
-            Button(action: action) { Image(systemName: systemImage) }
+            Button(action: action) { Image(systemName: systemImage).foregroundStyle(iconTint ?? Color.white) }
                 .buttonStyle(KDOverlayButtonStyle(circular: true))
                 .help(title)
                 .accessibilityLabel(title)
@@ -408,8 +415,7 @@ struct DetailPrimaryAction: View {
         } label: {
             Label(tr("Показать в папке", "Show in folder"), systemImage: "folder")
         }
-        .buttonStyle(KDPrimaryButtonStyle())
-        .controlSize(.large)
+        .buttonStyle(KDOverlayButtonStyle(prominent: true))
     }
 
     private func progressButton(_ transfer: Transfer) -> some View {
@@ -420,8 +426,7 @@ struct DetailPrimaryAction: View {
         } label: {
             Label(text, systemImage: "arrow.down.circle")
         }
-        .buttonStyle(KDPrimaryButtonStyle())
-        .controlSize(.large)
+        .buttonStyle(KDOverlayButtonStyle(prominent: true))
         .help(tr("Открыть загрузки", "Open Downloads"))
     }
 
@@ -443,8 +448,7 @@ struct DetailPrimaryAction: View {
                 Label(downloadTitle(row), systemImage: "arrow.down").lineLimit(1)
             }
         }
-        .buttonStyle(KDPrimaryButtonStyle())
-        .controlSize(.large)
+        .buttonStyle(KDOverlayButtonStyle(prominent: true))
         .disabled(adding)
     }
 
@@ -454,8 +458,7 @@ struct DetailPrimaryAction: View {
         } label: {
             Label(tr("Выбрать раздачу", "Choose a release"), systemImage: "list.bullet")
         }
-        .buttonStyle(KDPrimaryButtonStyle())
-        .controlSize(.large)
+        .buttonStyle(KDOverlayButtonStyle(prominent: true))
     }
 
     private func start(_ row: ReleaseRow) {

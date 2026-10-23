@@ -372,14 +372,14 @@ struct ReleaseFilterBar: View {
         } label: {
             KDChipLabel(text: extrasTitle, systemImage: "slider.horizontal.3", isActive: filters.extraCount > 0)
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(KDSecondaryButtonStyle())
         .accessibilityLabel(tr("Ещё фильтры", "More filters"))
         .accessibilityValue(showsExtras ? tr("Раскрыто", "Expanded") : tr("Свёрнуто", "Collapsed"))
     }
 
     private var resetButton: some View {
         Button(tr("Сбросить", "Reset")) { filters = DetailReleaseFilters() }
-            .buttonStyle(.bordered)
+            .buttonStyle(KDSecondaryButtonStyle())
     }
 
     // MARK: Extra filters

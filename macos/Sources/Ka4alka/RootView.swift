@@ -54,32 +54,27 @@ private extension View {
 struct RootView: View {
     @EnvironmentObject private var model: AppModel
     @EnvironmentObject private var updater: MacUpdater
-    @Environment(\.colorScheme) private var colorScheme
     @State private var dropTargeted = false
+    /// Height of the sidebar column; it sets how many download rows the widget can show.
+    @State private var sidebarHeight: CGFloat = 0
+    /// The strip under the toolbar in the content column, for banners that run up under it.
+    @State private var safeTop: CGFloat = 0
+    /// True while the page on screen opens with a full-bleed banner.
+    @State private var heroPage = false
 
     var body: some View {
         NavigationSplitView(columnVisibility: $model.sidebarVisibility) {
-            sidebar.toolbar(removing: .sidebarToggle)
+            sidebar
+                .toolbar(removing: .sidebarToggle)
+                // The toggle is an item of the sidebar column, as the system's own is: it sits in the sidebar's header
+                // and, once the sidebar is hidden, stays at the leading edge of the window toolbar. It is a control of
+                // its own and does not share a glass group with Back.
+                .toolbar { ToolbarItem(placement: .primaryAction) { sidebarToggle } }
         } detail: {
             detailColumn
         }
         .navigationSplitViewStyle(.balanced)
         .toolbar(removing: .sidebarToggle)
-        .toolbar {
-            ToolbarItem(placement: .navigation) {
-                Button {
-                    model.toggleSidebar()
-                } label: {
-                    Label(tr("Боковое меню", "Sidebar"), systemImage: "sidebar.left")
-                }
-                .labelStyle(.iconOnly)
-                .buttonStyle(.automatic)
-                .controlSize(.regular)
-                .help(tr("Показать или скрыть боковое меню", "Show or hide sidebar"))
-                .accessibilityIdentifier("shell-sidebar-toggle")
-                .settingsLayoutProbe("toolbar.sidebar")
-            }
-        }
         .buttonStyle(KDSecondaryButtonStyle())
         .sheet(item: sheetBinding) { sheet in sheetContent(sheet) }
         .dropDestination(for: URL.self, action: { urls, _ in acceptDrop(urls) }, isTargeted: { targeted in dropTargeted = targeted })
@@ -155,6 +150,28 @@ struct RootView: View {
 
     // MARK: Sidebar
 
+    /// Shows or hides the sidebar.
+    private var sidebarToggle: some View {
+        Button {
+            model.toggleSidebar()
+        } label: {
+            Label(tr("Боковое меню", "Sidebar"), systemImage: "sidebar.left")
+                // The glass capsule is as tall as the toolbar and as wide as its content plus padding; a wide enough
+                // content makes it a circle.
+                .frame(width: 26, height: 26)
+        }
+        .labelStyle(.iconOnly)
+        .buttonStyle(.automatic)
+        // A round button, as the system's own sidebar toggle: without a shape it took the width of its glyph and the
+        // height of the toolbar, which drew a tall oval.
+        .buttonBorderShape(.circle)
+        .controlSize(.regular)
+        .help(tr("Показать или скрыть боковое меню", "Show or Hide Sidebar"))
+        .accessibilityIdentifier("shell-sidebar-toggle")
+        .settingsLayoutProbe("toolbar.sidebar")
+    }
+
+    /// Search and the library sections that browse content. Downloads and Settings sit at the bottom.
     private var libraryEntries: [Section] {
         Section.allCases.filter { $0 != .downloads && $0 != .settings }
     }
@@ -162,6 +179,9 @@ struct RootView: View {
     /// at the bottom, not a scroll view with a safe-area inset: that arrangement drew the rows lower than the
     /// area that receives the click, so a click on one entry opened another. Clicking the open section goes back
     /// to its page when a title, person or collection is on top, and otherwise resets its search, filter and page.
+    /// Downloads and Settings sit at the bottom, as in the Windows app, and the live downloads widget stands in for
+    /// the Downloads button while something is queued. The column has no fill of its own: the system draws the
+    /// sidebar material.
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: KD.Space.xxs) {
@@ -181,7 +201,7 @@ struct RootView: View {
             sidebarFooter
         }
         .frame(minWidth: 196, idealWidth: 210, maxWidth: 250, maxHeight: .infinity, alignment: .topLeading)
-        .background(colorScheme == .dark ? KDPalette.sidebarBackground : Color.clear)
+        .kdReadHeight($sidebarHeight)
         .settingsLayoutProbe("sidebar")
         .navigationSplitViewColumnWidth(min: 196, ideal: 210, max: 250)
     }
@@ -190,13 +210,21 @@ struct RootView: View {
         // the complete ready status and component statistics remain in Settings → Updates.
         !updater.statusText.isEmpty && (!updater.ready || updater.isError) && (updater.available || updater.busy || updater.isError)
     }
-    /// Downloads and Settings sit at the bottom of the sidebar, as in the Windows app. They are plain buttons,
-    /// not list rows, so a click always reaches them.
+    /// The widget is shown only when there is room: its rows follow the height of the column, as on Windows.
+    private var downloadWidgetRows: Int {
+        if sidebarHeight >= 760 { return 3 }
+        if sidebarHeight >= 640 { return 2 }
+        if sidebarHeight >= 560 { return 1 }
+        return 0
+    }
+    /// Downloads (or its live widget) above Settings. Plain buttons, not list rows, so a click always reaches them.
     private var pinnedSections: some View {
         VStack(alignment: .leading, spacing: KD.Space.xxs) {
-            ShellPinnedRow(section: .downloads, selected: model.section == .downloads, store: model.transfers) {
-                pick(.downloads)
-            }
+            ShellDownloadsEntry(
+                store: model.transfers,
+                selected: !model.routes.contains(.search) && model.section == .downloads,
+                rows: downloadWidgetRows
+            ) { pick(.downloads) }
             ShellPinnedRow(section: .settings, selected: model.section == .settings, store: nil) {
                 pick(.settings)
             }
@@ -232,13 +260,6 @@ struct RootView: View {
                     .textSelection(.enabled)
                     .settingsLayoutProbe("sidebar.update.status")
             }
-            if !model.version.isEmpty {
-                Text(tr("Версия", "Version") + " " + model.version)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.leading, KD.Space.xs)
-                    .settingsLayoutProbe("sidebar.update.version")
-            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, KD.Space.m)
@@ -249,17 +270,22 @@ struct RootView: View {
 
     private var detailColumn: some View {
         detailBody
+            .environment(\.kdSafeTop, safeTop)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .kdReadSafeTop($safeTop)
             .shellPageBackground()
             .safeAreaInset(edge: .top, spacing: 0) { errorBanner }
             .kdToast($model.toast)
-            .modifier(ShellChromeView(title: navigationTitle))
+            .onPreferenceChange(KDHeroPageKey.self) { next in if heroPage != next { heroPage = next } }
+            .modifier(ShellChromeView(title: navigationTitle, heroPage: heroPage))
     }
     @ViewBuilder private var detailBody: some View {
         if model.connected {
+            // The scroll-edge effect keeps the system's automatic style: it is more opaque under toolbars with
+            // several controls and over the pinned page headers, which a forced soft edge left hard to read.
             content
                 .id(model.route.key)
-                .kdSoftScrollEdge()
+                .kdSoftScrollEdge(heroPage)
         } else if let message = model.error {
             KDEmptyState(
                 title: tr("Не удалось запустить движок", "Could not start the engine"),
@@ -327,21 +353,37 @@ struct RootView: View {
     }
 }
 
+/// The look every sidebar row shares, as in the system's own sidebars: the icon wears the accent colour (the one
+/// chosen in System Settings, or the app green), the label stays primary, and the open row gets a neutral highlight.
+private struct ShellSidebarRowLook: ViewModifier {
+    var selected: Bool
+    @Environment(\.colorSchemeContrast) private var contrast
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: KD.Radius.chip, style: .continuous)
+        content
+            .foregroundStyle(Color.primary)
+            .padding(.horizontal, KD.Space.s)
+            .frame(height: 32)
+            .background(shape.fill(selected ? Color.primary.opacity(contrast == .increased ? 0.2 : 0.1) : Color.clear))
+            .contentShape(shape)
+    }
+}
+
 struct ShellSearchRow: View {
     var selected: Bool
     var action: () -> Void
     var body: some View {
         Button(action: action) {
             HStack(spacing: KD.Space.xs) {
-                Image(systemName: "magnifyingglass").frame(width: 20).accessibilityHidden(true)
-                Text(tr("Поиск", "Search")).font(selected ? .body.weight(.semibold) : .body)
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 14, weight: .regular))
+                    .foregroundStyle(KDPalette.accent)
+                    .frame(width: 20)
+                    .accessibilityHidden(true)
+                Text(tr("Поиск", "Search")).lineLimit(1)
                 Spacer(minLength: 0)
             }
-            .foregroundStyle(selected ? KDPalette.accent : Color.primary)
-            .padding(.horizontal, KD.Space.s)
-            .frame(height: 32)
-            .background(RoundedRectangle(cornerRadius: KD.Radius.chip).fill(selected ? KDPalette.accentSoft : .clear))
-            .contentShape(RoundedRectangle(cornerRadius: KD.Radius.chip))
+            .modifier(ShellSidebarRowLook(selected: selected))
         }
         .buttonStyle(.plain)
         .help(tr("Поиск (⌘F)", "Search (⌘F)"))
@@ -350,7 +392,7 @@ struct ShellSearchRow: View {
     }
 }
 
-/// A sidebar button pinned to the bottom. Downloads shows the number of active transfers; the count lives in
+/// A sidebar button for one section. Downloads shows the number of active transfers; the count lives in
 /// its own view so the once-a-second queue updates redraw only that badge.
 struct ShellPinnedRow: View {
     var section: Section
@@ -359,31 +401,115 @@ struct ShellPinnedRow: View {
     var badge: Int = 0
     var action: () -> Void
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: KD.Radius.chip, style: .continuous)
         let symbol: String = KDNavSymbol.symbol(for: section.rawValue, selected: selected)
         return Button(action: action) {
             HStack(spacing: KD.Space.xs) {
                 Image(systemName: symbol)
                     .font(.system(size: 14, weight: .regular))
+                    .foregroundStyle(section == .saved && selected ? KDPalette.like : KDPalette.accent)
                     .frame(width: 20)
                     .accessibilityHidden(true)
                 Text(section.title)
-                    .font(selected ? Font.body.weight(.semibold) : Font.body)
                     .lineLimit(1)
                 Spacer(minLength: 0)
                 if let store { ShellActiveBadge(store: store) }
                 if badge > 0 { ShellCountText(count: badge) }
             }
-            .foregroundStyle(selected ? KDPalette.accent : Color.primary)
-            .padding(.horizontal, KD.Space.s)
-            .frame(height: 32)
-            .background(shape.fill(selected ? KDPalette.accentSoft : Color.clear))
-            .contentShape(shape)
+            .modifier(ShellSidebarRowLook(selected: selected))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(section.title)
         .accessibilityAddTraits(selected ? AccessibilityTraits.isSelected : AccessibilityTraits())
         .accessibilityIdentifier("nav-" + section.rawValue)
+    }
+}
+
+/// The Downloads entry of the sidebar: the live widget while something is queued and there is room for it, the
+/// plain Downloads button otherwise, so there is always exactly one way to the page. It observes the queue, so the
+/// once-a-second progress ticks redraw this view and nothing else.
+struct ShellDownloadsEntry: View {
+    @ObservedObject var store: TransferStore
+    var selected: Bool
+    var rows: Int
+    var open: () -> Void
+    var body: some View {
+        if !selected, rows > 0, !store.items.isEmpty {
+            ShellDownloadsWidget(store: store, rows: rows, open: open)
+        } else {
+            ShellPinnedRow(section: .downloads, selected: selected, store: store, action: open)
+        }
+    }
+}
+
+/// Active downloads at a glance: the count, both speeds and the first few transfers with their progress.
+struct ShellDownloadsWidget: View {
+    @ObservedObject var store: TransferStore
+    var rows: Int
+    var open: () -> Void
+    /// Downloading first, then checking, waiting, seeding and paused; the newest first within each group.
+    private static func rank(_ item: Transfer) -> Int {
+        if item.paused { return 4 }
+        switch item.statusKind ?? "" {
+        case "downloading": return 0
+        case "checking": return 1
+        case "waiting": return 2
+        case "seeding": return 3
+        default: return item.isActive ? 0 : 5
+        }
+    }
+    private var top: [Transfer] {
+        Array(store.items.sorted { left, right in
+            let a = ShellDownloadsWidget.rank(left), b = ShellDownloadsWidget.rank(right)
+            return a != b ? a < b : left.addedUtc > right.addedUtc
+        }.prefix(rows))
+    }
+    var body: some View {
+        Button(action: open) {
+            VStack(alignment: .leading, spacing: KD.Space.xs) {
+                HStack(spacing: 6) {
+                    Text(tr("Загрузки", "Downloads")).font(.subheadline.weight(.semibold))
+                    if store.activeCount > 0 { ShellCountText(count: store.activeCount) }
+                    Spacer(minLength: 0)
+                    HStack(spacing: 2) {
+                        Text(tr("Все", "All"))
+                        Image(systemName: "chevron.forward").font(.system(size: 9, weight: .bold)).accessibilityHidden(true)
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                }
+                HStack(spacing: KD.Space.s) {
+                    Text("↓ " + KDFormat.rate(store.downloadRate)).foregroundStyle(KDPalette.accent)
+                    Text("↑ " + KDFormat.rate(store.uploadRate)).foregroundStyle(.secondary)
+                }
+                .font(.caption.monospacedDigit())
+                .lineLimit(1)
+                ForEach(top) { item in
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(item.title.isEmpty ? item.releaseTitle : item.title)
+                            .font(.caption)
+                            .lineLimit(1)
+                        HStack(spacing: 6) {
+                            ProgressView(value: min(1, max(0, item.progress / 100)))
+                                .progressViewStyle(.linear)
+                                .tint(item.paused ? Color.secondary : KDPalette.accent)
+                            Text(KDFormat.percent(item.progress))
+                                .font(.caption2.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+            .padding(KD.Space.s)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            // A plain tile set into the sidebar, with no outline and no glass: it belongs to the interface, not above it.
+            .kdCard(radius: KD.Radius.control)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(tr("Открыть загрузки", "Open Downloads"))
+        .accessibilityLabel(tr("Открыть загрузки", "Open Downloads"))
+        .accessibilityIdentifier("nav-downloads")
+        .settingsLayoutProbe("sidebar.downloads.widget", kind: .control)
     }
 }
 
@@ -454,7 +580,7 @@ struct ShellFolderSheet: View {
                 Button(tr("Выйти", "Quit")) { NSApp.terminate(nil) }
                     .buttonStyle(KDSecondaryButtonStyle())
                 Spacer()
-                Button(tr("Выбрать папку", "Choose folder")) { Task { await model.chooseFolder() } }
+                Button(tr("Выбрать папку", "Choose Folder")) { Task { await model.chooseFolder() } }
                     .buttonStyle(KDPrimaryButtonStyle())
                     .keyboardShortcut(.defaultAction)
             }
@@ -472,7 +598,7 @@ struct ShellPairingSheet: View {
     private var spokenCode: String { prompt.code.map { String($0) }.joined(separator: " ") }
     var body: some View {
         VStack(spacing: KD.Space.m) {
-            Text(tr("Сопряжение устройств", "Pair devices"))
+            Text(tr("Сопряжение устройств", "Pair Devices"))
                 .font(KDFont.section)
                 .accessibilityAddTraits(.isHeader)
             Text(prompt.name)
@@ -487,7 +613,7 @@ struct ShellPairingSheet: View {
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: KD.Space.s) {
-                Button(tr("Коды совпадают", "Codes match")) { answer(true) }
+                Button(tr("Коды совпадают", "Codes Match")) { answer(true) }
                     .buttonStyle(KDSecondaryButtonStyle())
                 Button(tr("Отмена", "Cancel")) { answer(false) }
                     .buttonStyle(KDPrimaryButtonStyle())
@@ -522,7 +648,7 @@ struct AddTorrentSheet: View {
     private var showsInputHint: Bool { !busy && !trimmed.isEmpty && !ShellTorrentInput.isValid(trimmed) }
     var body: some View {
         VStack(alignment: .leading, spacing: KD.Space.m) {
-            Text(tr("Добавить торрент", "Add torrent"))
+            Text(tr("Добавить торрент", "Add Torrent"))
                 .font(KDFont.section)
                 .accessibilityAddTraits(.isHeader)
             TextField(tr("Magnet-ссылка или путь к .torrent", "Magnet link or .torrent path"), text: $model.magnet)
@@ -543,7 +669,7 @@ struct AddTorrentSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             HStack {
-                Button(tr("Выбрать файл…", "Choose file…")) { chooseFile() }
+                Button(tr("Выбрать файл…", "Choose File…")) { chooseFile() }
                     .disabled(busy)
                 Spacer()
                 if busy { ProgressView().controlSize(.small) }

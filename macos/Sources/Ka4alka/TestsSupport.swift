@@ -1,4 +1,5 @@
 import AppKit
+import MachO
 import Foundation
 
 // Helpers for the packaged smoke test (MacSmoke.swift) and the layout unit tests.
@@ -377,6 +378,24 @@ func smokeProcessStart() -> Date? {
     if #available(macOS 26.0, *) { return "glass" }
     #endif
     return "material"
+}
+
+/// The SDK version the running executable was linked against, from its LC_BUILD_VERSION command, as (major, minor).
+/// macOS draws the Liquid Glass sidebar and toolbar only for an executable linked against the macOS 26 SDK or later.
+func smokeLinkedSDK() -> (major: Int, minor: Int)? {
+    guard let header = _dyld_get_image_header(0) else { return nil }
+    let base = UnsafeRawPointer(header)
+    let count = Int(header.pointee.ncmds)
+    var offset = MemoryLayout<mach_header_64>.size
+    for _ in 0..<count {
+        let command = base.load(fromByteOffset: offset, as: load_command.self)
+        if command.cmd == UInt32(LC_BUILD_VERSION) {
+            let build = base.load(fromByteOffset: offset, as: build_version_command.self)
+            return (Int(build.sdk >> 16), Int((build.sdk >> 8) & 0xFF))
+        }
+        offset += Int(command.cmdsize)
+    }
+    return nil
 }
 
 func smokeGlassBranchCompiled() -> Bool {

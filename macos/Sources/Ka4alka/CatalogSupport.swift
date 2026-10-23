@@ -188,7 +188,7 @@ struct CatalogPosterStatus: View {
     private var heartBadge: some View {
         Image(systemName: "heart.fill")
             .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(Color.white)
+            .foregroundStyle(KDPalette.like)
             .frame(width: 22, height: 22)
             .background(Color.black.opacity(0.6), in: Circle())
     }

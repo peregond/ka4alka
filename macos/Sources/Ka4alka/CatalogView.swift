@@ -172,6 +172,7 @@ struct PosterCard: View {
             HStack(spacing: 8) {
                 Button { Task { await toggleSave() } } label: {
                     Image(systemName: saved ? "heart.fill" : "heart")
+                        .foregroundStyle(saved ? KDPalette.like : Color.white)
                 }
                 .buttonStyle(KDOverlayButtonStyle(circular: true))
                 .focused($focus, equals: .save)
@@ -275,16 +276,29 @@ struct CatalogView: View {
         }
     }
 
+    /// The banner is shown (or its placeholder while the first page loads), so it opens the page edge to edge.
+    private var showsHeroBlock: Bool {
+        guard showsSpotlight else { return false }
+        if let result = model.list { return !model.visible(result.items).isEmpty }
+        return !settled
+    }
+
     private var scroller: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                Color.clear.frame(height: KD.Space.m).id(Self.topID)
-                scrollContent
+                // The scroll anchor is the first thing on the page: the banner when there is one. The banner is
+                // outside the page's side margins, so it runs from edge to edge.
+                if showsHeroBlock { heroView.id(Self.topID) } else { Color.clear.frame(height: KD.Space.m).id(Self.topID) }
+                VStack(alignment: .leading, spacing: 18) {
+                    scrollContent
+                }
+                .padding(.horizontal, KD.gutter)
             }
             .scrollTargetLayout()
-            .padding(.horizontal, KD.gutter)
             .padding(.bottom, KD.gutter)
         }
+        // With the banner first, the page starts at the top of the window, under the toolbar.
+        .ignoresSafeArea(edges: showsHeroBlock ? .top : [])
         .scrollPosition(id: $scrollID, anchor: .top)
         .onAppear { if scrollID == nil { scrollID = model.browseAnchor } }
         .onChange(of: scrollID) { _, next in model.browseAnchor = next }
@@ -324,28 +338,35 @@ struct CatalogView: View {
 
     @ViewBuilder private var scrollContent: some View {
         if showsPageHeader { pageHeader }
-        heroBlock
+        heroTitle
         if !saved, !pinsHeader { FilterBar() }
         resultsBlock
     }
 
     // MARK: Hero
 
-    @ViewBuilder private var heroBlock: some View {
+    /// The banner, or its placeholder while the first page is loading.
+    @ViewBuilder private var heroView: some View {
         if showsSpotlight {
             if let result = model.list {
                 let shown = model.visible(result.items)
                 if !shown.isEmpty {
-                    CatalogSpotlightView(items: Array(shown.prefix(5)))
+                    CatalogSpotlightView(items: Array(shown.prefix(5)), columnMax: .infinity)
                         .id(model.section.rawValue)
                         .settingsLayoutProbe("catalog.banner." + model.section.rawValue)
-                    Text(model.section == .series ? tr("Все сериалы", "All series") : tr("Все фильмы", "All movies"))
-                        .font(KDFont.section)
-                        .accessibilityAddTraits(.isHeader)
                 }
             } else if !settled {
                 HeroPlaceholder()
             }
+        }
+    }
+
+    /// The heading of the list that follows the banner.
+    @ViewBuilder private var heroTitle: some View {
+        if showsSpotlight, let result = model.list, !model.visible(result.items).isEmpty {
+            Text(model.section == .series ? tr("Все сериалы", "All series") : tr("Все фильмы", "All movies"))
+                .font(KDFont.section)
+                .accessibilityAddTraits(.isHeader)
         }
     }
 

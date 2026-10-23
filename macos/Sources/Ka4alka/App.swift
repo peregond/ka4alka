@@ -14,7 +14,7 @@ import SwiftUI
         Window(tr("Качалка", "Ka4alka"), id: "main") { mainContent }
             .defaultSize(width: 1280, height: 820)
             .windowToolbarStyle(.unified)
-            .commands { ShellCommands(model: model, canGoBack: model.routes.count > 1, refreshing: model.refreshing, language: model.settings?.uiLanguage ?? "ru") }
+            .commands { ShellCommands(model: model, updater: updater, canGoBack: model.routes.count > 1, refreshing: model.refreshing, language: model.settings?.uiLanguage ?? "ru") }
     }
     private var interfaceLocale: Locale { Locale(identifier: model.settings?.uiLanguage == "en" ? "en" : "ru") }
     private var mainContent: some View {
@@ -44,6 +44,9 @@ import SwiftUI
         if model.settings != nil, let path = environment["KACHALKA_UPDATE_HEALTH_PATH"], let token = environment["KACHALKA_UPDATE_HEALTH_TOKEN"] {
             try? JSONEncoder().encode(["token": token, "version": model.version]).write(to: URL(fileURLWithPath: path), options: .atomic)
         }
+        // The update helper starts the new version as a plain child process, which the system leaves in the background:
+        // its window opened behind everything. Bring it forward once it is up.
+        if environment["KACHALKA_UPDATE_HEALTH_PATH"] != nil { delegate.bringToFront() }
         if ProcessInfo.processInfo.arguments.contains("--close-smoke-test") { await MacSmoke.close(model: model) }
         else if ProcessInfo.processInfo.arguments.contains("--smoke-test") { await MacSmoke.run(model: model) }
         else { await updater.restore(); if model.settings?.checkForUpdates == true { await updater.check(autoDownload: model.settings?.autoUpdate == true) } }
@@ -53,6 +56,7 @@ import SwiftUI
 /// Menu bar commands. The flags and the language are plain values so the menu items are rebuilt when they change.
 struct ShellCommands: Commands {
     let model: AppModel
+    let updater: MacUpdater
     var canGoBack: Bool
     var refreshing: Bool
     var language: String
@@ -63,6 +67,16 @@ struct ShellCommands: Commands {
         return KeyEquivalent(Character(String(number)))
     }
     var body: some Commands {
+        // Software update belongs in the app menu, right under About. The result is shown as a toast: a check that
+        // finds nothing would otherwise look like a command that did nothing.
+        CommandGroup(after: .appInfo) {
+            Button(tr("Проверить обновления…", "Check for Updates…")) {
+                Task { @MainActor in
+                    await updater.check(autoDownload: model.settings?.autoUpdate == true)
+                    if !updater.statusText.isEmpty { model.toast = updater.statusText }
+                }
+            }
+        }
         CommandGroup(replacing: .appSettings) {
             Button(tr("Настройки…", "Settings…")) { Task { @MainActor in model.select(.settings) } }.keyboardShortcut(",")
         }
@@ -72,7 +86,7 @@ struct ShellCommands: Commands {
             }.keyboardShortcut("s", modifiers: [.control, .command])
         }
         CommandGroup(replacing: .newItem) {
-            Button(tr("Добавить торрент…", "Add torrent…")) { Task { @MainActor in model.addTorrent = true } }.keyboardShortcut("o")
+            Button(tr("Добавить торрент…", "Add Torrent…")) { Task { @MainActor in model.addTorrent = true } }.keyboardShortcut("o")
         }
         CommandMenu(tr("Медиатека", "Library")) {
             Button(tr("Поиск", "Search")) { Task { @MainActor in model.openSearch() } }.keyboardShortcut("f")
@@ -82,10 +96,10 @@ struct ShellCommands: Commands {
             }
             Divider()
             Button(tr("Назад", "Back")) { Task { @MainActor in model.back() } }.keyboardShortcut("[").disabled(!canGoBack)
-            Button(tr("Обновить каталог", "Refresh catalog")) { Task { await model.refresh() } }.keyboardShortcut("r").disabled(refreshing)
+            Button(tr("Обновить каталог", "Refresh Catalog")) { Task { await model.refresh() } }.keyboardShortcut("r").disabled(refreshing)
         }
         CommandGroup(replacing: .help) {
-            Button(tr("Что нового в Качалке", "What’s new in Ka4alka")) {
+            Button(tr("Что нового в Качалке", "What’s New in Ka4alka")) {
                 if let url = ShellCommands.releaseNotes { NSWorkspace.shared.open(url) }
             }
         }
@@ -103,6 +117,20 @@ struct ShellCommands: Commands {
         NSApp.appearance = AppearanceMode.stored.nsAppearance
         NSApp.setActivationPolicy(.regular)
         NSApp.activate()
+    }
+    /// Puts the main window in front of other apps. `NSApp.activate()` alone is ignored for a process the system did not
+    /// launch itself, so LaunchServices is also asked to activate the application.
+    func bringToFront() {
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate()
+        for window in NSApp.windows where window.canBecomeMain {
+            if window.isMiniaturized { window.deminiaturize(nil) }
+            window.makeKeyAndOrderFront(nil)
+            window.orderFrontRegardless()
+        }
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: configuration, completionHandler: nil)
     }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
