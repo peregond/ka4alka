@@ -54,6 +54,12 @@ static class CharacterCreditsTests
             Check((await CharacterCredits.Load(new OnlineIndexClient(wrongSource,new Uri("https://index.example.test/")),movie,"ru",CancellationToken.None,true)).People[0].Character==null,"credits from another title are refused even when the actor's name matches");
             var old=new Handler("{}",HttpStatusCode.NotFound);using var oldSource=new SourceClient(old);
             Check((await CharacterCredits.Load(new OnlineIndexClient(oldSource,new Uri("https://index.example.test/")),movie,"ru",CancellationToken.None,true)).People[0].Name=="Адам Скотт","an older or unavailable server leaves the already loaded cast usable");
+            const string oldEnglish="""{"id":"tt11280740","section":"series","item":{"language":"en","title":"Severance","description":"Description","genres":[],"countries":[],"actors":["Adam Scott"],"directors":[]}}""";
+            var englishHandler=new Handler(oldEnglish);using var englishSource=new SourceClient(englishHandler);
+            var englishOnline=new OnlineIndexClient(englishSource,new Uri("https://index.example.test/"));
+            var legacy=await EnglishMedia.LoadAsync(englishOnline,movie,false,CancellationToken.None);
+            await EnglishMedia.LoadAsync(englishOnline,movie,false,CancellationToken.None);
+            Check(legacy?.People.Single().Name=="Adam Scott"&&legacy.Cast==null&&englishHandler.Calls==2&&EnglishMedia.NeedsLookup(legacy,true),"an older English reply remains usable but cannot pin missing character fields in the week-long disk cache");
         }
         finally{Environment.SetEnvironmentVariable("KACHALKA_DATA",previous);if(Directory.Exists(root))Directory.Delete(root,true);}
     }

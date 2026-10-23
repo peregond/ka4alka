@@ -31,7 +31,7 @@ static class MovieFranchiseTests
         var prior=AppLanguage.Current;
         try{AppLanguage.Set("en");var en=MovieFranchiseCatalog.OtherParts(row,harry,"en");Check(en[0].DisplayTitle.Contains("Harry Potter")&&en[0].DisplayImageUrl!=null,"English parts use English titles and posters");
             Check(!EnglishMedia.NeedsLookup(en[0].English)&&EnglishMedia.NeedsLookup(en[0].English,true),"poster previews do not trigger localization work but opening a partial card requests its credits");
-            Check(!EnglishMedia.NeedsLookup(en[0].English! with{Actors=["Fixture actor"]},true),"complete English credits are reused");}
+            Check(!EnglishMedia.NeedsLookup(en[0].English! with{Actors=["Fixture actor"],Cast=[]},true),"complete English credits are reused");}
         finally{AppLanguage.Set(prior);}
         var identity="tt0241527";
         var bytes=Encoding.UTF8.GetBytes("""{"id":"tt0241527","item":{"id":1241,"name":"Harry Potter","items":[{"imdbId":"tt0241527","title":"Harry Potter","originalTitle":"Harry Potter","year":2001,"description":"","poster":"https://evil.test/poster.jpg"}]}}""");
