@@ -710,7 +710,7 @@ struct KDChipButtonStyle: ButtonStyle {
         configuration.label
             .font(.callout.weight(isActive ? .semibold : .regular))
             .foregroundStyle(isActive ? KDPalette.accent : Color.primary)
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 10)
             .padding(.vertical, 5)
             .modifier(KDGlassControlChrome(shape: Capsule(), tint: isActive ? KDPalette.accent.opacity(0.3) : nil))
             .opacity(configuration.isPressed ? 0.85 : (enabled ? 1 : 0.45))
@@ -909,16 +909,27 @@ struct KDPageHeader<Trailing: View>: View {
         self.subtitle = subtitle
         self.trailing = trailing()
     }
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: KD.Space.m) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title).font(KDFont.pageTitle).lineLimit(2).accessibilityAddTraits(.isHeader)
-                if let subtitle, !subtitle.isEmpty {
-                    Text(subtitle).font(KDFont.secondary).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                }
+    private var titleBlock: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title).font(KDFont.pageTitle).lineLimit(2).accessibilityAddTraits(.isHeader)
+            if let subtitle, !subtitle.isEmpty {
+                Text(subtitle).font(KDFont.secondary).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
-            Spacer(minLength: KD.Space.m)
-            trailing
+        }
+    }
+    /// The actions sit beside the title when both fit on one line, and under it when the window is narrow: squeezed
+    /// beside a pile of glass buttons the title and its subtitle would wrap onto many lines.
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline, spacing: KD.Space.m) {
+                titleBlock.fixedSize(horizontal: true, vertical: false)
+                Spacer(minLength: KD.Space.m)
+                trailing
+            }
+            VStack(alignment: .leading, spacing: KD.Space.s) {
+                titleBlock
+                HStack(spacing: 0) { trailing }
+            }
         }
     }
 }

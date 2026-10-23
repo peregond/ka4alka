@@ -379,6 +379,7 @@ struct DownloadsView: View {
         let label = tab.title + " " + String(count(tab))
         return Button { filter = tab } label: { KDChipLabel(text: label, isActive: selected) }
             .buttonStyle(KDSecondaryButtonStyle())
+            .controlSize(.small)
             .accessibilityLabel(label)
             .accessibilityAddTraits(selected ? AccessibilityTraits.isSelected : AccessibilityTraits())
     }

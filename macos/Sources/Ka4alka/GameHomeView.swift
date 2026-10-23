@@ -161,6 +161,7 @@ struct GameHomeView: View {
             ForEach(sortChips) { chip in
                 Button { model.filter.sort = chip.key } label: { KDChipLabel(text: chip.title, systemImage: chip.symbol) }
                     .buttonStyle(KDSecondaryButtonStyle())
+                    .controlSize(.small)
             }
         }
         .padding(.horizontal, KD.gutter)
@@ -176,6 +177,7 @@ struct GameHomeView: View {
                 KDShelf(model.gameGenres, spacing: KD.Space.xs) { genre in
                     Button { model.filter.genre = genre.key } label: { KDChipLabel(text: genre.label) }
                         .buttonStyle(KDSecondaryButtonStyle())
+                        .controlSize(.small)
                 }
                 .featuredClippedShelf()
             }
