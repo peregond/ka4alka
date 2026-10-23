@@ -60,6 +60,7 @@ public partial class MainWindow
         else if(waiting)
         {discoveryHero.Margin=new(0);discoveryHero.Children.Add(BannerSkeleton());}
         if(slides.Length==0&&!waiting)discoveryHero.Margin=new(0);
+        UpdateHeroPageLayout();
         RestoreCatalogReflow(position);
     }
 }

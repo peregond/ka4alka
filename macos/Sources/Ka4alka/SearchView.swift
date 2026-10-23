@@ -19,13 +19,13 @@ struct SearchOrigin {
 /// Return submits one request, so network work never competes with text input or scrolling.
 struct SearchView: View {
     @EnvironmentObject private var model: AppModel
-    @State private var compactToolbar = true
+    @State private var fieldWidth: CGFloat = 240
     var body: some View {
         VStack(spacing: 0) {
             if model.submittedQuery.isEmpty { recentSearches } else { CatalogView() }
         }
         .settingsLayoutProbe("search.content")
-        .background { SearchToolbarLayoutObserver { compactToolbar = $0 } }
+        .background { SearchToolbarLayoutObserver { fieldWidth = $0 } }
         .toolbar {
             ToolbarItem(placement: .navigation) {
                 Button { model.back() } label: { Label(tr("Назад", "Back"), systemImage: "chevron.backward") }
@@ -34,7 +34,7 @@ struct SearchView: View {
             ToolbarItem(placement: .principal) {
                 NativeSearchField(text: $model.query, focusToken: model.searchFocus,
                                   prompt: tr("Найти фильм, сериал или игру", "Find a movie, series or game")) { model.submitSearch() }
-                    .frame(width: compactToolbar ? 240 : 420)
+                    .frame(width: fieldWidth)
                     .settingsLayoutProbe("search.field")
             }
         }

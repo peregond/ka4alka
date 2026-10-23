@@ -48,6 +48,9 @@ public partial class MainWindow
         Check(featuredHero!=null&&VisualElements<TextBlock>(featuredHero).Any(text=>text.Text=="КП")&&VisualElements<TextBlock>(featuredHero).Any(text=>text.Text=="IMDb")&&!VisualElements<TextBlock>(featuredHero).Any(text=>text.Text is "Фильм" or "Сериал"),"The banner shows both ratings with the mark of their site and no kind word.");
         Check(FindVisual<StackPanel>(Body,panel=>panel.Name=="FeaturedotherworldsBlock") is {} leadBlock&&VisualElements<TextBlock>(leadBlock).Any(text=>text.Text=="1")&&VisualElements<TextBlock>(leadBlock).Any(text=>text.Text=="2"),"The lead story is numbered one like the list beside it.");
         Check(SearchBar.Visibility==Visibility.Visible&&featuredShelves.Count==4,"Search and editorial shelves are available.");
+        var heroBounds=carousel!.Frame.TransformToAncestor(CenterRegion).TransformBounds(new Rect(carousel.Frame.RenderSize));
+        Check(heroBounds.Left<1&&heroBounds.Left<=-CenterRegion.Margin.Left+1,"The Windows hero reaches the content edge while shelves keep their gutter.");
+        Check(carousel.Frame.ActualWidth>Body.ActualWidth,"The full-width hero is wider than the inset poster shelves.");
         Check(featuredShelves[rankingDefinition.Id].Custom!=null&&FindVisual<StackPanel>(Body,panel=>panel.Name=="FeaturedtopratedBlock")?.Children.OfType<UniformGrid>().FirstOrDefault()?.Children.Count>=2,"The ranking shows numbered posters.");
         // Films, series and games each have a tab in the ranking; a tab shows its own list.
         var rankingBlock=FindVisual<StackPanel>(Body,panel=>panel.Name=="FeaturedtopratedBlock")!;

@@ -245,7 +245,9 @@ public partial class MainWindow
         footer.Children.Add(numbers);
         if(liveError.Length>0&&!favoritesOnly){var retry=Button("Повторить загрузку",()=>{onlineIndex.RetryNow();catalogPages.Clear();ResetDiscoveryData();catalogRefreshRequested=true;liveKey="";Render();});retry.Style=(Style)FindResource("QuietButton");footer.Children.Add(retry);}
         content.Children.Add(footer);
-        Body.Children.Add(new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=content,Margin=new(-6,-6,-6,0),VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});
+        var scroll=new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=content,Margin=new(-6,-6,-6,0),VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};
+        Body.Children.Add(scroll);
+        if(DiscoveryCatalog)UseHeroPageLayout(scroll,content,discoveryHero);
         UpdateFilterRail();
     }
     StackPanel? catalogEmptyHost;

@@ -2,6 +2,18 @@ import XCTest
 @testable import Ka4alka
 
 @MainActor final class SearchNavigationTests: XCTestCase {
+    func testNativeSearchUsesWideWindowsWithoutCrowdingToolbarControls() {
+        XCTAssertGreaterThan(SearchToolbarLayoutObserver.fieldWidth(windowWidth: 1440), 680)
+        for width: CGFloat in [720, 900, 1100, 1440, 1920, 2560] {
+            let field = SearchToolbarLayoutObserver.fieldWidth(windowWidth: width)
+            XCTAssertGreaterThanOrEqual(field, 176)
+            XCTAssertLessThanOrEqual(field, width - 540)
+            XCTAssertLessThanOrEqual(field, 1120)
+        }
+        XCTAssertEqual(SearchToolbarLayoutObserver.fieldWidth(windowWidth: 1440),
+                       SearchToolbarLayoutObserver.fieldWidth(windowWidth: 1441))
+    }
+
     func testBackRestoresBrowseFiltersPageAndScrollAfterSearch() {
         let model = AppModel()
         model.bridge.disabled = true

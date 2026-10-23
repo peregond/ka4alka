@@ -3,9 +3,14 @@ import SwiftUI
 
 /// Native centered search width depends on the actual window width. A SwiftUI content
 /// proposal can retain its old width while AppKit is resizing separate toolbar hosts.
-/// Publish only the compact/wide transition, never a stream of resize pixels.
+/// Publish width steps rather than a stream of resize pixels.
 struct SearchToolbarLayoutObserver: NSViewRepresentable {
-    var onChange: (Bool) -> Void
+    var onChange: (CGFloat) -> Void
+    // Reserve the sidebar, native navigation and trailing toolbar controls.
+    // A finite width prevents the principal item from pushing native controls away.
+    static func fieldWidth(windowWidth: CGFloat) -> CGFloat {
+        min(1120, max(176, floor((windowWidth - 540) / 32) * 32))
+    }
     func makeNSView(context: Context) -> Probe { Probe() }
     func updateNSView(_ view: Probe, context: Context) { view.configure(onChange) }
     static func dismantleNSView(_ view: Probe, coordinator: ()) { view.detach() }
@@ -13,11 +18,11 @@ struct SearchToolbarLayoutObserver: NSViewRepresentable {
     @MainActor final class Probe: NSView {
         private weak var observedWindow: NSWindow?
         private var observation: NSObjectProtocol?
-        private var callback: ((Bool) -> Void)?
-        private var compact: Bool?
+        private var callback: ((CGFloat) -> Void)?
+        private var fieldWidth: CGFloat?
         override func hitTest(_ point: NSPoint) -> NSView? { nil }
         override func viewDidMoveToWindow() { super.viewDidMoveToWindow(); attach() }
-        func configure(_ callback: @escaping (Bool) -> Void) {
+        func configure(_ callback: @escaping (CGFloat) -> Void) {
             self.callback = callback
             attach()
         }
@@ -38,9 +43,9 @@ struct SearchToolbarLayoutObserver: NSViewRepresentable {
         }
         private func measure() {
             guard let window else { return }
-            let next = window.frame.width < 1100
-            guard next != compact else { return }
-            compact = next
+            let next = SearchToolbarLayoutObserver.fieldWidth(windowWidth: window.frame.width)
+            guard next != fieldWidth else { return }
+            fieldWidth = next
             DispatchQueue.main.async { [weak self] in self?.callback?(next) }
         }
     }

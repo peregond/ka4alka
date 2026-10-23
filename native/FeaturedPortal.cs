@@ -67,7 +67,7 @@ public partial class MainWindow
         featuredHero.Children.Clear();featuredHeroIds.Clear();featuredDigestKey=null;
         if(slides.Length==0){carousel=null;featuredHero.Margin=new(0);return;}
         var rubrics=slides.ToDictionary(row=>row.Item!.Id,row=>row.Group.Collection.Label);
-        featuredHero.Margin=new(0,0,0,32);
+        featuredHero.Margin=new(0,0,0,32);UpdateHeroPageLayout();
         featuredHero.Children.Add(BuildFeatureCarousel(slides.Select(row=>row.Item!).ToArray(),(item,_)=>AppLanguage.T("Главное")+" · "+rubrics[item.Id]));
         foreach(var row in slides)featuredHeroIds.Add(row.Item!.Id);
         if(featuredWidth>0)ArrangeFeatureCarousel(featuredWidth);

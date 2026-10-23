@@ -63,6 +63,10 @@ public partial class MainWindow
                 prefs.Light=light;ApplyTheme();Render();await Settle();SearchSubmitButton.Focus();await Settle();
                 Check(InterfacePalette.For(light).All(pair=>pair.Value.IsFrozen&&ReferenceEquals(FindResource(pair.Key),pair.Value)),"Theme reuses its frozen palette: "+(light?"light":"dark"));
                 Check(SearchShortcutHint.IsVisible&&SearchPlaceholder.Margin.Right>=70,"Wide idle search shows its keyboard hint with reserved text space: "+(light?"light":"dark"));
+                Check(SearchBar.ActualWidth>1000&&Math.Abs(SearchBar.ActualWidth-HeaderArea.ActualWidth)<2,"Wide search fills the page reading width: "+(light?"light":"dark"));
+                var searchBounds=SearchBar.TransformToAncestor(HeaderArea).TransformBounds(new Rect(SearchBar.RenderSize));
+                var actionsBounds=HeaderActions.TransformToAncestor(HeaderArea).TransformBounds(new Rect(HeaderActions.RenderSize));
+                Check(searchBounds.Top>=actionsBounds.Bottom,"Wide search and header actions do not overlap.");
                 await WaitForPosterRealization();CheckCards(light?"light":"dark");Shot("interface-"+(light?"light":"dark"));
             }
             // A RenderTargetBitmap can capture a viewport larger than the actual

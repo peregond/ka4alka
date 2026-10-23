@@ -194,7 +194,9 @@ public partial class MainWindow
             var hint=Text("Проверь соединение и обнови каталог.",13,true);hint.TextAlignment=TextAlignment.Center;empty.Children.Add(hint);
             var retry=ActionButton("Повторить загрузку","IconRefresh",RefreshGames);retry.HorizontalAlignment=HorizontalAlignment.Center;empty.Children.Add(retry);content.Children.Add(empty);
         }
-        Body.Children.Add(new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=content,Margin=new(-6,-6,-6,0),VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});
+        var scroll=new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=content,Margin=new(-6,-6,-6,0),VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};
+        Body.Children.Add(scroll);
+        UseHeroPageLayout(scroll,content,discoveryHero);
         UpdateCatalogColumns(true);UpdateFilterRail();
     }
     // Banner slides get their genre, studio and score from Steam's store details; they are cached for a week.

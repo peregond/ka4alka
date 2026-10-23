@@ -74,7 +74,8 @@ public partial class MainWindow
             if(featuredGroups==null)featuredHero.Children.Add(BannerSkeleton());
             // Start with the banner; the small margin leaves room for the hover ring of a story.
             var page=new StackPanel{Margin=new(6,0,6,0)};page.Children.Add(panel);
-            Body.Children.Add(new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=page,VerticalScrollBarVisibility=ScrollBarVisibility.Auto});
+            var scroll=new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=page,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};
+            Body.Children.Add(scroll);UseHeroPageLayout(scroll,page,featuredHero);
             var definitions=featuredGroups?.Select(row=>row.Collection).ToArray()??FeaturedCatalog.Collections.ToArray();
             foreach(var collection in definitions)AddFeaturedShelf(panel,collection);
             featuredState=Text("Загружаем подборки…",13,true);panel.Children.Add(featuredState);

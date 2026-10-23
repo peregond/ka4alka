@@ -165,6 +165,7 @@ public partial class MainWindow
         SearchMagnifier.Visibility=narrowSearch?Visibility.Collapsed:Visibility.Visible;
         SearchPlaceholder.Text=AppLanguage.T(narrowSearch?"Поиск":"Найти фильм, сериал или игру");SearchPlaceholder.Margin=new Thickness(narrowSearch?12:48,0,narrowSearch?72:110,0);
         foreach(var subtitle in PageHeader.Children.OfType<TextBlock>().Where(x=>Equals(x.Tag,"CatalogSubtitle")))subtitle.Visibility=shortView?Visibility.Collapsed:Visibility.Visible;
+        UpdateHeroPageLayout();
         RenderNavSelection();
         UpdateSavedCount();UpdateDownloadsWidget();
         UpdateFilterRail();
@@ -172,14 +173,14 @@ public partial class MainWindow
     }
     void CenterHeaderSearch(bool narrow,double gutter)
     {
-        // Reserve the actual action width on both sides. At small sizes use the
-        // remaining grid column instead of overlapping the Add/Refresh buttons.
-        HeaderActions.Measure(new Size(double.PositiveInfinity,double.PositiveInfinity));
-        var inset=HeaderActions.DesiredSize.Width+12;
-        var available=Math.Max(0,ActualWidth-(narrow?64:236)-2*gutter);
-        var centered=!narrow&&available-2*inset>=260;
-        Grid.SetColumn(SearchBar,centered?0:1);Grid.SetColumnSpan(SearchBar,centered?3:1);
-        SearchBar.Margin=centered?new Thickness(inset,0,inset,0):new Thickness(0,0,ActualWidth<780?8:12,0);
+        // Give search the page's whole reading width. On short windows retain a
+        // single compact row so controls do not take space from the viewport.
+        var fullRow=ActualHeight>=640&&SearchBar.Visibility==Visibility.Visible;
+        Grid.SetRow(SearchBar,fullRow?1:0);
+        Grid.SetColumn(SearchBar,fullRow?0:1);Grid.SetColumnSpan(SearchBar,fullRow?3:1);
+        Grid.SetRow(FiltersPanel,fullRow?2:1);
+        SearchBar.Margin=fullRow?new Thickness(0,10,0,0):new Thickness(0,0,ActualWidth<780?8:12,0);
+        UpdateHeroPageLayout();
     }
     void UpdateFilterRail()
     {
