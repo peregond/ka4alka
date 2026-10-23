@@ -14,7 +14,7 @@ on:
       version:
         description: Version matching native/Kachalka.csproj
         required: true
-        default: '0.44.23'
+        default: '0.44.24'
       publish:
         description: Publish the release as soon as every release check passes
         type: boolean
@@ -37,7 +37,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 25
     env:
-      RELEASE_VERSION: ${{ inputs.version || '0.44.23' }}
+      RELEASE_VERSION: ${{ inputs.version || '0.44.24' }}
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
     steps:
       - uses: actions/checkout@v4
@@ -60,6 +60,8 @@ jobs:
           if($LASTEXITCODE -ne 0){throw 'Locked web dependencies failed'}
           node tests/release-audio-rules.mjs
           if($LASTEXITCODE -ne 0){throw 'Release audio rules checks failed'}
+          node tests/middle-east-releases.mjs
+          if($LASTEXITCODE -ne 0){throw 'Middle East indexed release regression failed'}
           node tests/release-performance.mjs
           if($LASTEXITCODE -ne 0){throw 'Server release search performance checks failed'}
           node tests/title-identity.mjs
@@ -146,6 +148,8 @@ jobs:
       - name: Verify metadata and actual release for affected new films
         if: steps.tested.outputs.verified != 'true'
         run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --probe-affected-films
+      - name: Verify the reported Middle East film through the live index
+        run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --probe-middle-east
       - name: Verify public replacement site
         # The live backend can change independently of a previously tested desktop tree.
         shell: pwsh
@@ -191,9 +195,9 @@ jobs:
           $process=Start-Process $application -ArgumentList @('--cinema-smoke-test',$output) -PassThru
           if(-not $process.WaitForExit(60000)){$process.Kill();throw 'Person card UI smoke timed out'}
           if($process.ExitCode -ne 0 -or (Test-Path "$output/error.txt") -or -not (Test-Path "$output/checks.json")){throw 'Person card UI smoke failed'}
-      - name: Verify upgrade from previously published 0.44.22
+      - name: Verify upgrade from previously published 0.44.23
         shell: pwsh
-        run: ./tests/WindowsPublishedUpgrade.ps1 -FromVersion 0.44.22 -ReleaseDirectory ('dist/release-'+$env:RELEASE_VERSION)
+        run: ./tests/WindowsPublishedUpgrade.ps1 -FromVersion 0.44.23 -ReleaseDirectory ('dist/release-'+$env:RELEASE_VERSION)
       - name: Upload verified files to draft GitHub Release
         shell: pwsh
         env:
@@ -309,7 +313,7 @@ jobs:
     timeout-minutes: 15
     env:
       GH_TOKEN: ${{ github.token }}
-      RELEASE_VERSION: ${{ inputs.version || '0.44.23' }}
+      RELEASE_VERSION: ${{ inputs.version || '0.44.24' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4

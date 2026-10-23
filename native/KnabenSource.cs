@@ -6,7 +6,7 @@ using System.Text.RegularExpressions;
 
 namespace Kachalka;
 
-// RuTracker video and verified PC game categories are read from Knaben's public index.
+// Verified video and PC game categories from RuTracker and The Pirate Bay.
 public static class KnabenSource
 {
     const int MaxResponseBytes=2_000_000;
@@ -40,8 +40,7 @@ public static class KnabenSource
     public static Uri QueryUri(string title,bool games=false)
     {
         var query=games?"\""+title.Replace("\"","").Trim()+"\"":title.Trim();
-        return new("https://api.knaben.org/v2/search?q="+Uri.EscapeDataString(query)+"&sf=title&t="+
-            (games?"rutracker,thepiratebay":"rutracker")+"&o=seeders&d=desc&s=150");
+        return new("https://api.knaben.org/v2/search?q="+Uri.EscapeDataString(query)+"&sf=title&t=rutracker,thepiratebay&o=seeders&d=desc&s=150");
     }
 
     static async Task<IReadOnlyList<SourceEntry>> SearchQuery(string query,MediaItem item,CancellationToken ct)
@@ -80,7 +79,7 @@ public static class KnabenSource
             if(row.ValueKind!=JsonValueKind.Object)continue;
             var tracker=String(row,"tracker")?.Trim();
             var source=string.Equals(tracker,"RuTracker",StringComparison.OrdinalIgnoreCase)||string.Equals(tracker,"RuTracker.org",StringComparison.OrdinalIgnoreCase)?"RuTracker":
-                item.Section=="Игры"&&string.Equals(tracker,"The Pirate Bay",StringComparison.OrdinalIgnoreCase)?"The Pirate Bay":null;
+                string.Equals(tracker,"The Pirate Bay",StringComparison.OrdinalIgnoreCase)?"The Pirate Bay":null;
             if(source==null)continue;
             var title=String(row,"title")?.Trim();
             if(string.IsNullOrWhiteSpace(title)||title.Length>500||!(item.Section=="Игры"?Regex.IsMatch(String(row,"category")??"",@"(?i)(?:games?.*(?:pc|windows)|pc.*games?|windows.*games?|игры.*(?:pc|пк))"):VideoCategoryPattern.IsMatch(String(row,"category")??"")))continue;
@@ -102,7 +101,7 @@ public static class KnabenSource
             if(item.Section=="Фильмы"&&item.Year>0&&!Regex.IsMatch(title,@"(?<!\d)"+item.Year+@"(?!\d)"))continue;
             entries.Add(entry);
         }
-        return entries.DistinctBy(entry=>entry.Id).ToArray();
+        return ReleaseSearch.Distinct(entries);
     }
 
     static string? String(JsonElement row,string name)=>row.TryGetProperty(name,out var value)&&value.ValueKind==JsonValueKind.String?value.GetString():null;
@@ -112,6 +111,13 @@ public static class KnabenSource
     static string SecurePage(string? value,string source)
     {
         if(!Uri.TryCreate(value,UriKind.Absolute,out var uri)||uri.Scheme!="https"||!string.IsNullOrEmpty(uri.UserInfo))return "";
+        // The index can return its own TPB proxy page. Preserve a usable canonical
+        // source page without trusting arbitrary proxy paths or query parameters.
+        if(source=="The Pirate Bay"&&uri.Host=="knaben.xyz"&&uri.IsDefaultPort&&uri.AbsolutePath=="/thepiratebay/description.php")
+        {
+            var id=Regex.Match(uri.Query,@"^\?id=(\d{1,15})$");
+            return id.Success?"https://thepiratebay.org/description.php?id="+id.Groups[1].Value:"";
+        }
         return ((uri.Host is "rutracker.org" or "www.rutracker.org" or "knaben.org" or "knaben.eu")||source=="The Pirate Bay"&&(uri.Host is "thepiratebay.org" or "www.thepiratebay.org"))?uri.AbsoluteUri:"";
     }
 }

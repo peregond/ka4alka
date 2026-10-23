@@ -15,7 +15,7 @@ export function catalogModules(overrides={},globals={}) {
     if(file.endsWith('.json'))return JSON.parse(fs.readFileSync(file,'utf8'));
     const exports={};cache.set(file,exports);
     const code=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText;
-    vm.runInNewContext(code,{exports,require:name=>load(name,path.dirname(file)),Date,Map,Set,JSON,Number,Math,Promise,Response,URL,AbortSignal,TextDecoder,TextEncoder,fetch,console,...globals},{filename:file});
+    vm.runInNewContext(code,{exports,require:name=>load(name,path.dirname(file)),Date,Map,Set,JSON,Number,Math,Promise,Response,URL,URLSearchParams,AbortSignal,TextDecoder,TextEncoder,fetch,console,...globals},{filename:file});
     return exports;
   }
   return name=>load(name);

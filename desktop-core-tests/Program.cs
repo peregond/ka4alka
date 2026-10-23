@@ -5,6 +5,8 @@ using System.Security.Cryptography;
 using Kachalka;
 using MonoTorrent;
 using MonoTorrent.Client;
+if(args.Contains("--probe-middle-east")){await MiddleEastReleaseTests.Probe();return;}
+MiddleEastReleaseTests.Run();
 ReleaseAudioTests.Run();
 BackroomsAudioTests.Run();
 await ReleaseAudioRulesTests.Run();

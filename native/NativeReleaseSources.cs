@@ -15,7 +15,7 @@ public static class NativeReleaseSources
             new("NNM-Club",ct=>Resolved(new NnmClubSource(client).Search,ct)),
             new("MegaPeer",ct=>Resolved(new MegaPeerSource(client).Search,ct)),
             new("BigFanGroup",ct=>Resolved(new BigFanGroupSource(client).Search,ct)),
-            new("RuTracker · через Knaben",ct=>Resolved(KnabenSource.Search,ct)),
+            new("Knaben",ct=>Resolved(KnabenSource.Search,ct)),
             new("The Pirate Bay",ct=>Resolved(new PirateBaySource(client).Search,ct,aliases:true)),
             new("Internet Archive",ct=>Resolved((item,t)=>Aliases(item,(title,token)=>client.SearchArchive(title,"Фильмы",1,token),t),ct,aliases:true))
         };

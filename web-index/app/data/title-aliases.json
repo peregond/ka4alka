@@ -38,5 +38,20 @@
     "source": "TheTVDB",
     "sourceId": 375892,
     "russianTitle": "Обратная сторона Земли"
+  },
+  {
+    "imdbId": "tt34386754",
+    "section": "movies",
+    "year": 2026,
+    "originalTitle": "Once Upon a Time in the Middle East",
+    "aliases": [
+      "Однажды на Ближнем Востоке",
+      "Once Upon a Time in the Middle East",
+      "Huan ying laai long can guan",
+      "欢迎来龙餐馆"
+    ],
+    "source": "TMDB",
+    "sourceId": 1391021,
+    "russianTitle": "Однажды на Ближнем Востоке"
   }
 ]
