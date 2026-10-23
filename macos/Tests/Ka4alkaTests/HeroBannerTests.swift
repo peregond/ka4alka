@@ -85,7 +85,7 @@ final class HeroRotationTests: XCTestCase {
                 SettingsLayoutMeasurements.refreshNativeViews()
                 let banner = try XCTUnwrap(SettingsLayoutMeasurements.frames["detail.banner"])
                 let body = try XCTUnwrap(SettingsLayoutMeasurements.frames["detail.body"])
-                let scroll = try XCTUnwrap(SmokeViews.largestScrollView(in: window))
+                let scroll = try XCTUnwrap(SettingsLayoutMeasurements.enclosingScrollView(for: "detail.banner"))
                 XCTAssertEqual(banner.width, scroll.contentView.bounds.width, accuracy: 2, section)
                 XCTAssertLessThanOrEqual(body.width, KD.Width.page + 1, section)
                 XCTAssertLessThan(body.width, banner.width, section)

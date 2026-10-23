@@ -594,14 +594,14 @@ struct SmokeShot {
     }
 
     private func inspectDetailBanner(_ page: String) {
-        guard let main = MacSmoke.mainWindow(),
-              let scroll = SmokeViews.largestScrollView(in: main),
+        guard let scroll = SettingsLayoutMeasurements.enclosingScrollView(for: "detail.banner"),
               let banner = SettingsLayoutMeasurements.frames["detail.banner"] else {
             check(false, page + ": full-width detail banner is measured")
             return
         }
         check(abs(banner.width - scroll.contentView.bounds.width) <= 2,
-              page + ": detail artwork fills the scroll viewport without side gutters")
+              page + ": detail artwork fills the scroll viewport without side gutters (banner " + String(Int(banner.width)) +
+              ", viewport " + String(Int(scroll.contentView.bounds.width)) + ", document " + String(Int(scroll.documentView?.bounds.width ?? 0)) + ")")
         if let body = SettingsLayoutMeasurements.frames["detail.body"] {
             check(body.width <= KD.Width.page + 2 && body.width < banner.width,
                   page + ": description and releases keep their inset reading column")

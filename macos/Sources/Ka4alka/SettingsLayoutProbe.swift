@@ -60,6 +60,18 @@ private let layoutProbeEnabled: Bool = CommandLine.arguments.contains("--smoke-t
             }
         }
     }
+    /// The scroll view that actually owns a measured element. A navigation stack
+    /// can keep other, larger scroll views mounted behind its current page.
+    static func enclosingScrollView(for id: String) -> NSScrollView? {
+        for reference in nativeViews.values {
+            guard let probe = reference.view as? ToolbarMeasurementView,
+                  probe.id == id, probe.owner == owners[id],
+                  probe.window != nil, !probe.isHiddenOrHasHiddenAncestor else { continue }
+            if let scroll = probe.enclosingScrollView { return scroll }
+        }
+        return nil
+    }
+
     /// A view that appears again after it disappeared (same identity, kept state) records frames again.
     static func activate(owner: UUID) { retiredOwners.remove(owner) }
     static func record(_ id: String, frame: CGRect, owner: UUID, kind: LayoutProbeKind = .container, group: String? = nil) {
