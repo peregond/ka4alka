@@ -43,8 +43,7 @@ struct SettingsUpdatesCard: View {
             )
             Divider()
             installFailureRow
-            statusRow
-            progressRow
+            if !updater.busy || updater.isError { statusRow }
             actions
         }
     }
@@ -84,15 +83,6 @@ struct SettingsUpdatesCard: View {
         }
     }
 
-    @ViewBuilder private var progressRow: some View {
-        if let value = updater.progressValue {
-            ProgressView(value: value)
-                .tint(KDPalette.accent)
-                .accessibilityLabel(tr("Загрузка обновления", "Downloading the update"))
-                .accessibilityValue(KDFormat.percent(value * 100))
-        }
-    }
-
     private var actions: some View {
         ViewThatFits(in: .horizontal) {
             HStack(spacing: KD.Space.m) { actionItems }
@@ -101,10 +91,8 @@ struct SettingsUpdatesCard: View {
     }
 
     @ViewBuilder private var actionItems: some View {
-        Button(updater.buttonTitle) { Task { await updater.primaryAction() } }
-            .buttonStyle(KDPrimaryButtonStyle())
+        MacUpdateButton(updater: updater)
             .controlSize(.large)
-            .disabled(updater.busy)
         Link(destination: URL(string: "https://github.com/peregond/ka4alka/releases/latest")!) {
             Text(tr("Что нового", "Release notes")).foregroundStyle(KDPalette.accent)
         }

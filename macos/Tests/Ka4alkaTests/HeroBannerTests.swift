@@ -61,6 +61,41 @@ final class HeroRotationTests: XCTestCase {
         window.contentView = nil
     }
 
+    func testFilmSeriesAndGameDetailPagesKeepOnlyArtworkFullWidth() throws {
+        _ = NSApplication.shared
+        let previousProbe = SettingsLayoutMeasurements.enabledForTests
+        SettingsLayoutMeasurements.enabledForTests = true
+        defer { SettingsLayoutMeasurements.enabledForTests = previousProbe }
+        for section in ["movies", "series", "games"] {
+            let model = AppModel()
+            model.bridge.disabled = true
+            model.settings = try TestFixtures.decode(AppSettings.self, TestFixtures.settingsJSON)
+            let card = try TestFixtures.card(section + ":full-width", "A title that also wraps in a narrow window", section: section)
+            let host = NSHostingView(rootView: DetailView(card: card).environmentObject(model))
+            host.autoresizingMask = [.width, .height]
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1000, height: 700), styleMask: [.borderless], backing: .buffered, defer: false)
+            window.contentView = host
+            window.orderFront(nil)
+            for width: CGFloat in [496, 1000, 1800, 496] {
+                SettingsLayoutMeasurements.frames.removeAll()
+                window.setContentSize(NSSize(width: width, height: 700))
+                host.layoutSubtreeIfNeeded()
+                RunLoop.main.run(until: Date().addingTimeInterval(0.15))
+                host.layoutSubtreeIfNeeded()
+                SettingsLayoutMeasurements.refreshNativeViews()
+                let banner = try XCTUnwrap(SettingsLayoutMeasurements.frames["detail.banner"])
+                let body = try XCTUnwrap(SettingsLayoutMeasurements.frames["detail.body"])
+                let scroll = try XCTUnwrap(SmokeViews.largestScrollView(in: window))
+                XCTAssertEqual(banner.width, scroll.contentView.bounds.width, accuracy: 2, section)
+                XCTAssertLessThanOrEqual(body.width, KD.Width.page + 1, section)
+                XCTAssertLessThan(body.width, banner.width, section)
+                XCTAssertGreaterThanOrEqual(body.minX - banner.minX, KD.gutter - 2, section)
+            }
+            window.orderOut(nil)
+            window.contentView = nil
+        }
+    }
+
     func testScrollVisibilityPublishesOnlyOnVisibilityChanges() {
         _ = NSApplication.shared
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 400), styleMask: [.borderless], backing: .buffered, defer: false)

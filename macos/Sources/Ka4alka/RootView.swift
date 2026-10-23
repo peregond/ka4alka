@@ -206,9 +206,8 @@ struct RootView: View {
         .navigationSplitViewColumnWidth(min: 196, ideal: 210, max: 250)
     }
     private var showsUpdateStatus: Bool {
-        // Ready is already communicated by the restart button. Keep progress/errors here;
-        // the complete ready status and component statistics remain in Settings → Updates.
-        !updater.statusText.isEmpty && (!updater.ready || updater.isError) && (updater.available || updater.busy || updater.isError)
+        // Progress lives inside the button; keep failures visible beside it.
+        !updater.statusText.isEmpty && (updater.isError || (!updater.busy && !updater.ready && updater.available))
     }
     /// The widget is shown only when there is room: its rows follow the height of the column, as on Windows.
     private var downloadWidgetRows: Int {
@@ -237,19 +236,7 @@ struct RootView: View {
         VStack(alignment: .leading, spacing: KD.Space.xs) {
             pinnedSections
             if updater.available {
-                Button { Task { await updater.primaryAction() } } label: {
-                    Label(updater.buttonTitle, systemImage: "arrow.triangle.2.circlepath")
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(KDPrimaryButtonStyle())
-                .disabled(updater.busy)
-                .help(updater.buttonTitle)
-                .settingsLayoutProbe("sidebar.update.action")
-            }
-            if updater.busy, !updater.ready {
-                ProgressView(value: updater.progressValue)
+                MacUpdateButton(updater: updater, expanded: true, probeID: "sidebar.update.action")
             }
             if showsUpdateStatus {
                 Text(updater.statusText)

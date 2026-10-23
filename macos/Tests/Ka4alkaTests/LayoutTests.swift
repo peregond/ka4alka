@@ -189,7 +189,7 @@ private struct LayoutOutcome {
 
     // MARK: Tests
 
-    func testReadyUpdateFooterFitsShortWindows() throws {
+    func testUpdateFooterFitsShortWindowsAcrossDownloadAndReadyStates() throws {
         try requireWindowServer()
         let priorProbeMode = SettingsLayoutMeasurements.enabledForTests
         let savedLanguage = TestLanguage.current()
@@ -201,11 +201,16 @@ private struct LayoutOutcome {
         for language in ["ru", "en"] {
             UserDefaults.standard.set(language, forKey: "UiLanguage")
             for height: CGFloat in [468, 520, 700] {
+              for state in ["available", "waiting", "downloading", "ready", "error"] {
                 let model = try makeModel()
                 model.version = "0.44.12"
                 let updater = MacUpdater()
-                updater.available = true; updater.ready = true
-                updater.statusText = tr("Обновление готово к установке", "Update ready to install") + " · 7.4 MB · " + tr("Сохранено компонентов: ", "Reused components: ") + "422"
+                updater.available = true; updater.ready = state == "ready"
+                updater.busy = state == "waiting" || state == "downloading"
+                updater.progressValue = state == "downloading" ? 0.5 : nil
+                updater.isError = state == "error"
+                updater.statusText = state == "error" ? tr("Ошибка загрузки", "Download failed") : tr("Доступна новая версия", "A new version is available")
+                if state == "available" { XCTAssertEqual(updater.buttonTitle, language == "ru" ? "Скачать" : "Download") }
                 SettingsLayoutMeasurements.frames.removeAll()
                 let controller = NSHostingController(rootView: RootView().environmentObject(model).environmentObject(updater))
                 let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 760, height: height), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
@@ -217,7 +222,15 @@ private struct LayoutOutcome {
                 RunLoop.main.run(until: Date().addingTimeInterval(0.2))
                 controller.view.layoutSubtreeIfNeeded()
                 SettingsLayoutMeasurements.refreshNativeViews()
-                XCTAssertNil(SettingsLayoutMeasurements.frames["sidebar.update.status"], "Ready status should not duplicate the restart button")
+                if updater.busy || updater.ready {
+                    XCTAssertNil(SettingsLayoutMeasurements.frames["sidebar.update.status"], "Progress and readiness belong inside the update button")
+                }
+                if state == "error" { XCTAssertNotNil(SettingsLayoutMeasurements.frames["sidebar.update.status"], "Download errors must remain visible") }
+                if state == "downloading" {
+                    let button = try XCTUnwrap(SettingsLayoutMeasurements.frames["sidebar.update.action"])
+                    let fill = try XCTUnwrap(SettingsLayoutMeasurements.frames["sidebar.update.action.fill"])
+                    XCTAssertEqual(fill.width, button.width * 0.5, accuracy: 1.5, "Received bytes fill half of the actual button")
+                }
                 for id in ["sidebar.update.action"] {
                     guard let frame = SettingsLayoutMeasurements.nativeFrames[id], let visible = SettingsLayoutMeasurements.nativeVisibleFrames[id] else {
                         XCTFail("Missing native " + id + " " + language); continue
@@ -229,8 +242,17 @@ private struct LayoutOutcome {
                     XCTAssertGreaterThanOrEqual(shown.width * shown.height, frame.width * frame.height * 0.99,
                                                 id + " " + language + " height " + String(Int(height)))
                 }
+                if height == 520, let bitmap = controller.view.bitmapImageRepForCachingDisplay(in: controller.view.bounds) {
+                    controller.view.cacheDisplay(in: controller.view.bounds, to: bitmap)
+                    let folder = TestSources.repository.appendingPathComponent("test-output/macos/render")
+                    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                    if let png = bitmap.representation(using: .png, properties: [:]) {
+                        try png.write(to: folder.appendingPathComponent("update-" + state + "-" + language + ".png"))
+                    }
+                }
                 window.orderOut(nil)
                 window.contentViewController = nil
+              }
             }
         }
     }

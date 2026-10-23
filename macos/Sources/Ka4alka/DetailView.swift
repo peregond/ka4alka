@@ -23,28 +23,34 @@ struct DetailView: View {
         ScrollView {
             page
         }
+        .ignoresSafeArea(edges: .top)
         .scrollPosition(id: $scrollTarget, anchor: .top)
         .task(id: loadKey) { await loadDetail() }
         .task(id: loadKey) { await model.loadReleases(card) }
     }
 
     private var page: some View {
-        VStack(alignment: .leading, spacing: KD.Space.l) {
+        VStack(alignment: .leading, spacing: 0) {
+            // The artwork spans the scroll viewport; the reading column below stays inset.
             DetailHero(card: card, detail: detail, onChooseRelease: { scrollToReleases() }, onOtherParts: card.section == "movies" ? { franchiseExpanded.toggle() } : nil)
-            descriptionBlock
-            gameBlock
-            peopleBlock
-            if franchiseExpanded { DetailFranchiseSection(card: item).id(card.id) }
-            awardsBlock
-            VStack(alignment: .leading, spacing: 0) {
-                DetailReleasesSection(transfers: model.transfers, card: card).id(card.id)
+            VStack(alignment: .leading, spacing: KD.Space.l) {
+                descriptionBlock
+                gameBlock
+                peopleBlock
+                if franchiseExpanded { DetailFranchiseSection(card: item).id(card.id) }
+                awardsBlock
+                VStack(alignment: .leading, spacing: 0) {
+                    DetailReleasesSection(transfers: model.transfers, card: card).id(card.id)
+                }
+                .id(DetailView.releasesAnchor)
             }
-            .id(DetailView.releasesAnchor)
+            .scrollTargetLayout()
+            .frame(maxWidth: KD.Width.page, alignment: .leading)
+            .settingsLayoutProbe("detail.body")
+            .padding(KD.gutter)
+            .frame(maxWidth: .infinity)
         }
         .scrollTargetLayout()
-        .frame(maxWidth: KD.Width.page, alignment: .leading)
-        .padding(KD.gutter)
-        .frame(maxWidth: .infinity)
     }
 
     // MARK: Loading
@@ -141,6 +147,7 @@ struct DetailHero: View {
     var onChooseRelease: () -> Void
     var onOtherParts: (() -> Void)? = nil
     @State private var width: CGFloat = 0
+    @Environment(\.kdSafeTop) private var safeTop
 
     private var item: MediaCard { detail?.item ?? card }
     private var isGame: Bool { card.section == "games" }
@@ -180,11 +187,11 @@ struct DetailHero: View {
     }
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: KD.Radius.hero, style: .continuous)
         content
             .background { layers }
-            .clipShape(shape)
+            .clipped()
             .kdReadWidth($width)
+            .preference(key: KDHeroPageKey.self, value: true)
             .settingsLayoutProbe("detail.banner")
     }
 
@@ -216,8 +223,11 @@ struct DetailHero: View {
             posterView
             textColumn
         }
-        .padding(compact ? KD.Space.m : KD.Space.l)
-        .frame(maxWidth: .infinity, minHeight: KD.Size.heroHeight, alignment: .bottomLeading)
+        .padding(.vertical, compact ? KD.Space.m : KD.Space.l)
+        .padding(.top, safeTop)
+        .frame(maxWidth: KD.Width.page, minHeight: KD.Size.heroHeight + safeTop, alignment: .bottomLeading)
+        .padding(.horizontal, KD.gutter)
+        .frame(maxWidth: .infinity)
         .kdOnBanner()
     }
 
