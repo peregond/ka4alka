@@ -296,6 +296,9 @@ enum MacUpdateInstaller {
                     if !child.isRunning { break }; Thread.sleep(forTimeInterval: 0.1)
                 }
                 try? files.removeItem(at: health)
+                // The new version was started as a child of this helper, so the system did not bring it forward. Ask
+                // LaunchServices to activate it; without this its window opened behind the other apps.
+                if healthy { try? runTool("/usr/bin/open", [old.path]) }
                 if !healthy { if child.isRunning { child.terminate(); child.waitUntilExit() }; throw UpdateError(tr("Новая версия не прошла проверку запуска. Возвращена предыдущая версия.", "The updated application failed its startup check; the previous version was restored.")) }
             }
             try? files.removeItem(at: backup)

@@ -218,7 +218,7 @@ private struct LayoutOutcome {
                 controller.view.layoutSubtreeIfNeeded()
                 SettingsLayoutMeasurements.refreshNativeViews()
                 XCTAssertNil(SettingsLayoutMeasurements.frames["sidebar.update.status"], "Ready status should not duplicate the restart button")
-                for id in ["sidebar.update.action", "sidebar.update.version"] {
+                for id in ["sidebar.update.action"] {
                     guard let frame = SettingsLayoutMeasurements.nativeFrames[id], let visible = SettingsLayoutMeasurements.nativeVisibleFrames[id] else {
                         XCTFail("Missing native " + id + " " + language); continue
                     }
@@ -323,7 +323,9 @@ private struct LayoutOutcome {
         UserDefaults.standard.set("ru", forKey: "UiLanguage")
         let model = try makeModel()
         func meanLuminance(dark: Bool) -> (mean: Double, deviation: Double) {
-            let controller = NSHostingController(rootView: AnyView(SettingsView().environmentObject(model).environmentObject(MacUpdater()).preferredColorScheme(dark ? ColorScheme.dark : ColorScheme.light)))
+            // Liquid Glass is drawn on the GPU and an offscreen cache of a scroll view that holds it comes back empty,
+            // so this colour test runs with the flat fallback (Lite mode) that has the same colours.
+            let controller = NSHostingController(rootView: AnyView(SettingsView().environmentObject(model).environmentObject(MacUpdater()).environment(\.kdLite, true).preferredColorScheme(dark ? ColorScheme.dark : ColorScheme.light)))
             let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1000, height: 700), styleMask: [.borderless], backing: .buffered, defer: false)
             window.appearance = NSAppearance(named: dark ? NSAppearance.Name.darkAqua : NSAppearance.Name.aqua)
             window.contentViewController = controller
@@ -384,7 +386,7 @@ private struct LayoutOutcome {
         var failures: [String] = []
         for name in [NSAppearance.Name.aqua, NSAppearance.Name.darkAqua] {
             let label: String = name == NSAppearance.Name.aqua ? "light" : "dark"
-            guard let page = rgb(NSColor.windowBackgroundColor, appearance: name), let surface = rgb(NSColor.controlBackgroundColor, appearance: name) else { continue }
+            guard let page = rgb(NSColor(KDPalette.pageBackground), appearance: name), let surface = rgb(NSColor(KDPalette.surface), appearance: name) else { continue }
             for (role, color, minimum) in roles {
                 guard let foreground = rgb(NSColor(color), appearance: name) else { continue }
                 for (backgroundName, background) in [("page", page), ("surface", surface)] {

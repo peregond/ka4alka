@@ -228,7 +228,7 @@ struct SettingsDownloadsCard: View {
         Button {
             openFolder()
         } label: {
-            Label(tr("Открыть папку", "Open folder"), systemImage: "folder")
+            Label(tr("Открыть папку", "Open Folder"), systemImage: "folder")
         }
         .buttonStyle(KDSecondaryButtonStyle())
         .disabled(!configured || folderMissing)

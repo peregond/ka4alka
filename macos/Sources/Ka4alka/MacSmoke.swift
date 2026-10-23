@@ -179,8 +179,14 @@ struct SmokeShot {
         var fatal: String?
         do {
             try await bootstrapChecks()
-            try await runCombination(language: "ru", mode: AppearanceMode.dark, sizes: fullSizes)
-            try await runCombination(language: "en", mode: AppearanceMode.light, sizes: reducedSizes)
+            // KD_SMOKE_ONLY="detail-movie,settings" runs just those pages at one size in Russian/dark: a quick look
+            // while designing. A run limited like this is never a release check.
+            if let only = ProcessInfo.processInfo.environment["KD_SMOKE_ONLY"], !only.isEmpty {
+                try await runCombination(language: "ru", mode: AppearanceMode.dark, sizes: [CGSize(width: 1280, height: 820)], only: Set(only.split(separator: ",").map(String.init)))
+            } else {
+                try await runCombination(language: "ru", mode: AppearanceMode.dark, sizes: fullSizes)
+                try await runCombination(language: "en", mode: AppearanceMode.light, sizes: reducedSizes)
+            }
             await restoreDefaults()
             finalChecks()
         } catch {
@@ -215,9 +221,15 @@ struct SmokeShot {
         environment["reduceMotion"] = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? "yes" : "no"
         environment["increaseContrast"] = NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast ? "yes" : "no"
         checkGlobal(!environment["surfaceVariant", default: ""].isEmpty, "The active surface variant is recorded: " + environment["surfaceVariant", default: "?"])
+        if let sdk = smokeLinkedSDK() {
+            environment["linkedSDK"] = String(sdk.major) + "." + String(sdk.minor)
+            checkGlobal(sdk.major >= 26, "The executable is linked against the macOS 26 SDK or later, so the system draws Liquid Glass chrome (linked against " + environment["linkedSDK", default: "?"] + ")")
+        } else {
+            notes.append("not-instrumented:linked-sdk")
+        }
     }
 
-    private func runCombination(language next: String, mode: AppearanceMode, sizes: [CGSize]) async throws {
+    private func runCombination(language next: String, mode: AppearanceMode, sizes: [CGSize], only: Set<String>? = nil) async throws {
         language = next
         theme = mode == AppearanceMode.dark ? "dark" : "light"
         lastDigest = [:]
@@ -226,7 +238,7 @@ struct SmokeShot {
         await model.set("uiLanguage", .string(next))
         model.setAppearance(mode)
         await pause(400)
-        for page in SmokePage.allCases {
+        for page in SmokePage.allCases where only?.contains(page.rawValue) ?? true {
             try await runPage(page, sizes: sizes)
         }
     }
@@ -559,7 +571,9 @@ struct SmokeShot {
     private func inspectBanner(_ section: String) {
         let frames: [String: CGRect] = SettingsLayoutMeasurements.frames
         guard let banner = frames["catalog.banner." + section], let content = MacSmoke.mainWindow()?.contentView else { return }
-        let maximumHeight = CatalogHeroMetrics.height(forWidth: banner.width)
+        // The banner runs up under the toolbar, so it is taller by the strip the toolbar covers.
+        let strip = MacSmoke.mainWindow()?.contentView?.safeAreaInsets.top ?? 0
+        let maximumHeight = CatalogHeroMetrics.height(forWidth: banner.width) + strip
         check(banner.width > 280 && banner.height >= 280 && banner.height <= maximumHeight + 2, section + ": spotlight banner has a complete native layout")
         let inside: Bool = banner.minX >= -2 && banner.maxX <= content.bounds.width + 2 && banner.minY >= -2 && banner.maxY <= content.bounds.height + 2
         check(inside, section + ": spotlight banner is visible at the top of the catalog")
@@ -572,15 +586,15 @@ struct SmokeShot {
     private func inspectToolbar(primary: Bool) {
         guard let main = MacSmoke.mainWindow() else { return }
         SettingsLayoutMeasurements.refreshNativeViews()
-        reportToolbar(primary, SettingsLayoutMeasurements.nativeAttached["toolbar.add"] != true, "toolbar: hidden at the top of the page")
+        reportToolbar(primary, SettingsLayoutMeasurements.nativeAttached["toolbar.add"] == true, "toolbar: the page actions are present at the top of the page")
     }
 
     private func inspectExpandedToolbar() {
         SettingsLayoutMeasurements.refreshNativeViews()
         guard let main = MacSmoke.mainWindow() else { return }
         inspectWindowControls()
-        check(SettingsLayoutMeasurements.nativeAttached["toolbar.add"] == true, "toolbar: appears after scrolling")
-        check(!main.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, "toolbar: page name uses the native window title")
+        check(SettingsLayoutMeasurements.nativeAttached["toolbar.add"] == true, "toolbar: stays after scrolling")
+        check(!(main.accessibilityTitle() ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, "toolbar: page name is the window's accessibility title")
         for id in ["toolbar.add", "toolbar.refresh", "toolbar.appearance"] {
             guard SettingsLayoutMeasurements.nativeAttached[id] == true, let frame = SettingsLayoutMeasurements.nativeFrames[id], let visible = SettingsLayoutMeasurements.nativeVisibleFrames[id] else {
                 check(false, "toolbar: missing native control " + id)
@@ -621,7 +635,7 @@ struct SmokeShot {
         let low: CGFloat = document.bounds.minY - (document.isFlipped ? insets.top : insets.bottom)
         let high: CGFloat = max(low, document.bounds.maxY - scroll.contentView.bounds.height + (document.isFlipped ? insets.bottom : insets.top))
         let y: CGFloat = toBottom == document.isFlipped ? high : low
-        scroll.contentView.scroll(to: NSPoint(x: document.bounds.minX - insets.left, y: y))
+        scroll.contentView.scroll(to: NSPoint(x: scroll.contentView.bounds.origin.x, y: y))
         scroll.reflectScrolledClipView(scroll.contentView)
         await settle("settings scroll", timeout: 3)
     }
@@ -850,9 +864,36 @@ struct SmokeShot {
             try await inspectSidebarToggle()
         case .movies:
             try await scrollStall("movies")
+        case .detailMovie, .settings, .downloadsQueue:
+            // A page scrolled by half a screen: the toolbar must still show the page name and its buttons, and the
+            // content must not run under them. The captured frames are the review evidence.
+            try await captureScrolled(page)
         default:
             break
         }
+    }
+
+    /// Scrolls the page by 420 pt, waits for it to settle, saves a screenshot and scrolls back to the top.
+    private func captureScrolled(_ page: SmokePage) async throws {
+        let main: NSWindow = try window()
+        guard let scroll = SmokeViews.largestScrollView(in: main), let document = scroll.documentView else { return }
+        let insets: NSEdgeInsets = scroll.contentInsets
+        let low: CGFloat = document.bounds.minY - (document.isFlipped ? insets.top : insets.bottom)
+        let topY: CGFloat = document.isFlipped ? low : max(low, document.bounds.maxY - scroll.contentView.bounds.height)
+        let step: CGFloat = document.isFlipped ? 420 : -420
+        scroll.contentView.scroll(to: NSPoint(x: scroll.contentView.bounds.origin.x, y: topY + step))
+        scroll.reflectScrolledClipView(scroll.contentView)
+        await pause(500)
+        // KD_SMOKE_HOLD keeps the scrolled page on screen for a while, so a screen recorder outside the app can take a
+        // composited picture of it (the in-process capture does not draw glass, blur or scroll-edge effects).
+        if ProcessInfo.processInfo.environment["KD_SMOKE_HOLD"] != nil {
+            stage("hold " + page.rawValue + "-scrolled")
+            await pause(5000)
+        }
+        _ = try await capture(saveAs: page.rawValue + "-scrolled-" + theme + "-" + language)
+        scroll.contentView.scroll(to: NSPoint(x: scroll.contentView.bounds.origin.x, y: topY))
+        scroll.reflectScrolledClipView(scroll.contentView)
+        await pause(200)
     }
 
     private func clickSidebarToggle(in window: NSWindow) -> Bool {
@@ -1030,7 +1071,7 @@ struct SmokeShot {
         monitor.start()
         for step in 1...40 {
             let y: CGFloat = topY + (bottomY - topY) * CGFloat(step) / 40
-            scroll.contentView.scroll(to: NSPoint(x: document.bounds.minX - insets.left, y: y))
+            scroll.contentView.scroll(to: NSPoint(x: scroll.contentView.bounds.origin.x, y: y))
             scroll.reflectScrolledClipView(scroll.contentView)
             await pause(16)
         }
@@ -1040,7 +1081,7 @@ struct SmokeShot {
             inspectExpandedToolbar()
             _ = try await capture(saveAs: "movies-scrolled-" + theme + "-" + language)
         }
-        scroll.contentView.scroll(to: NSPoint(x: document.bounds.minX - insets.left, y: topY))
+        scroll.contentView.scroll(to: NSPoint(x: scroll.contentView.bounds.origin.x, y: topY))
         scroll.reflectScrolledClipView(scroll.contentView)
         metrics["scroll." + label + ".maxGapMs"] = result.maxGap
         metrics["scroll." + label + ".gapsOver100ms"] = Double(result.over100)
@@ -1052,7 +1093,7 @@ struct SmokeShot {
         await settle("after scrolling " + label, timeout: 3)
         if label == "movies" {
             SettingsLayoutMeasurements.refreshNativeViews()
-            check(SettingsLayoutMeasurements.nativeAttached["toolbar.add"] != true, "toolbar: hides again on return to the top")
+            check(SettingsLayoutMeasurements.nativeAttached["toolbar.add"] == true, "toolbar: is unchanged on return to the top")
         }
     }
 

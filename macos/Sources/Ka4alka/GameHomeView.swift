@@ -94,6 +94,9 @@ struct GameHomeView: View {
 
     var body: some View {
         ScrollView {
+            // The banner is outside the centred column: it runs from edge to edge and up under the toolbar.
+            VStack(spacing: 0) {
+            hero
             LazyVStack(alignment: .leading, spacing: 0) {
                 KDPageHeader(
                     tr("Игры", "Games"),
@@ -109,10 +112,14 @@ struct GameHomeView: View {
                 }
             }
             .scrollTargetLayout()
-            .padding(.vertical, KD.gutter)
+            .padding(.top, KD.Space.l)
+            .padding(.bottom, KD.gutter)
             .frame(maxWidth: KD.Width.page)
             .frame(maxWidth: .infinity)
+            }
         }
+        // With the banner first, the page starts at the top of the window, under the toolbar.
+        .ignoresSafeArea(edges: showsHero ? .top : [])
         .scrollPosition(id: $anchor, anchor: .top)
         .onAppear { if anchor == nil { anchor = model.gamesAnchor } }
         .onDisappear { model.gamesAnchor = anchor }
@@ -122,7 +129,6 @@ struct GameHomeView: View {
     // MARK: Content
 
     @ViewBuilder private var homeContent: some View {
-        hero
         sortRow
         genreRail
         GameHomeOwnedShelf(store: model.transfers, known: knownCards)
@@ -134,18 +140,17 @@ struct GameHomeView: View {
         }
     }
 
+    /// True when a banner (or its placeholder) opens the page.
+    private var showsHero: Bool { !heroCards.isEmpty || (heroCards.isEmpty && phase == .loading) }
+
     @ViewBuilder private var hero: some View {
         let cards: [MediaCard] = heroCards
         if !cards.isEmpty {
             CatalogSpotlightView(items: cards)
-                .padding(.horizontal, KD.gutter)
-                .padding(.bottom, KD.Space.l)
                 .id("games-hero")
                 .settingsLayoutProbe("games.hero")
         } else if phase == .loading {
             HeroPlaceholder()
-                .padding(.horizontal, KD.gutter)
-                .padding(.bottom, KD.Space.l)
                 .id("games-hero")
                 .settingsLayoutProbe("games.hero")
         }

@@ -27,6 +27,8 @@ bash scripts/macos/build.sh arm64   # Apple Silicon
 bash scripts/macos/build.sh x64     # Intel
 ```
 
+Сценарий передаёт линкеру реальную версию SDK: без этого SwiftPM 6.4 записывает в приложение SDK 14.0, и macOS рисует для него боковую панель и тулбар в старом виде, без Liquid Glass. Ручная сборка: `swift build -c release -Xlinker -platform_version -Xlinker macos -Xlinker 14.0 -Xlinker "$(xcrun --show-sdk-version)"`.
+
 Результаты находятся в `dist/macos-ARCH/`. В DMG находится приложение и ссылка на Applications. Перетащите Ka4alka в Applications и откройте его; при первом запуске выберите папку для загрузок. Внутри создаётся `Ka4alka`.
 
 Без настроенного Developer ID используется ad-hoc подпись, проверяемая при сборке. Это не нотариализация Apple: Gatekeeper может потребовать разрешить запуск приложения в «Системные настройки → Конфиденциальность и безопасность». Для обычного подтверждённого Apple запуска потребуются сертификат Developer ID и нотариализация; они не заменяются подписью манифеста обновлений.

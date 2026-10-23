@@ -234,7 +234,7 @@ struct TransferDiagnosticsView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline) {
-                Text(tr("Почему не скачивается?", "Why is it not downloading?"))
+                Text(tr("Почему не скачивается?", "Why Isn’t It Downloading?"))
                     .font(KDFont.section)
                     .accessibilityAddTraits(.isHeader)
                 Spacer(minLength: KD.Space.m)
@@ -295,7 +295,7 @@ struct TransferDiagnosticsView: View {
                 Button(tr("Повторить соединение", "Retry connections")) { retryConnections() }
                     .buttonStyle(KDSecondaryButtonStyle())
             }
-            Button(tr("Открыть папку", "Open folder")) { DownloadsActions.openFolder(of: item, model: model) }
+            Button(tr("Открыть папку", "Open Folder")) { DownloadsActions.openFolder(of: item, model: model) }
                 .buttonStyle(KDSecondaryButtonStyle())
             if item.mediaId != nil {
                 Button(tr("Выбрать другую раздачу", "Choose another release")) {

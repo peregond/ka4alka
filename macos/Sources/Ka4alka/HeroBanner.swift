@@ -8,7 +8,10 @@ struct CatalogSpotlightView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
+    @Environment(\.kdSafeTop) private var safeTop
     var items: [MediaCard]
+    /// How wide the column of the banner's text and controls may be. The banner itself always runs edge to edge.
+    var columnMax: CGFloat = KD.Width.page
     @State private var selectedID: String?
     @State private var width: CGFloat = 900
     @State private var visible = false
@@ -30,17 +33,20 @@ struct CatalogSpotlightView: View {
         if let selected {
             ZStack {
                 FeaturedHero(card: selected, eyebrow: eyebrow(for: selected), hasPager: items.count > 1,
-                             focusedControl: $focusedControl)
+                             columnMax: columnMax, focusedControl: $focusedControl)
                     .id(selected.id)
                     .transition(.opacity)
             }
+                // The banner runs edge to edge and up under the toolbar, so it is taller by the strip the toolbar covers.
                 .containerRelativeFrame(.vertical) { length, _ in
-                    CatalogHeroMetrics.height(forWidth: width, viewportHeight: length)
+                    CatalogHeroMetrics.height(forWidth: width, viewportHeight: length) + safeTop
                 }
                 .kdReadWidth($width)
                 .animation(reduceMotion || model.settings?.liteMode == true ? nil : .easeInOut(duration: 0.4), value: selected.id)
-                .overlay { if items.count > 1 { arrows } }
+                .preference(key: KDHeroPageKey.self, value: true)
+                .overlay { if items.count > 1 { arrows.padding(.top, safeTop) } }
                 .overlay(alignment: .bottom) { if items.count > 1 { pager(selected: selected) } }
+                .kdBackdropExtension()
                 .background(HeroVisibilityProbe { visible = $0 })
                 .onHover { hovered = $0 }
                 .task(id: clock) {
@@ -66,6 +72,7 @@ struct CatalogSpotlightView: View {
             arrow("chevron.right", title: tr("Следующий баннер", "Next banner"), delta: 1)
         }
         .padding(.horizontal, 12)
+        .heroColumn(columnMax)
         .kdOnBanner()
     }
 
@@ -97,6 +104,7 @@ struct CatalogSpotlightView: View {
         .padding(.bottom, 14)
         .frame(maxWidth: .infinity)
         .overlay(alignment: .trailing) { if !reduced { pauseButton } }
+        .heroColumn(columnMax)
         .kdOnBanner()
     }
 
@@ -118,13 +126,25 @@ struct CatalogSpotlightView: View {
 
 /// The dark banner base with shimmering lines, drawn while the first page is loading.
 struct HeroPlaceholder: View {
+    @Environment(\.kdSafeTop) private var safeTop
     @State private var width: CGFloat = 0
     var body: some View {
-        GeometryReader { geometry in KDHeroSkeleton(height: geometry.size.height) }
+        GeometryReader { geometry in KDHeroSkeleton(height: geometry.size.height, rounded: false) }
             .containerRelativeFrame(.vertical) { length, _ in
-                CatalogHeroMetrics.height(forWidth: width > 0 ? width : 900, viewportHeight: length)
+                CatalogHeroMetrics.height(forWidth: width > 0 ? width : 900, viewportHeight: length) + safeTop
             }
             .kdReadWidth($width)
+            .preference(key: KDHeroPageKey.self, value: true)
+    }
+}
+
+extension View {
+    /// Keeps the controls of a full-bleed banner in the same centred column as the page below it: the page's
+    /// reading width and its side margins.
+    func heroColumn(_ maximum: CGFloat = KD.Width.page) -> some View {
+        frame(maxWidth: maximum)
+            .padding(.horizontal, KD.gutter)
+            .frame(maxWidth: .infinity)
     }
 }
 
@@ -133,6 +153,7 @@ struct FeaturedHero: View {
     var card: MediaCard
     var eyebrow: String? = nil
     var hasPager = false
+    var columnMax: CGFloat = KD.Width.page
     var focusedControl: FocusState<String?>.Binding
     @State private var backdrop: String?
     @State private var localized: MediaCard?
@@ -144,21 +165,27 @@ struct FeaturedHero: View {
     private var requestID: String { card.id + ":" + language }
     private var saved: Bool { model.isSaved(card) }
     private var saveTitle: String { saved ? tr("Удалить из сохранённого", "Remove from Saved") : tr("Сохранить", "Save") }
-    private var heroShape: RoundedRectangle { RoundedRectangle(cornerRadius: KD.Radius.hero, style: .continuous) }
+    @Environment(\.kdSafeTop) private var safeTop
 
     var body: some View {
         GeometryReader { geometry in
+            // The banner is as wide as the window; its text keeps the page's column. The part under the toolbar is
+            // artwork only, so the height that counts for the layout is what lies below it.
+            let column = min(geometry.size.width, columnMax) - 2 * KD.gutter
+            let visibleHeight = geometry.size.height - safeTop
             ZStack(alignment: .bottomLeading) {
                 openButton(size: geometry.size)
                 VStack(alignment: .leading, spacing: 20) {
-                    heroText(compact: geometry.size.width < 680, short: geometry.size.height < 340,
-                             descriptionLines: geometry.size.height < 340 ? 1 : (geometry.size.width < 680 ? 2 : 3))
+                    heroText(compact: column < 680, short: visibleHeight < 340,
+                             descriptionLines: visibleHeight < 340 ? 1 : (column < 680 ? 2 : 3))
                         .allowsHitTesting(false)
                     actionRow
                 }
-                .frame(maxWidth: max(120, min(geometry.size.width - 124, 620)), alignment: .leading)
-                .padding(.horizontal, 62)
+                .frame(maxWidth: max(120, min(column - 124, 620)), alignment: .leading)
+                .padding(.leading, 62)
                 .padding(.bottom, hasPager ? 58 : 28)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .heroColumn(columnMax)
             }
             .kdOnBanner()
         }
@@ -191,26 +218,29 @@ struct FeaturedHero: View {
 
     private func openButton(size: CGSize) -> some View {
         Button { model.open(item) } label: { bannerFace(size: size) }
-            .buttonStyle(KDPosterButtonStyle(radius: KD.Radius.hero))
+            .buttonStyle(.plain)
             .accessibilityLabel(accessibilityTitle)
             .accessibilityIdentifier("hero-open")
     }
 
+    /// Square, edge to edge. The artwork and its scrim are extended under the sidebar and the toolbar (macOS 26 and
+    /// later), so the glass sidebar and the toolbar buttons float over the picture instead of over a flat colour.
     private func bannerFace(size: CGSize) -> some View {
         ZStack(alignment: .bottomLeading) {
-            HeroBackground(
-                poster: item.poster,
-                backdrop: shownBackdrop,
-                lite: lite,
-                imageWidth: CatalogHeroMetrics.backdropWidth(forWidth: size.width, lite: lite)
-            )
+            ZStack(alignment: .bottomLeading) {
+                HeroBackground(
+                    poster: item.poster,
+                    backdrop: shownBackdrop,
+                    lite: lite,
+                    imageWidth: CatalogHeroMetrics.backdropWidth(forWidth: size.width, lite: lite)
+                )
+                .frame(width: size.width, height: size.height)
+                KDBannerScrim()
+            }
             .frame(width: size.width, height: size.height)
-            KDBannerScrim()
         }
         .frame(width: size.width, height: size.height)
-        .clipShape(heroShape)
-        .overlay(heroShape.strokeBorder(Color.white.opacity(0.12), lineWidth: 1).allowsHitTesting(false))
-        .contentShape(heroShape)
+        .contentShape(Rectangle())
     }
 
     private var accessibilityTitle: String {
@@ -273,7 +303,7 @@ struct FeaturedHero: View {
                 Button { Task { await model.save(card) } } label: {
                     Image(systemName: saved ? "heart.fill" : "heart")
                         .font(.system(size: 18))
-                        .foregroundStyle(saved ? Color.pink : Color.white)
+                        .foregroundStyle(saved ? KDPalette.like : Color.white)
                         .frame(width: 44, height: 44)
                 }
                 .buttonStyle(KDOverlayButtonStyle(circular: true, solid: model.settings?.liteMode == true))

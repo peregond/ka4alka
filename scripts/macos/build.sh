@@ -8,7 +8,13 @@ output="dist/macos-$arch"
 bundle="$output/Ka4alka.app"
 mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources"
 dotnet publish desktop-host/Kachalka.DesktopHost.csproj -c Release -r "$rid" --self-contained true -p:Version="$version" -p:PublishReadyToRun=true -p:DebugType=None -p:DebugSymbols=false -o "$bundle/Contents/Resources/engine"
-(cd macos && swift build -c release --arch "$swift_arch" --jobs 3)
+# SwiftPM 6.4 stamps the executable with the deployment target (14.0) as the SDK it was linked against, and macOS then draws
+# the pre-Liquid-Glass sidebar and toolbar for it. Record the real SDK version, as Xcode's own builds do.
+sdk_version="$(xcrun --sdk macosx --show-sdk-version)"
+if ! (cd macos && swift build -c release --arch "$swift_arch" --jobs 3 -Xlinker -platform_version -Xlinker macos -Xlinker 14.0 -Xlinker "$sdk_version"); then
+  echo "The SDK version could not be recorded through the linker; building without it."
+  (cd macos && swift build -c release --arch "$swift_arch" --jobs 3)
+fi
 bin_dir="$(cd macos && swift build -c release --arch "$swift_arch" --show-bin-path)"
 cp "$bin_dir/Ka4alka" "$bundle/Contents/MacOS/Ka4alka"
 cp native/Localization/en.json "$bundle/Contents/Resources/en.json"
