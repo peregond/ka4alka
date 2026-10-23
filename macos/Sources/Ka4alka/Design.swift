@@ -303,7 +303,8 @@ extension View {
     func kdPinnedHeader<H: View>(@ViewBuilder _ header: () -> H) -> some View {
         safeAreaInset(edge: .top, spacing: 0) {
             header()
-                .background(.bar)
+                // The page colour, not the bar material: over the near-black dark page the material was a light grey slab.
+                .background(KDPalette.pageBackground)
                 .overlay(alignment: .bottom) { Rectangle().fill(KDPalette.hairline).frame(height: 1).allowsHitTesting(false) }
         }
     }

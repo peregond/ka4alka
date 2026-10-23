@@ -424,7 +424,7 @@ struct DownloadsView: View {
     // MARK: Summary tiles
 
     private var summaryTiles: some View {
-        let columns: [GridItem] = [GridItem(.adaptive(minimum: 150), spacing: KD.Space.s, alignment: .top)]
+        let columns: [GridItem] = [GridItem(.adaptive(minimum: 190), spacing: KD.Space.s, alignment: .top)]
         return LazyVGrid(columns: columns, alignment: .leading, spacing: KD.Space.s) {
             downloadTile
             uploadTile
