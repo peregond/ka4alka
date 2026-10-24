@@ -62,7 +62,7 @@ jobs:
             export KD_SMOKE_SIZE=1280x820
             for appearance in dark light; do
               export KD_SMOKE_APPEARANCE="$appearance"
-              export KD_SMOKE_ONLY=featured,movies,series,games-home,downloads-empty,settings
+              export KD_SMOKE_ONLY=featured,movies,series,games-home,downloads-empty,settings,detail-movie
               if [ "$appearance" = light ]; then export KD_SMOKE_ONLY=movies,settings; fi
               output="$PWD/test-output/mac-capture/$language/$appearance"
               mkdir -p "$output"

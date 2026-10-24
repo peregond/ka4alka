@@ -16,7 +16,7 @@ for language in ('ru','en'):
         assert not report['failures'] and report['checks'], (language,appearance,report['failures'])
         cells=json.loads((root/appearance/'matrix.json').read_text())
         assert cells and all(cell['language']==language and cell['theme']==appearance for cell in cells)
-    mapping={'featured-dark':'featured','catalog-dark':'movies','series-dark':'series','games-dark':'games-home','downloads-dark':'downloads-empty','settings-dark':'settings','settings-light':'settings','catalog-light':'movies'}
+    mapping={'featured-dark':'featured','catalog-dark':'movies','series-dark':'series','games-dark':'games-home','detail-dark':'detail-movie','downloads-dark':'downloads-empty','settings-dark':'settings','settings-light':'settings','catalog-light':'movies'}
     for name,source in mapping.items():
         appearance='light' if name.endswith('-light') else 'dark'
         with Image.open(root/appearance/f'{source}-1280x820-{appearance}-{language}.png') as image:
