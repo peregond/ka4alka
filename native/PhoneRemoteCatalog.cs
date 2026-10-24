@@ -51,7 +51,7 @@ public sealed class PhoneRemoteCatalog(DownloadService downloads, Preferences pr
                 {
                     var key=Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(id+"|"+entry.Source+"|"+entry.Id)))[..24];
                     if(releases.Count>=2000)releases.Remove(releases.Keys.First());releases[key]=(entry,id);
-                    return new{id=key,title=entry.Title,source=entry.Source,size=entry.Size,seeds=entry.Seeds,quality=entry.Quality,audio=entry.Voice,downloadable=true};
+                    return new{id=key,title=entry.Title,source=entry.Source,size=entry.Size,seeds=entry.Seeds,quality=entry.Quality,audio=entry.Voice,downloadable=true,recommended=entry==recommendation};
                 }).ToArray()};
             case "add":
                 if(!prefs.FolderConfigured||!Directory.Exists(prefs.Folder))throw new InvalidOperationException("Choose a download folder on your computer.");
@@ -92,7 +92,12 @@ public sealed class PhoneRemoteCatalog(DownloadService downloads, Preferences pr
                 return new{id=task.Id};
             case "downloads":
                 await downloads.CheckCompletedFilesAsync(true);
-                downloads.Update();return new{items=downloads.Items.OrderByDescending(x=>x.AddedUtc).Take(200).Select(x=>new{id=x.Id,title=x.DisplayName,status=AppLanguage.T(x.Status),progress=x.Progress,paused=x.Paused,filesMissing=x.FilesMissing,busy=x.Busy,complete=x.Completed}).ToArray()};
+                downloads.Update();return new{items=downloads.Items.OrderByDescending(x=>x.AddedUtc).Take(200).Select(x=>new
+                {
+                    id=x.Id,title=x.DisplayName,status=AppLanguage.T(x.Status),statusKind=x.StatusKind.ToString().ToLowerInvariant(),
+                    progress=double.IsFinite(x.Progress)?Math.Clamp(x.Progress,0,100):0,paused=x.Paused,filesMissing=x.FilesMissing,busy=x.Busy,complete=x.Completed,
+                    poster=RemotePoster(x.ImageUrl),downloadRate=Math.Max(0,x.DownloadRate),uploadRate=Math.Max(0,x.UploadRate),totalBytes=x.TotalBytes
+                }).ToArray()};
             default:throw new ArgumentException("Unknown phone operation.");
         }
     }
@@ -100,7 +105,13 @@ public sealed class PhoneRemoteCatalog(DownloadService downloads, Preferences pr
     {
         var key=Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(MediaIdentity.StableKey(item))))[..24];
         if(cards.Count>=1000)cards.Remove(cards.Keys.First());cards[key]=item;
-        return (object)new{id=key,title=item.DisplayTitle,year=item.Year,poster=item.DisplayImageUrl};
+        return (object)new
+        {
+            id=key,title=item.DisplayTitle,year=item.Year,poster=RemotePoster(item.DisplayImageUrl),
+            kind=item.Section=="Игры"?"games":item.Section=="Сериалы"?"series":"movies",description=item.DisplayDescription,
+            rating=item.HasCardRating?item.CardRating:null,ratingSource=item.HasCardRating?(item.KpAvailable?"КП":"IMDb"):null
+        };
     }).ToArray();
+    static string? RemotePoster(string? value)=>Uri.TryCreate(value,UriKind.Absolute,out var uri)&&uri.Scheme==Uri.UriSchemeHttps&&uri.UserInfo.Length==0?value:null;
     public void Dispose()=>source.Dispose();
 }

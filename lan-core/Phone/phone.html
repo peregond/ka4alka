@@ -1,1 +1,384 @@
-<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Качалка · Remote</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script></head><body><header><h1>Качалка</h1><span id="device"></span></header><main><section id="pair"><h2 data-ru="Подключить телефон" data-en="Connect your phone"></h2><p data-ru="Телефон и компьютер должны быть в одной сети Wi-Fi. Введи код из настроек приложения на компьютере." data-en="Connect to the same Wi-Fi as your computer. Enter the code shown in the desktop app settings."></p><form id="pair-form"><input id="code" type="text" inputmode="numeric" enterkeyhint="go" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" aria-label="Код / Code" required><button data-ru="Подключиться" data-en="Connect"></button></form></section><section id="remote" hidden><nav><button id="browse" data-ru="Каталог" data-en="Catalog"></button><button id="transfers" data-ru="Загрузки" data-en="Downloads"></button><button id="logout" data-ru="Отключиться" data-en="Disconnect"></button></nav><form id="search"><select id="section" aria-label="Категория / Category"><option value="movies" data-ru="Фильмы" data-en="Movies"></option><option value="series" data-ru="Сериалы" data-en="Series"></option><option value="games" data-ru="Игры для Windows" data-en="Windows games"></option></select><input id="query" type="search" enterkeyhint="search" autocapitalize="none" maxlength="200" aria-label="Поиск / Search"><button data-ru="Найти" data-en="Search"></button></form><div id="results"></div><button id="more" hidden data-ru="Ещё" data-en="More"></button><details><summary data-ru="Добавить magnet-ссылку" data-en="Add a magnet link"></summary><form id="magnet-form"><textarea id="magnet" maxlength="32768" placeholder="magnet:?xt=urn:btih:…" required></textarea><button data-ru="Скачать на компьютере" data-en="Download on computer"></button></form></details></section><p id="status" role="status" aria-live="polite"></p></main><footer data-ru="Файлы сохраняются на компьютере. Приложение должно оставаться запущенным." data-en="Files are saved on your computer. Keep the desktop app running."></footer></body></html>
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#f5f5f7" />
+    <title>Качалка · Remote</title>
+    <link rel="stylesheet" href="/style.css" />
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <header class="app-header">
+      <a class="brand" href="/" aria-label="Качалка / Kachalka"
+        ><span class="brand-mark" aria-hidden="true">@</span
+        ><span
+          ><strong data-ru="Качалка" data-en="Kachalka"></strong
+          ><span
+            id="device"
+            class="device-label"
+            data-ru="Пульт в твоём телефоне"
+            data-en="Your phone. Your remote."
+          ></span></span
+      ></a>
+      <div id="session-actions" class="header-actions" hidden>
+        <button
+          id="refresh"
+          class="icon-button"
+          type="button"
+          data-icon="refresh"
+          data-ru-label="Обновить"
+          data-en-label="Refresh"
+        ></button>
+        <button
+          id="add-magnet"
+          class="icon-button accent"
+          type="button"
+          data-icon="plus"
+          data-ru-label="Добавить magnet-ссылку"
+          data-en-label="Add a magnet link"
+        ></button>
+      </div>
+    </header>
+    <main>
+      <section id="pair" class="pair-screen">
+        <div class="pair-illustration" aria-hidden="true">
+          <span class="pair-computer" data-icon="computer"></span
+          ><span class="pair-phone" data-icon="phone"></span>
+        </div>
+        <p
+          class="eyebrow"
+          data-ru="ТВОЙ КОМПЬЮТЕР. ТВОЁ КИНО."
+          data-en="YOUR COMPUTER. YOUR ENTERTAINMENT."
+        ></p>
+        <h2 data-ru="Подключить телефон" data-en="Connect your phone"></h2>
+        <p
+          class="pair-description"
+          data-ru="Выбирай на телефоне — скачивай на компьютере. Отсканируй QR-код в приложении или введи код ниже."
+          data-en="Choose on your phone. Download on your computer. Scan the QR code in the app or enter its code below."
+        ></p>
+        <form id="pair-form" class="pair-card">
+          <label
+            for="code"
+            data-ru="Код с компьютера"
+            data-en="Code from your computer"
+          ></label>
+          <input
+            id="code"
+            type="text"
+            inputmode="numeric"
+            enterkeyhint="go"
+            pattern="[0-9]{6}"
+            maxlength="6"
+            autocomplete="one-time-code"
+            placeholder="000000"
+            required
+          />
+          <button
+            class="primary"
+            data-ru="Подключиться"
+            data-en="Connect"
+          ></button>
+        </form>
+        <p class="connection-note">
+          <span data-icon="wifi" aria-hidden="true"></span
+          ><span
+            data-ru="Телефон и компьютер должны быть в одной сети Wi-Fi."
+            data-en="Your phone and computer must be on the same Wi-Fi network."
+          ></span>
+        </p>
+      </section>
+      <section id="remote" hidden>
+        <div class="page-heading">
+          <button id="back" class="back-button" type="button" hidden>
+            <span data-icon="back" aria-hidden="true"></span
+            ><span data-ru="Каталог" data-en="Catalog"></span>
+          </button>
+          <h1 id="view-title"></h1>
+          <p id="view-subtitle" class="muted"></p>
+        </div>
+        <form id="search">
+          <div class="search-field">
+            <span data-icon="search" aria-hidden="true"></span
+            ><input
+              id="query"
+              type="search"
+              enterkeyhint="search"
+              autocapitalize="none"
+              maxlength="200"
+              data-ru-label="Поиск по каталогу"
+              data-en-label="Search the catalog"
+            /><button
+              class="search-submit"
+              type="submit"
+              data-ru="Найти"
+              data-en="Search"
+            ></button>
+          </div>
+          <div
+            class="segmented categories"
+            role="tablist"
+            data-ru-label="Категория"
+            data-en-label="Category"
+          >
+            <button
+              id="category-movies"
+              type="button"
+              role="tab"
+              data-section="movies"
+              aria-selected="true"
+              aria-controls="results"
+              data-ru="Фильмы"
+              data-en="Movies"
+            ></button>
+            <button
+              id="category-series"
+              type="button"
+              role="tab"
+              data-section="series"
+              aria-selected="false"
+              aria-controls="results"
+              data-ru="Сериалы"
+              data-en="Series"
+            ></button>
+            <button
+              id="category-games"
+              type="button"
+              role="tab"
+              data-section="games"
+              aria-selected="false"
+              aria-controls="results"
+              data-ru="Игры"
+              data-en="Games"
+            ></button>
+          </div>
+        </form>
+        <section id="release-tools" class="view-tools" hidden>
+          <div class="filter-scroll">
+            <label
+              ><span data-ru="Качество" data-en="Quality"></span
+              ><select id="release-quality"></select
+            ></label>
+            <label
+              ><span data-ru="Озвучка" data-en="Audio"></span
+              ><select id="release-audio"></select
+            ></label>
+            <label
+              ><span data-ru="Порядок" data-en="Sort"></span
+              ><select id="release-order">
+                <option
+                  value="recommended"
+                  data-ru="Рекомендуемые"
+                  data-en="Recommended"
+                ></option>
+                <option
+                  value="seeds"
+                  data-ru="Больше раздающих"
+                  data-en="Most seeders"
+                ></option>
+                <option
+                  value="size"
+                  data-ru="Меньше размер"
+                  data-en="Smallest size"
+                ></option></select
+            ></label>
+          </div>
+          <p id="release-count" class="result-count"></p>
+        </section>
+        <section id="download-tools" class="view-tools" hidden>
+          <div id="download-summary" class="download-summary"></div>
+          <div
+            class="segmented download-filters"
+            role="group"
+            data-ru-label="Фильтр загрузок"
+            data-en-label="Filter downloads"
+          >
+            <button
+              type="button"
+              data-download-filter="all"
+              aria-pressed="true"
+              data-ru="Все"
+              data-en="All"
+            ></button>
+            <button
+              type="button"
+              data-download-filter="active"
+              aria-pressed="false"
+              data-ru="Активные"
+              data-en="Active"
+            ></button>
+            <button
+              type="button"
+              data-download-filter="paused"
+              aria-pressed="false"
+              data-ru="Пауза"
+              data-en="Paused"
+            ></button>
+            <button
+              type="button"
+              data-download-filter="complete"
+              aria-pressed="false"
+              data-ru="Готово"
+              data-en="Done"
+            ></button>
+          </div>
+        </section>
+        <div id="results" aria-live="polite"></div>
+        <button
+          id="more"
+          class="load-more secondary"
+          hidden
+          data-ru="Показать ещё"
+          data-en="Show more"
+        ></button>
+        <section id="device-panel" hidden>
+          <article class="settings-card">
+            <div
+              class="settings-icon"
+              data-icon="computer"
+              aria-hidden="true"
+            ></div>
+            <h2 data-ru="Компьютер подключён" data-en="Computer connected"></h2>
+            <p id="device-address" class="device-address"></p>
+            <p
+              class="muted"
+              data-ru="Файлы сохраняются на компьютере. Оставь приложение запущенным, а устройства — в одной сети."
+              data-en="Files are saved on your computer. Keep the desktop app running and both devices on the same network."
+            ></p>
+          </article>
+          <article class="settings-card">
+            <h2 data-ru="Оформление" data-en="Appearance"></h2>
+            <div
+              class="segmented theme-options"
+              role="group"
+              data-ru-label="Тема интерфейса"
+              data-en-label="Interface theme"
+            >
+              <button
+                type="button"
+                data-theme="auto"
+                aria-pressed="true"
+                data-ru="Система"
+                data-en="System"
+              ></button
+              ><button
+                type="button"
+                data-theme="light"
+                aria-pressed="false"
+                data-ru="Светлая"
+                data-en="Light"
+              ></button
+              ><button
+                type="button"
+                data-theme="dark"
+                aria-pressed="false"
+                data-ru="Тёмная"
+                data-en="Dark"
+              ></button>
+            </div>
+          </article>
+          <article class="settings-card">
+            <button id="device-magnet" class="settings-link" type="button">
+              <span data-icon="plus" aria-hidden="true"></span
+              ><span
+                data-ru="Добавить magnet-ссылку"
+                data-en="Add a magnet link"
+              ></span
+              ><span data-icon="forward" aria-hidden="true"></span></button
+            ><button
+              id="logout"
+              class="settings-link destructive"
+              type="button"
+            >
+              <span data-icon="disconnect" aria-hidden="true"></span
+              ><span
+                data-ru="Отключить этот телефон"
+                data-en="Disconnect this phone"
+              ></span>
+            </button>
+          </article>
+        </section>
+        <nav
+          id="tab-bar"
+          class="tab-bar"
+          data-ru-label="Навигация"
+          data-en-label="Navigation"
+        >
+          <button id="browse" type="button" aria-current="page">
+            <span data-icon="catalog" aria-hidden="true"></span
+            ><span data-ru="Каталог" data-en="Catalog"></span>
+          </button>
+          <button id="transfers" type="button">
+            <span data-icon="download" aria-hidden="true"></span
+            ><span data-ru="Загрузки" data-en="Downloads"></span>
+          </button>
+          <button id="connection" type="button">
+            <span data-icon="computer" aria-hidden="true"></span
+            ><span data-ru="Устройство" data-en="Device"></span>
+          </button>
+        </nav>
+      </section>
+      <div id="status" role="status" aria-live="polite" hidden>
+        <span id="status-text"></span
+        ><button
+          id="retry"
+          type="button"
+          hidden
+          data-ru="Повторить"
+          data-en="Try again"
+        ></button>
+      </div>
+    </main>
+    <footer
+      data-ru="Выбирай здесь. Скачивай на компьютере."
+      data-en="Choose here. Download on your computer."
+    ></footer>
+    <dialog id="magnet-dialog" aria-labelledby="magnet-title">
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <div class="sheet-heading">
+        <h2
+          id="magnet-title"
+          data-ru="Новая загрузка"
+          data-en="New download"
+        ></h2>
+        <button
+          id="close-magnet"
+          class="icon-button"
+          type="button"
+          data-icon="close"
+          data-ru-label="Закрыть"
+          data-en-label="Close"
+        ></button>
+      </div>
+      <p
+        class="muted"
+        data-ru="Вставь magnet-ссылку. Компьютер добавит её в свою очередь загрузок."
+        data-en="Paste a magnet link. Your computer will add it to its download queue."
+      ></p>
+      <form id="magnet-form">
+        <label
+          for="magnet"
+          data-ru="Magnet-ссылка"
+          data-en="Magnet link"
+        ></label
+        ><textarea
+          id="magnet"
+          maxlength="32768"
+          placeholder="magnet:?xt=urn:btih:…"
+          autocapitalize="none"
+          spellcheck="false"
+          required
+        ></textarea>
+        <p id="magnet-message" role="status" aria-live="polite" hidden></p>
+        <button
+          class="primary"
+          data-ru="Скачать на компьютере"
+          data-en="Download on computer"
+        ></button>
+      </form>
+    </dialog>
+  </body>
+</html>

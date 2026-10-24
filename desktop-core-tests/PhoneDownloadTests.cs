@@ -56,8 +56,14 @@ static class PhoneDownloadTests
             await downloads.Toggle(downloads.Items.Single());
             var file=Directory.GetFiles(folder,"test.bin",SearchOption.AllDirectories).Single();
             if(!SHA256.HashData(await File.ReadAllBytesAsync(file)).SequenceEqual(SHA256.HashData(expected)))throw new Exception("Phone download bytes differ.");
+            // Poster metadata must never turn a computer path into phone-visible data.
+            downloads.Items.Single().ImageUrl=Path.Combine(folder,"private-poster.jpg");
             var transfers=await Call("/api/downloads",new{});
             if(transfers.GetProperty("items").GetArrayLength()!=1||transfers.ToString().Contains(folder))throw new Exception("Phone transfer list invalid or reveals local path.");
+            var snapshot=transfers.GetProperty("items")[0];
+            if(snapshot.GetProperty("poster").ValueKind!=JsonValueKind.Null||snapshot.GetProperty("totalBytes").GetInt64()!=expected.Length||
+               snapshot.GetProperty("downloadRate").GetInt64()<0||snapshot.GetProperty("uploadRate").GetInt64()<0||snapshot.GetProperty("statusKind").GetString()!="paused")
+                throw new Exception("Phone transfer presentation does not reflect the real queue or reveals a local poster path.");
             File.Delete(file);
             transfers=await Call("/api/downloads",new{});
             if(!transfers.GetProperty("items")[0].GetProperty("filesMissing").GetBoolean())throw new Exception("Phone does not show externally deleted files.");

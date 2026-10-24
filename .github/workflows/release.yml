@@ -14,7 +14,7 @@ on:
       version:
         description: Version matching native/Kachalka.csproj
         required: true
-        default: '0.44.27'
+        default: '0.44.28'
       publish:
         description: Publish the release as soon as every release check passes
         type: boolean
@@ -37,7 +37,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 25
     env:
-      RELEASE_VERSION: ${{ inputs.version || '0.44.27' }}
+      RELEASE_VERSION: ${{ inputs.version || '0.44.28' }}
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
     steps:
       - uses: actions/checkout@v4
@@ -195,9 +195,9 @@ jobs:
           $process=Start-Process $application -ArgumentList @('--cinema-smoke-test',$output) -PassThru
           if(-not $process.WaitForExit(60000)){$process.Kill();throw 'Person card UI smoke timed out'}
           if($process.ExitCode -ne 0 -or (Test-Path "$output/error.txt") -or -not (Test-Path "$output/checks.json")){throw 'Person card UI smoke failed'}
-      - name: Verify upgrade from previously published 0.44.26
+      - name: Verify upgrade from previously published 0.44.27
         shell: pwsh
-        run: ./tests/WindowsPublishedUpgrade.ps1 -FromVersion 0.44.26 -ReleaseDirectory ('dist/release-'+$env:RELEASE_VERSION)
+        run: ./tests/WindowsPublishedUpgrade.ps1 -FromVersion 0.44.27 -ReleaseDirectory ('dist/release-'+$env:RELEASE_VERSION)
       - name: Preserve the verified signed Windows packages before uploading
         uses: actions/upload-artifact@v4
         with:
@@ -327,7 +327,7 @@ jobs:
     timeout-minutes: 15
     env:
       GH_TOKEN: ${{ github.token }}
-      RELEASE_VERSION: ${{ inputs.version || '0.44.27' }}
+      RELEASE_VERSION: ${{ inputs.version || '0.44.28' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4

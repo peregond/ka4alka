@@ -10,7 +10,7 @@ on:
       version:
         description: Published release matching the reviewed screenshots
         required: true
-        default: '0.44.27'
+        default: '0.44.28'
 permissions:
   contents: write
 concurrency:

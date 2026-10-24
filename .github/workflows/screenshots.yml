@@ -19,7 +19,7 @@ on:
       version:
         description: Published version to capture
         required: true
-        default: '0.44.27'
+        default: '0.44.28'
       settings_only:
         description: Capture only Lite mode and LAN phone settings
         type: boolean
