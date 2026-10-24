@@ -198,6 +198,14 @@ jobs:
       - name: Verify upgrade from previously published 0.44.26
         shell: pwsh
         run: ./tests/WindowsPublishedUpgrade.ps1 -FromVersion 0.44.26 -ReleaseDirectory ('dist/release-'+$env:RELEASE_VERSION)
+      - name: Preserve the verified signed Windows packages before uploading
+        uses: actions/upload-artifact@v4
+        with:
+          name: signed-windows-release-${{ env.RELEASE_VERSION }}-${{ github.sha }}
+          path: dist/release-${{ env.RELEASE_VERSION }}/*
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
       - name: Upload verified files to draft GitHub Release
         shell: pwsh
         env:
