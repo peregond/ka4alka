@@ -1,0 +1,22 @@
+name: Verify draft release write access
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check the existing unpublished release without changing its target
+        run: |
+          set -euo pipefail
+          test "$(gh release view v0.44.27 --json isDraft --jq .isDraft)" = true
+          gh release edit v0.44.27 --notes-file distribution/RELEASE-NOTES-0.44.27.md
+          echo 'Release API upload verification; not an application package.' > "$RUNNER_TEMP/validation-upload-probe.txt"
+          gh release upload v0.44.27 "$RUNNER_TEMP/validation-upload-probe.txt" --clobber
+          gh release delete-asset v0.44.27 validation-upload-probe.txt --yes
