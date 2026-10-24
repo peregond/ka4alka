@@ -105,7 +105,7 @@ final class HeroRotationTests: XCTestCase {
         model.bridge.disabled = true
         model.settings = try TestFixtures.decode(AppSettings.self, TestFixtures.settingsJSON)
         model.connected = true
-        model.route = .detail(try TestFixtures.card("movies:split-width", "A film"))
+        model.open(try TestFixtures.card("movies:split-width", "A film"))
         let controller = NSHostingController(rootView: RootView().environmentObject(model).environmentObject(MacUpdater()))
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1280, height: 700), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
         window.contentViewController = controller
