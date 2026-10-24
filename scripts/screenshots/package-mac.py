@@ -29,5 +29,5 @@ for language in ('ru','en'):
             filename=f'screenshots-macos-{language}-{name}.webp'
             image.save(output/filename,format='WEBP',quality=88,method=6)
             info['Captures'].append(dict(File=filename,Language=language,Width=image.width,Height=image.height,Sha256=hashlib.sha256((output/filename).read_bytes()).hexdigest()))
-(output/'screenshots-macos-info.json').write_text(json.dumps(info,ensure_ascii=False,indent=2)+'\n')
+(output/'screenshots-macos-info.json').write_text(json.dumps(info,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
 print('Verified Mac screenshots:',version,len(info['Captures']))

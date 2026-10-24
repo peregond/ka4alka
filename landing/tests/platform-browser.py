@@ -1,5 +1,5 @@
 """Exercise the real built landing page; screenshots are browser evidence only."""
-import json,os,sys
+import json,os,re,sys
 from pathlib import Path
 from playwright.sync_api import sync_playwright, expect
 base=sys.argv[1] if len(sys.argv)>1 else 'http://127.0.0.1:3000'
@@ -21,6 +21,18 @@ with sync_playwright() as p:
    expect(page.locator('.preview-image img')).to_have_attribute('data-platform',expected)
    image=page.locator('.preview-image img');expect(image).to_have_js_property('complete',True);assert image.evaluate('(i)=>i.naturalWidth')>700
    assert ('/macos/' in image.get_attribute('src'))==(expected=='macos')
+   gallery=page.locator('.preview-tabs [role=tab]')
+   expect(gallery).to_have_count(9 if expected=='windows' else 8)
+   expect(gallery.first).to_have_text({'ru':'Актуальное','en':'Featured','es':'Destacados'}[locale.split('-')[0]])
+   for index in range(gallery.count()):
+    gallery.nth(index).click()
+    expect(gallery.nth(index)).to_have_attribute('aria-selected','true')
+    page.wait_for_function("() => { const image = document.querySelector('.preview-image img'); return image?.complete && image.naturalWidth > 700; }")
+    current=page.locator('.preview-image img')
+    expect(current).to_have_js_property('complete',True)
+    assert current.evaluate('(i)=>i.naturalWidth')>700,f'{name}: unavailable gallery frame {index}'
+    assert ('/macos/' in current.get_attribute('src'))==(expected=='macos')
+   gallery.first.click()
    primary=page.locator('.hero-actions .platform-download')
    if expected=='macos':
     expect(primary.locator('.button-alternative')).to_have_attribute('href','/download?format=installer')
@@ -33,10 +45,16 @@ with sync_playwright() as p:
    else:
     expect(primary.locator('a.button-download')).to_have_attribute('href','/download?format=installer')
    # OS override changes downloads, installation and gallery together.
+   if expected=='windows':
+    page.locator('#preview-tab-network').click()
+    expect(page.locator('.preview-image img')).to_have_attribute('src',re.compile('settings-lan-dark'))
    other='windows' if expected=='macos' else 'macos'
    page.locator('.platform-switcher button').nth(0 if other=='windows' else 1).click()
    expect(page.locator('.preview-image img')).to_have_attribute('data-platform',other)
    expect(page.locator('.hero-actions .platform-download')).to_have_attribute('data-platform',other)
+   expect(page.locator('.preview-tabs [role=tab]')).to_have_count(9 if other=='windows' else 8)
+   page.wait_for_function("() => { const image = document.querySelector('.preview-image img'); return image?.complete && image.naturalWidth > 700; }")
+   expect(page.locator('.preview-image img')).to_have_js_property('complete',True)
    page.locator('.platform-switcher button').nth(0 if expected=='windows' else 1).click()
    tabs=page.locator('.preview-tabs [role=tab]');tabs.first.focus();page.keyboard.press('ArrowRight');expect(tabs.nth(1)).to_have_attribute('aria-selected','true')
    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),f'{name}: horizontal page overflow'

@@ -1,0 +1,61 @@
+{
+  "Version": "0.44.27",
+  "CaptureMethod": "Windows desktop client pixels",
+  "ReleaseArchiveSha256": "a0c9ac8994132f2fc3ba909741b62994e1a0892725ecaa7529bc0a7fe0d207f2",
+  "ReleaseDllSha256": "c79524b0ab24209b421f21fc0ce91e713b017ea7881582a880c3381edcb06c4a",
+  "CaptureWorkflowRuns": {
+    "ru": "40048875720",
+    "en": "40050236826"
+  },
+  "ApplicationSourceCommit": "d92a48640b28df697ddec2b38fcc5cb3ca136ca0",
+  "Captures": [
+    {
+      "File": "ru/settings-lite-dark.png",
+      "Language": "ru",
+      "Width": 1424,
+      "Height": 892,
+      "LoadedVisiblePosters": 0,
+      "PendingVisiblePosters": 0,
+      "Titles": [],
+      "CaptureWorkflowRun": "40048875720",
+      "Sha256": "916b01fc9f073f8afc91078bd06364750ee8de5f74e0ca2adaf91676157e7e28"
+    },
+    {
+      "File": "ru/settings-lan-dark.png",
+      "Language": "ru",
+      "Width": 1424,
+      "Height": 892,
+      "LoadedVisiblePosters": 0,
+      "PendingVisiblePosters": 0,
+      "Titles": [],
+      "CaptureWorkflowRun": "40048875720",
+      "Sha256": "54fcb564247d3253b067051fadaae75636643e702e5edad0d59230cbe2addc79"
+    },
+    {
+      "File": "en/settings-lite-dark.png",
+      "Language": "en",
+      "Width": 1424,
+      "Height": 892,
+      "LoadedVisiblePosters": 0,
+      "PendingVisiblePosters": 0,
+      "UnavailableVisiblePosters": 0,
+      "UnavailableTitles": [],
+      "Titles": [],
+      "CaptureWorkflowRun": "40050236826",
+      "Sha256": "0809d7ea0c92a159160a3c6ea2d5658c7a0639761b9218107b4e3768659d78b7"
+    },
+    {
+      "File": "en/settings-lan-dark.png",
+      "Language": "en",
+      "Width": 1424,
+      "Height": 892,
+      "LoadedVisiblePosters": 0,
+      "PendingVisiblePosters": 0,
+      "UnavailableVisiblePosters": 0,
+      "UnavailableTitles": [],
+      "Titles": [],
+      "CaptureWorkflowRun": "40050236826",
+      "Sha256": "e40d6779fab1f014378a88d3f41dac51be831dd77b4c2bbe4a1a0d43bc5e1662"
+    }
+  ]
+}

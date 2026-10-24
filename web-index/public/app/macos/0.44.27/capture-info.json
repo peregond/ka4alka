@@ -1,0 +1,159 @@
+{
+  "Version": "0.44.27",
+  "Platform": "macos",
+  "OperatingSystemVersion": "27.0.1",
+  "Architecture": "arm64",
+  "CaptureMethod": "Composited native macOS window from verified published app",
+  "ReleaseArchiveSha256": "2a8f4e152f2903e76d487c7e1b4f8e621c41aeffd6093b51e0beb28f173121d1",
+  "Captures": [
+    {
+      "File": "ru/featured-dark.webp",
+      "Language": "ru",
+      "Width": 1280,
+      "Height": 677,
+      "Sha256": "28e3cab90478c4022d23b6c8772b88120f1f469283687c91970fe38ebf2444f4",
+      "CaptureWorkflowRun": "40050292861"
+    },
+    {
+      "File": "ru/catalog-dark.webp",
+      "Language": "ru",
+      "Width": 1280,
+      "Height": 677,
+      "Sha256": "1993d985ca85f4e2c12f95ac864bf2354b2785b9143e9849643ebf7abddc7df5",
+      "CaptureWorkflowRun": "40050292861"
+    },
+    {
+      "File": "ru/series-dark.webp",
+      "Language": "ru",
+      "Width": 1280,
+      "Height": 677,
+      "Sha256": "711c5c22a5688a182058cac61f7da6f4beea26e893261c05f1fc777d36a0b32c",
+      "CaptureWorkflowRun": "40050292861"
+    },
+    {
+      "File": "ru/games-dark.webp",
+      "Language": "ru",
+      "Width": 1280,
+      "Height": 677,
+      "Sha256": "ea679700c78a0084d05c3475dec8345796a3496af95a16fda91a18eabafefeb1",
+      "CaptureWorkflowRun": "40050292861"
+    },
+    {
+      "File": "ru/detail-dark.webp",
+      "Language": "ru",
+      "Width": 1280,
+      "Height": 677,
+      "Sha256": "355ac8119560153010ddbea5b3ea8671fa65cc612c597ee48bdfff32bb9ac64c",
+      "CaptureWorkflowRun": "40050292861"
+    },
+    {
+      "File": "ru/downloads-dark.webp",
+      "Language": "ru",
+      "Width": 1280,
+      "Height": 677,
+      "Sha256": "8b8a9f753a89c57b84f1c8714fb2fa844623d8611dca58550997a3d3de8777ec",
+      "CaptureWorkflowRun": "40050292861"
+    },
+    {
+      "File": "ru/settings-dark.webp",
+      "Language": "ru",
+      "Width": 1280,
+      "Height": 677,
+      "Sha256": "c0ac975f7a19be41c1db9b6e0f82ebc0b403d20422dd77034b384f3becf38fa6",
+      "CaptureWorkflowRun": "40050292861"
+    },
+    {
+      "File": "ru/settings-light.webp",
+      "Language": "ru",
+      "Width": 1280,
+      "Height": 677,
+      "Sha256": "dcedaafcc2d801cda3bc4cfad6a70af1293dd4bab5539845bf701b2d7c1c3e8f",
+      "CaptureWorkflowRun": "40050292861"
+    },
+    {
+      "File": "ru/catalog-light.webp",
+      "Language": "ru",
+      "Width": 1280,
+      "Height": 677,
+      "Sha256": "5da3587cfe0a3d5c4a814da0e3735b5be2b24a14eb41e1b6de5858b2dde1acf4",
+      "CaptureWorkflowRun": "40050292861"
+    },
+    {
+      "File": "en/featured-dark.webp",
+      "Language": "en",
+      "Width": 1280,
+      "Height": 677,
+      "Sha256": "2bb411d654dcd595b2643c58b0ae1bde4d461c287d8fdbaf67fcb0d43b3b8517",
+      "CaptureWorkflowRun": "40050292861"
+    },
+    {
+      "File": "en/catalog-dark.webp",
+      "Language": "en",
+      "Width": 1280,
+      "Height": 677,
+      "Sha256": "0ba4bcc4da1ba2e635033636abae43599986f4b64ded2e1442b1df57d4b40f68",
+      "CaptureWorkflowRun": "40050292861"
+    },
+    {
+      "File": "en/series-dark.webp",
+      "Language": "en",
+      "Width": 1280,
+      "Height": 677,
+      "Sha256": "0ee82f4d422092cdf4388804c62ebaf864206b55ab0f5d806d78d0e4c788df66",
+      "CaptureWorkflowRun": "40050292861"
+    },
+    {
+      "File": "en/games-dark.webp",
+      "Language": "en",
+      "Width": 1280,
+      "Height": 677,
+      "Sha256": "aa1dc42d396003e9a803222830db829ff6ba5d8c4b7560e6c0b8dbc03c4e509b",
+      "CaptureWorkflowRun": "40050292861"
+    },
+    {
+      "File": "en/detail-dark.webp",
+      "Language": "en",
+      "Width": 1280,
+      "Height": 677,
+      "Sha256": "0a6354d2622ca191d72b18a4a46137508e81e61188d9ea8a25bba7b3dcfd28de",
+      "CaptureWorkflowRun": "40050292861"
+    },
+    {
+      "File": "en/downloads-dark.webp",
+      "Language": "en",
+      "Width": 1280,
+      "Height": 677,
+      "Sha256": "5eff95cf55c0f304a612b04c2f1ce50c4a686edfc6c2bff752b37a1ffb7fffaf",
+      "CaptureWorkflowRun": "40050292861"
+    },
+    {
+      "File": "en/settings-dark.webp",
+      "Language": "en",
+      "Width": 1280,
+      "Height": 677,
+      "Sha256": "63d9a8bebfd7a76b466f2b2bfcd113abf832e5dd09dbc1c06c4ff5efb42db2ab",
+      "CaptureWorkflowRun": "40050292861"
+    },
+    {
+      "File": "en/settings-light.webp",
+      "Language": "en",
+      "Width": 1280,
+      "Height": 677,
+      "Sha256": "28e0ea60ecb98e93e7fe4e373b2b4586ef320cbaa5938eda22050a23074e29f3",
+      "CaptureWorkflowRun": "40050292861"
+    },
+    {
+      "File": "en/catalog-light.webp",
+      "Language": "en",
+      "Width": 1280,
+      "Height": 677,
+      "Sha256": "5ecba5c8fcad77ae78cfb0e7688dd03efef03aa3c8a3ae95d8ccc5c555463364",
+      "CaptureWorkflowRun": "40050292861"
+    }
+  ],
+  "CaptureWorkflowRuns": {
+    "ru": "40050292861",
+    "en": "40050292861"
+  },
+  "ApplicationSourceCommit": "d92a48640b28df697ddec2b38fcc5cb3ca136ca0"
+}

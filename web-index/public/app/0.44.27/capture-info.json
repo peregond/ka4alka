@@ -1,0 +1,203 @@
+{
+  "Version": "0.44.27",
+  "Platform": "windows",
+  "CaptureMethod": "Windows desktop client pixels",
+  "ReleaseArchiveSha256": "a0c9ac8994132f2fc3ba909741b62994e1a0892725ecaa7529bc0a7fe0d207f2",
+  "ReleaseDllSha256": "c79524b0ab24209b421f21fc0ce91e713b017ea7881582a880c3381edcb06c4a",
+  "Captures": [
+    {
+      "File": "ru/featured-dark.webp",
+      "Language": "ru",
+      "Width": 1424,
+      "Height": 892,
+      "PendingVisiblePosters": 0,
+      "Sha256": "009b376f794c60c38deb860bcd3b42ce0571a9f5f0b055bcdb2d37a2917a6fdb",
+      "CaptureWorkflowRun": "40048875720"
+    },
+    {
+      "File": "ru/catalog-dark.webp",
+      "Language": "ru",
+      "Width": 1424,
+      "Height": 892,
+      "PendingVisiblePosters": 0,
+      "Sha256": "b0a69001137fb17ca5723e0e9a91b742082d629688701f609984670eb9e54438",
+      "CaptureWorkflowRun": "40048875720"
+    },
+    {
+      "File": "ru/series-dark.webp",
+      "Language": "ru",
+      "Width": 1424,
+      "Height": 892,
+      "PendingVisiblePosters": 0,
+      "Sha256": "7f624e74d4ad3ab268f9536b8dd87ec0c2061c09d2d162845ea89439f31f5bee",
+      "CaptureWorkflowRun": "40048875720"
+    },
+    {
+      "File": "ru/games-dark.webp",
+      "Language": "ru",
+      "Width": 1424,
+      "Height": 892,
+      "PendingVisiblePosters": 0,
+      "Sha256": "d6ebad495010f0b12dec2e96d881680e580747bce1ed0095a3cd146e0103acba",
+      "CaptureWorkflowRun": "40048875720"
+    },
+    {
+      "File": "ru/detail-dark.webp",
+      "Language": "ru",
+      "Width": 1424,
+      "Height": 892,
+      "PendingVisiblePosters": 0,
+      "Sha256": "82efca2d6a490b78c88fa1976e10fd4b5ac37dadc5bee9b02e7af8a0670846e1",
+      "CaptureWorkflowRun": "40048875720"
+    },
+    {
+      "File": "ru/downloads-dark.webp",
+      "Language": "ru",
+      "Width": 1424,
+      "Height": 892,
+      "PendingVisiblePosters": 0,
+      "Sha256": "6d3b175bf1aa8611631fb4648de5385bcf3edc81589107879240e7fa32c07434",
+      "CaptureWorkflowRun": "40048875720"
+    },
+    {
+      "File": "ru/catalog-light.webp",
+      "Language": "ru",
+      "Width": 1424,
+      "Height": 892,
+      "PendingVisiblePosters": 0,
+      "Sha256": "509cc943cefe0c337537ec405d40597c9e6189f0acfa2e79553881acb17567c9",
+      "CaptureWorkflowRun": "40048875720"
+    },
+    {
+      "File": "ru/settings-lite-dark.webp",
+      "Language": "ru",
+      "Width": 1424,
+      "Height": 892,
+      "PendingVisiblePosters": 0,
+      "Sha256": "cdcfaef39b3f48a83c744d06b90d0d1bada8db251847c24e443a9dec8fd76e51",
+      "CaptureWorkflowRun": "40048875720"
+    },
+    {
+      "File": "ru/settings-lan-dark.webp",
+      "Language": "ru",
+      "Width": 1424,
+      "Height": 892,
+      "PendingVisiblePosters": 0,
+      "Sha256": "7c7cfbb64a99622b1073603ca8eaa024edf1cff6c23474dfde752a47583591a2",
+      "CaptureWorkflowRun": "40048875720"
+    },
+    {
+      "File": "en/featured-dark.webp",
+      "Language": "en",
+      "Width": 1424,
+      "Height": 892,
+      "PendingVisiblePosters": 0,
+      "UnavailableVisiblePosters": 0,
+      "UnavailableTitles": [],
+      "Sha256": "361287a15a77a7a04bf8d654ff8eab89436392e4931e99e301ce2aca9e2d33a5",
+      "CaptureWorkflowRun": "40050236826"
+    },
+    {
+      "File": "en/catalog-dark.webp",
+      "Language": "en",
+      "Width": 1424,
+      "Height": 892,
+      "PendingVisiblePosters": 0,
+      "UnavailableVisiblePosters": 1,
+      "UnavailableTitles": [
+        "Son of a Rich 3"
+      ],
+      "Sha256": "6df80fc005d3be671e7237c287050971b1e1b5a6db5cb0b0d0fc52c3bb1febab",
+      "CaptureWorkflowRun": "40050236826"
+    },
+    {
+      "File": "en/series-dark.webp",
+      "Language": "en",
+      "Width": 1424,
+      "Height": 892,
+      "PendingVisiblePosters": 0,
+      "UnavailableVisiblePosters": 4,
+      "UnavailableTitles": [
+        "Сверхъестественное",
+        "Ходячие мертвецы",
+        "First Department",
+        "Во все тяжкие"
+      ],
+      "Sha256": "8565e20087135fb356ebc488b713c5cae2a14716765e1dbba0baa06e5f9bb469",
+      "CaptureWorkflowRun": "40050236826"
+    },
+    {
+      "File": "en/games-dark.webp",
+      "Language": "en",
+      "Width": 1424,
+      "Height": 892,
+      "PendingVisiblePosters": 0,
+      "UnavailableVisiblePosters": 0,
+      "UnavailableTitles": [],
+      "Sha256": "dfa377ed83e7045a219c85928708123259103b6a4d7850bc3e16006cc44d017d",
+      "CaptureWorkflowRun": "40050236826"
+    },
+    {
+      "File": "en/detail-dark.webp",
+      "Language": "en",
+      "Width": 1424,
+      "Height": 892,
+      "PendingVisiblePosters": 0,
+      "UnavailableVisiblePosters": 0,
+      "UnavailableTitles": [],
+      "Sha256": "2cac2efc8a934b1cea529821176919a89d8a4f508e2761b261520fe807221d7e",
+      "CaptureWorkflowRun": "40050236826"
+    },
+    {
+      "File": "en/downloads-dark.webp",
+      "Language": "en",
+      "Width": 1424,
+      "Height": 892,
+      "PendingVisiblePosters": 0,
+      "UnavailableVisiblePosters": 0,
+      "UnavailableTitles": [],
+      "Sha256": "2d363c1cdf70747a46dfc6b606deef9cb455cdc9afc09adc0fb71cc65ddc922b",
+      "CaptureWorkflowRun": "40050236826"
+    },
+    {
+      "File": "en/catalog-light.webp",
+      "Language": "en",
+      "Width": 1424,
+      "Height": 892,
+      "PendingVisiblePosters": 0,
+      "UnavailableVisiblePosters": 1,
+      "UnavailableTitles": [
+        "Мстители: Финал"
+      ],
+      "Sha256": "3f34c593a7788b03de88aec13002af76a1f6b262863f5d0147cdb33e857e37b1",
+      "CaptureWorkflowRun": "40050236826"
+    },
+    {
+      "File": "en/settings-lite-dark.webp",
+      "Language": "en",
+      "Width": 1424,
+      "Height": 892,
+      "PendingVisiblePosters": 0,
+      "UnavailableVisiblePosters": 0,
+      "UnavailableTitles": [],
+      "Sha256": "0a6dae42ad1c76bd6143e5a4ee308a4cc4ea0ba011acddb44a8a0838f1a11ea1",
+      "CaptureWorkflowRun": "40050236826"
+    },
+    {
+      "File": "en/settings-lan-dark.webp",
+      "Language": "en",
+      "Width": 1424,
+      "Height": 892,
+      "PendingVisiblePosters": 0,
+      "UnavailableVisiblePosters": 0,
+      "UnavailableTitles": [],
+      "Sha256": "0db063ee45be78d3de388c3311cb093c18db4f5d02bebc92bafeabca5606ed96",
+      "CaptureWorkflowRun": "40050236826"
+    }
+  ],
+  "CaptureWorkflowRuns": {
+    "ru": "40048875720",
+    "en": "40050236826"
+  },
+  "ApplicationSourceCommit": "d92a48640b28df697ddec2b38fcc5cb3ca136ca0"
+}

@@ -21,5 +21,5 @@ for name in names:
         image.save(output/filename,format='WEBP',quality=88,method=6)
         export['Captures'].append(dict(File=filename,Language=language,Width=image.width,Height=image.height,PendingVisiblePosters=0,UnavailableVisiblePosters=capture.get('UnavailableVisiblePosters',0),UnavailableTitles=capture.get('UnavailableTitles',[]),Sha256=hashlib.sha256((output/filename).read_bytes()).hexdigest()))
 metadata=f'settings-screenshots-windows-{language}-info.json' if settings_only else f'screenshots-windows-{language}-info.json'
-(output/metadata).write_text(json.dumps(export,ensure_ascii=False,indent=2)+'\n')
+(output/metadata).write_text(json.dumps(export,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
 print('Verified Windows screenshots:',version,language)

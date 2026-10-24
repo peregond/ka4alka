@@ -10,7 +10,7 @@ on:
       version:
         description: Published release matching the reviewed screenshots
         required: true
-        default: '0.43.4'
+        default: '0.44.27'
 permissions:
   contents: write
 concurrency:
@@ -27,6 +27,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_VERSION: ${{ inputs.version }}
         run: |
+          if [ -f "distribution/assets/$RELEASE_VERSION/capture-info.json" ]; then
+            python3 scripts/screenshots/publish-gallery.py "$RELEASE_VERSION"
+            exit 0
+          fi
           python3 - <<'PY'
           import json, os, re, shutil, subprocess, tempfile, zipfile
           from pathlib import Path

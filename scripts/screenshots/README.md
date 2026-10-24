@@ -8,6 +8,10 @@ Workflow `Capture published application screenshots` запускается вр
 
 Захват читает реальные пиксели клиентской области окна Windows, чтобы избежать артефактов кэша текста WPF при снимке визуального дерева.
 
+Mac снимается на macOS 27 через системный захват собственного окна приложения. Буфер кадров сохраняет вид страницы непосредственно перед контрольным снимком, включая системные стеклянные эффекты. Версия ОС и SHA-256 пакета сохраняются в метаданных. Изображения не дорисовываются.
+
+Windows ждёт завершения метаданных и всех доступных постеров. Отсутствующая у источника английская обложка остаётся штатной заглушкой приложения и учитывается отдельно в `UnavailableVisiblePosters`; `PendingVisiblePosters` должен быть равен нулю. Параметр `language=ru|en|both` позволяет переснять один язык.
+
 Настройки дополнительно снимаются в двух разделах: `settings-lite-dark.png` показывает переключатель лёгкого режима, `settings-lan-dark.png` — подключение телефона и переключатель загрузок на другом компьютере. Драйвер нажимает настоящие кнопки разделов и проверяет, что нужные элементы полностью видны. Сеть и подключение телефона для снимка не включаются, QR-коды и коды доступа не публикуются.
 
 Параметр workflow `settings_only=true` (локально `KACHALKA_SCREENSHOT_SCOPE=settings`) снимает только эти два раздела, без ожидания каталога и постеров. WebP добавляются в соответствующий релиз с отдельным файлом `settings-screenshots-windows-<язык>-info.json`, сохраняя метаданные основной галереи.
@@ -15,10 +19,10 @@ Workflow `Capture published application screenshots` запускается вр
 `capture-info.json` содержит способ захвата, язык, версию, SHA-256 DLL и архива, список снимков и число загруженных постеров. После захвата PNG нужно визуально проверить перед сохранением в документации. Временный черновик `docs-preview-<run-id>` можно удалить после сохранения снимков.
 
 ```powershell
-dotnet build scripts/screenshots/CaptureReleaseScreenshot.csproj -c Release -p:ReleaseDirectory=C:\Kachalka-0.43
-$env:KACHALKA_SCREENSHOT_VERSION='0.43.4'
+dotnet build scripts/screenshots/CaptureReleaseScreenshot.csproj -c Release -p:ReleaseDirectory=C:\Kachalka-0.44
+$env:KACHALKA_SCREENSHOT_VERSION='0.44.27'
 $env:KACHALKA_SCREENSHOT_LANGUAGE='en' # ru или en
-dotnet scripts/screenshots/bin/Release/net10.0-windows/CaptureReleaseScreenshot.dll C:\Kachalka-0.43 C:\screenshots
+dotnet scripts/screenshots/bin/Release/net10.0-windows/CaptureReleaseScreenshot.dll C:\Kachalka-0.44 C:\screenshots
 ```
 
 Нужны Windows и .NET 10 SDK. Профиль изолирован; в GitHub передаются только PNG и очищенные метаданные. Workflow `Publish reviewed release screenshots` загружает проверенные снимки из `distribution/assets/<полная-версия>/<язык>/` в соответствующий опубликованный релиз; установщик и файлы обновления он не меняет.
