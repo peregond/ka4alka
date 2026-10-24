@@ -125,7 +125,7 @@ jobs:
           # Persist only public screenshot metadata, never the isolated profile or keys.
           $captures=@($info.Captures | ForEach-Object {
             if($_.File -notmatch '^[a-z0-9][a-z0-9.-]*\.png$'){throw 'Invalid capture filename'}
-            [ordered]@{File=$_.File;Language=$_.Language;Width=$_.Width;Height=$_.Height;LoadedVisiblePosters=$_.LoadedVisiblePosters;PendingVisiblePosters=$_.PendingVisiblePosters;Titles=@($_.Titles)}
+            [ordered]@{File=$_.File;Language=$_.Language;Width=$_.Width;Height=$_.Height;LoadedVisiblePosters=$_.LoadedVisiblePosters;PendingVisiblePosters=$_.PendingVisiblePosters;UnavailableVisiblePosters=$_.UnavailableVisiblePosters;UnavailableTitles=@($_.UnavailableTitles);Titles=@($_.Titles)}
           })
           [ordered]@{Version=$env:RELEASE_VERSION;Language=$env:KACHALKA_SCREENSHOT_LANGUAGE;CaptureMethod=$info.CaptureMethod;ReleaseArchiveSha256=$env:RELEASE_ARCHIVE_SHA256;ReleaseDllSha256=$dllHash;Captures=$captures} | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $infoPath -Encoding utf8NoBOM
           Get-Content -LiteralPath $infoPath

@@ -19,7 +19,7 @@ for name in names:
         image=image.convert('RGB');assert image.width>=760 and image.height>=520
         filename=f'screenshots-windows-{language}-{name}.webp'
         image.save(output/filename,format='WEBP',quality=88,method=6)
-        export['Captures'].append(dict(File=filename,Language=language,Width=image.width,Height=image.height,PendingVisiblePosters=0,Sha256=hashlib.sha256((output/filename).read_bytes()).hexdigest()))
+        export['Captures'].append(dict(File=filename,Language=language,Width=image.width,Height=image.height,PendingVisiblePosters=0,UnavailableVisiblePosters=capture.get('UnavailableVisiblePosters',0),UnavailableTitles=capture.get('UnavailableTitles',[]),Sha256=hashlib.sha256((output/filename).read_bytes()).hexdigest()))
 metadata=f'settings-screenshots-windows-{language}-info.json' if settings_only else f'screenshots-windows-{language}-info.json'
 (output/metadata).write_text(json.dumps(export,ensure_ascii=False,indent=2)+'\n')
 print('Verified Windows screenshots:',version,language)
