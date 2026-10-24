@@ -8,7 +8,7 @@ published,captures,output=map(Path,(published,captures,output))
 assert plistlib.loads((published/'app/Ka4alka.app/Contents/Info.plist').read_bytes())['CFBundleShortVersionString']==version
 output.mkdir(parents=True,exist_ok=True)
 archive=published/'Kachalka-macos-arm64.zip'
-info=dict(Version=version,Platform='macos',OperatingSystemVersion=platform.mac_ver()[0],Architecture=platform.machine(),CaptureMethod='Native AppKit window pixels from verified published app',ReleaseArchiveSha256=hashlib.sha256(archive.read_bytes()).hexdigest(),Captures=[])
+info=dict(Version=version,Platform='macos',OperatingSystemVersion=platform.mac_ver()[0],Architecture=platform.machine(),CaptureMethod='Composited native macOS window from verified published app',ReleaseArchiveSha256=hashlib.sha256(archive.read_bytes()).hexdigest(),Captures=[])
 for language in ('ru','en'):
     root=captures/language
     for appearance in ('dark','light'):
@@ -16,10 +16,14 @@ for language in ('ru','en'):
         assert not report['failures'] and report['checks'], (language,appearance,report['failures'])
         cells=json.loads((root/appearance/'matrix.json').read_text())
         assert cells and all(cell['language']==language and cell['theme']==appearance for cell in cells)
-    mapping={'featured-dark':'featured','catalog-dark':'movies','series-dark':'series','games-dark':'games-home','detail-dark':'detail-movie','downloads-dark':'downloads-empty','settings-dark':'settings','settings-light':'settings','catalog-light':'movies'}
+    mapping={'featured-dark':'featured','catalog-dark':'movies','series-dark':'series','games-dark':'games-grid','detail-dark':'detail-movie','downloads-dark':'downloads-empty','settings-dark':'settings','settings-light':'settings','catalog-light':'movies'}
     for name,source in mapping.items():
         appearance='light' if name.endswith('-light') else 'dark'
-        with Image.open(root/appearance/f'{source}-1280x820-{appearance}-{language}.png') as image:
+        filename_source=f'{source}-1280x820-{appearance}-{language}.png'
+        evidence=json.loads((root/appearance/'composited/capture-times.json').read_text())
+        assert filename_source in evidence
+        assert 0.19 <= evidence[filename_source]['SourceTimestamp']-evidence[filename_source]['CompositedTimestamp'] <= 2
+        with Image.open(root/appearance/'composited'/filename_source) as image:
             image=image.convert('RGB')
             assert image.width>=760 and image.height>=520
             filename=f'screenshots-macos-{language}-{name}.webp'

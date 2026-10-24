@@ -32,6 +32,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Prepare a desktop large enough for the gallery window
+        run: |
+          swiftc scripts/screenshots/mac-display.swift -o "$RUNNER_TEMP/mac-capture-display"
+          "$RUNNER_TEMP/mac-capture-display" display
       - name: Verify the exact published Mac packages
         run: |
           if [ -z "$RELEASE_VERSION" ]; then RELEASE_VERSION="$(gh release view --json tagName --jq '.tagName | ltrimstr("v")')"; fi
@@ -63,18 +67,12 @@ jobs:
             export KD_SMOKE_SIZE=1280x820
             for appearance in dark light; do
               export KD_SMOKE_APPEARANCE="$appearance"
-              export KD_SMOKE_ONLY=featured,movies,series,games-home,downloads-empty,settings,detail-movie
+              export KD_SMOKE_ONLY=featured,movies,series,games-grid,downloads-empty,settings,detail-movie
               if [ "$appearance" = light ]; then export KD_SMOKE_ONLY=movies,settings; fi
               output="$PWD/test-output/mac-capture/$language/$appearance"
               mkdir -p "$output"
-              published/app/Ka4alka.app/Contents/MacOS/Ka4alka --smoke-test "$output" -ApplePersistenceIgnoreState YES > "$output/app.log" 2>&1 &
-              process=$!
-              for ((attempt=0;attempt<900;attempt++)); do
-                if ! kill -0 "$process" 2>/dev/null; then break; fi
-                sleep 1
-              done
-              if kill -0 "$process" 2>/dev/null; then kill "$process"; echo 'Native capture timed out'; exit 1; fi
-              wait "$process"
+              python3 scripts/screenshots/capture-mac.py \
+                "$PWD/published/app/Ka4alka.app/Contents/MacOS/Ka4alka" "$output" "$RUNNER_TEMP/mac-capture-display"
               test ! -f "$output/error.txt" || { cat "$output/error.txt"; exit 1; }
               test -f "$output/checks.json"
             done
