@@ -1,5 +1,5 @@
 """Export screenshots from the signed published app, without modifying its binary."""
-import hashlib,json,plistlib,re,sys
+import hashlib,json,platform,plistlib,re,sys
 from pathlib import Path
 from PIL import Image
 version,published,captures,output=sys.argv[1:]
@@ -8,7 +8,7 @@ published,captures,output=map(Path,(published,captures,output))
 assert plistlib.loads((published/'app/Ka4alka.app/Contents/Info.plist').read_bytes())['CFBundleShortVersionString']==version
 output.mkdir(parents=True,exist_ok=True)
 archive=published/'Kachalka-macos-arm64.zip'
-info=dict(Version=version,Platform='macos',CaptureMethod='Native AppKit window pixels from verified published app',ReleaseArchiveSha256=hashlib.sha256(archive.read_bytes()).hexdigest(),Captures=[])
+info=dict(Version=version,Platform='macos',OperatingSystemVersion=platform.mac_ver()[0],Architecture=platform.machine(),CaptureMethod='Native AppKit window pixels from verified published app',ReleaseArchiveSha256=hashlib.sha256(archive.read_bytes()).hexdigest(),Captures=[])
 for language in ('ru','en'):
     root=captures/language
     for appearance in ('dark','light'):

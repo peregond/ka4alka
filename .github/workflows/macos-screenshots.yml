@@ -18,7 +18,8 @@ concurrency:
   cancel-in-progress: false
 jobs:
   capture:
-    runs-on: macos-15
+    # Show the current native Mac appearance, including Liquid Glass controls.
+    runs-on: xcode-27
     timeout-minutes: 35
     env:
       RELEASE_VERSION: ${{ inputs.version }}
