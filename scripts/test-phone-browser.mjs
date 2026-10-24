@@ -60,17 +60,52 @@ for (const [name, engine] of [
         try {
           const page = await context.newPage(),
             errors = [],
+            policyViolations = [],
+            policyMessages = [],
             commands = [],
             catalogRequests = [],
             adds = [];
+          // WebKit's screenshot helper injects an inline `body {}` stylesheet.
+          // Keep the production CSP and all functional/CSP assertions intact;
+          // collect visual artifacts in Chromium without that injected stylesheet.
+          const capture = (options) =>
+            name === "chromium" ? page.screenshot(options) : Promise.resolve();
+          await page.addInitScript(() => {
+            document.addEventListener("securitypolicyviolation", (event) => {
+              console.log(
+                "PHONE_POLICY " +
+                  JSON.stringify({
+                    directive: event.effectiveDirective,
+                    blocked: event.blockedURI,
+                    sample: event.sample,
+                  }),
+              );
+            });
+          });
+          // Diagnostic reporting only in the test response: retain all enforcing
+          // directives and add report-sample so UA styles can be identified.
+          // The shipped server header remains unchanged.
+          await page.route("http://127.0.0.1:*/", async (route) => {
+            const response = await route.fetch();
+            const headers = response.headers();
+            assert(
+              headers["content-security-policy"].includes("style-src 'self';"),
+            );
+            headers["content-security-policy"] = headers[
+              "content-security-policy"
+            ].replace("style-src 'self';", "style-src 'self' 'report-sample';");
+            await route.fulfill({ response, headers });
+          });
           let confirmAction = true;
           page.on("pageerror", (error) => errors.push(error.message));
           page.on("console", (message) => {
+            if (message.text().startsWith("PHONE_POLICY "))
+              policyViolations.push(JSON.parse(message.text().slice(13)));
             if (
               message.type() === "error" &&
               /content security policy|refused to/i.test(message.text())
             )
-              errors.push(message.text());
+              policyMessages.push(message.text());
           });
           page.on("dialog", (dialog) =>
             confirmAction ? dialog.accept() : dialog.dismiss(),
@@ -92,7 +127,7 @@ for (const [name, engine] of [
               : "Connect your phone",
           );
           if (!blockedStorage) {
-            await page.screenshot({
+            await capture({
               path: `${output}/phone-pair-${name}-${locale}.png`,
               fullPage: true,
             });
@@ -129,7 +164,7 @@ for (const [name, engine] of [
           await expect(page.locator(".card")).toHaveCount(8);
           if (!blockedStorage) {
             await page.evaluate(() => scrollTo(0, 0));
-            await page.screenshot({
+            await capture({
               path: `${output}/phone-catalog-${name}-${locale}.png`,
               fullPage: true,
             });
@@ -169,7 +204,7 @@ for (const [name, engine] of [
           await page.locator(".card").first().tap();
           await expect(page.locator(".row")).toHaveCount(3);
           if (!blockedStorage)
-            await page.screenshot({
+            await capture({
               path: `${output}/phone-releases-${name}-${locale}.png`,
               fullPage: true,
             });
@@ -214,7 +249,7 @@ for (const [name, engine] of [
           );
           assert(commands[2].confirmed === true);
           if (!blockedStorage)
-            await page.screenshot({
+            await capture({
               path: `${output}/phone-downloads-${name}-${locale}.png`,
               fullPage: true,
             });
@@ -237,7 +272,7 @@ for (const [name, engine] of [
             "dark",
           );
           if (!blockedStorage)
-            await page.screenshot({
+            await capture({
               path: `${output}/phone-device-${name}-${locale}.png`,
               fullPage: true,
             });
@@ -304,6 +339,32 @@ for (const [name, engine] of [
           await page.locator("#logout").tap();
           await expect(page.locator("#pair")).toBeVisible();
           assert.deepEqual(errors, []);
+          // WebKit's native select shadow tree requests exactly this internal
+          // style attribute while parsing each select. The strict CSP blocks it
+          // (without affecting the native picker). No application inline style,
+          // external resource, or other policy violation is permitted.
+          assert.deepEqual(
+            policyViolations.filter(
+              (event) =>
+                !(
+                  name === "webkit" &&
+                  event.directive === "style-src-attr" &&
+                  event.blocked === "inline" &&
+                  event.sample === "text-overflow:inherit"
+                ),
+            ),
+            [],
+          );
+          assert.equal(
+            policyMessages.length,
+            policyViolations.length,
+            "Unclassified CSP console error",
+          );
+          assert.equal(
+            await page.locator("[style]").count(),
+            0,
+            "Application contains inline style attributes",
+          );
         } finally {
           await context.close();
           fixture.stdin.end("\n");
