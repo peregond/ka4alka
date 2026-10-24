@@ -182,7 +182,12 @@ struct SmokeShot {
             // KD_SMOKE_ONLY="detail-movie,settings" runs just those pages at one size in Russian/dark: a quick look
             // while designing. A run limited like this is never a release check.
             if let only = ProcessInfo.processInfo.environment["KD_SMOKE_ONLY"], !only.isEmpty {
-                try await runCombination(language: "ru", mode: AppearanceMode.dark, sizes: [Self.requestedQuickSize() ?? CGSize(width: 1280, height: 820)], only: Set(only.split(separator: ",").map(String.init)))
+                let captureLanguage = ProcessInfo.processInfo.environment["KD_SMOKE_LANGUAGE"] ?? "ru"
+                let captureAppearance = ProcessInfo.processInfo.environment["KD_SMOKE_APPEARANCE"] ?? "dark"
+                guard ["ru", "en"].contains(captureLanguage), ["dark", "light"].contains(captureAppearance) else {
+                    throw UpdateError("Capture language must be ru/en and appearance dark/light")
+                }
+                try await runCombination(language: captureLanguage, mode: captureAppearance == "light" ? AppearanceMode.light : AppearanceMode.dark, sizes: [Self.requestedQuickSize() ?? CGSize(width: 1280, height: 820)], only: Set(only.split(separator: ",").map(String.init)))
             } else {
                 try await runCombination(language: "ru", mode: AppearanceMode.dark, sizes: fullSizes)
                 try await runCombination(language: "en", mode: AppearanceMode.light, sizes: reducedSizes)
@@ -272,6 +277,14 @@ struct SmokeShot {
             currentSize = actual
             requestedText = sizeText(requested)
             await settle(page.rawValue)
+            if ProcessInfo.processInfo.environment["KD_SMOKE_LANGUAGE"] != nil {
+                // Documentation capture waits for the real source artwork; it
+                // never seeds a queue or substitutes media for unavailable data.
+                await pause(1000)
+                let loaded = await waitUntil("documentation artwork", timeout: 60) { ImageStore.shared.pendingCount == 0 && !model.loading }
+                try require(loaded, "Documentation artwork has finished loading")
+                await settle("documentation artwork")
+            }
             let main = try window()
             main.contentView?.layoutSubtreeIfNeeded()
             main.displayIfNeeded()

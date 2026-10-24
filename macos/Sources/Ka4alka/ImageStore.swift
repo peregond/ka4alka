@@ -49,6 +49,7 @@ final class ArtworkMemory: @unchecked Sendable {
     private(set) var loadedCount = 0
     private(set) var failedCount = 0
     private var inflight: [String: Request] = [:]
+    var pendingCount: Int { inflight.count }
     private var failures: [String: Date] = [:]
     private var failureOrder: [String] = []
     private let failureLimit = 120

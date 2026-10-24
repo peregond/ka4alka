@@ -1,14 +1,11 @@
 name: Capture published Mac screenshots
 on:
-  push:
-    branches: [claude/quirky-hopper-1vlmj6]
-    paths: ['.github/workflows/macos-screenshots.yml', 'scripts/screenshots/package-mac.py']
   workflow_dispatch:
     inputs:
       version:
         description: Published application version (never rebuilt for capture)
         required: true
-        default: '0.44.1'
+        default: '0.44.27'
   workflow_call:
     inputs:
       version:
@@ -61,17 +58,25 @@ jobs:
             # The runner belongs to this capture job. Clear the prior language
             # run's saved window size; never touch a real user's preferences.
             defaults delete org.ka4alka.app >/dev/null 2>&1 || true
-            output="$PWD/test-output/mac-capture/$language"
-            published/app/Ka4alka.app/Contents/MacOS/Ka4alka --smoke-test "$output" -ApplePersistenceIgnoreState YES &
-            process=$!
-            for ((attempt=0;attempt<900;attempt++)); do
-              if ! kill -0 "$process" 2>/dev/null; then break; fi
-              sleep 1
+            export KD_SMOKE_LANGUAGE="$language"
+            export KD_SMOKE_SIZE=1280x820
+            for appearance in dark light; do
+              export KD_SMOKE_APPEARANCE="$appearance"
+              export KD_SMOKE_ONLY=featured,movies,series,games-home,downloads-empty,settings
+              if [ "$appearance" = light ]; then export KD_SMOKE_ONLY=movies,settings; fi
+              output="$PWD/test-output/mac-capture/$language/$appearance"
+              mkdir -p "$output"
+              published/app/Ka4alka.app/Contents/MacOS/Ka4alka --smoke-test "$output" -ApplePersistenceIgnoreState YES > "$output/app.log" 2>&1 &
+              process=$!
+              for ((attempt=0;attempt<900;attempt++)); do
+                if ! kill -0 "$process" 2>/dev/null; then break; fi
+                sleep 1
+              done
+              if kill -0 "$process" 2>/dev/null; then kill "$process"; echo 'Native capture timed out'; exit 1; fi
+              wait "$process"
+              test ! -f "$output/error.txt" || { cat "$output/error.txt"; exit 1; }
+              test -f "$output/checks.json"
             done
-            if kill -0 "$process" 2>/dev/null; then kill "$process"; echo 'Native capture timed out'; exit 1; fi
-            wait "$process"
-            test ! -f "$output/error.txt" || { cat "$output/error.txt"; exit 1; }
-            test -f "$output/checks.json"
           done
       - name: Encode and verify screenshots with provenance
         run: |
@@ -83,6 +88,13 @@ jobs:
           name: published-macos-screenshots-${{ env.RELEASE_VERSION }}
           path: test-output/mac-screenshots/
           if-no-files-found: error
+      - name: Preserve native capture evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: published-macos-capture-${{ env.RELEASE_VERSION }}
+          path: test-output/mac-capture/
+          if-no-files-found: ignore
       - name: Add screenshot assets to their published release
         run: |
           gh release upload "v$RELEASE_VERSION" test-output/mac-screenshots/screenshots-macos-* --clobber

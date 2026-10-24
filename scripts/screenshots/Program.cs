@@ -231,6 +231,10 @@ internal static class Program
         }
         await Until(()=>Field(window,"liveLoading") is false&&Field(window,"liveItems") is IEnumerable rows&&rows.Cast<object>().Any(),TimeSpan.FromSeconds(80),"Actual default source catalogue did not load.");
         await Task.Delay(2000);await WaitPosters(window,"Film catalogue");await Task.Delay(8000);await WaitPosters(window,"Final film catalogue");await WaitFeature(window);await WaitPosters(window,"Settled film catalogue");Save(window,"catalog-dark.png");
+        Call(window,"ShowFeatured");await Settle(window);
+        await Until(()=>Field(window,"featuredGroups") is IEnumerable groups&&groups.Cast<object>().Any()&&Field(window,"featuredDeferred") is IEnumerable pending&&!pending.Cast<object>().Any(),TimeSpan.FromSeconds(80),"Actual curated collections did not load.");
+        await WaitPosters(window,"Featured curated collections");Save(window,"featured-dark.png");
+        Call(window,"ShowCatalogSection","Фильмы");await Settle(window);await WaitPosters(window,"Returned film catalogue");
         Call(window,"ToggleTheme",window,new RoutedEventArgs());await Settle(window);await WaitPosters(window,"Light film catalogue");Save(window,"catalog-light.png");
         Call(window,"ToggleTheme",window,new RoutedEventArgs());await Settle(window);
         var movieButton=Visuals<Button>(window).FirstOrDefault(button=>button.Tag is MediaItem movie&&movie.Section=="Фильмы"&&movie.IsLive&&

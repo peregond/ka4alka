@@ -11,7 +11,7 @@ assert info['Version']==version and info['Language']==language
 export=dict(Version=version,Platform='windows',CaptureMethod=info['CaptureMethod'],ReleaseArchiveSha256=info['ReleaseArchiveSha256'],ReleaseDllSha256=info['ReleaseDllSha256'],Captures=[])
 names=('settings-lite-dark','settings-lan-dark')
 if not settings_only:
-    names=('catalog-dark','series-dark','games-dark','detail-dark','downloads-dark','catalog-light')+names
+    names=('featured-dark','catalog-dark','series-dark','games-dark','detail-dark','downloads-dark','catalog-light')+names
 for name in names:
     capture=next(item for item in info['Captures'] if item['File']==name+'.png')
     assert capture['PendingVisiblePosters']==0

@@ -110,7 +110,7 @@ jobs:
           if($info.Version -ne $env:RELEASE_VERSION -or $info.ReleaseDllSha256 -ne $dllHash){throw 'Screenshots were not captured from the verified published DLL'}
           if($info.Language -ne $env:KACHALKA_SCREENSHOT_LANGUAGE){throw 'Capture language mismatch'}
           $required=@('settings-lite-dark.png','settings-lan-dark.png')
-          if($env:KACHALKA_SCREENSHOT_SCOPE -ne 'settings'){$required+=@('catalog-dark.png','catalog-light.png','series-dark.png','detail-dark.png','games-dark.png','games-light.png','game-detail-dark.png','downloads-dark.png','settings-dark.png')}
+          if($env:KACHALKA_SCREENSHOT_SCOPE -ne 'settings'){$required+=@('featured-dark.png','catalog-dark.png','catalog-light.png','series-dark.png','detail-dark.png','games-dark.png','games-light.png','game-detail-dark.png','downloads-dark.png','settings-dark.png')}
           foreach($name in $required){
             if(-not(Test-Path -LiteralPath (Join-Path $output $name))){throw ('Missing required screenshot: '+$name)}
           }
