@@ -11,6 +11,9 @@ on:
       settings_only:
         type: boolean
         default: false
+      language:
+        type: string
+        default: both
   workflow_dispatch:
     inputs:
       version:
@@ -21,6 +24,11 @@ on:
         description: Capture only Lite mode and LAN phone settings
         type: boolean
         default: false
+      language:
+        description: Language to capture
+        type: choice
+        options: [both, ru, en]
+        default: both
       publish_reviewed:
         description: Publish reviewed repository screenshots instead of capturing again
         type: boolean
@@ -40,7 +48,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [ru, en]
+        language: ${{ fromJSON(inputs.language == 'en' && '["en"]' || inputs.language == 'ru' && '["ru"]' || '["ru","en"]') }}
     if: ${{ !inputs.publish_reviewed }}
     runs-on: windows-latest
     timeout-minutes: 15

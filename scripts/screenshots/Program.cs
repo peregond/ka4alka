@@ -151,7 +151,13 @@ internal static class Program
             await Task.Delay(200);
         }
         var current=VisiblePosters(window);var loaded=current.Count(Loaded);
-        if(!CatalogSettled(window)||current.Length==0||loaded<Math.Min(minimum,current.Length)||current.Any(image=>!Loaded(image)))throw new InvalidOperationException(stage+": real application loaded only "+loaded+" visible source posters; pending="+current.Count(image=>!Loaded(image))+"; catalogue error: "+Field(window,"liveError"));
+        if(!CatalogSettled(window)||current.Length==0||loaded<Math.Min(minimum,current.Length)||current.Any(image=>!Loaded(image)))
+        {
+            var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(CaptureClient(window)));
+            using(var file=File.Create(Path.Combine(outputDirectory,"capture-error.png")))png.Save(file);
+            var missing=string.Join("; ",current.Where(image=>!Loaded(image)).Select(image=>image.DataContext is MediaItem item?item.DisplayTitle+" | "+item.DisplayImageUrl+" | "+image.Tag:"unknown"));
+            throw new InvalidOperationException(stage+": real application loaded only "+loaded+" visible source posters; pending="+current.Count(image=>!Loaded(image))+"; missing="+missing+"; catalogue error: "+Field(window,"liveError"));
+        }
         Console.WriteLine(stage+": actual source posters loaded="+loaded+", unavailable or still pending="+current.Count(image=>!Loaded(image)));
     }
     static async Task WaitFeature(MainWindow window)
@@ -215,6 +221,17 @@ internal static class Program
         finally {SelectObject(memory,previous);DeleteObject(bitmap);DeleteDC(memory);ReleaseDC(IntPtr.Zero,desktop);}
     }
 
+    static void SelectEnglishCatalogOrder(MainWindow window)
+    {
+        if(CaptureLanguage!="en")return;
+        // Recent releases can have no English artwork yet. Use the app's
+        // ordinary visible Popularity control for the English documentation.
+        var sort=Visuals<Button>(window).Single(button=>AutomationProperties.GetName(button)==AppLanguage.T("Порядок"));
+        var option=sort.ContextMenu?.Items.OfType<MenuItem>().Single(item=>item.Tag?.ToString()=="По популярности")
+            ??throw new InvalidOperationException("The released catalogue popularity option is missing.");
+        option.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+    }
+
     static async Task Capture(Kachalka.App app)
     {
         await Until(()=>app.MainWindow is MainWindow window&&window.IsLoaded,TimeSpan.FromSeconds(25),"Actual public application startup did not create its main window.");
@@ -229,12 +246,13 @@ internal static class Program
             WriteCaptureInfo();
             return;
         }
+        SelectEnglishCatalogOrder(window);await Settle(window);
         await Until(()=>Field(window,"liveLoading") is false&&Field(window,"liveItems") is IEnumerable rows&&rows.Cast<object>().Any(),TimeSpan.FromSeconds(80),"Actual default source catalogue did not load.");
         await Task.Delay(2000);await WaitPosters(window,"Film catalogue");await Task.Delay(8000);await WaitPosters(window,"Final film catalogue");await WaitFeature(window);await WaitPosters(window,"Settled film catalogue");Save(window,"catalog-dark.png");
         Call(window,"ShowFeatured");await Settle(window);
         await Until(()=>Field(window,"featuredGroups") is IEnumerable groups&&groups.Cast<object>().Any()&&Field(window,"featuredDeferred") is IEnumerable pending&&!pending.Cast<object>().Any(),TimeSpan.FromSeconds(80),"Actual curated collections did not load.");
         await WaitPosters(window,"Featured curated collections");Save(window,"featured-dark.png");
-        Call(window,"ShowCatalogSection","Фильмы");await Settle(window);await WaitPosters(window,"Returned film catalogue");
+        Call(window,"ShowCatalogSection","Фильмы");await Settle(window);SelectEnglishCatalogOrder(window);await Settle(window);await WaitPosters(window,"Returned film catalogue");
         Call(window,"ToggleTheme",window,new RoutedEventArgs());await Settle(window);await WaitPosters(window,"Light film catalogue");Save(window,"catalog-light.png");
         Call(window,"ToggleTheme",window,new RoutedEventArgs());await Settle(window);
         var movieButton=Visuals<Button>(window).FirstOrDefault(button=>button.Tag is MediaItem movie&&movie.Section=="Фильмы"&&movie.IsLive&&
@@ -250,7 +268,7 @@ internal static class Program
             else skipped.Add("Detail navigation did not open a genuine source card.");
         }
         else skipped.Add("No genuine loaded film card was available for detail navigation.");
-        Call(window,"ShowCatalogSection","Сериалы");await Settle(window);
+        Call(window,"ShowCatalogSection","Сериалы");await Settle(window);SelectEnglishCatalogOrder(window);await Settle(window);
         await Until(()=>Field(window,"liveLoading") is false&&Field(window,"liveItems") is IEnumerable rows&&rows.Cast<object>().Any(),TimeSpan.FromSeconds(70),"Actual series source catalogue did not load.");
         await Task.Delay(2000);await WaitPosters(window,"Series catalogue");await WaitFeature(window);await WaitPosters(window,"Settled series catalogue");Save(window,"series-dark.png");
         Call(window,"ShowGames");await Settle(window);
