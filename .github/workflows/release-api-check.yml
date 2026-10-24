@@ -1,6 +1,9 @@
 name: Verify draft release write access
 on:
   workflow_dispatch:
+  push:
+    branches: [claude/quirky-hopper-1vlmj6]
+    paths: [.github/workflows/release-api-check.yml]
 permissions:
   contents: write
 jobs:
