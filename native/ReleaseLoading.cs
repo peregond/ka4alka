@@ -47,7 +47,7 @@ public partial class MainWindow
 
     void CancelStaleDetailWork()
     {
-        var active=activePerson==null&&(section is "Фильмы" or "Сериалы")?current?.Id:null;
+        var active=activePerson==null&&(section is "Фильмы" or "Сериалы" or "ТВ Шоу")?current?.Id:null;
         foreach(var pair in releaseViews.Where(pair=>pair.Key!=active&&pair.Value.Checking).ToArray())
         {
             pair.Value.Request?.Cancel();pair.Value.Checking=false;requestedDetails.Remove(pair.Key);
@@ -90,7 +90,7 @@ public partial class MainWindow
             if(releaseRowsDirty||publishedChecking!=view.Checking)QueueDetailRefresh(item.Id,releasesOnly:true);
             else RefreshReleaseLoadingIndicator();
             releaseRowsDirty=false;publishedChecking=view.Checking;
-            if(!view.Checking&&(prefs.HidePoorQuality||prefs.CatalogQualityHeight!=0)&&current==null&&(section is "Фильмы" or "Сериалы")&&liveItems.Concat(prefs.LiveFavorites).Any(x=>x.Id==item.Id))RenderCatalogKeepingPosition();
+            if(!view.Checking&&(prefs.HidePoorQuality||prefs.CatalogQualityHeight!=0)&&current==null&&(section is "Фильмы" or "Сериалы" or "ТВ Шоу")&&liveItems.Concat(prefs.LiveFavorites).Any(x=>x.Id==item.Id))RenderCatalogKeepingPosition();
         }
         void IndexRows(IEnumerable<SourceEntry> rows,SourceState state)
         {

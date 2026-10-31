@@ -319,7 +319,7 @@ struct RootView: View {
         case .search: SearchView()
         case .section(.featured): FeaturedView()
         case .section(.games) where model.submittedQuery.isEmpty && model.filter == CatalogFilter() && model.page == 1: GameHomeView()
-        case .section(.movies), .section(.series), .section(.games): CatalogView()
+        case .section(.movies), .section(.series), .section(.shows), .section(.games): CatalogView()
         case .section(.saved): CatalogView(saved: true)
         case .section(.downloads): DownloadsView(store: model.transfers)
         case .section(.settings): SettingsView()

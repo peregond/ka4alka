@@ -66,3 +66,15 @@ public static class CatalogChoices
         new("taivan","Тайвань"),
     ];
 }
+
+// "ТВ Шоу" is a view over the series catalogue: its titles are ordinary series
+// whose source genre is one of ShowGenres, so items keep the "Сериалы" section.
+public static class CatalogSections
+{
+    public const string Shows="ТВ Шоу";
+    public static readonly CatalogChoice[] ShowGenres=[new("realnoe-tv","реальное ТВ"),new("tok-shou","ток-шоу"),new("igra","игра")];
+    public static bool IsShowGenre(string? key)=>ShowGenres.Any(genre=>genre.Key==key);
+    // The section an item of a catalogue view belongs to.
+    public static string ItemSection(string section)=>section==Shows?"Сериалы":section;
+    public static bool IsShow(MediaItem item)=>item.Section=="Сериалы"&&item.GenreKeys.Any(IsShowGenre);
+}

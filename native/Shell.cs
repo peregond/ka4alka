@@ -46,7 +46,7 @@ public partial class MainWindow
     void ClearBack(){headerBackAction=null;BackButton.Visibility=Visibility.Collapsed;}
 
     // Each catalogue section keeps its own icon: a film strip, a television and a gamepad.
-    static string NavIcon(string section)=>section switch{"Актуальное"=>"IconStar","Фильмы"=>"IconFilm","Игры"=>"IconGame",_=>"IconTv"};
+    static string NavIcon(string section)=>section switch{"Актуальное"=>"IconStar","Фильмы"=>"IconFilm","Игры"=>"IconGame",CatalogSections.Shows=>"IconShow",_=>"IconTv"};
 
     // Navigation entry content: 20 px icon, label and an optional trailing badge.
     // badge: 0 none, 1 plain counter (Saved), 2 accent pill (active downloads).
@@ -94,7 +94,7 @@ public partial class MainWindow
         if(button.Content is Grid grid&&grid.Children.OfType<Path>().FirstOrDefault(x=>Equals(x.Tag,"NavIcon")) is {} icon)
         {
             // The section being shown has a solid icon (star, heart, film strip, television, gamepad), not just an accent outline.
-            var solid=button.Tag?.ToString() is "Актуальное" or "Фильмы" or "Сериалы" or "Игры"||ReferenceEquals(button,SavedButton);
+            var solid=button.Tag?.ToString() is "Актуальное" or "Фильмы" or "Сериалы" or CatalogSections.Shows or "Игры"||ReferenceEquals(button,SavedButton);
             if(selected)
             {
                 BindingOperations.ClearBinding(icon,Shape.StrokeProperty);

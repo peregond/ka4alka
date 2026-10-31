@@ -8,7 +8,7 @@ public partial class MainWindow
     internal Action<double>? catalogRefreshMeasured;
     bool RefreshCatalogInPlace()
     {
-        if(closed||current!=null||activePerson!=null||section is not ("Фильмы" or "Сериалы")||catalogList==null||catalogRows==null||catalogEmptyHost==null)return false;
+        if(closed||current!=null||activePerson!=null||section is not ("Фильмы" or "Сериалы" or "ТВ Шоу")||catalogList==null||catalogRows==null||catalogEmptyHost==null)return false;
         var refreshStart=catalogRefreshMeasured==null?0:System.Diagnostics.Stopwatch.GetTimestamp();
         var rawPage=CatalogPageItems();
         var cards=rawPage.Where(item=>(!DiscoveryCatalog||RecommendableTitle(item))&&CatalogQualityMatches(item)).ToArray();

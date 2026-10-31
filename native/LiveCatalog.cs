@@ -33,28 +33,60 @@ public sealed class LiveCatalog(SourceClient client)
     public Task<CatalogPage> BrowsePage(string section,int page,CatalogSelection selection,CancellationToken ct,bool forceRefresh=false)=>Task.Run(()=>BrowsePageCore(section,page,selection,ct,forceRefresh),ct);
     async Task<CatalogPage> BrowsePageCore(string section,int page,CatalogSelection selection,CancellationToken ct,bool forceRefresh=false)
     {
+        if(section==CatalogSections.Shows)
+        {
+            section="Сериалы";
+            if(selection.Genre.Length==0)return await ShowsPage(page,selection,ct,forceRefresh);
+        }
+        var window=CatalogPaging.SourceWindow(page);
+        var slice=await Slice(section,selection,window.Page,window.Offset,CatalogPaging.Size,ct,forceRefresh);
+        return new(slice.Rows.ToArray(),page<CatalogPaging.Limit&&slice.HasNext,slice.First.Genres,slice.First.Countries);
+    }
+    // The source filters by one genre at a time, so a show page is assembled from
+    // the same slice of every show genre. Each page depends only on its number,
+    // never on how many titles earlier pages happened to deduplicate.
+    async Task<CatalogPage> ShowsPage(int page,CatalogSelection selection,CancellationToken ct,bool forceRefresh)
+    {
+        const int Share=14;
+        var start=(Math.Clamp(page,1,CatalogPaging.Limit)-1)*Share;
+        // One genre failing to load leaves the others; only a page with no answer at all is an error.
+        async Task<SliceResult?> Genre(CatalogChoice genre)
+        {
+            try{return await Slice("Сериалы",selection with{Genre=genre.Key},start/CatalogPaging.SourceSize+1,start%CatalogPaging.SourceSize,Share,ct,forceRefresh);}
+            catch(Exception) when(!ct.IsCancellationRequested){return null;}
+        }
+        var slices=(await Task.WhenAll(CatalogSections.ShowGenres.Select(Genre))).OfType<SliceResult>().ToArray();
+        if(slices.Length==0)throw new System.IO.InvalidDataException("Источник не вернул ни одного жанра шоу.");
+        var rows=new List<MediaItem>();
+        for(var index=0;index<Share;index++)foreach(var slice in slices)if(index<slice.Rows.Count)rows.Add(slice.Rows[index]);
+        var countries=slices.Select(x=>x.First.Countries).FirstOrDefault(x=>x.Length>0)??[];
+        return new(rows.DistinctBy(x=>x.Id).ToArray(),page<CatalogPaging.Limit&&slices.Any(x=>x.HasNext),CatalogSections.ShowGenres,countries);
+    }
+    sealed record SliceResult(List<MediaItem> Rows,bool HasNext,CatalogPage First);
+    // `count` cards starting at card `offset` of source page `sourcePage`, continuing on the next source page when needed.
+    async Task<SliceResult> Slice(string section,CatalogSelection selection,int sourcePage,int offset,int count,CancellationToken ct,bool forceRefresh)
+    {
         var path=section=="Сериалы"?"/tvseries":"/movies";
         var filter=selection.Filter;
-        async Task<CatalogPage> SourcePage(int sourcePage)
+        async Task<CatalogPage> SourcePage(int number)
         {
-            var url=Base+path+(filter.Length>0?"/filter/"+filter:"")+"?page="+sourcePage;
+            var url=Base+path+(filter.Length>0?"/filter/"+filter:"")+"?page="+number;
             var cache=System.IO.Path.Combine(Preferences.DataDir,"catalog",Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(url)))+".html");
             if(!forceRefresh&&System.IO.File.Exists(cache)&&DateTime.UtcNow-System.IO.File.GetLastWriteTimeUtc(cache)<TimeSpan.FromMinutes(15))
-                return ParsePage(await CacheFiles.ReadAllBytesAsync(cache,ct),section,sourcePage,selection);
+                return ParsePage(await CacheFiles.ReadAllBytesAsync(cache,ct),section,number,selection);
             try
             {
-                var bytes=await client.Read(new Uri(url),4*1024*1024,ct);var parsed=ParsePage(bytes,section,sourcePage,selection);
+                var bytes=await client.Read(new Uri(url),4*1024*1024,ct);var parsed=ParsePage(bytes,section,number,selection);
                 if(parsed.Items.Length==0&&parsed.Genres.Length==0)throw new System.IO.InvalidDataException("Источник вернул страницу без каталога.");
                 System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(cache)!);await CacheFiles.WriteAllBytesAsync(cache,bytes,ct);return parsed;
             }
-            catch(Exception) when(!ct.IsCancellationRequested&&System.IO.File.Exists(cache)){return ParsePage(await CacheFiles.ReadAllBytesAsync(cache,ct),section,sourcePage,selection);}
+            catch(Exception) when(!ct.IsCancellationRequested&&System.IO.File.Exists(cache)){return ParsePage(await CacheFiles.ReadAllBytesAsync(cache,ct),section,number,selection);}
         }
-        var window=CatalogPaging.SourceWindow(page);
-        var first=await SourcePage(window.Page);
-        var rows=first.Items.Skip(window.Offset).ToList();
+        var first=await SourcePage(sourcePage);
+        var rows=first.Items.Skip(offset).ToList();
         var tail=first;
-        if(rows.Count<CatalogPaging.Size&&first.HasNext){tail=await SourcePage(window.Page+1);rows.AddRange(tail.Items);}
-        return new(rows.Take(CatalogPaging.Size).ToArray(),page<CatalogPaging.Limit&&(rows.Count>CatalogPaging.Size||tail.HasNext),first.Genres,first.Countries);
+        if(rows.Count<count&&first.HasNext){tail=await SourcePage(sourcePage+1);rows.AddRange(tail.Items);}
+        return new(rows.Take(count).ToList(),rows.Count>count||tail.HasNext,first);
     }
     public static IReadOnlyList<MediaItem> Parse(byte[] bytes,string section)
     {

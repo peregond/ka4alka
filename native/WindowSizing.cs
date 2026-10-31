@@ -149,9 +149,11 @@ public partial class MainWindow
         {
             nav.HorizontalContentAlignment=narrow?HorizontalAlignment.Center:HorizontalAlignment.Stretch;
             nav.Padding=new Thickness(narrow?6:12,0,narrow?6:12,0);
-            nav.MinHeight=veryShort?30:shortView?40:44;nav.Margin=new(0,0,0,veryShort?2:4);
+            nav.MinHeight=veryShort?26:shortView?40:44;nav.Margin=new(0,0,0,veryShort?1:4);
         }
-        SidebarUpdateButton.MinHeight=veryShort?30:40;
+        // Five library entries share the column with the footer, so low windows give them tighter rows.
+        foreach(var nav in Navigation.Children.OfType<Button>()){nav.MinHeight=veryShort?26:shortView?32:44;nav.Margin=new(0,0,0,veryShort?1:shortView?2:4);}
+        SidebarUpdateButton.MinHeight=veryShort?28:40;
         var control=tiny?40d:shortView?44d:48d;
         AddTorrentButton.Content=IconLabel(tiny?"":narrow?"Добавить":"Добавить торрент","IconMagnet",18);
         AddTorrentButton.Padding=new Thickness(tiny?0:narrow?14:18,0,tiny?0:narrow?14:18,0);AddTorrentButton.MinHeight=control;AddTorrentButton.Height=control;AddTorrentButton.MinWidth=tiny?control:0;AddTorrentButton.Margin=new Thickness(0,0,tiny?8:12,0);
@@ -182,7 +184,7 @@ public partial class MainWindow
     }
     void UpdateFilterRail()
     {
-        var visible=(inlineCatalogFilterScroll!=null&&catalogToolbar!=null||section=="Игры"&&gameFilterRow!=null)&&current==null&&activePerson==null&&section is "Фильмы" or "Сериалы" or "Сохранённое" or "Игры";
+        var visible=(inlineCatalogFilterScroll!=null&&catalogToolbar!=null||section=="Игры"&&gameFilterRow!=null)&&current==null&&activePerson==null&&section is "Фильмы" or "Сериалы" or "ТВ Шоу" or "Сохранённое" or "Игры";
         FiltersPanel.Visibility=visible?Visibility.Visible:Visibility.Collapsed;
         if(!visible||inlineCatalogFilters==null)return;
         var width=FiltersPanel.ActualWidth>0?FiltersPanel.ActualWidth:Math.Max(1,ActualWidth-(compactWidth?64:236)-2*contentGutter);
