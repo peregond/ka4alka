@@ -16,6 +16,11 @@ const targets = [
   { name: "Онлайн-индекс: каталог (>16 КБ)", host: "ka4alka-online-new.peregon.chatgpt.site", path: "/api/catalog", query: "section=movies&page=1" },
   { name: "Онлайн-индекс: раздачи (>16 КБ)", host: "ka4alka-online-new.peregon.chatgpt.site", path: "/api/releases", query: "id=movies:obekt-prestupleniya" },
   { name: "Онлайн-индекс: torrent через бэкенд", host: "ka4alka-online-new.peregon.chatgpt.site", path: "/api/torrent", query: "url=" + encodeURIComponent("https://nnmclub.to/forum/download.php?id=1") },
+  { name: "Railway catalog: здоровье", host: "catalog-production-e329.up.railway.app", path: "/api/health" },
+  { name: "Railway catalog: каталог (>16 КБ)", host: "catalog-production-e329.up.railway.app", path: "/api/catalog", query: "section=movies&page=1" },
+  { name: "Railway catalog: карточка", host: "catalog-production-e329.up.railway.app", path: "/api/media", query: "id=movies:obekt-prestupleniya" },
+  { name: "Railway catalog: раздачи (>16 КБ)", host: "catalog-production-e329.up.railway.app", path: "/api/releases", query: "id=movies:obekt-prestupleniya", keepBody: true },
+  { name: "Railway catalog: torrent через бэкенд", host: "catalog-production-e329.up.railway.app", path: "/api/torrent", query: "url=" + encodeURIComponent("https://nnmclub.to/forum/download.php?id=1"), keepBody: true },
   { name: "Railway: карточка", host: "web-production-d7aa7.up.railway.app", path: "/api/media", query: "id=movies:obekt-prestupleniya" },
   { name: "Railway: раздачи", host: "web-production-d7aa7.up.railway.app", path: "/api/releases", query: "id=movies:obekt-prestupleniya" },
   { name: "Railway: torrent через бэкенд", host: "web-production-d7aa7.up.railway.app", path: "/api/torrent", query: "url=" + encodeURIComponent("https://nnmclub.to/forum/download.php?id=1") },
@@ -44,8 +49,11 @@ try {
     targets.splice(1, 0, { name: `Посредник ${url.hostname}: поиск`, host: url.hostname, path: url.pathname + "api/search", query: "id=movies:interstellar&title=%D0%98%D0%BD%D1%82%D0%B5%D1%80%D1%81%D1%82%D0%B5%D0%BB%D0%BB%D0%B0%D1%80&original=Interstellar&year=2014" });
   }
 } catch { /* No relay is published yet. */ }
-const dnsTargets = ["api.knaben.org", "apibay.org", "rutor.info", "nnmclub.to", "megapeer.vip", "nyaa.si", "ka4alka-online-new.peregon.chatgpt.site", "web-production-d7aa7.up.railway.app", "tracker.opentrackr.org"];
-const ooniDomains = ["rutor.info", "nnmclub.to", "megapeer.vip", "bigfangroup.org", "nyaa.si", "eztvx.to", "api.knaben.org", "knaben.org", "apibay.org", "yts.gg", "archive.org", "w6.zona.plus", "chatgpt.site", "up.railway.app", "raw.githubusercontent.com", "github.com"];
+// ONLY=<подстрока хоста> ограничивает проверку одним сервисом: так запуск укладывается в лимит workflow.
+const only = process.env.ONLY?.trim();
+if (only) for (let i = targets.length - 1; i >= 0; i--) if (!targets[i].host.includes(only)) targets.splice(i, 1);
+const dnsTargets = ["api.knaben.org", "apibay.org", "rutor.info", "nnmclub.to", "megapeer.vip", "nyaa.si", "ka4alka-online-new.peregon.chatgpt.site", "web-production-d7aa7.up.railway.app", "catalog-production-e329.up.railway.app", "tracker.opentrackr.org"].filter(host => !only || host.includes(only));
+const ooniDomains = ["rutor.info", "nnmclub.to", "megapeer.vip", "bigfangroup.org", "nyaa.si", "eztvx.to", "api.knaben.org", "knaben.org", "apibay.org", "yts.gg", "archive.org", "w6.zona.plus", "chatgpt.site", "up.railway.app", "raw.githubusercontent.com", "github.com"].filter(domain => !only || domain.includes(only) || only.includes(domain));
 
 async function request(body) {
   for (let attempt = 0; attempt < 4; attempt++) {
@@ -102,6 +110,25 @@ async function ooni(domain) {
   } catch (error) { return { domain, error: String(error.message) }; }
 }
 
+// Does the service find releases itself? Reads its catalog and asks /api/releases for the first cards.
+// Runs from the runner (the service's own trackers matter here, not the route from Russia).
+async function serviceReleases(host) {
+  const rows = [];
+  try {
+    const catalog = await (await fetch(`https://${host}/api/catalog?section=movies&page=1`, { signal: AbortSignal.timeout(30_000) })).json();
+    for (const item of (catalog.items ?? []).slice(0, 5)) {
+      const started = Date.now();
+      try {
+        const data = await (await fetch(`https://${host}/api/releases?id=${encodeURIComponent(item.id)}`, { signal: AbortSignal.timeout(60_000) })).json();
+        const sources = {};
+        for (const row of data.items ?? []) sources[row.source] = (sources[row.source] ?? 0) + 1;
+        rows.push({ id: item.id, title: item.title, year: item.year, count: (data.items ?? []).length, sources, ms: Date.now() - started, error: data.error ?? null });
+      } catch (error) { rows.push({ id: item.id, error: String(error.message), ms: Date.now() - started }); }
+    }
+  } catch (error) { rows.push({ error: "catalog: " + String(error.message) }); }
+  return rows;
+}
+
 const report = { generatedUtc: new Date().toISOString(), http: [], dns: [], ooni: [], baseline: [] };
 // The first measurement chooses Russian probes; the rest reuse exactly the same probes.
 let probesId = null;
@@ -143,6 +170,10 @@ lines.push("", "## OONI web_connectivity, Россия, 30 дней", "", "| Д�
 for (const row of report.ooni) lines.push(`| ${row.domain} | ${row.measurement_count ?? row.error ?? ""} | ${row.ok_count ?? ""} | ${row.anomaly_count ?? ""} | ${row.confirmed_count ?? ""} | ${row.failure_count ?? ""} |`);
 lines.push("", "## Тот же запрос с раннера GitHub (вне России)", "", "| Цель | Код | Байт | мс |", "|---|---|---|---|");
 for (const row of report.baseline) lines.push(`| ${row.target} | ${row.status}${row.error ? " " + row.error : ""} | ${row.bytes ?? ""} | ${row.ms} |`);
+if (only) {
+  lines.push("", "## Раздачи, которые сервис находит сам (с раннера GitHub)", "", "| Карточка | Год | Раздач | Источники | мс | Ошибка |", "|---|---|---|---|---|---|");
+  for (const row of await serviceReleases(only.includes(".") ? only : `${only}.up.railway.app`)) lines.push(`| ${row.title ?? row.id ?? ""} | ${row.year ?? ""} | ${row.count ?? ""} | ${JSON.stringify(row.sources ?? {})} | ${row.ms ?? ""} | ${row.error ?? ""} |`);
+}
 const markdown = lines.join("\n") + "\n";
 writeFileSync("russia-reachability.md", markdown);
 if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, markdown);

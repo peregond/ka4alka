@@ -1,5 +1,7 @@
 {
   "schemaVersion": 1,
   "relays": [],
-  "mirrors": []
+  "mirrors": [
+    "https://catalog-production-e329.up.railway.app/"
+  ]
 }
