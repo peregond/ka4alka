@@ -110,6 +110,25 @@ async function ooni(domain) {
   } catch (error) { return { domain, error: String(error.message) }; }
 }
 
+// Does the service find releases itself? Reads its catalog and asks /api/releases for the first cards.
+// Runs from the runner (the service's own trackers matter here, not the route from Russia).
+async function serviceReleases(host) {
+  const rows = [];
+  try {
+    const catalog = await (await fetch(`https://${host}/api/catalog?section=movies&page=1`, { signal: AbortSignal.timeout(30_000) })).json();
+    for (const item of (catalog.items ?? []).slice(0, 5)) {
+      const started = Date.now();
+      try {
+        const data = await (await fetch(`https://${host}/api/releases?id=${encodeURIComponent(item.id)}`, { signal: AbortSignal.timeout(60_000) })).json();
+        const sources = {};
+        for (const row of data.items ?? []) sources[row.source] = (sources[row.source] ?? 0) + 1;
+        rows.push({ id: item.id, title: item.title, year: item.year, count: (data.items ?? []).length, sources, ms: Date.now() - started, error: data.error ?? null });
+      } catch (error) { rows.push({ id: item.id, error: String(error.message), ms: Date.now() - started }); }
+    }
+  } catch (error) { rows.push({ error: "catalog: " + String(error.message) }); }
+  return rows;
+}
+
 const report = { generatedUtc: new Date().toISOString(), http: [], dns: [], ooni: [], baseline: [] };
 // The first measurement chooses Russian probes; the rest reuse exactly the same probes.
 let probesId = null;
@@ -151,6 +170,10 @@ lines.push("", "## OONI web_connectivity, Россия, 30 дней", "", "| Д�
 for (const row of report.ooni) lines.push(`| ${row.domain} | ${row.measurement_count ?? row.error ?? ""} | ${row.ok_count ?? ""} | ${row.anomaly_count ?? ""} | ${row.confirmed_count ?? ""} | ${row.failure_count ?? ""} |`);
 lines.push("", "## Тот же запрос с раннера GitHub (вне России)", "", "| Цель | Код | Байт | мс |", "|---|---|---|---|");
 for (const row of report.baseline) lines.push(`| ${row.target} | ${row.status}${row.error ? " " + row.error : ""} | ${row.bytes ?? ""} | ${row.ms} |`);
+if (only) {
+  lines.push("", "## Раздачи, которые сервис находит сам (с раннера GitHub)", "", "| Карточка | Год | Раздач | Источники | мс | Ошибка |", "|---|---|---|---|---|---|");
+  for (const row of await serviceReleases(only.includes(".") ? only : `${only}.up.railway.app`)) lines.push(`| ${row.title ?? row.id ?? ""} | ${row.year ?? ""} | ${row.count ?? ""} | ${JSON.stringify(row.sources ?? {})} | ${row.ms ?? ""} | ${row.error ?? ""} |`);
+}
 const markdown = lines.join("\n") + "\n";
 writeFileSync("russia-reachability.md", markdown);
 if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, markdown);
