@@ -49,8 +49,11 @@ try {
     targets.splice(1, 0, { name: `Посредник ${url.hostname}: поиск`, host: url.hostname, path: url.pathname + "api/search", query: "id=movies:interstellar&title=%D0%98%D0%BD%D1%82%D0%B5%D1%80%D1%81%D1%82%D0%B5%D0%BB%D0%BB%D0%B0%D1%80&original=Interstellar&year=2014" });
   }
 } catch { /* No relay is published yet. */ }
-const dnsTargets = ["api.knaben.org", "apibay.org", "rutor.info", "nnmclub.to", "megapeer.vip", "nyaa.si", "ka4alka-online-new.peregon.chatgpt.site", "web-production-d7aa7.up.railway.app", "catalog-production-e329.up.railway.app", "tracker.opentrackr.org"];
-const ooniDomains = ["rutor.info", "nnmclub.to", "megapeer.vip", "bigfangroup.org", "nyaa.si", "eztvx.to", "api.knaben.org", "knaben.org", "apibay.org", "yts.gg", "archive.org", "w6.zona.plus", "chatgpt.site", "up.railway.app", "raw.githubusercontent.com", "github.com"];
+// ONLY=<подстрока хоста> ограничивает проверку одним сервисом: так запуск укладывается в лимит workflow.
+const only = process.env.ONLY?.trim();
+if (only) for (let i = targets.length - 1; i >= 0; i--) if (!targets[i].host.includes(only)) targets.splice(i, 1);
+const dnsTargets = ["api.knaben.org", "apibay.org", "rutor.info", "nnmclub.to", "megapeer.vip", "nyaa.si", "ka4alka-online-new.peregon.chatgpt.site", "web-production-d7aa7.up.railway.app", "catalog-production-e329.up.railway.app", "tracker.opentrackr.org"].filter(host => !only || host.includes(only));
+const ooniDomains = ["rutor.info", "nnmclub.to", "megapeer.vip", "bigfangroup.org", "nyaa.si", "eztvx.to", "api.knaben.org", "knaben.org", "apibay.org", "yts.gg", "archive.org", "w6.zona.plus", "chatgpt.site", "up.railway.app", "raw.githubusercontent.com", "github.com"].filter(domain => !only || domain.includes(only) || only.includes(domain));
 
 async function request(body) {
   for (let attempt = 0; attempt < 4; attempt++) {

@@ -5,6 +5,11 @@ name: Russia reachability probe
 # OONI aggregates) and checks every relay listed in distribution/relays.json.
 on:
   workflow_dispatch:
+    inputs:
+      only:
+        description: Measure only hosts containing this text (for example catalog-production-e329); skips the relay and tracker steps
+        required: false
+        default: ''
 permissions:
   contents: read
 jobs:
@@ -17,28 +22,32 @@ jobs:
         with:
           node-version: '22'
       - name: Install the site toolchain for the relay
+        if: ${{ inputs.only == '' }}
         working-directory: web-index
         run: npm ci --no-audit --no-fund
       - name: Run the standalone relay against live trackers
+        if: ${{ inputs.only == '' }}
         run: |
           cd relay-worker
           ../web-index/node_modules/.bin/wrangler dev --local --port 8798 --ip 127.0.0.1 --inspector-port 0 > ../relay-dev.log 2>&1 &
           cd ..
           node scripts/probe-relay-live.mjs
       - name: Relay log
-        if: always()
+        if: ${{ (always()) && inputs.only == '' }}
         run: tail -n 60 relay-dev.log || true
       - name: Compare the site's answer by country
-        if: ${{ !cancelled() }}
+        if: ${{ (!cancelled()) && inputs.only == '' }}
         run: node scripts/probe-site-geoblock.mjs
       - name: List trackers covered by Knaben, which answers in Russia
-        if: ${{ !cancelled() }}
+        if: ${{ (!cancelled()) && inputs.only == '' }}
         run: node scripts/probe-knaben-trackers.mjs
       - name: Measure sources, the site and relays from Russian networks
         if: ${{ !cancelled() }}
+        env:
+          ONLY: ${{ inputs.only }}
         run: node scripts/probe-russia-reachability.mjs
       - name: Check published relays from Russian networks
-        if: ${{ !cancelled() }}
+        if: ${{ (!cancelled()) && inputs.only == '' }}
         run: |
           status=0
           for relay in $(node -e 'for(const r of require("./distribution/relays.json").relays??[])console.log(r)'); do
