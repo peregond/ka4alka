@@ -1209,13 +1209,14 @@ struct KDShelf<Item: Identifiable, Cell: View>: View {
 // MARK: Sidebar symbols
 
 enum KDNavSymbol {
-    /// `key` is Section.rawValue: featured, movies, series, games, saved, downloads, settings.
+    /// `key` is Section.rawValue: featured, movies, series, shows, games, saved, downloads, settings.
     /// The open section gets a solid icon, as on Windows; Актуальное uses a star.
     static func symbol(for key: String, selected: Bool) -> String {
         switch key {
         case "featured": return selected ? "star.fill" : "star"
         case "movies": return selected ? "film.fill" : "film"
         case "series": return selected ? "tv.fill" : "tv"
+        case "shows": return selected ? "theatermasks.fill" : "theatermasks"
         case "games": return selected ? "gamecontroller.fill" : "gamecontroller"
         case "saved": return selected ? "heart.fill" : "heart"
         case "downloads": return selected ? "arrow.down.circle.fill" : "arrow.down.circle"

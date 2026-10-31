@@ -176,7 +176,7 @@ public partial class MainWindow
         if(!favoritesOnly&&liveKey!=key){liveKey=key;_ = FetchCatalog(key,section,submittedQuery,livePage);}
         var headingRow=new DockPanel{Margin=new(5,0,8,5)};
         var count=Text(liveLoading?"Загружаем…":$"Страница {livePage}",11,true);count.VerticalAlignment=VerticalAlignment.Center;count.Margin=new(14,0,0,0);DockPanel.SetDock(count,Dock.Right);headingRow.Children.Add(count);
-        var title=favoritesOnly?"Сохранённое":SearchActive?"Результаты поиска":catalogCollection.StartsWith("seasonal:",StringComparison.Ordinal)?sharedCatalog.ActiveCollections.FirstOrDefault(x=>"seasonal:"+x.Id==catalogCollection)?.Title??"Подборка":catalogRegion=="native"?section=="Фильмы"?"Отечественные фильмы":"Отечественные сериалы":catalogRegion=="foreign"?section=="Фильмы"?"Иностранные фильмы":"Иностранные сериалы":catalogCollection=="popular"?"Популярное":catalogCollection=="rated"?"Кино с высоким рейтингом":section=="Фильмы"?"Все фильмы":"Все сериалы";
+        var title=favoritesOnly?"Сохранённое":SearchActive?"Результаты поиска":catalogCollection.StartsWith("seasonal:",StringComparison.Ordinal)?sharedCatalog.ActiveCollections.FirstOrDefault(x=>"seasonal:"+x.Id==catalogCollection)?.Title??"Подборка":catalogRegion=="native"?DiscoveryShelfTitle(DiscoveryShelfKind.Native):catalogRegion=="foreign"?DiscoveryShelfTitle(DiscoveryShelfKind.Foreign):catalogCollection=="popular"?"Популярное":catalogCollection=="rated"?"Кино с высоким рейтингом":AllTitlesHeading;
         var heading=Text(title,compactHeight?20:22);heading.FontWeight=FontWeights.Bold;heading.Margin=new(0);headingRow.Children.Add(heading);if(!DiscoveryCatalog)PageHeader.Children.Add(headingRow);
         var subtitle=Text(liveError.Length>0?liveError:favoritesOnly?"Кино, к которому хочется вернуться.":SearchActive?$"Результаты для «{submittedQuery}».":catalogCollection.StartsWith("seasonal:",StringComparison.Ordinal)?"Сезонная подборка.":catalogCollection!="all"?"Подборка Zona · обновляется из общего каталога.":"Выбирай историю на сегодня.",13,true);subtitle.Tag="CatalogSubtitle";subtitle.Margin=new(5,3,0,12);subtitle.Visibility=compactHeight?Visibility.Collapsed:Visibility.Visible;if(!DiscoveryCatalog)PageHeader.Children.Add(subtitle);
         var toolbar=new DockPanel();catalogToolbar=toolbar;
@@ -268,7 +268,7 @@ public partial class MainWindow
     MediaItem[] CatalogPageItems()
     {
         var selection=CatalogSelection;
-        IEnumerable<MediaItem> shown=favoritesOnly?prefs.LiveFavorites.Where(x=>x.Section==section&&x.Title.Contains(submittedQuery,StringComparison.CurrentCultureIgnoreCase)).DistinctBy(x=>x.Id).Where(selection.Matches):SearchActive?UnifiedSearch.Filter(liveItems,searchCategory).Where(selection.Matches):liveItems;
+        IEnumerable<MediaItem> shown=favoritesOnly?prefs.LiveFavorites.Where(x=>x.Section==CatalogSections.ItemSection(section)&&(section!=CatalogSections.Shows||CatalogSections.IsShow(x))&&x.Title.Contains(submittedQuery,StringComparison.CurrentCultureIgnoreCase)).DistinctBy(x=>x.Id).Where(selection.Matches):SearchActive?UnifiedSearch.Filter(liveItems,searchCategory).Where(selection.Matches):liveItems;
         if(favoritesOnly)shown=catalogOrder=="По рейтингу"?shown.OrderByDescending(CatalogPaging.Rating):shown.OrderByDescending(x=>x.Year);
         var local=favoritesOnly||SearchActive;
         var all=shown.Where(x=>favoritesOnly||SearchActive||!NoDownloads(x)&&PersonallyVisible(x)).ToArray();
@@ -314,12 +314,12 @@ public partial class MainWindow
             }
             AttachMenuToggle(button,menu);(sorting?sortTarget??target:target).Children.Add(button);
         }
-        if(!favoritesOnly&&!SearchActive)Choice("Подборка",new CatalogChoice[]{new("all","Весь каталог"),new("popular","Популярное · Zona"),new("rated","Высокий рейтинг · Zona"),new("foreign","Иностранные"),new("native","Отечественные")}.Concat(sharedCatalog.ActiveCollections.Select(x=>new CatalogChoice("seasonal:"+x.Id,x.Title))).ToArray(),catalogRegion.Length>0?catalogRegion:catalogCollection,v=>
+        if(!favoritesOnly&&!SearchActive)Choice("Подборка",new CatalogChoice[]{new("all","Весь каталог"),new("popular","Популярное · Zona"),new("rated","Высокий рейтинг · Zona"),new("foreign","Иностранные"),new("native","Отечественные")}.Concat(section==CatalogSections.Shows?Enumerable.Empty<CatalogChoice>():sharedCatalog.ActiveCollections.Select(x=>new CatalogChoice("seasonal:"+x.Id,x.Title))).ToArray(),catalogRegion.Length>0?catalogRegion:catalogCollection,v=>
         {
             catalogRegion=v is "foreign" or "native"?v:"";catalogCollection=catalogRegion.Length>0?"all":v;
             if(catalogRegion.Length>0)catalogCountry="";
         });
-        Choice("Жанр",new[]{new CatalogChoice("","Любой жанр")}.Concat(catalogGenres),catalogGenre,v=>catalogGenre=v);
+        Choice("Жанр",new[]{new CatalogChoice("","Любой жанр")}.Concat(section==CatalogSections.Shows?CatalogSections.ShowGenres:catalogGenres),catalogGenre,v=>catalogGenre=v);
         Choice("Страна",new[]{new CatalogChoice("","Любая страна")}.Concat(catalogCountries),catalogCountry,v=>{catalogCountry=v;catalogRegion="";});
         Choice("Рейтинг от",new[]{new CatalogChoice("0","Любой рейтинг")}.Concat(Enumerable.Range(1,9).Reverse().Select(x=>new CatalogChoice(x.ToString(),x+" и выше"))),catalogRating.ToString(),v=>catalogRating=int.Parse(v));
         Choice("Год выхода",new[]{new CatalogChoice("","Любой год")}.Concat(Enumerable.Range(2010,DateTime.UtcNow.Year-2009).Reverse().Select(x=>new CatalogChoice(x.ToString(),x.ToString()))),catalogYear?.ToString()??"",v=>catalogYear=int.TryParse(v,out var y)?y:null);
@@ -356,13 +356,13 @@ public partial class MainWindow
                             var pack=sharedCatalog.ActiveCollections.FirstOrDefault(x=>"seasonal:"+x.Id==selection.Collection);
                             shared=pack==null?new CatalogPage([],false,[],[]):SeasonalCatalog.Page(pack,sharedCatalog.All,category,page,selection);
                         }
-                        else shared=selection.IsDefault?await sharedCatalog.PageAsync(category,page,token):null;
+                        else shared=selection.IsDefault&&category!=CatalogSections.Shows?await sharedCatalog.PageAsync(category,page,token):null;
                         if(shared!=null)_ = RefreshSharedCatalogAsync(forceRefresh);
                         result=shared??(selection.Region.Length>0
                             ?await new RegionalCatalog(sourceClient).BrowsePage(category,page,selection.Region,selection.HomeCountry,token,selection,forceRefresh)
                             :await new LiveCatalog(sourceClient).BrowsePage(category,page,selection,token,forceRefresh));
                     }
-                    catch(Exception) when(!token.IsCancellationRequested&&selection.IsDefault)
+                    catch(Exception) when(!token.IsCancellationRequested&&selection.IsDefault&&category!=CatalogSections.Shows)
                     {
                         try
                         {

@@ -55,10 +55,11 @@ public partial class MainWindow
     string DiscoveryShelfTitle(DiscoveryShelfKind kind)=>kind switch
     {
         DiscoveryShelfKind.Popular=>"Популярное",
-        DiscoveryShelfKind.New=>section=="Фильмы"?"Новые фильмы":"Новые сериалы",
-        DiscoveryShelfKind.Foreign=>section=="Фильмы"?"Иностранные фильмы":"Иностранные сериалы",
-        _=>section=="Фильмы"?"Отечественные фильмы":"Отечественные сериалы"
+        DiscoveryShelfKind.New=>section switch{"Фильмы"=>"Новые фильмы",CatalogSections.Shows=>"Новые шоу",_=>"Новые сериалы"},
+        DiscoveryShelfKind.Foreign=>section switch{"Фильмы"=>"Иностранные фильмы",CatalogSections.Shows=>"Иностранные шоу",_=>"Иностранные сериалы"},
+        _=>section switch{"Фильмы"=>"Отечественные фильмы",CatalogSections.Shows=>"Отечественные шоу",_=>"Отечественные сериалы"}
     };
+    string AllTitlesHeading=>section switch{"Фильмы"=>"Все фильмы",CatalogSections.Shows=>"Все шоу",_=>"Все сериалы"};
     DiscoveryShelfView AddDiscoveryShelf(Panel parent,DiscoveryShelfKind kind)=>AddShelf(parent,kind.ToString(),DiscoveryShelfTitle(kind),()=>OpenDiscoveryShelf(kind),"MediaRow",1);
     // A titled shelf with its "Ещё" button; the film home and the games home both build theirs here. Game capsules fill two rows, posters one.
     DiscoveryShelfView AddShelf(Panel parent,string id,string title,Action open,string template,int rows,string? kicker=null)

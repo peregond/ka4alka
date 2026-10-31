@@ -66,7 +66,7 @@ public partial class MainWindow
     }
     void StartPeopleSearch()
     {
-        if(!SearchActive||current!=null||activePerson!=null||section is not ("Фильмы" or "Сериалы")){CancelPeopleSearch();return;}
+        if(!SearchActive||current!=null||activePerson!=null||section is not ("Фильмы" or "Сериалы" or "ТВ Шоу")){CancelPeopleSearch();return;}
         var query=submittedQuery;var term=PersonSearchTerm(query);
         if(term.Length<2){CancelPeopleSearch(true);return;}
         var local=KnownSearchPeople(term);
@@ -85,7 +85,7 @@ public partial class MainWindow
                 await sharedCatalog.RestoreAsync(request.Token);
                 if(request.IsCancellationRequested||!ReferenceEquals(peopleSearchRequest,request))return;
                 peopleSearchItems=MergePeopleSearch(term,peopleSearchItems,KnownSearchPeople(term));
-                if(!closed&&current==null&&activePerson==null&&SearchActive&&submittedQuery==query&&(section is "Фильмы" or "Сериалы"))RenderCatalogKeepingPosition();
+                if(!closed&&current==null&&activePerson==null&&SearchActive&&submittedQuery==query&&(section is "Фильмы" or "Сериалы" or "ТВ Шоу"))RenderCatalogKeepingPosition();
                 IReadOnlyList<CinemaPerson> remote=peopleSearchProvider!=null?
                     await peopleSearchProvider(query,request.Token).WaitAsync(request.Token):
                     await new ProfessionalCinemaPeople(sourceClient).SearchPeople(query,request.Token).WaitAsync(request.Token);
@@ -107,7 +107,7 @@ public partial class MainWindow
                 var active=ReferenceEquals(peopleSearchRequest,request);
                 if(active){peopleSearchRequest=null;peopleSearchResolvedQuery=term;}
                 request.Dispose();
-                if(active&&!closed&&current==null&&activePerson==null&&SearchActive&&submittedQuery==query&&(section is "Фильмы" or "Сериалы"))RenderCatalogKeepingPosition();
+                if(active&&!closed&&current==null&&activePerson==null&&SearchActive&&submittedQuery==query&&(section is "Фильмы" or "Сериалы" or "ТВ Шоу"))RenderCatalogKeepingPosition();
             }
         }
     }

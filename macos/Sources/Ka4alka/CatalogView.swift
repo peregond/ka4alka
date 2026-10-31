@@ -250,8 +250,15 @@ struct CatalogView: View {
     private static let topID = "catalog-top"
 
     private var showsSpotlight: Bool {
-        !saved && (model.section == .movies || model.section == .series)
+        !saved && (model.section == .movies || model.section == .series || model.section == .shows)
             && model.page == 1 && model.submittedQuery.isEmpty && !model.filter.active
+    }
+    private var allTitlesHeading: String {
+        switch model.section {
+        case .series: return tr("Все сериалы", "All series")
+        case .shows: return tr("Все шоу", "All shows")
+        default: return tr("Все фильмы", "All movies")
+        }
     }
     /// The filters stay on screen while a filter or a search is active; the page title always scrolls with the content.
     private var pinsHeader: Bool { !saved && (model.filter.active || !model.submittedQuery.isEmpty) }
@@ -339,7 +346,7 @@ struct CatalogView: View {
                     CatalogSpotlightView(items: Array(shown.prefix(5)))
                         .id(model.section.rawValue)
                         .settingsLayoutProbe("catalog.banner." + model.section.rawValue)
-                    Text(model.section == .series ? tr("Все сериалы", "All series") : tr("Все фильмы", "All movies"))
+                    Text(allTitlesHeading)
                         .font(KDFont.section)
                         .accessibilityAddTraits(.isHeader)
                 }
@@ -594,7 +601,13 @@ struct CatalogView: View {
 struct FilterBar: View {
     @EnvironmentObject var model: AppModel
     private var isGames: Bool { model.section == .games }
-    private var genreItems: [Choice] { isGames ? model.gameGenres : model.genres }
+    private var isShows: Bool { model.section == .shows }
+    /// The source genres that make a series a TV show; the engine uses the same three.
+    private static let showGenreKeys: Set<String> = ["realnoe-tv", "tok-shou", "igra"]
+    private var genreItems: [Choice] {
+        if isGames { return model.gameGenres }
+        return isShows ? model.genres.filter { FilterBar.showGenreKeys.contains($0.key) } : model.genres
+    }
     private var showsKind: Bool { !model.submittedQuery.isEmpty && !isGames }
     private var showsReset: Bool { model.filter.active || !model.submittedQuery.isEmpty }
     private var currentYear: Int { Calendar.current.component(.year, from: Date()) }
@@ -604,6 +617,7 @@ struct FilterBar: View {
         VStack(alignment: .leading, spacing: KD.Space.xs) {
             KDFlowLayout(spacing: KD.Space.xs, lineSpacing: KD.Space.xs) {
                 if showsKind { kindPicker }
+                if isShows && model.submittedQuery.isEmpty { scopePicker }
                 genreMenu
                 if !isGames {
                     countryMenu
@@ -637,6 +651,9 @@ struct FilterBar: View {
     private var qualityBinding: Binding<String> {
         Binding(get: { model.filter.quality }, set: { model.filter.quality = $0 })
     }
+    private var scopeBinding: Binding<String> {
+        Binding(get: { model.filter.scope }, set: { model.filter.scope = $0 })
+    }
     private var kindBinding: Binding<String> {
         Binding(get: { model.filter.kind }, set: { model.filter.kind = $0 })
     }
@@ -654,6 +671,20 @@ struct FilterBar: View {
     }
 
     // MARK: Menus
+
+    /// The basic split of the TV Shows page, as on the Windows home: everything, popular, local and international.
+    private var scopePicker: some View {
+        Picker(tr("Подборка", "Collection"), selection: scopeBinding) {
+            Text(tr("Все", "All")).tag("")
+            Text(tr("Популярные", "Popular")).tag("popular")
+            Text(tr("Отечественные", "Local")).tag("native")
+            Text(tr("Иностранные", "International")).tag("foreign")
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .frame(width: 440)
+        .accessibilityLabel(tr("Подборка", "Collection"))
+    }
 
     private var kindPicker: some View {
         Picker(tr("Показывать", "Show"), selection: kindBinding) {

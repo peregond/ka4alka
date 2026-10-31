@@ -36,7 +36,7 @@ public partial class MainWindow
             catalogEvidenceRefresh=new(System.Windows.Threading.DispatcherPriority.Background){Interval=TimeSpan.FromMilliseconds(160)};
             catalogEvidenceRefresh.Tick+=(_,_)=>
             {
-                if(closed||current!=null||activePerson!=null||section is not ("Фильмы" or "Сериалы")){catalogEvidenceRefresh.Stop();return;}
+                if(closed||current!=null||activePerson!=null||section is not ("Фильмы" or "Сериалы" or "ТВ Шоу")){catalogEvidenceRefresh.Stop();return;}
                 if(VisualElements<ComboBox>(RootGrid).Any(x=>x.IsDropDownOpen)||VisualElements<Button>(RootGrid).Any(x=>x.ContextMenu?.IsOpen==true))return;
                 catalogEvidenceRefresh.Stop();RenderCatalogKeepingPosition();
             };
@@ -168,7 +168,7 @@ public partial class MainWindow
             if(token.IsCancellationRequested)work.Pending.Clear();
             if(active)catalogQualityRequest=null;
             request.Dispose();
-            if(active&&!closed&&current==null&&activePerson==null&&(section is "Фильмы" or "Сериалы")&&!VisualElements<Button>(RootGrid).Any(x=>x.ContextMenu?.IsOpen==true))RenderCatalogKeepingPosition();
+            if(active&&!closed&&current==null&&activePerson==null&&(section is "Фильмы" or "Сериалы" or "ТВ Шоу")&&!VisualElements<Button>(RootGrid).Any(x=>x.ContextMenu?.IsOpen==true))RenderCatalogKeepingPosition();
         }
     }
 
