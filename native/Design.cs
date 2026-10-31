@@ -43,7 +43,7 @@ public partial class MainWindow
             onlineIndex.RetryNow();ResetCatalogQualityChecks();catalogPages.Clear();ResetDiscoveryData();
             Status.Text=AppLanguage.T(changed?"Каталог обновлён. Новые названия появятся в разделах.":"Новых названий пока нет.");
             if(current!=null)return;
-            if(section is "Фильмы" or "Сериалы"){catalogRefreshRequested=true;liveKey="";Render();}
+            if(section is "Фильмы" or "Сериалы" or "ТВ Шоу"){catalogRefreshRequested=true;liveKey="";Render();}
             else if(section=="Игры")RefreshGames();
             else if(section==FeaturedSection){featuredGroups=null;Render();}
         }

@@ -178,9 +178,20 @@ sealed class DesktopEngine:IAsyncDisposable
             var result=await new GameCatalog(source,prefs.UiLanguage).Browse(new(query,S(p,"sort","popular"),S(p,"genre")=="all"?"":S(p,"genre"),page),ct);
             return new{items=Remember(result.Items.Where(Visible)),hasNext=result.HasNext,offline=false};
         }
-        await BundledCatalog.EnsureLoadedAsync(ct);var category=section=="series"?"Сериалы":"Фильмы";
+        await BundledCatalog.EnsureLoadedAsync(ct);var category=section is "series" or "shows"?"Сериалы":"Фильмы";
         var selection=new CatalogSelection(S(p,"genre"),S(p,"country"),I(p,"year")==0?null:I(p,"year"),I(p,"rating"),S(p,"sort","date"));
         var qualityHeight=S(p,"quality") switch{"HD Ready"=>720,"Full HD"=>1080,"4K"=>2160,_=>0};
+        if(section=="shows"&&query.Length==0)
+        {
+            // The source offers no "TV show" listing, so the page is built from the show genres of the series catalogue and always comes from the live source.
+            var scope=S(p,"scope");
+            var shows=selection with{Collection=scope=="popular"?"popular":"all"};
+            var browsed=scope is "native" or "foreign"
+                ?await new RegionalCatalog(source).BrowsePage(CatalogSections.Shows,page,scope,prefs.HomeCountry,ct,shows)
+                :await new LiveCatalog(source).BrowsePage(CatalogSections.Shows,page,shows,ct);
+            var listed=await Task.Run(()=>browsed.Items.Where(Visible).Where(item=>qualityHeight==0||QualityMatches(item,qualityHeight)).ToArray(),ct);
+            return new{items=Remember(listed),hasNext=browsed.HasNext,offline=false};
+        }
         if(query.Length>0)
         {
             var result=await UnifiedSearch.FindAsync(query,(kind,t)=>online.Browse(kind,query,1,t),kind=>shared.Search(kind,query),ct,

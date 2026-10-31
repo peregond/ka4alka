@@ -18,6 +18,20 @@ static class CatalogPagingTests
         }
     }
 
+    // Show genres of different length: two long lists and one that ends within its first source page.
+    sealed class ShowPages:HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken ct)
+        {
+            var genre=System.Text.RegularExpressions.Regex.Match(request.RequestUri!.AbsolutePath,@"genre-([a-z-]+?)(?:/|$)").Groups[1].Value;
+            var page=int.Parse(System.Text.RegularExpressions.Regex.Match(request.RequestUri.Query,@"page=(\d+)").Groups[1].Value);
+            var total=genre=="igra"?20:120;
+            var cards=string.Concat(Enumerable.Range((page-1)*60+1,Math.Max(0,Math.Min(60,total-(page-1)*60))).Select(x=>$"<li class='results-item-wrap'><a itemprop='url' href='/tvseries/{genre}-{x}'><span itemprop='name'>{genre} {x}</span></a></li>"));
+            var next=page*60<total?$"<link rel='next' href='/tvseries/filter/genre-{genre}?page={page+1}'>":"";
+            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK){Content=new StringContent(cards+next,Encoding.UTF8,"text/html")});
+        }
+    }
+
     public static void Run()
     {
         void Check(bool ok,string name){if(!ok)throw new Exception(name);Console.WriteLine("PASS: "+name);}
@@ -44,6 +58,24 @@ static class CatalogPagingTests
             }
             Check(all.Select(x=>x.Title).SequenceEqual(Enumerable.Range(1,180).Select(x=>"Фильм "+x)),"native source browsing retains all films across 60-to-40 page boundaries");
         }
+        using(var client=new SourceClient(new ShowPages()))
+        {
+            var catalog=new LiveCatalog(client);
+            CatalogPage Shows(int n)=>catalog.BrowsePage(CatalogSections.Shows,n,new CatalogSelection(),CancellationToken.None,true).GetAwaiter().GetResult();
+            var pages=Enumerable.Range(1,9).Select(Shows).ToArray();
+            Check(pages[0].Items.Length==42&&pages[0].Items.Take(3).Select(x=>x.Title).SequenceEqual(["realnoe-tv 1","tok-shou 1","igra 1"]),"the first show page takes one title from every show genre in turn");
+            Check(pages.SelectMany(x=>x.Items).All(x=>x.Section=="Сериалы"&&x.PageUrl!.Contains("/tvseries/")),"show titles stay ordinary series of the source catalogue");
+            Check(pages.SelectMany(x=>x.Items).Select(x=>x.Id).Distinct().Count()==pages.SelectMany(x=>x.Items).Count(),"show pages never repeat a title");
+            Check(pages.SelectMany(x=>x.Items).Where(x=>x.Title.StartsWith("realnoe-tv ")).Select(x=>x.Title).SequenceEqual(Enumerable.Range(1,120).Select(x=>"realnoe-tv "+x)),"every title of a long show genre appears once across the 60-to-14 page boundaries");
+            Check(pages.SelectMany(x=>x.Items).Count(x=>x.Title.StartsWith("igra "))==20&&pages[2].Items.All(x=>!x.Title.StartsWith("igra ")),"a short genre runs out without blocking the others");
+            Check(pages[7].Items.Length>0&&pages.Take(8).All(x=>x.HasNext)&&!pages[8].HasNext,"show pages continue while any genre has more titles");
+            Check(pages[0].Genres.Select(x=>x.Key).SequenceEqual(CatalogSections.ShowGenres.Select(x=>x.Key)),"the genre filter of the shows view lists only show genres");
+            var one=catalog.BrowsePage(CatalogSections.Shows,1,new CatalogSelection(Genre:"tok-shou"),CancellationToken.None,true).GetAwaiter().GetResult();
+            Check(one.Items.Length==40&&one.Items.All(x=>x.Title.StartsWith("tok-shou ")),"choosing a show genre narrows the shows view to that genre");
+        }
+        Check(CatalogSections.ItemSection(CatalogSections.Shows)=="Сериалы"&&CatalogSections.ItemSection("Фильмы")=="Фильмы"&&CatalogSections.ItemSection("Игры")=="Игры","the shows view is backed by series");
+        var talk=new MediaItem(2,"Вечерний ургант","Сериалы","ток-шоу",2012,"7,0","—","#526B69"){GenreKeys=["tok-shou"]};
+        Check(CatalogSections.IsShow(talk)&&!CatalogSections.IsShow(talk with{GenreKeys=["drama"]})&&!CatalogSections.IsShow(talk with{Section="Фильмы"}),"a saved series counts as a show only through a show genre");
         var nextLink=html.Replace("<a href='/movies/filter/sort-date?page=2'>Далее</a>","<link rel='next' href='/movies/filter/sort-date?page=2'>");
         Check(LiveCatalog.ParsePage(Encoding.UTF8.GetBytes(nextLink),"Фильмы",1).HasNext,"head rel=next link keeps the catalog navigable without a visible anchor");
         Check(BundledCatalog.Count("Фильмы")>=2000,"application includes at least 2000 distinct real movies");

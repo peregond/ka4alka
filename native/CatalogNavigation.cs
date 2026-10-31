@@ -68,7 +68,7 @@ public partial class MainWindow
         if(current is {} item)return "detail|"+item.Section+"|"+item.Id;
         if(section=="Актуальное")return "featured|"+featuredCollectionId;
         if(section=="Сохранённое")return "saved|"+savedCategory+"|"+savedPage;
-        if(section is "Фильмы" or "Сериалы")
+        if(section is "Фильмы" or "Сериалы" or "ТВ Шоу")
             return "catalog|"+section+"|"+CurrentCatalogKey+"|page:"+livePage+"|category:"+searchCategory+
                 "|selection:"+CatalogSelection.Filter+"|collection:"+catalogCollection+"|region:"+catalogRegion+
                 "|poor:"+prefs.HidePoorQuality+"|favorites:"+favoritesOnly;
@@ -95,7 +95,7 @@ public partial class MainWindow
             previous.StartsWith("saved|",StringComparison.Ordinal)&&next.StartsWith("saved|",StringComparison.Ordinal)&&previous!=next)
             catalogPositions.Remove(next);
         navigationResetRequested=false;
-        if(current==null&&activePerson==null&&section is "Фильмы" or "Сериалы")
+        if(current==null&&activePerson==null&&section is "Фильмы" or "Сериалы" or "ТВ Шоу")
             catalogBrowseContext=new(section,submittedQuery,searchCategory,livePage,favoritesOnly,catalogGenre,catalogCountry,
                 catalogYear,catalogRating,catalogOrder,catalogCollection,catalogRegion);
         navigationScroll=FindVisual<ScrollViewer>(Body,scroll=>scroll.VerticalScrollBarVisibility!=ScrollBarVisibility.Disabled);

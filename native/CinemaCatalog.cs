@@ -18,7 +18,7 @@ public partial class MainWindow
     CancellationTokenSource? featuredRequest;
     string? featuredCategory;
     int featuredGeneration;
-    bool DiscoveryCatalog=>section is ("Фильмы" or "Сериалы")&&!SearchActive&&!favoritesOnly&&activePerson==null&&current==null&&livePage==1&&CatalogSelection.IsDefault&&catalogRegion.Length==0;
+    bool DiscoveryCatalog=>section is ("Фильмы" or "Сериалы" or "ТВ Шоу")&&!SearchActive&&!favoritesOnly&&activePerson==null&&current==null&&livePage==1&&CatalogSelection.IsDefault&&catalogRegion.Length==0;
 
     void AddDiscovery(StackPanel content,MediaItem[] cards,UIElement? filterRow=null)
     {
@@ -47,7 +47,7 @@ public partial class MainWindow
                 case DiscoveryShelfKind.Native:view.Set(regions.Native,regions.Loading);break;
             }
         }
-        var all=Text(section=="Фильмы"?"Все фильмы":"Все сериалы",22);all.Name="CatalogAllHeading";all.FontWeight=FontWeights.Bold;all.Margin=new(0,4,0,16);content.Children.Add(all);
+        var all=Text(AllTitlesHeading,22);all.Name="CatalogAllHeading";all.FontWeight=FontWeights.Bold;all.Margin=new(0,4,0,16);content.Children.Add(all);
         UpdateDiscoveryLayout();
         StartRegionalDiscovery(section,cards);
         if(!catalogPages.ContainsKey(section+"||1")&&!featuredRequests.Contains(section)&&!featuredFallback.Contains(section)){featuredRequests.Add(section);_=LoadFeatured(section);}

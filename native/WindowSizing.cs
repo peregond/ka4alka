@@ -171,7 +171,7 @@ public partial class MainWindow
     }
     void UpdateFilterRail()
     {
-        var visible=(inlineCatalogFilterScroll!=null&&catalogToolbar!=null||section=="Игры"&&gameFilterRow!=null)&&current==null&&activePerson==null&&section is "Фильмы" or "Сериалы" or "Сохранённое" or "Игры";
+        var visible=(inlineCatalogFilterScroll!=null&&catalogToolbar!=null||section=="Игры"&&gameFilterRow!=null)&&current==null&&activePerson==null&&section is "Фильмы" or "Сериалы" or "ТВ Шоу" or "Сохранённое" or "Игры";
         FiltersPanel.Visibility=visible?Visibility.Visible:Visibility.Collapsed;
         if(!visible||inlineCatalogFilters==null)return;
         var width=FiltersPanel.ActualWidth>0?FiltersPanel.ActualWidth:Math.Max(1,ActualWidth-(compactWidth?64:236)-2*contentGutter);
