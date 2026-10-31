@@ -2,10 +2,10 @@ import AppKit
 import SwiftUI
 import UserNotifications
 
-enum Section: String, CaseIterable, Identifiable { case featured, movies, series, games, saved, downloads, settings
+enum Section: String, CaseIterable, Identifiable { case featured, movies, series, shows, games, saved, downloads, settings
     var id: String { rawValue }
-    var title: String { switch self { case .featured: return tr("Актуальное", "Featured"); case .movies: return tr("Фильмы", "Movies"); case .series: return tr("Сериалы", "Series"); case .games: return tr("Игры", "Games"); case .saved: return tr("Сохранённое", "Saved"); case .downloads: return tr("Загрузки", "Downloads"); case .settings: return tr("Настройки", "Settings") } }
-    var icon: String { switch self { case .featured: return "sparkles"; case .movies: return "film"; case .series: return "tv"; case .games: return "gamecontroller"; case .saved: return "heart"; case .downloads: return "arrow.down.circle"; case .settings: return "gearshape" } }
+    var title: String { switch self { case .featured: return tr("Актуальное", "Featured"); case .movies: return tr("Фильмы", "Movies"); case .series: return tr("Сериалы", "Series"); case .shows: return tr("ТВ Шоу", "TV Shows"); case .games: return tr("Игры", "Games"); case .saved: return tr("Сохранённое", "Saved"); case .downloads: return tr("Загрузки", "Downloads"); case .settings: return tr("Настройки", "Settings") } }
+    var icon: String { switch self { case .featured: return "sparkles"; case .movies: return "film"; case .series: return "tv"; case .shows: return "theatermasks"; case .games: return "gamecontroller"; case .saved: return "heart"; case .downloads: return "arrow.down.circle"; case .settings: return "gearshape" } }
 }
 enum Route: Equatable { case section(Section), search, collection(String), detail(MediaCard), person(Person)
     static func == (a: Route, b: Route) -> Bool { a.key == b.key }
@@ -13,8 +13,10 @@ enum Route: Equatable { case section(Section), search, collection(String), detai
 }
 struct CatalogFilter: Equatable {
     var genre = ""; var country = ""; var year = 0; var rating = 0; var sort = "date"; var quality = ""; var kind = ""
+    /// The basic split of the TV Shows page: "" all, "popular", "native" (the home country) or "foreign".
+    var scope = ""
     var active: Bool { self != CatalogFilter() }
-    var arguments: [String: JSONValue] { ["genre": .string(genre), "country": .string(country), "year": .number(Double(year)), "rating": .number(Double(rating)), "sort": .string(sort), "kind": .string(kind), "quality": .string(quality)] }
+    var arguments: [String: JSONValue] { ["genre": .string(genre), "country": .string(country), "year": .number(Double(year)), "rating": .number(Double(rating)), "sort": .string(sort), "kind": .string(kind), "quality": .string(quality), "scope": .string(scope)] }
 }
 /// The download queue. Views that show queue numbers observe this object, not the whole model.
 @MainActor final class TransferStore: ObservableObject {
@@ -331,7 +333,7 @@ struct CatalogFilter: Equatable {
     // MARK: Catalog and pages
 
     var requestKey: String {
-        let parts: [String] = [section.rawValue, submittedQuery, String(page), String(revision), filter.genre, filter.country, String(filter.year), String(filter.rating), filter.sort, filter.kind, filter.quality]
+        let parts: [String] = [section.rawValue, submittedQuery, String(page), String(revision), filter.genre, filter.country, String(filter.year), String(filter.rating), filter.sort, filter.kind, filter.quality, filter.scope]
         return parts.joined(separator: "|") + (routes.contains(.search) ? "|search:" + String(searchRevision) : "")
     }
     func loadCatalog() async {
@@ -707,7 +709,7 @@ struct CatalogFilter: Equatable {
     private func catalogBecameReady() {
         cache.removeAll()
         ImageStore.shared.clearFailures()
-        let browsing = section == .movies || section == .series
+        let browsing = section == .movies || section == .series || section == .shows
         if browsing, list?.items.isEmpty != false { revision += 1 }
         Task { await self.loadFeatured(force: true) }
     }

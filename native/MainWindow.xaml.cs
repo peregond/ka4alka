@@ -34,7 +34,7 @@ public partial class MainWindow:Window
             if(closed)return;
             _=MaintainCacheAsync();var expired=ExpireCatalogPages();
             if(sharedCatalog.RefreshDue)_ = RefreshSharedCatalogAsync();
-            if(current==null&&(section is "Фильмы" or "Сериалы")&&!SearchActive&&!favoritesOnly&&expired)
+            if(current==null&&(section is "Фильмы" or "Сериалы" or "ТВ Шоу")&&!SearchActive&&!favoritesOnly&&expired)
             {
                 catalogPages.Clear();catalogLastPage=null;liveKey="";Render();
             }
@@ -46,10 +46,10 @@ public partial class MainWindow:Window
         try{downloads=new(null,prefs.MaxDownloadKbps,prefs.MaxUploadKbps);}catch(Exception e){downloads=newEmpty(prefs.MaxDownloadKbps,prefs.MaxUploadKbps);Status.Text=AppLanguage.T("Не удалось прочитать очередь: "+e.Message);}
         InitializeDownloadReliability();
         InitializeLanDevices();
-        foreach(var name in new[]{"Актуальное","Фильмы","Сериалы","Игры"}) { var n=name;var b=ActionButton(n,NavIcon(n),()=>{if(n=="Актуальное")ShowFeatured();else if(n=="Игры")ShowGames();else ShowCatalogSection(n);},"NavButton");b.Tag=n;b.ToolTip=AppLanguage.T(n);b.HorizontalContentAlignment=HorizontalAlignment.Left;b.Margin=new(0,0,0,5);Navigation.Children.Add(b); }
+        foreach(var name in new[]{"Актуальное","Фильмы","Сериалы",CatalogSections.Shows,"Игры"}) { var n=name;var b=ActionButton(n,NavIcon(n),()=>{if(n=="Актуальное")ShowFeatured();else if(n=="Игры")ShowGames();else ShowCatalogSection(n);},"NavButton");b.Tag=n;b.ToolTip=AppLanguage.T(n);b.HorizontalContentAlignment=HorizontalAlignment.Left;b.Margin=new(0,0,0,5);Navigation.Children.Add(b); }
         refresh.Tick+=(_,_)=>RefreshDownloadsReliably();
         ContentRendered+=async(_,_)=>{if(!prefs.AutoResumeDownloads||downloads.PendingResumeCount==0)return;Status.Text=AppLanguage.T("Продолжаем загрузки…");var resumed=await downloads.ResumePendingAsync();Status.Text=AppLanguage.T(resumed>0?$"Продолжено загрузок: {resumed}":"Не удалось продолжить загрузки. Проверь очередь.");if(!closed){SyncTimer();if(section=="Загрузки")Render();}};
-        StateChanged+=(_,_)=>SyncTimer();searchDelay.Tick+=(_,_)=>{searchDelay.Stop();if(section is "Фильмы" or "Сериалы"){current=null;Render();}};
+        StateChanged+=(_,_)=>SyncTimer();searchDelay.Tick+=(_,_)=>{searchDelay.Stop();if(section is "Фильмы" or "Сериалы" or "ТВ Шоу"){current=null;Render();}};
         Closing+=OnClosing;ready=true;ApplyLiteMode();ApplyTheme();ApplyCompactLayout();Render();
     }
     static DownloadService newEmpty(int down,int up){var path=Path.Combine(Preferences.DataDir,"queue.json");if(File.Exists(path))File.Move(path,path+".unreadable-"+DateTime.Now.Ticks);return new(null,down,up);}
@@ -76,7 +76,7 @@ public partial class MainWindow:Window
                 if(!changed||closed)return;
                 if(section=="Актуальное"&&current==null)ReloadFeatured();
                 catalogPages.Clear();cardMetadata.Clear();catalogLastPage=null;ResetDiscoveryData();
-                if(current==null&&activePerson==null&&(section is "Фильмы" or "Сериалы")&&!SearchActive&&!favoritesOnly&&(CatalogSelection.IsDefault||CatalogSelection.Collection.StartsWith("seasonal:",StringComparison.Ordinal)))
+                if(current==null&&activePerson==null&&(section is "Фильмы" or "Сериалы" or "ТВ Шоу")&&!SearchActive&&!favoritesOnly&&(CatalogSelection.IsDefault||CatalogSelection.Collection.StartsWith("seasonal:",StringComparison.Ordinal)))
                 {liveKey="";Render();}
             }
             catch(OperationCanceledException) when(metadataLifetime.IsCancellationRequested){}
@@ -92,7 +92,7 @@ public partial class MainWindow:Window
     void ShowCatalogSection(string name)
     {
         searchDelay.Stop();if(TryRestoreCatalogContext(name)){Render();return;}
-        var restore=SearchActive&&name==lastCatalogSection&&section is not ("Фильмы" or "Сериалы");
+        var restore=SearchActive&&name==lastCatalogSection&&section is not ("Фильмы" or "Сериалы" or "ТВ Шоу");
         searchDelay.Stop();section=name;lastCatalogSection=name;current=null;activePerson=null;personSearchReturn=null;savedReturn=null;
         if(!restore){ResetCatalogNavigationPosition();liveRequest?.Cancel();liveLoading=false;genre="Все";livePage=1;favoritesOnly=false;submittedQuery="";searchCategory="";ResetCatalogFilters();Search.Text="";liveKey="";}
         else Search.Text=submittedQuery;
@@ -126,11 +126,11 @@ public partial class MainWindow:Window
         if(activePerson!=null&&(section!=personSection||current?.Id!=personOrigin?.Id))activePerson=null;
         if(current==null&&activePerson==null&&section is not ("Настройки" or "Загрузки"))downloadReturnItem=null;
         if(current==null&&activePerson==null&&section!="Настройки")savedReturn=null;
-        if(activePerson==null&&(current==null||section is not ("Фильмы" or "Сериалы")))returnPerson=null;
-        if(activePerson!=null||current!=null||section is not ("Фильмы" or "Сериалы"))CancelCatalogQualityCheck();
-        if(activePerson!=null||current!=null||section is not ("Фильмы" or "Сериалы")||!SearchActive)CancelPeopleSearch(!SearchActive);
+        if(activePerson==null&&(current==null||section is not ("Фильмы" or "Сериалы" or "ТВ Шоу")))returnPerson=null;
+        if(activePerson!=null||current!=null||section is not ("Фильмы" or "Сериалы" or "ТВ Шоу"))CancelCatalogQualityCheck();
+        if(activePerson!=null||current!=null||section is not ("Фильмы" or "Сериалы" or "ТВ Шоу")||!SearchActive)CancelPeopleSearch(!SearchActive);
         try{heroPageScroll=null;heroPageContent=null;heroPageHost=null;catalogList=null;catalogRows=null;catalogEmptyHost=null;catalogEmptyKey="";detailHero=null;detailMetaRow=null;detailRatings=null;detailInfo=null;detailPoster=null;detailSynopsis=null;detailTitle=null;detailDescription=null;descriptionToggle=null;inlineCatalogFilters=null;inlineCatalogFilterScroll=null;catalogToolbar=null;catalogRefreshButton=null;catalogFilterBack=null;catalogFilterForward=null;catalogFiltersCompact=null;catalogFilterCaptions.Clear();catalogRailPreview=null;discoveryHero=null;gameShelfViews.Clear();gameFilterRow=null;gameGenreScroll=null;gameGenreBack=null;gameGenreForward=null;if(carousel!=null)DetachFeatureWatch(carousel);carousel=null;discoveryShelf=null;ReturnFiltersPanel();FilterControls.Children.Clear();PageHeader.Children.Clear();ClearBack();AddTorrentButton.Visibility=section=="Загрузки"?Visibility.Collapsed:Visibility.Visible;Body.Children.Clear();Body.RowDefinitions.Clear();SyncTimer();UpdateFilterRail();
-        SearchBar.Visibility=current!=null||section is "Фильмы" or "Сериалы" or "Игры" or "Сохранённое" or "Загрузки" or "Актуальное"?Visibility.Visible:Visibility.Collapsed;
+        SearchBar.Visibility=current!=null||section is "Фильмы" or "Сериалы" or "ТВ Шоу" or "Игры" or "Сохранённое" or "Загрузки" or "Актуальное"?Visibility.Visible:Visibility.Collapsed;
         CenterHeaderSearch(compactWidth,contentGutter);
         SearchPlaceholder.Text=AppLanguage.T(compactSearch?"Поиск":"Найти фильм, сериал или игру");
         ContextLabel.Visibility=SearchBar.Visibility==Visibility.Visible||section is "Загрузки" or "Настройки"?Visibility.Collapsed:Visibility.Visible;ContextLabel.Text=section;
@@ -144,14 +144,14 @@ public partial class MainWindow:Window
         if(current!=null){Detail(current);return;}
         if(section=="Актуальное"){RenderFeatured();return;}
         if(section=="Сохранённое"){RenderSaved();return;}
-        if(!demoCatalog&&section is "Фильмы" or "Сериалы"){RenderLiveCatalog();return;}
+        if(!demoCatalog&&section is "Фильмы" or "Сериалы" or "ТВ Шоу"){RenderLiveCatalog();return;}
         if(section=="Игры"){RenderGames();return;}
         if(!demoCatalog&&section is "Музыка" or "Программы"){RenderArchive();return;}
         if(!demoCatalog&&section is "ТВ-каналы" or "Радио" or "Спорт"){RenderBroadcast();return;}
         if(section=="Загрузки"){RenderDownloads();return;}
         PageHeader.Children.Add(Text(section,25));
         PageHeader.Children.Add(Text("Демо-каталог · названия, раздачи и оценки Кинопоиска / IMDb вымышлены",11,true));
-        var filters=new WrapPanel();if(section is "Фильмы" or "Сериалы")foreach(var g in new[]{"Все","Фантастика","Триллер","Драма","Приключения"}){var value=g;var b=Button(g,()=>{genre=value;Render();});b.Opacity=g==genre?1:.6;filters.Children.Add(b);}
+        var filters=new WrapPanel();if(section is "Фильмы" or "Сериалы" or "ТВ Шоу")foreach(var g in new[]{"Все","Фантастика","Триллер","Драма","Приключения"}){var value=g;var b=Button(g,()=>{genre=value;Render();});b.Opacity=g==genre?1:.6;filters.Children.Add(b);}
         var order=new ComboBox{ItemsSource=new[]{"По популярности","По году","По названию"},SelectedItem=sort};order.SelectionChanged+=(_,_)=>{sort=order.SelectedItem.ToString()!;Render();};filters.Children.Add(order);PageHeader.Children.Add(filters);
         IEnumerable<MediaItem> result=Catalog.Items.Concat(prefs.LiveFavorites).Where(x=>section=="Избранное"?prefs.Favorites.Contains(x.Id):x.Section==section).Where(x=>x.Title.Contains(Search.Text,StringComparison.CurrentCultureIgnoreCase)).Where(x=>genre=="Все"||x.Genre==genre);
         result=sort=="По году"?result.OrderByDescending(x=>x.Year):sort=="По названию"?result.OrderBy(x=>x.Title):result;

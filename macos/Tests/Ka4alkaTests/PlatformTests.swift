@@ -198,6 +198,20 @@ final class ModelDecodingTests: XCTestCase {
         XCTAssertEqual(model.query, "")
         XCTAssertNil(model.list)
     }
+    func testShowsSectionKeepsItsScopeInTheRequest() throws {
+        let model = makeModel()
+        model.select(.shows)
+        XCTAssertEqual(model.section, Section.shows)
+        XCTAssertEqual(Section.shows.rawValue, "shows")
+        let everything = model.requestKey
+        model.filter.scope = "native"
+        XCTAssertNotEqual(model.requestKey, everything)
+        XCTAssertEqual(model.filter.arguments["scope"]?.string, "native")
+        XCTAssertTrue(model.filter.active)
+        model.select(.series)
+        XCTAssertEqual(model.filter, CatalogFilter())
+        XCTAssertEqual(model.filter.arguments["scope"]?.string, "")
+    }
     func testSelectKeepsContextWhenReturningFromADetailPage() throws {
         let model = makeModel()
         model.select(.movies)
