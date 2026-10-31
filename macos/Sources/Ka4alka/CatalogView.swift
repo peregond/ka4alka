@@ -361,10 +361,18 @@ struct CatalogView: View {
         }
     }
 
+    private var allTitlesHeading: String {
+        switch model.section {
+        case .series: return tr("Все сериалы", "All series")
+        case .shows: return tr("Все шоу", "All shows")
+        default: return tr("Все фильмы", "All movies")
+        }
+    }
+
     /// The heading of the list that follows the banner.
     @ViewBuilder private var heroTitle: some View {
         if showsSpotlight, let result = model.list, !model.visible(result.items).isEmpty {
-            Text(model.section == .series ? tr("Все сериалы", "All series") : tr("Все фильмы", "All movies"))
+            Text(allTitlesHeading)
                 .font(KDFont.section)
                 .accessibilityAddTraits(.isHeader)
         }
