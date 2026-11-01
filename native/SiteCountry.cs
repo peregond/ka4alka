@@ -45,7 +45,7 @@ public static class SiteCountry
                 if(Parse(await client.Read(trace,4096,timeout.Token)) is {} country)
                 {
                     lock(gate)expiresUtc=DateTime.UtcNow.AddHours(6);
-                    DiagnosticLog.Write("site-country",new{Country=country,Railway=Blocked(country)});
+                    DiagnosticLog.Write("site-country",new{Country=country,Blocked=Blocked(country)});
                     return country;
                 }
             }

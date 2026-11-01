@@ -99,6 +99,8 @@ public partial class MainWindow
 
         var nav=Navigation.Children.OfType<Button>().Single(button=>Equals(button.Tag,"Игры"));
         Check(nav.Content is Grid navGrid&&ReferenceEquals(navGrid.Children.OfType<System.Windows.Shapes.Path>().Single(x=>Equals(x.Tag,"NavIcon")).Data,FindResource("IconGame")),"the Games entry in the sidebar shows the gamepad, not the television");
+        System.Windows.Media.Geometry? NavGlyph(string name)=>Navigation.Children.OfType<Button>().Single(button=>Equals(button.Tag,name)).Content is Grid glyphGrid?glyphGrid.Children.OfType<System.Windows.Shapes.Path>().Single(x=>Equals(x.Tag,"NavIcon")).Data:null;
+        Check(ReferenceEquals(NavGlyph(CatalogSections.Shows),FindResource("IconShow"))&&ReferenceEquals(NavGlyph("Сериалы"),FindResource("IconTv"))&&!ReferenceEquals(FindResource("IconShow"),FindResource("IconTv")),"the TV Shows entry in the sidebar has its own screen icon, not the series television or a star");
         nav.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await Settle();
         Check(section=="Игры"&&SearchBar.IsVisible&&GameHome&&gameShelfLoading.Count==3&&gameShelfViews.Count==GameShelves.Home.Length,"Games navigation opens its own home page with every shelf in place while the first three are pending");
         Check(VisualElements<Border>(Body).Any(x=>x.Name=="FeatureSkeleton")&&VisualElements<FrameworkElement>(Body).Any(x=>x.Name=="DiscoveryPopularSkeleton")&&VisualElements<FrameworkElement>(Body).Any(x=>x.Name=="DiscoveryActionSkeleton"||x.Name=="DiscoveryActionSection"),"the pending home shows breathing placeholders for the banner and the shelves");
