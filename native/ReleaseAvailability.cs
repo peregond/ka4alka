@@ -50,7 +50,7 @@ public partial class MainWindow
                             return;
                         }
                         var detail=item;try{detail=await Metadata(item).WaitAsync(TimeSpan.FromSeconds(8),token);}catch(TimeoutException){}
-                        result=await ReleaseSearch.RunAsync(NativeReleaseSources.Create(sourceClient,detail),ct:token);
+                        result=await ReleaseSearch.RunAsync(NativeReleaseSources.ShortenBlocked(NativeReleaseSources.Create(sourceClient,detail),countryToken=>SiteCountry.Get(sourceClient,countryToken)),ct:token);
                         result=result with{Sources=result.Sources.Append(new SourceCheck("Онлайн-индекс",SourceState.Empty,CheckedUtc:DateTime.UtcNow,LastSuccessUtc:DateTime.UtcNow)).ToArray()};
                     }
                     catch(OperationCanceledException)when(token.IsCancellationRequested){throw;}
