@@ -70,9 +70,13 @@ def film_text(data, current_description=None):
     return found
 
 
-def needs_text(row):
-    """A film with a Kinopoisk id whose card was never read for its Russian texts."""
-    return type(row.get('kinopoiskId')) is int and row['kinopoiskId'] > 0 and not row.get('kinopoiskTextAtUtc')
+def needs_text(row, now=None):
+    """A recent film, or one with no description of its own, whose card was never read for its Russian texts.
+
+    Older films already hold their texts in the library; the card is not spent on them."""
+    now = now or datetime.datetime.now(datetime.timezone.utc)
+    return (type(row.get('kinopoiskId')) is int and row['kinopoiskId'] > 0 and not row.get('kinopoiskTextAtUtc')
+            and (row['year'] >= now.year - 1 or not (row.get('description') or '').strip()))
 
 
 def details(row, token, get=fetch):
@@ -144,7 +148,7 @@ def searchable(row):
 
 def settled(row, now):
     """A score of a film from before last year is final: it is kept as is and never asked again."""
-    return bool(row.get('kinopoisk') and row.get('kinopoiskId')) and row['year'] < now.year - 1 and not needs_text(row)
+    return bool(row.get('kinopoisk') and row.get('kinopoiskId')) and row['year'] < now.year - 1 and not needs_text(row, now)
 
 
 def select_rows(rows, limit, now, max_age_days=7, retry_days=30):
@@ -160,7 +164,7 @@ def select_rows(rows, limit, now, max_age_days=7, retry_days=30):
         recent = row['year'] >= now.year - 1
         checked = stamp(row) or oldest
         # A card never read for its texts is read at once, whatever the cooldown.
-        if not needs_text(row) and (checked > now + datetime.timedelta(minutes=15) or checked > now - datetime.timedelta(days=max_age_days if recent else retry_days)):
+        if not needs_text(row, now) and (checked > now + datetime.timedelta(minutes=15) or checked > now - datetime.timedelta(days=max_age_days if recent else retry_days)):
             continue
         candidates.append((bool(row.get('kinopoisk')), checked, row['id']))
     return [row_id for _, _, row_id in sorted(candidates)[:limit]]
@@ -183,7 +187,7 @@ def refresh(rows, token, limit=450, now=None, get=fetch, pause=0.06):
         texts = {}
         failed = False
         try:
-            if needs_text(row) or type(row.get('kinopoiskId')) is int:
+            if type(row.get('kinopoiskId')) is int:
                 found_id, found_score, texts = details(row, token, get)
             else:
                 found_id, found_score = lookup(row, token, get)
