@@ -70,16 +70,24 @@ def stamp(row):
         return None
 
 
-def select_rows(rows, limit, now, max_age_days=7):
-    """Titles with a known identity, never scored first, then the longest unchecked."""
+def settled(row, now):
+    """A score of a film from before last year is final: it is kept as is and never asked again."""
+    return bool(row.get('kinopoisk') and row.get('kinopoiskId')) and row['year'] < now.year - 1
+
+
+def select_rows(rows, limit, now, max_age_days=7, retry_days=30):
+    """Weekly for this and last year's titles; older ones only until they have a score.
+
+    Never scored titles go first. Old titles that could not be scored are retried monthly.
+    """
     oldest = datetime.datetime.min.replace(tzinfo=datetime.timezone.utc)
-    horizon = now - datetime.timedelta(days=max_age_days)
     candidates = []
     for row in rows:
-        if not (row.get('imdbId') or row.get('kinopoiskId')):
+        if not (row.get('imdbId') or row.get('kinopoiskId')) or settled(row, now):
             continue
+        recent = row['year'] >= now.year - 1
         checked = stamp(row) or oldest
-        if checked > now + datetime.timedelta(minutes=15) or checked > horizon:
+        if checked > now + datetime.timedelta(minutes=15) or checked > now - datetime.timedelta(days=max_age_days if recent else retry_days):
             continue
         candidates.append((bool(row.get('kinopoisk')), checked, row['id']))
     return [row_id for _, _, row_id in sorted(candidates)[:limit]]
