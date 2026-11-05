@@ -12,6 +12,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+from library_metadata import normalize
+
 BASE = 'https://kinopoiskapiunofficial.tech/api/v2.2/films'
 STOP_STATUSES = (401, 402, 429)  # bad token, daily quota spent, throttled: nothing more today
 
@@ -53,7 +55,7 @@ def lookup(row, token, get=fetch):
         return (known, score(data.get('ratingKinopoisk'))) if isinstance(data, dict) else (known, None)
     imdb = row.get('imdbId')
     if not isinstance(imdb, str) or not re.fullmatch(r'tt\d{6,12}', imdb):
-        return None, None
+        return search(row, token, get)
     data = get(f'{BASE}?{urllib.parse.urlencode({"imdbId": imdb})}', token)
     items = [x for x in (data or {}).get('items', []) if isinstance(x, dict) and x.get('imdbId') == imdb
              and type(x.get('kinopoiskId')) is int and x['kinopoiskId'] > 0]
@@ -62,12 +64,40 @@ def lookup(row, token, get=fetch):
     return items[0]['kinopoiskId'], score(items[0].get('ratingKinopoisk'))
 
 
+KINDS = {'movies': ('FILM',), 'series': ('TV_SERIES', 'MINI_SERIES')}
+
+
+def search(row, token, get=fetch):
+    """For a title without any identity: the one entry of the same name, year and kind."""
+    title, year = row.get('title'), row.get('year')
+    if not isinstance(title, str) or not normalize(title) or type(year) is not int or year <= 0 or row.get('section') not in KINDS:
+        return None, None
+    query = urllib.parse.urlencode({'keyword': title, 'yearFrom': year, 'yearTo': year, 'order': 'NUM_VOTE'})
+    data = get(f'{BASE}?{query}', token)
+    wanted = {normalize(row[field]) for field in ('title', 'originalTitle') if isinstance(row.get(field), str)} - {''}
+    items = {}
+    for item in (data or {}).get('items', []):
+        if not isinstance(item, dict) or item.get('year') != year or item.get('type') not in KINDS[row['section']]:
+            continue
+        names = {normalize(item[field]) for field in ('nameRu', 'nameOriginal', 'nameEn') if isinstance(item.get(field), str)}
+        if type(item.get('kinopoiskId')) is int and item['kinopoiskId'] > 0 and wanted & names:
+            items[item['kinopoiskId']] = item
+    if len(items) != 1:
+        return None, None
+    found = next(iter(items.values()))
+    return found['kinopoiskId'], score(found.get('ratingKinopoisk'))
+
+
 def stamp(row):
     try:
         value = datetime.datetime.fromisoformat(row.get('kinopoiskCheckedAtUtc', '').replace('Z', '+00:00'))
         return value if value.tzinfo else None
     except (ValueError, TypeError, AttributeError):
         return None
+
+
+def searchable(row):
+    return bool(row.get('title')) and type(row.get('year')) is int and row['year'] > 0 and row.get('section') in KINDS
 
 
 def settled(row, now):
@@ -83,7 +113,7 @@ def select_rows(rows, limit, now, max_age_days=7, retry_days=30):
     oldest = datetime.datetime.min.replace(tzinfo=datetime.timezone.utc)
     candidates = []
     for row in rows:
-        if not (row.get('imdbId') or row.get('kinopoiskId')) or settled(row, now):
+        if settled(row, now) or not (row.get('imdbId') or row.get('kinopoiskId') or searchable(row)):
             continue
         recent = row['year'] >= now.year - 1
         checked = stamp(row) or oldest
@@ -100,6 +130,7 @@ def refresh(rows, token, limit=450, now=None, get=fetch, pause=0.06):
         return rows, 0
     wanted = set(select_rows(rows, limit, now))
     done = 0
+    failures = []
     result = []
     stopped = None
     for row in rows:
@@ -112,8 +143,9 @@ def refresh(rows, token, limit=450, now=None, get=fetch, pause=0.06):
             stopped = error.args[0]
             result.append(row)
             continue
-        except Exception:
+        except Exception as error:
             # A failed attempt moves behind untouched titles; its old score stays.
+            failures.append(f'{type(error).__name__}: {error}')
             found_id, found_score = row.get('kinopoiskId'), None
         done += 1
         fresh = dict(row, kinopoiskCheckedAtUtc=now.isoformat().replace('+00:00', 'Z'))
@@ -125,5 +157,7 @@ def refresh(rows, token, limit=450, now=None, get=fetch, pause=0.06):
         time.sleep(pause)
     if stopped:
         print('Kinopoisk stopped by HTTP', stopped, 'after', done, 'lookups; previous scores preserved', flush=True)
+    if failures:
+        print('Kinopoisk lookups failed:', len(failures), 'first:', failures[0][:200], flush=True)
     print('Kinopoisk:', done, 'lookups;', sum(bool(x.get('kinopoisk')) for x in result), 'scores', flush=True)
     return result, done
