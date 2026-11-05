@@ -58,6 +58,14 @@ def feed_report(section, library_ids, top):
                 first_missing=[f'{title} / {original}' for _, title, original in missing[:25]])
 
 
+def safe(function, *arguments, **keywords):
+    """A failed request is only a missing answer."""
+    try:
+        return function(*arguments, **keywords)
+    except Exception:
+        return None
+
+
 def cyrillic(text):
     return bool(re.search('[а-яА-ЯёЁ]', text or ''))
 
@@ -98,12 +106,6 @@ def main():
     rows = json.load(open(args.catalog, encoding='utf-8'))['items']
     lines = []
     pool = concurrent.futures.ThreadPoolExecutor(max_workers=4)
-
-    def safe(function, *arguments):
-        try:
-            return function(*arguments)
-        except Exception:
-            return None
 
     since = datetime.date.today() - datetime.timedelta(days=548)
     report = dict(feed=[])
