@@ -1,3 +1,4 @@
+import datetime
 import importlib.util
 import json
 import gzip
@@ -37,6 +38,20 @@ class CollectorTests(unittest.TestCase):
         self.assertEqual(indexed['movies:old']['people'], older['people'])
         self.assertEqual(indexed['movies:fresh']['imdb'], '7.5')
         self.assertEqual(indexed['movies:fresh']['description'], 'Описание')
+
+    def test_titles_new_in_the_source_rise_above_older_ones_of_the_same_year(self):
+        now = datetime.datetime(2026, 11, 5, tzinfo=datetime.timezone.utc)
+        old = [self.item('old-' + str(index)) for index in range(3)]
+        fresh = [self.item('fresh-a'), self.item('fresh-b')]
+        earlier_year = {**self.item('earlier'), 'year': 2025}
+        current = fresh + [old[1]]  # the source lists newest first
+        rows = module.merge_catalog(old + [earlier_year], current)
+        ordered = module.order_library(rows, current, now)
+        self.assertEqual([row['id'] for row in ordered],
+                         ['movies:fresh-a', 'movies:fresh-b', 'movies:old-1', 'movies:old-0', 'movies:old-2', 'movies:earlier'])
+        # A year in the future never floats above the current one.
+        future = {**self.item('future'), 'year': 2030}
+        self.assertEqual(module.order_library([future, *ordered], current, now)[0]['id'], 'movies:fresh-a')
 
     def test_changed_identity_does_not_inherit_other_movie_credits(self):
         prior = self.item('remake', description='Сюжет прежней версии', imdbId='tt1234567')
