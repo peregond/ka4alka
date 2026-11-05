@@ -5,6 +5,7 @@ import datetime
 import hashlib
 import importlib.util
 import json
+import sys
 import time
 import urllib.error
 import urllib.parse
@@ -50,6 +51,8 @@ def probe(query, site):
 
 
 def main():
+    # Windows runners print in cp1252, which cannot show Russian titles; the audit must not die on that.
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--site', default='https://ka4alka-online-new.peregon.chatgpt.site')
     parser.add_argument('--catalog', type=Path)
