@@ -44,6 +44,21 @@ class KinopoiskTests(unittest.TestCase):
         self.assertEqual(select_rows(rows, 10, NOW), ['movies:new', 'movies:scored'])
         self.assertEqual(select_rows(rows, 1, NOW), ['movies:new'])
 
+    def test_old_scored_films_are_frozen_and_old_misses_retried_monthly(self):
+        old = dict(year=2019)
+        rows = [dict(row('frozen', imdbId='tt1000001', kinopoisk='8.0', kinopoiskId=1), **old),
+                dict(row('lastyear', imdbId='tt1000002', kinopoisk='7.0', kinopoiskId=2, kinopoiskCheckedAtUtc='2026-10-01T00:00:00Z'), year=2025),
+                dict(row('miss-recent', imdbId='tt1000003', kinopoiskCheckedAtUtc='2026-10-20T00:00:00Z'), **old),
+                dict(row('miss-old', imdbId='tt1000004', kinopoiskCheckedAtUtc='2026-09-20T00:00:00Z'), **old),
+                dict(row('never', imdbId='tt1000005'), **old),
+                dict(row('no-id-score', imdbId='tt1000006', kinopoisk='6.0'), **old)]
+        # A page score without a Kinopoisk id is not final: it is confirmed once through the API.
+        chosen = select_rows(rows, 10, NOW)
+        self.assertNotIn('movies:frozen', chosen)
+        self.assertNotIn('movies:miss-recent', chosen)
+        self.assertEqual(set(chosen), {'movies:never', 'movies:miss-old', 'movies:lastyear', 'movies:no-id-score'})
+        self.assertEqual(chosen[:2], ['movies:never', 'movies:miss-old'])
+
     def test_refresh_keeps_old_score_on_failure_and_stops_on_quota(self):
         calls = []
         def get(url, token):
