@@ -34,6 +34,12 @@ class FeedTests(unittest.TestCase):
         self.assertEqual((result['top'], result['inside'], result['share']), (4, 2, 50))
         self.assertEqual(result['first_missing'], ['Б / B', 'Г / D'])
 
+    def test_safe_passes_keywords_and_hides_failures(self):
+        self.assertEqual(feed.safe(lambda a, language=None: (a, language), 1, language='ru-RU'), (1, 'ru-RU'))
+        def broken(*a, **k):
+            raise OSError('down')
+        self.assertIsNone(feed.safe(broken, 1, language='ru-RU'))
+
     def test_names_and_people(self):
         row = dict(title='Тест')
         card = dict(title='Тест', original_title='Test', credits={'cast': [
