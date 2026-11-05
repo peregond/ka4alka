@@ -39,6 +39,17 @@ class CollectorTests(unittest.TestCase):
         self.assertEqual(indexed['movies:fresh']['imdb'], '7.5')
         self.assertEqual(indexed['movies:fresh']['description'], 'Описание')
 
+    def test_kinopoisk_texts_survive_a_round_trip_and_bad_values_are_dropped(self):
+        good = self.item('texts', kinopoiskId=7, kinopoiskTitle='Тест', kinopoiskDescription='Описание', kinopoiskGenre='драма',
+                         kinopoiskCountry='США', kinopoiskCheckedAtUtc='2026-11-05T00:00:00Z', kinopoiskTextAtUtc='2026-11-05T00:00:00Z')
+        kept = module.checked_item(good)
+        for field in ('kinopoiskTitle', 'kinopoiskDescription', 'kinopoiskGenre', 'kinopoiskCountry', 'kinopoiskTextAtUtc'):
+            self.assertEqual(kept[field], good[field])
+        bad = module.checked_item(dict(good, kinopoiskTitle=5, kinopoiskDescription='x' * 2501, kinopoiskGenre=' ', kinopoiskTextAtUtc='z' * 41))
+        for field in ('kinopoiskTitle', 'kinopoiskDescription', 'kinopoiskGenre', 'kinopoiskTextAtUtc'):
+            self.assertNotIn(field, bad)
+        self.assertEqual(bad['kinopoiskCountry'], 'США')
+
     def test_titles_new_in_the_source_rise_above_older_ones_of_the_same_year(self):
         now = datetime.datetime(2026, 11, 5, tzinfo=datetime.timezone.utc)
         old = [self.item('old-' + str(index)) for index in range(3)]

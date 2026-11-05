@@ -2,7 +2,7 @@ import datetime
 import unittest
 import urllib.error
 
-from kinopoisk_ratings import QuotaReached, lookup, refresh, score, search, select_rows
+from kinopoisk_ratings import QuotaReached, details, fill_missing_descriptions, film_text, lookup, needs_text, refresh, score, search, select_rows
 from library_metadata import merge_metadata
 
 NOW = datetime.datetime(2026, 11, 5, 5, 0, tzinfo=datetime.timezone.utc)
@@ -46,7 +46,7 @@ class KinopoiskTests(unittest.TestCase):
 
     def test_old_scored_films_are_frozen_and_old_misses_retried_monthly(self):
         old = dict(year=2019)
-        rows = [dict(row('frozen', imdbId='tt1000001', kinopoisk='8.0', kinopoiskId=1), **old),
+        rows = [dict(row('frozen', imdbId='tt1000001', kinopoisk='8.0', kinopoiskId=1, kinopoiskTextAtUtc='2026-10-01T00:00:00Z'), **old),
                 dict(row('lastyear', imdbId='tt1000002', kinopoisk='7.0', kinopoiskId=2, kinopoiskCheckedAtUtc='2026-10-01T00:00:00Z'), year=2025),
                 dict(row('miss-recent', imdbId='tt1000003', kinopoiskCheckedAtUtc='2026-10-20T00:00:00Z'), **old),
                 dict(row('miss-old', imdbId='tt1000004', kinopoiskCheckedAtUtc='2026-09-20T00:00:00Z'), **old),
@@ -109,6 +109,48 @@ class KinopoiskTests(unittest.TestCase):
         # The id is kept even when Kinopoisk has no score yet.
         unrated = dict(item(9, nameRu='Тест'), ratingKinopoisk=None)
         self.assertEqual(search(film, 't', get([unrated])), (9, None))
+
+    def test_film_card_gives_russian_texts_and_skips_a_description_already_stored(self):
+        data = dict(nameRu='  Тест ', description='Описание\xa0фильма  ', genres=[dict(genre='драма'), dict(genre='комедия'), {}],
+                    countries=[dict(country='Россия')], ratingKinopoisk=7.26)
+        self.assertEqual(film_text(data), dict(kinopoiskTitle='Тест', kinopoiskDescription='Описание фильма',
+                                               kinopoiskGenre='драма, комедия', kinopoiskCountry='Россия'))
+        self.assertNotIn('kinopoiskDescription', film_text(data, 'Описание фильма'))
+        self.assertEqual(film_text(dict(nameRu=5, description='', genres=None)), {})
+        self.assertEqual(details(dict(kinopoiskId=4), 't', lambda url, token: data)[:2], (4, '7.3'))
+
+    def test_card_never_read_for_texts_is_read_whatever_the_cooldown(self):
+        recent = row('a', imdbId='tt1000001', kinopoiskId=3, kinopoisk='7.0', kinopoiskCheckedAtUtc='2026-11-04T00:00:00Z')
+        self.assertTrue(needs_text(recent))
+        self.assertEqual(select_rows([recent], 5, NOW), ['movies:a'])
+        done = dict(recent, kinopoiskTextAtUtc='2026-11-04T00:00:00Z')
+        self.assertFalse(needs_text(done))
+        self.assertEqual(select_rows([done], 5, NOW), [])
+        old = dict(done, year=2015)
+        self.assertEqual(select_rows([dict(old, kinopoiskTextAtUtc=None)], 5, NOW), ['movies:a'])
+        self.assertEqual(select_rows([old], 5, NOW), [])
+
+    def test_refresh_stores_texts_once_and_failure_does_not_mark_them_read(self):
+        card = dict(nameRu='Тест', description='Описание', genres=[dict(genre='драма')], countries=[dict(country='США')], ratingKinopoisk=6.5)
+        rows = [row('a', kinopoiskId=1), row('b', kinopoiskId=2, description='Описание'), row('c', kinopoiskId=3)]
+        def get(url, token):
+            if url.endswith('/3'):
+                raise urllib.error.URLError('down')
+            return card
+        result, done = refresh(rows, 't', 10, NOW, get, pause=0)
+        self.assertEqual(done, 3)
+        a, b, c = result
+        self.assertEqual((a['kinopoiskDescription'], a['kinopoiskTitle'], a['kinopoisk']), ('Описание', 'Тест', '6.5'))
+        self.assertIn('kinopoiskTextAtUtc', a)
+        self.assertNotIn('kinopoiskDescription', b)
+        self.assertIn('kinopoiskTextAtUtc', b)
+        self.assertNotIn('kinopoiskTextAtUtc', c)
+
+    def test_a_title_without_description_shows_the_kinopoisk_one(self):
+        rows = [dict(row('a'), kinopoiskDescription='Из Кинопоиска'), dict(row('b', description='Своё'), kinopoiskDescription='Из Кинопоиска'),
+                dict(row('c'), description='  ', kinopoiskDescription='Из Кинопоиска'), row('d')]
+        filled = fill_missing_descriptions(rows)
+        self.assertEqual([x.get('description') for x in filled], ['Из Кинопоиска', 'Своё', 'Из Кинопоиска', None])
 
     def test_page_score_does_not_replace_the_official_one(self):
         self.assertEqual(merge_metadata(row('a', kinopoiskId=3, kinopoisk='8.1'), {'kinopoisk': '7.0'})['kinopoisk'], '8.1')
