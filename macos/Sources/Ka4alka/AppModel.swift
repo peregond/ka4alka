@@ -69,6 +69,8 @@ struct CatalogFilter: Equatable {
     @Published var toast: String?
     @Published var addTorrent = false { didSet { if addTorrent { addError = nil } } }
     @Published var magnet = ""
+    /// The "What's New" sheet, opened from the Help menu and from Settings.
+    @Published var releaseNotes = false
     @Published var addError: String?
     @Published var folderRequired = false
     @Published var pairingPrompt: PairingPrompt?

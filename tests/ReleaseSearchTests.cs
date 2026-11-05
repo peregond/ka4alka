@@ -47,6 +47,17 @@ static class ReleaseSearchTests
         Check(reports.Last().Complete&&reports.Last().Sources.All(x=>x.State!=SourceState.Searching),"progress ends with every attempted source settled");
         var timed=await ReleaseSearch.RunAsync([new("Timeout",async ct=>{await Task.Delay(Timeout.InfiniteTimeSpan,ct);return [];}),new("Fast",_=>Task.FromResult<IReadOnlyList<SourceEntry>>([row]))],timeout:TimeSpan.FromMilliseconds(60));
         Check(timed.Sources.Single(x=>x.Name=="Timeout").State==SourceState.TimedOut&&timed.Items.Length==1,"timeout remains local to one source");
+        // Blocked trackers get a short wait only from Russia and Belarus; other sources and other countries keep the full one.
+        ReleaseSource Hang(string name)=>new(name,async ct=>{await Task.Delay(Timeout.InfiniteTimeSpan,ct);return [];});
+        var wait=TimeSpan.FromMilliseconds(80);var clock=System.Diagnostics.Stopwatch.StartNew();
+        var russian=await ReleaseSearch.RunAsync(NativeReleaseSources.ShortenBlocked([Hang("RuTor")],_=>Task.FromResult<string?>("RU"),wait),timeout:TimeSpan.FromSeconds(5));
+        var russianMs=clock.ElapsedMilliseconds;clock.Restart();
+        var abroad=await ReleaseSearch.RunAsync(NativeReleaseSources.ShortenBlocked([Hang("RuTor")],_=>Task.FromResult<string?>("DE"),wait),timeout:TimeSpan.FromMilliseconds(400));
+        var abroadMs=clock.ElapsedMilliseconds;clock.Restart();
+        var otherSource=await ReleaseSearch.RunAsync(NativeReleaseSources.ShortenBlocked([Hang("The Pirate Bay")],_=>Task.FromResult<string?>("RU"),wait),timeout:TimeSpan.FromMilliseconds(400));
+        var otherMs=clock.ElapsedMilliseconds;
+        Check(russian.Sources.Single().State==SourceState.TimedOut&&russianMs<2000,"a registry-blocked tracker gives up after the short wait from a Russian address");
+        Check(abroad.Sources.Single().State==SourceState.TimedOut&&abroadMs>=350&&otherSource.Sources.Single().State==SourceState.TimedOut&&otherMs>=350,"the same tracker abroad, and any other source in Russia, keep the full wait");
         using(var cancel=new CancellationTokenSource())
         {
             var canceled=ReleaseSearch.RunAsync([new("Canceled",async ct=>{await Task.Delay(Timeout.InfiniteTimeSpan,ct);return [];})],ct:cancel.Token);

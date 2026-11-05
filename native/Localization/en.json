@@ -1621,5 +1621,9 @@
   "Фильмы в порядке выхода.": "Films in release order.",
   "Другие части пока не найдены.": "No other parts found yet.",
   "Не удалось загрузить другие части.": "Could not load other parts.",
-  "Лучшие фильмы по рейтингу": "Top rated movies"
+  "Лучшие фильмы по рейтингу": "Top rated movies",
+  "Новости Качалки": "News from Ka4alka",
+  "Повторить": "Try again",
+  "Открыть на GitHub": "Open on GitHub",
+  "Не удалось загрузить описание. Проверь соединение или открой страницу выпуска.": "The release notes could not be loaded. Check the connection or open the release page."
 }

@@ -2,6 +2,20 @@ namespace Kachalka;
 
 public static class NativeReleaseSources
 {
+    // Trackers in the Russian registry hang instead of refusing, which keeps a card "searching" for the full wait.
+    // From Russia and Belarus they get a short wait; everyone else, and every other source, keeps the full one.
+    public static readonly TimeSpan BlockedWait=TimeSpan.FromSeconds(8);
+    static readonly HashSet<string> RegistryBlocked=["RuTor","NNM-Club","MegaPeer","BigFanGroup","Nyaa","EZTV"];
+    public static ReleaseSource[] ShortenBlocked(IEnumerable<ReleaseSource> sources,Func<CancellationToken,Task<string?>> country,TimeSpan? wait=null)
+        =>sources.Select(source=>!RegistryBlocked.Contains(source.Name)?source:source with{Search=async ct=>
+        {
+            if(!SiteCountry.Blocked(await country(ct)))return await source.Search(ct);
+            // The limit cancels only this source: the caller's token stays alive, so the search reports it as timed out.
+            using var limit=CancellationTokenSource.CreateLinkedTokenSource(ct);
+            limit.CancelAfter(wait??BlockedWait);
+            return await source.Search(limit.Token);
+        }}).ToArray();
+
     public static ReleaseSource[] Create(SourceClient client,MediaItem item)=>Create(client,_=>Task.FromResult(item),item.Section=="Сериалы");
     public static ReleaseSource[] Create(SourceClient client,Func<CancellationToken,Task<MediaItem>> resolve,bool series,Func<CancellationToken,Task<MediaItem>>? resolveAliases=null)
     {

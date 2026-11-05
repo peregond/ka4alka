@@ -93,9 +93,11 @@ struct SettingsUpdatesCard: View {
     @ViewBuilder private var actionItems: some View {
         MacUpdateButton(updater: updater)
             .controlSize(.large)
-        Link(destination: URL(string: "https://github.com/peregond/ka4alka/releases/latest")!) {
+        Button { model.releaseNotes = true } label: {
             Text(tr("Что нового", "Release notes")).foregroundStyle(KDPalette.accent)
         }
+        .buttonStyle(.plain)
+        .accessibilityHint(tr("Открывает описание последнего выпуска", "Shows the notes of the latest release"))
     }
 }
 

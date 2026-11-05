@@ -38,6 +38,18 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null,Inde
 
     public void RetryNow()=>retryAfterTicks.Clear();
 
+    // The diagnostic log names the copy and the kind of request, never the query: titles and ids stay out of the report.
+    static string Kind(string path)=>path.Split('?')[0];
+    string? lastAnswered;
+    void LogFailure(Uri site,string path,Exception error)
+        =>DiagnosticLog.Write("index-site-failed",new{Host=site.Host,Request=Kind(path),Error=error.GetType().Name,Status=(error as HttpRequestException)?.StatusCode?.ToString()});
+    // Written when the copy that answers changes, not on every card.
+    void LogAnswer(Uri site,int failedBefore)
+    {
+        if(Interlocked.Exchange(ref lastAnswered,site.Host)!=site.Host)
+            DiagnosticLog.Write("index-site-answered",new{Host=site.Host,Primary=site==primary,FailedBefore=failedBefore});
+    }
+
     // Reads one path from the first copy of the site that answers. A refusal
     // (401/403, the country block) rests that copy for 15 minutes, a hung or
     // refused connection for 2 minutes, any other failure but 404 for 30 seconds,
@@ -52,6 +64,7 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null,Inde
                 var bytes=await client.Read(new Uri(site,path),limit,ct);
                 validate?.Invoke(bytes);
                 Answered(failed);
+                LogAnswer(site,failed.Count);
                 return bytes;
             }
             catch(Exception error) when(!ct.IsCancellationRequested&&error is HttpRequestException or JsonException or IOException or InvalidDataException or OperationCanceledException)
@@ -59,6 +72,7 @@ public sealed class OnlineIndexClient(SourceClient client,Uri? baseUri=null,Inde
                 // An optional lookup (restSites: false) never makes a copy of the site rest for the catalog and releases.
                 if(restSites&&Rest(site,error))failed.Add(site);
                 failure=error;
+                LogFailure(site,path,error);
             }
         }
         throw failure??new HttpRequestException("Онлайн-индекс временно недоступен.");

@@ -127,7 +127,7 @@ public partial class MainWindow
             // Supplement cached/indexed rows concurrently: a single screen copy must not suppress better sources.
             // The online index only knows catalog titles; an IMDb-only title goes straight to the trackers.
             var providers=(ImdbSuggestions.IsImdbOnly(item)?[]:new[]{new ReleaseSource("Онлайн-индекс",ct=>onlineIndex.Releases(item,ct,allowRelay:true))})
-                .Concat(NativeReleaseSources.Create(sourceClient,Resolved,item.Section=="Сериалы",Aliases));
+                .Concat(NativeReleaseSources.ShortenBlocked(NativeReleaseSources.Create(sourceClient,Resolved,item.Section=="Сериалы",Aliases),countryToken=>SiteCountry.Get(sourceClient,countryToken)));
             var settled=false;
             void Apply(ReleaseSearchUpdate update)
             {
