@@ -17,6 +17,9 @@ static class BackroomsAudioTests
         Check(ReleaseAudio.StudioNames(fullHd).Contains("HDrezka")&&ReleaseAudio.TypeNames(fullHd).Contains("Дубляж"),"mixed-studio rows preserve Flarrow Films and HDrezka without dropping the D audio marker");
         var sparse=flarrow.Where(row=>row.Quality is "4K" or "Full HD").ToArray();
         Check(sparse.Length>0&&sparse.All(row=>row.Seeds<ReleaseRecommendation.MinimumSeeds),"the real Flarrow HD fixture is not falsely reported as a well-seeded recommendation");
+        var dubChoice=ReleaseRecommendation.Pick(sparse);
+        Check(dubChoice!=null&&RussianAudio.DubbedAudio(dubChoice.Entry)&&dubChoice.Entry.Seeds>0&&dubChoice.Reason.Contains("мало отдающих"),"Backrooms gets a real available dub recommendation without claiming a healthy swarm");
+        Check(ReleaseRecommendation.Ranked(rows).Where(row=>ReleaseAudio.MatchesStudio(row,"Flarrow Films")).FirstOrDefault()==ReleaseRecommendation.Pick(flarrow)?.Entry,"filtering to Flarrow Films preserves the shared recommendation order");
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
         var megaHtml=File.ReadAllText(Path.Combine(AppContext.BaseDirectory,"Fixtures","megapeer-backrooms-2026.html"));
         var megaRows=MegaPeerSource.Parse(Encoding.GetEncoding(1251).GetBytes(megaHtml),item);

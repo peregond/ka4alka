@@ -120,7 +120,7 @@ public partial class MainWindow:Window
     internal int renderCount;internal string? lastRenderCaller;
     void Render()
     {
-        if(!ready)return;renderCount++;if(!MotionAllowed)lastRenderCaller=Environment.StackTrace;BeginCatalogNavigationRender();savedScroll=null;personRequest?.Cancel();personRequest?.Dispose();personRequest=null;
+        if(!ready)return;ResetDetailFranchiseIfLeaving();renderCount++;if(!MotionAllowed)lastRenderCaller=Environment.StackTrace;BeginCatalogNavigationRender();savedScroll=null;personRequest?.Cancel();personRequest?.Dispose();personRequest=null;
         CancelStaleDetailWork();CancelGameWork();CancelFeaturedWork();
         SyncDiscoveryContext();
         if(activePerson!=null&&(section!=personSection||current?.Id!=personOrigin?.Id))activePerson=null;
@@ -129,9 +129,10 @@ public partial class MainWindow:Window
         if(activePerson==null&&(current==null||section is not ("Фильмы" or "Сериалы" or "ТВ Шоу")))returnPerson=null;
         if(activePerson!=null||current!=null||section is not ("Фильмы" or "Сериалы" or "ТВ Шоу"))CancelCatalogQualityCheck();
         if(activePerson!=null||current!=null||section is not ("Фильмы" or "Сериалы" or "ТВ Шоу")||!SearchActive)CancelPeopleSearch(!SearchActive);
-        try{catalogList=null;catalogRows=null;catalogEmptyHost=null;catalogEmptyKey="";detailHero=null;detailMetaRow=null;detailRatings=null;detailInfo=null;detailPoster=null;detailSynopsis=null;detailTitle=null;detailDescription=null;descriptionToggle=null;inlineCatalogFilters=null;inlineCatalogFilterScroll=null;catalogToolbar=null;catalogRefreshButton=null;catalogFilterBack=null;catalogFilterForward=null;catalogFiltersCompact=null;catalogFilterCaptions.Clear();catalogRailPreview=null;discoveryHero=null;gameShelfViews.Clear();gameFilterRow=null;gameGenreScroll=null;gameGenreBack=null;gameGenreForward=null;if(carousel!=null)DetachFeatureWatch(carousel);carousel=null;discoveryShelf=null;ReturnFiltersPanel();FilterControls.Children.Clear();PageHeader.Children.Clear();ClearBack();AddTorrentButton.Visibility=section=="Загрузки"?Visibility.Collapsed:Visibility.Visible;Body.Children.Clear();Body.RowDefinitions.Clear();SyncTimer();UpdateFilterRail();
+        try{heroPageScroll=null;heroPageContent=null;heroPageHost=null;catalogList=null;catalogRows=null;catalogEmptyHost=null;catalogEmptyKey="";detailHero=null;detailMetaRow=null;detailRatings=null;detailInfo=null;detailPoster=null;detailSynopsis=null;detailTitle=null;detailDescription=null;descriptionToggle=null;inlineCatalogFilters=null;inlineCatalogFilterScroll=null;catalogToolbar=null;catalogRefreshButton=null;catalogFilterBack=null;catalogFilterForward=null;catalogFiltersCompact=null;catalogFilterCaptions.Clear();catalogRailPreview=null;discoveryHero=null;gameShelfViews.Clear();gameFilterRow=null;gameGenreScroll=null;gameGenreBack=null;gameGenreForward=null;if(carousel!=null)DetachFeatureWatch(carousel);carousel=null;discoveryShelf=null;ReturnFiltersPanel();FilterControls.Children.Clear();PageHeader.Children.Clear();ClearBack();AddTorrentButton.Visibility=section=="Загрузки"?Visibility.Collapsed:Visibility.Visible;Body.Children.Clear();Body.RowDefinitions.Clear();SyncTimer();UpdateFilterRail();
         SearchBar.Visibility=current!=null||section is "Фильмы" or "Сериалы" or "ТВ Шоу" or "Игры" or "Сохранённое" or "Загрузки" or "Актуальное"?Visibility.Visible:Visibility.Collapsed;
-        SearchPlaceholder.Text=AppLanguage.T(compactSearch?"Поиск":section=="Игры"?"Найти игру для Windows":"Найти фильм, сериал или человека");
+        CenterHeaderSearch(compactWidth,contentGutter);
+        SearchPlaceholder.Text=AppLanguage.T(compactSearch?"Поиск":"Найти фильм, сериал или игру");
         ContextLabel.Visibility=SearchBar.Visibility==Visibility.Visible||section is "Загрузки" or "Настройки"?Visibility.Collapsed:Visibility.Visible;ContextLabel.Text=section;
         downloadView=null;downloadList=null;
         RenderNavSelection();UpdateDownloadsWidget();
@@ -239,10 +240,10 @@ public partial class MainWindow:Window
     {
         if(closed)return;e.Cancel=true;if(closing)return;closing=true;StopCoverViewport();
         DiagnosticLog.Write("closing",new{QueueCount=downloads.Items.Count});Status.Text=AppLanguage.T("Сохраняем загрузки и закрываем приложение…");
-        IsEnabled=false;StopDownloadReliability();var lanStopped=StopLanDevicesAsync();personRequest?.Cancel();updateCancellation.Cancel();catalogRefreshTimer.Stop();refresh.Stop();searchDelay.Stop();liveRequest?.Cancel();sourceRequest?.Cancel();archiveRequest?.Cancel();gameCatalogRequest?.Cancel();gameDetailRequest?.Cancel();broadcastRequest?.Cancel();
+        IsEnabled=false;StopDownloadReliability();var lanStopped=StopLanDevicesAsync();var phoneStopped=StopPhoneRemoteAsync();personRequest?.Cancel();updateCancellation.Cancel();catalogRefreshTimer.Stop();refresh.Stop();searchDelay.Stop();liveRequest?.Cancel();sourceRequest?.Cancel();archiveRequest?.Cancel();gameCatalogRequest?.Cancel();gameDetailRequest?.Cancel();broadcastRequest?.Cancel();
         ResetDiscoveryData();CancelDetailMetadata();CancelCatalogQualityCheck();CancelPeopleSearch();foreach(var view in releaseViews.Values)view.Request?.Cancel();
         bool saved=false;
-        try{prefs.Save();await downloads.Close();await lanStopped;saved=true;DiagnosticLog.Write("closed",new{QueueSaved=true});}
+        try{prefs.Save();await phoneStopped;await downloads.Close();await lanStopped;saved=true;DiagnosticLog.Write("closed",new{QueueSaved=true});}
         catch(Exception ex){ErrorLog.Write(ex);LocalizedDialog.Show(AppLanguage.T(ex.Message),AppLanguage.T("Не удалось сохранить очередь"));}
         finally
         {

@@ -7,9 +7,9 @@ namespace Kachalka;
 
 // A film or series the link points to. The slug is the title's page on the catalog site and is what
 // identifies it; the title and year only let the card show before its details load.
-public sealed record ShareTarget(string Section,string Slug,string Title,int Year)
+public sealed record ShareTarget(string Section,string Slug,string Title,int Year,string? ImdbId=null)
 {
-    public string PageUrl=>LiveCatalog.Base+(Section=="Фильмы"?"/movies/":"/tvseries/")+Slug;
+    public string PageUrl=>ImdbId!=null?"https://www.imdb.com/title/"+ImdbId+"/":LiveCatalog.Base+(Section=="Фильмы"?"/movies/":"/tvseries/")+Slug;
 }
 
 // Links of the form kachalka://movie/<slug>?title=…&year=… (kachalka://series/… for series). They open the
@@ -25,11 +25,18 @@ public static class ShareLink
     {
         var kind=item.Section switch{"Фильмы"=>"movie","Сериалы"=>"series",_=>null};
         var path=item.Section=="Фильмы"?"/movies/":"/tvseries/";
-        if(kind==null||!Uri.TryCreate(item.PageUrl,UriKind.Absolute,out var page)||page.Scheme!="https"||page.Host!=new Uri(LiveCatalog.Base).Host||!page.IsDefaultPort||page.UserInfo.Length>0||page.Query.Length>0||page.Fragment.Length>0||!page.AbsolutePath.StartsWith(path,StringComparison.Ordinal))return null;
-        var slug=Uri.UnescapeDataString(page.AbsolutePath[path.Length..].TrimEnd('/'));
+        if(kind==null||!Uri.TryCreate(item.PageUrl,UriKind.Absolute,out var page)||page.Scheme!="https"||!page.IsDefaultPort||page.UserInfo.Length>0||page.Query.Length>0||page.Fragment.Length>0)return null;
+        string slug;
+        if(page.Host=="www.imdb.com"&&Regex.IsMatch(page.AbsolutePath,@"^/title/tt\d{5,10}/?$"))
+        {slug=page.AbsolutePath.Split('/',StringSplitOptions.RemoveEmptyEntries)[1];kind+="-imdb";}
+        else
+        {
+            if(page.Host!=new Uri(LiveCatalog.Base).Host||!page.AbsolutePath.StartsWith(path,StringComparison.Ordinal))return null;
+            slug=Uri.UnescapeDataString(page.AbsolutePath[path.Length..].TrimEnd('/'));
+        }
         if(!Slug.IsMatch(slug))return null;
         var link=new StringBuilder(Scheme+"://").Append(kind).Append('/').Append(Escape(slug));
-        var title=Clean(item.Title);
+        var title=Clean(item.DisplayTitle);
         if(title.Length>0)link.Append("?title=").Append(Escape(title));
         if(item.Year is >=1888 and <=2100)link.Append(title.Length>0?'&':'?').Append("year=").Append(item.Year);
         return link.ToString();
@@ -49,10 +56,13 @@ public static class ShareLink
         var query=queryStart<0||rest[queryStart]=='#'?"":rest[(queryStart+1)..].Split('#')[0];
         var parts=path.Split('/');
         if(parts.Length!=2)return null;
-        var section=parts[0].ToLowerInvariant() switch{"movie"=>"Фильмы","series"=>"Сериалы",_=>null};
+        var kind=parts[0].ToLowerInvariant();
+        var section=kind switch{"movie" or "movie-imdb"=>"Фильмы","series" or "series-imdb"=>"Сериалы",_=>null};
         string slug;
         try{slug=Uri.UnescapeDataString(parts[1]);}catch(UriFormatException){return null;}
         if(section==null||!Slug.IsMatch(slug))return null;
+        var imdb=kind.EndsWith("-imdb",StringComparison.Ordinal);
+        if(imdb&&!Regex.IsMatch(slug,@"^tt\d{5,10}$"))return null;
         string title="";var year=0;
         foreach(var pair in query.Split('&',StringSplitOptions.RemoveEmptyEntries))
         {
@@ -63,7 +73,7 @@ public static class ShareLink
             if(key=="title")title=Clean(data);
             else if(key=="year"&&int.TryParse(data,System.Globalization.NumberStyles.None,System.Globalization.CultureInfo.InvariantCulture,out var parsed)&&parsed is >=1888 and <=2100)year=parsed;
         }
-        return new(section,slug,title,year);
+        return new(section,slug,title,year,imdb?slug:null);
     }
 
     static string Clean(string? value)

@@ -16,7 +16,7 @@ public partial class MainWindow
     {
         Directory.CreateDirectory(output);await Task.Delay(300);
         liveRequest?.Cancel();searchDelay.Stop();
-        var person=new CinemaPerson("Участник UI-проверки","Актёры","");
+        var person=new CinemaPerson("Участник UI-проверки","Актёры","",Character:"Персонаж UI-проверки");
         var original=new MediaItem(-70001,"Первый проверочный фильм","Фильмы","Драма",2020,"8.2","7.8","#526B69")
         {
             PageUrl=LiveCatalog.Base+"/movies/cinema-smoke-first",Description="Описание фильма",OriginalTitle="First verification film: a story to remember",
@@ -46,7 +46,7 @@ public partial class MainWindow
         requestedDetails.Add(original.Id);requestedDetails.Add(next.Id);liveReleases[original.Id]=[];liveReleases[next.Id]=[];
         cardMetadata[original.Id]=Task.FromResult(original);cardMetadata[next.Id]=Task.FromResult(next);
         section="Фильмы";current=original;Render();UpdateLayout();
-        var open=FindVisual<Button>(Body,x=>AutomationProperties.GetName(x)=="Открыть карточку: "+person.Name+", "+person.Role)??throw new Exception("Person action missing.");
+        var open=FindVisual<Button>(Body,x=>AutomationProperties.GetName(x)=="Открыть карточку: "+person.Name+", "+person.CreditLabel)??throw new Exception("Person action missing.");
         open.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
         var limit=DateTime.UtcNow.AddSeconds(15);
         while((FindVisual<TextBlock>(Body,x=>x.Text==biography)==null||FindVisual<Image>(Body,x=>x.Source!=null)==null)&&DateTime.UtcNow<limit)await Task.Delay(100);
@@ -139,9 +139,10 @@ public partial class MainWindow
                 if(button.BorderThickness!=new Thickness(0)||button.Background is not SolidColorBrush{Color.A:0})throw new Exception("Crew actions must not draw separate permanent cards.");
                 var portrait=FindVisual<Border>(button,x=>x.Name=="CinemaPersonPortrait")??throw new Exception("Crew photograph frame is missing.");
                 if(portrait.BorderThickness!=new Thickness(0)||portrait.Clip is not RectangleGeometry{RadiusX:>0,RadiusY:>0})throw new Exception("Crew photographs must keep rounded clipping without an extra outline.");
+                if(Math.Abs(portrait.ActualHeight-portrait.ActualWidth*1.25)>2||portrait.ActualWidth<button.ActualWidth-button.Padding.Left-button.Padding.Right-6)throw new Exception("Crew photographs must fill their tile at the Mac 4:5 portrait proportion.");
                 var bounds=button.TransformToAncestor(frame).TransformBounds(new Rect(new Point(),button.RenderSize));
                 if(bounds.Left<-.5||bounds.Right>frame.ActualWidth+.5)throw new Exception("Crew action overflows its participant card.");
-                if(button.Tag is not CinemaPerson person||AutomationProperties.GetName(button)!="Открыть карточку: "+person.Name+", "+person.Role)throw new Exception("Crew action lost its participant navigation.");
+                if(button.Tag is not CinemaPerson person||AutomationProperties.GetName(button)!="Открыть карточку: "+person.Name+", "+person.CreditLabel)throw new Exception("Crew action lost its participant navigation.");
             }
         }
         CheckIdentityOrder();CheckCrewTiles();

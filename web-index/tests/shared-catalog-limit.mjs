@@ -1,15 +1,9 @@
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import vm from 'node:vm';
-import { stripTypeScriptTypes } from 'node:module';
+import { catalogModules } from './helpers/catalog-modules.mjs';
 
 let now=Date.UTC(2026,9,11,6);
 class Clock extends Date {static now(){return now}}
-const code=stripTypeScriptTypes(fs.readFileSync(new URL('../lib/shared-catalog.ts',import.meta.url),'utf8'))
-  .replace(/^import[^\n]+catalog-source[^\n]+\n/m,'const normalize=value=>value.toLowerCase().replace(/[^\\p{L}\\p{N}]+/gu," ").trim();\n')
-  .replace(/^export /gm,'');
-const load=fetch=>vm.runInNewContext(code+'\n({readSharedCatalog,sharedCatalogPage,MAX_SHARED_CATALOG_BYTES})',
-  {Response,URL,Date:Clock,Number,Math,AbortSignal,TextDecoder,fetch});
+const load=fetch=>catalogModules({}, {Date:Clock,fetch})('@/lib/shared-catalog');
 const rows=Array.from({length:2300},(_,index)=>{
   const section=index<2000?'movies':'series',slug='fixture-'+index;
   return {id:section+':'+slug,section,title:'Фильм '+index,year:2026,

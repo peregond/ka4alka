@@ -14,16 +14,9 @@ public sealed class BigFanGroupSource(SourceClient client)
         var encoded=string.Concat(PageEncoding.GetBytes(title.Trim()).Select(x=>"%"+x.ToString("X2",CultureInfo.InvariantCulture)));
         return new(Base,"browse.php?ajax=1&search="+encoded+"&cat=0&incldead=1&year=0&format=0&s=seed&d=desc");
     }
-    public async Task<IReadOnlyList<SourceEntry>> Search(MediaItem item,CancellationToken ct)
-    {
-        var groups=await Task.WhenAll(MediaIdentity.Queries(item).Where(x=>!string.IsNullOrWhiteSpace(x)).Cast<string>().Distinct(StringComparer.OrdinalIgnoreCase).Take(4).Select(async title=>
-        {
-            try{return (Items:Parse(await client.Read(QueryUri(title),2_000_000,ct),item),Error:(Exception?)null);}
-            catch(Exception error) when(!ct.IsCancellationRequested){return (Items:(IReadOnlyList<SourceEntry>)[],Error:error);}
-        }));
-        if(groups.All(x=>x.Error!=null))throw groups.First().Error!;
-        return groups.SelectMany(x=>x.Items).DistinctBy(x=>x.Id).OrderByDescending(x=>x.Seeds??-1).Take(100).ToArray();
-    }
+    public Task<IReadOnlyList<SourceEntry>> Search(MediaItem item,CancellationToken ct)=>
+        ReleaseAliasSearch.Run(MediaIdentity.Queries(item),async(query,token)=>Parse(await client.Read(QueryUri(query),2_000_000,token),item),ct);
+
     public static IReadOnlyList<SourceEntry> Parse(byte[] bytes,MediaItem item)
     {
         var html=new HtmlDocument();html.LoadHtml(PageEncoding.GetString(bytes));

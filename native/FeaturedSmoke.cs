@@ -44,10 +44,13 @@ public partial class MainWindow
         Check(Navigation.Children.OfType<Button>().First().Tag?.ToString()==FeaturedSection,"Featured is the first library section.");
         Check(Navigation.Children.OfType<Button>().First().Content is Grid navGrid&&navGrid.Children.OfType<System.Windows.Shapes.Path>().FirstOrDefault()?.Fill!=null,"The icon of the open section is solid.");
         Check(Navigation.Children.OfType<Button>().Skip(1).All(button=>button.Content is Grid other&&other.Children.OfType<System.Windows.Shapes.Path>().FirstOrDefault()?.Fill==null),"The icons of the other sections stay outlined.");
-        Check(FindVisual<ScrollViewer>(Body,_=>true) is {} pageScroll&&FindVisual<TextBlock>(pageScroll,text=>text.Name=="FeaturedHeading")!=null,"The page title and date scroll away with the stories.");
+        Check(FindVisual<ScrollViewer>(Body,_=>true) is {} pageScroll&&FindVisual<TextBlock>(pageScroll,text=>text.Name=="FeaturedHeading")==null,"Featured starts with the banner without a redundant page title or date.");
         Check(featuredHero!=null&&VisualElements<TextBlock>(featuredHero).Any(text=>text.Text=="КП")&&VisualElements<TextBlock>(featuredHero).Any(text=>text.Text=="IMDb")&&!VisualElements<TextBlock>(featuredHero).Any(text=>text.Text is "Фильм" or "Сериал"),"The banner shows both ratings with the mark of their site and no kind word.");
         Check(FindVisual<StackPanel>(Body,panel=>panel.Name=="FeaturedotherworldsBlock") is {} leadBlock&&VisualElements<TextBlock>(leadBlock).Any(text=>text.Text=="1")&&VisualElements<TextBlock>(leadBlock).Any(text=>text.Text=="2"),"The lead story is numbered one like the list beside it.");
         Check(SearchBar.Visibility==Visibility.Visible&&featuredShelves.Count==4,"Search and editorial shelves are available.");
+        var heroBounds=carousel!.Frame.TransformToAncestor(CenterRegion).TransformBounds(new Rect(carousel.Frame.RenderSize));
+        Check(heroBounds.Left<1&&heroBounds.Left<=-CenterRegion.Margin.Left+1,"The Windows hero reaches the content edge while shelves keep their gutter.");
+        Check(carousel.Frame.ActualWidth>Body.ActualWidth,"The full-width hero is wider than the inset poster shelves.");
         Check(featuredShelves[rankingDefinition.Id].Custom!=null&&FindVisual<StackPanel>(Body,panel=>panel.Name=="FeaturedtopratedBlock")?.Children.OfType<UniformGrid>().FirstOrDefault()?.Children.Count>=2,"The ranking shows numbered posters.");
         // Films, series and games each have a tab in the ranking; a tab shows its own list.
         var rankingBlock=FindVisual<StackPanel>(Body,panel=>panel.Name=="FeaturedtopratedBlock")!;
@@ -92,7 +95,7 @@ public partial class MainWindow
             for(var wait=0;wait<200&&featuredGroups==null;wait++)await Task.Delay(50);await Settle();
             Check(featuredGroups!=null&&featuredLanguage==language,"Shelves are resolved again after the interface language changes: "+language);
             featuredProvider=null;
-            Check((FindVisual<TextBlock>(Body,text=>text.Name=="FeaturedHeading")??FindVisual<TextBlock>(PageHeader,text=>text.Name=="FeaturedHeading"))?.Text==AppLanguage.T(FeaturedSection),"Featured title translates: "+language);
+            Check(FindVisual<TextBlock>(Body,text=>text.Name=="FeaturedHeading")==null&&FindVisual<TextBlock>(PageHeader,text=>text.Name=="FeaturedHeading")==null,"Featured has no redundant heading in either language: "+language);
             foreach(var width in new[]{760d,1280d})
             {
                 Width=width;await Settle();ResizeFeaturedShelves();

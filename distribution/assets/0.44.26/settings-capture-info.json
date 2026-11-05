@@ -1,0 +1,49 @@
+{
+  "Version": "0.44.26",
+  "CaptureMethod": "Windows desktop client pixels",
+  "ReleaseArchiveSha256": "3b648f77f605ffa140b49eac809c517c395914357f79f930bea3bcdbdf92c9e5",
+  "ReleaseDllSha256": "1a781516a35998882b9753fb800d780d6819a70b9e3dbd8f70caa349235ad9f5",
+  "Captures": [
+    {
+      "File": "ru/settings-lite-dark.png",
+      "Language": "ru",
+      "Width": 1424,
+      "Height": 892,
+      "LoadedVisiblePosters": 0,
+      "PendingVisiblePosters": 0,
+      "Titles": [],
+      "Sha256": "f2dc96e70b3cfcb0a3cd8472fc329927d1502d98f56dba5962ce4e9c675879ba"
+    },
+    {
+      "File": "ru/settings-lan-dark.png",
+      "Language": "ru",
+      "Width": 1424,
+      "Height": 892,
+      "LoadedVisiblePosters": 0,
+      "PendingVisiblePosters": 0,
+      "Titles": [],
+      "Sha256": "0d810ed33b6c4cb909b365e3164d00029be594cc80328b9ae896289b36c4645a"
+    },
+    {
+      "File": "en/settings-lite-dark.png",
+      "Language": "en",
+      "Width": 1424,
+      "Height": 892,
+      "LoadedVisiblePosters": 0,
+      "PendingVisiblePosters": 0,
+      "Titles": [],
+      "Sha256": "8d3a183a7cb534ed501e5dd17bbdf56eb2518fd19d4c77137faf874a4966b505"
+    },
+    {
+      "File": "en/settings-lan-dark.png",
+      "Language": "en",
+      "Width": 1424,
+      "Height": 892,
+      "LoadedVisiblePosters": 0,
+      "PendingVisiblePosters": 0,
+      "Titles": [],
+      "Sha256": "dd526a94207e238a8bd58c274c31d052b4279ec3c8e43518f02f76023ddf877a"
+    }
+  ],
+  "CaptureWorkflowRun": "https://github.com/peregond/ka4alka/actions/runs/40045703892"
+}

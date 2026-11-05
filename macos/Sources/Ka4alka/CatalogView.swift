@@ -66,7 +66,7 @@ struct PosterCard: View {
     private var posterArt: some View {
         Color.clear
             .aspectRatio(KD.posterAspect(wide: wideArt), contentMode: .fit)
-            .overlay { Artwork(address: item.poster, width: wideArt ? 720 : 640, placeholderSymbol: placeholderSymbol) }
+            .overlay { Artwork(address: item.poster, width: 640, placeholderSymbol: placeholderSymbol, fallbackAddress: item.posterFallback) }
             .overlay { CatalogPosterStatus(store: model.transfers, cardID: card.id, saved: saved) }
             .overlay(alignment: .topLeading) { topLeadingBadge.padding(8) }
             .overlay(alignment: .bottomLeading) { bottomLeadingMark.padding(8) }
@@ -172,6 +172,7 @@ struct PosterCard: View {
             HStack(spacing: 8) {
                 Button { Task { await toggleSave() } } label: {
                     Image(systemName: saved ? "heart.fill" : "heart")
+                        .foregroundStyle(saved ? KDPalette.like : Color.white)
                 }
                 .buttonStyle(KDOverlayButtonStyle(circular: true))
                 .focused($focus, equals: .save)
@@ -253,13 +254,6 @@ struct CatalogView: View {
         !saved && (model.section == .movies || model.section == .series || model.section == .shows)
             && model.page == 1 && model.submittedQuery.isEmpty && !model.filter.active
     }
-    private var allTitlesHeading: String {
-        switch model.section {
-        case .series: return tr("Все сериалы", "All series")
-        case .shows: return tr("Все шоу", "All shows")
-        default: return tr("Все фильмы", "All movies")
-        }
-    }
     /// The filters stay on screen while a filter or a search is active; the page title always scrolls with the content.
     private var pinsHeader: Bool { !saved && (model.filter.active || !model.submittedQuery.isEmpty) }
     private var showsPageHeader: Bool { saved || !model.submittedQuery.isEmpty || model.section == .games }
@@ -282,16 +276,29 @@ struct CatalogView: View {
         }
     }
 
+    /// The banner is shown (or its placeholder while the first page loads), so it opens the page edge to edge.
+    private var showsHeroBlock: Bool {
+        guard showsSpotlight else { return false }
+        if let result = model.list { return !model.visible(result.items).isEmpty }
+        return !settled
+    }
+
     private var scroller: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                Color.clear.frame(height: KD.Space.m).id(Self.topID)
-                scrollContent
+                // The scroll anchor is the first thing on the page: the banner when there is one. The banner is
+                // outside the page's side margins, so it runs from edge to edge.
+                if showsHeroBlock { heroView.id(Self.topID) } else { Color.clear.frame(height: KD.Space.m).id(Self.topID) }
+                VStack(alignment: .leading, spacing: 18) {
+                    scrollContent
+                }
+                .padding(.horizontal, KD.gutter)
             }
             .scrollTargetLayout()
-            .padding(.horizontal, KD.gutter)
             .padding(.bottom, KD.gutter)
         }
+        // With the banner first, the page starts at the top of the window, under the toolbar.
+        .ignoresSafeArea(edges: showsHeroBlock ? .top : [])
         .scrollPosition(id: $scrollID, anchor: .top)
         .onAppear { if scrollID == nil { scrollID = model.browseAnchor } }
         .onChange(of: scrollID) { _, next in model.browseAnchor = next }
@@ -331,28 +338,43 @@ struct CatalogView: View {
 
     @ViewBuilder private var scrollContent: some View {
         if showsPageHeader { pageHeader }
-        heroBlock
+        heroTitle
         if !saved, !pinsHeader { FilterBar() }
         resultsBlock
     }
 
     // MARK: Hero
 
-    @ViewBuilder private var heroBlock: some View {
+    /// The banner, or its placeholder while the first page is loading.
+    @ViewBuilder private var heroView: some View {
         if showsSpotlight {
             if let result = model.list {
                 let shown = model.visible(result.items)
                 if !shown.isEmpty {
-                    CatalogSpotlightView(items: Array(shown.prefix(5)))
+                    CatalogSpotlightView(items: Array(shown.prefix(5)), columnMax: .infinity)
                         .id(model.section.rawValue)
                         .settingsLayoutProbe("catalog.banner." + model.section.rawValue)
-                    Text(allTitlesHeading)
-                        .font(KDFont.section)
-                        .accessibilityAddTraits(.isHeader)
                 }
             } else if !settled {
-                HeroPlaceholder().padding(.bottom, CatalogHeroMetrics.pagerHeight)
+                HeroPlaceholder()
             }
+        }
+    }
+
+    private var allTitlesHeading: String {
+        switch model.section {
+        case .series: return tr("Все сериалы", "All series")
+        case .shows: return tr("Все шоу", "All shows")
+        default: return tr("Все фильмы", "All movies")
+        }
+    }
+
+    /// The heading of the list that follows the banner.
+    @ViewBuilder private var heroTitle: some View {
+        if showsSpotlight, let result = model.list, !model.visible(result.items).isEmpty {
+            Text(allTitlesHeading)
+                .font(KDFont.section)
+                .accessibilityAddTraits(.isHeader)
         }
     }
 
@@ -691,10 +713,11 @@ struct FilterBar: View {
             Text(tr("Все", "All")).tag("")
             Text(tr("Фильмы", "Movies")).tag("movies")
             Text(tr("Сериалы", "Series")).tag("series")
+            Text(tr("Игры", "Games")).tag("games")
         }
         .pickerStyle(.segmented)
         .labelsHidden()
-        .frame(width: 260)
+        .frame(minWidth: 220, idealWidth: 320, maxWidth: 360)
         .accessibilityLabel(tr("Показывать", "Show"))
     }
 
@@ -873,7 +896,7 @@ struct FilterBar: View {
         Button(action: chip.clear) {
             KDChipLabel(text: chip.text, systemImage: "xmark", isActive: true)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(KDSecondaryButtonStyle())
         .help(tr("Убрать фильтр", "Remove filter"))
         .accessibilityLabel(tr("Убрать фильтр: ", "Remove filter: ") + chip.text)
     }

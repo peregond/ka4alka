@@ -73,7 +73,7 @@ public partial class MainWindow
         }
         hero.SizeChanged+=(_,_)=>HeroLayout();biography.SizeChanged+=(_,_)=>UpdateBiography();
         var status=Text("Загружаем фильмографию…",12,true);status.Name="PersonFilmographyStatus";status.Margin=new(2,0,0,14);body.Children.Add(status);
-        var top=PersonGallery("Лучшие фильмы по Кинопоиску","Оценки среди подтверждённых работ участника.","PersonTopFilms");body.Children.Add(top.Frame);
+        var top=PersonGallery("Лучшие фильмы по рейтингу","Оценки среди подтверждённых работ участника.","PersonTopFilms",oneRow:true);body.Children.Add(top.Frame);
         var awards=PersonGallery("Фильмы с наградами","Награды за работу этого участника.","PersonAwardFilms");body.Children.Add(awards.Frame);
         var all=PersonGallery("Фильмография","Фильмы и сериалы · сначала новые.","PersonFilmographyGrid");body.Children.Add(all.Frame);
         var empty=Text("Подтверждённые фильмы и сериалы пока недоступны.",13,true);empty.Name="PersonFilmographyEmpty";empty.Visibility=Visibility.Collapsed;body.Children.Add(empty);
@@ -95,8 +95,9 @@ public partial class MainWindow
             }
             var uri=PersonBiographyUrl(profile.SourceUrl);sourceUrl=uri?.AbsoluteUri;source.Visibility=uri==null?Visibility.Collapsed:Visibility.Visible;source.ToolTip=uri?.Host;
             var films=profile.Filmography.Where(film=>film.Cinema).DistinctBy(film=>film.Id).OrderByDescending(film=>film.Year).ThenBy(film=>film.Title).ToArray();
-            all.Update(films);all.Frame.Visibility=films.Length>0?Visibility.Visible:Visibility.Collapsed;
-            var best=CinemaMetadata.Top(films);top.Update(best);top.Frame.Visibility=films.Length>3&&best.Length>1?Visibility.Visible:Visibility.Collapsed;
+            top.Loading(!complete&&films.Length==0);all.Loading(!complete&&films.Length==0);
+            all.Update(films);all.Frame.Visibility=films.Length>0||!complete?Visibility.Visible:Visibility.Collapsed;
+            var best=CinemaMetadata.Top(films);top.Update(best);top.Frame.Visibility=films.Length>3&&best.Length>1||!complete&&films.Length==0?Visibility.Visible:Visibility.Collapsed;
             var winners=films.Where(film=>film.Awards.Any(award=>award.Winner&&person.PageUrl.Length>0&&award.PersonUrl==person.PageUrl)).ToArray();awards.Update(winners);awards.Frame.Visibility=winners.Length>0?Visibility.Visible:Visibility.Collapsed;
             status.Text=AppLanguage.T(complete?(films.Length>0?$"Подтверждённые работы: {films.Length}":"Фильмография пока недоступна."):(films.Length>0?$"Подтверждённые работы: {films.Length} · загружаем остальные…":"Загружаем фильмографию…"));
             empty.Visibility=complete&&films.Length==0?Visibility.Visible:Visibility.Collapsed;
@@ -108,6 +109,7 @@ public partial class MainWindow
             if(!IsCurrent())return;
             var attempt=++refreshAttempt;
             personProfileLoading=true;
+            top.Frame.Visibility=all.Frame.Visibility=Visibility.Visible;top.Loading(true);all.Loading(true);
             retry.Visibility=Visibility.Collapsed;status.Text=AppLanguage.T("Загружаем фильмографию…");
             try
             {
@@ -125,7 +127,7 @@ public partial class MainWindow
             catch(OperationCanceledException)when(request.IsCancellationRequested){}
             catch
             {
-                if(!IsCurrent()||attempt!=refreshAttempt)return;settledAttempt=attempt;personProfileLoading=false;status.Text=AppLanguage.T("Не удалось обновить фильмографию.");retry.Visibility=Visibility.Visible;
+                if(!IsCurrent()||attempt!=refreshAttempt)return;top.Loading(false);all.Loading(false);settledAttempt=attempt;personProfileLoading=false;status.Text=AppLanguage.T("Не удалось обновить фильмографию.");retry.Visibility=Visibility.Visible;
                 if(biography.Text==AppLanguage.T("Загружаем биографию…"))biography.Text=AppLanguage.T("Биография пока недоступна.");
                 if(navigationPendingPosition!=null)ScheduleCatalogPositionRestore();
             }

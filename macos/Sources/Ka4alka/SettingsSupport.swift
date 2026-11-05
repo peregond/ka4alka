@@ -251,33 +251,21 @@ struct SettingsSwitch: View {
     }
 
     var body: some View {
-        HStack(alignment: .center, spacing: KD.Space.m) {
-            labelBlock
-            Toggle(title, isOn: $isOn)
-                .labelsHidden()
-                .toggleStyle(.switch)
-                .fixedSize()
-                .accessibilityHint(detail ?? "")
-        }
-    }
-
-    /// The text side of the row toggles the switch. The switch itself is outside this tap area, so one click never toggles twice.
-    private var labelBlock: some View {
-        HStack(spacing: 0) {
+        Toggle(isOn: $isOn) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title).fixedSize(horizontal: false, vertical: true)
                 if let detail {
                     Text(detail)
                         .font(KDFont.secondary)
-                        .foregroundStyle(Color.secondary)
+                        .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            Spacer(minLength: 0)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .contentShape(Rectangle())
-        .onTapGesture { isOn.toggle() }
-        .accessibilityHidden(true)
+        .toggleStyle(.switch)
+        .accessibilityLabel(title)
+        .accessibilityHint(detail ?? "")
     }
 }
 

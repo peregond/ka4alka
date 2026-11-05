@@ -4,7 +4,10 @@ using System.Text.RegularExpressions;
 using HtmlAgilityPack;
 namespace Kachalka;
 
-public record CinemaPerson(string Name,string Role,string PageUrl,string? ProfileUrl=null,string? PhotoUrl=null,string? OriginalName=null,string? SourcePersonId=null);
+public record CinemaPerson(string Name,string Role,string PageUrl,string? ProfileUrl=null,string? PhotoUrl=null,string? OriginalName=null,string? SourcePersonId=null,string? Character=null)
+{
+    [System.Text.Json.Serialization.JsonIgnore] public string CreditLabel=>Role=="Актёры"&&!string.IsNullOrWhiteSpace(Character)?Character:AppLanguage.T(Role switch{"Актёры"=>"В ролях","Режиссёры"=>"Режиссёр","Операторы"=>"Оператор",_=>Role});
+}
 public record CinemaAward(string Name,int Year,string Category,bool Winner,string? PersonUrl=null)
 {
     public string Label=>$"{Name} · {Year} · {Category} · {(Winner?"Победитель":"Номинация")}";
@@ -81,5 +84,6 @@ public static class CinemaMetadata
         return new(person,bio,items);
     }
     public static double Rating(MediaItem item)=>double.TryParse(item.Kinopoisk.Replace(',','.'),NumberStyles.Float,CultureInfo.InvariantCulture,out var value)&&value is >0 and <=10?value:0;
-    public static MediaItem[] Top(IEnumerable<MediaItem> items)=>items.Where(x=>Rating(x)>0).OrderByDescending(Rating).ThenByDescending(x=>x.Year).Take(10).ToArray();
+    public static double BestRating(MediaItem item)=>Rating(item)>0?Rating(item):double.TryParse(item.Imdb.Replace(',','.'),NumberStyles.Float,CultureInfo.InvariantCulture,out var value)&&value is >0 and <=10?value:0;
+    public static MediaItem[] Top(IEnumerable<MediaItem> items)=>items.Where(x=>BestRating(x)>0).OrderByDescending(BestRating).ThenByDescending(x=>x.Year).Take(10).ToArray();
 }

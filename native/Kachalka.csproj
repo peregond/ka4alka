@@ -7,12 +7,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>Kachalka</AssemblyName>
     <Product>Качалка</Product>
-    <Version>0.45.1</Version>
+    <Version>0.45.2</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets/app.ico</ApplicationIcon>
     <ServerGarbageCollection>false</ServerGarbageCollection>
   </PropertyGroup>
-  <ItemGroup><PackageReference Include="MonoTorrent" Version="3.0.2" /><PackageReference Include="HtmlAgilityPack" Version="1.13.0" /></ItemGroup>
+  <ItemGroup><PackageReference Include="MonoTorrent" Version="3.0.2" /><PackageReference Include="HtmlAgilityPack" Version="1.13.0" /><PackageReference Include="QRCoder" Version="1.8.1" /></ItemGroup>
   <ItemGroup><ProjectReference Include="../update-core/Kachalka.UpdateCore.csproj" /></ItemGroup>
   <ItemGroup><ProjectReference Include="../lan-core/Kachalka.Lan.csproj" /></ItemGroup>
   <ItemGroup><EmbeddedResource Include="../web-index/app/data/seed.json" LogicalName="Kachalka.catalog-seed.json" /></ItemGroup>
@@ -20,6 +20,7 @@
   <ItemGroup><EmbeddedResource Include="../web-index/app/data/title-aliases.json" LogicalName="Kachalka.title-aliases.json" /></ItemGroup>
   <ItemGroup><EmbeddedResource Include="../scripts/catalog-collections.json" LogicalName="Kachalka.catalog-collections.json" /></ItemGroup>
   <ItemGroup><Resource Include="Fonts/*.ttf" /></ItemGroup>
+  <ItemGroup><EmbeddedResource Include="MovieFranchises.json" LogicalName="Kachalka.MovieFranchises.json" /></ItemGroup>
   <ItemGroup><EmbeddedResource Include="FeaturedCollections.json" LogicalName="Kachalka.FeaturedCollections.json" /></ItemGroup>
   <ItemGroup><EmbeddedResource Include="Localization/en.json" LogicalName="Kachalka.Localization.en.json" /></ItemGroup>
   <ItemGroup><Resource Include="Assets/logo.png" /><Resource Include="Assets/app.ico" /></ItemGroup>

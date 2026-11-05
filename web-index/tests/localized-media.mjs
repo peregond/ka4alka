@@ -10,7 +10,7 @@ const identity={section:'movies',title:'Дюна',originalTitle:'Dune',year:2021
 let calls=[];
 const fake=async(url,options)=>{
  calls.push(url);assert.equal(options.redirect,'manual');assert.equal(options.headers.Authorization,'Bearer fixture-token');assert(!url.includes('fixture-token'));
- return Response.json(url.includes('/find/')?{movie_results:[{id:438631}],tv_results:[{id:2190}]}:{id:url.includes('/tv/')?2190:438631,title:'Dune',name:'South Park',overview:'English synopsis',genres:[{name:'Adventure'}],credits:{cast:[{name:'English Actor',order:0}],crew:[{name:'Director',job:'Director'}]},images:{posters:[image('/ru.jpg','ru',999),image('/neutral.jpg',null),image('/en.jpg','en')],backdrops:[image('/ru_back.jpg','ru',999),image('/en_back.jpg','en')]}});
+ return Response.json(url.includes('/find/')?{movie_results:[{id:438631}],tv_results:[{id:2190}]}:{id:url.includes('/tv/')?2190:438631,title:'Dune',name:'South Park',overview:'English synopsis',genres:[{name:'Adventure'}],credits:{cast:[{name:'English Actor',original_name:'Original Actor',character:'Paul Atreides',order:0}],crew:[{name:'Director',job:'Director'}]},images:{posters:[image('/ru.jpg','ru',999),image('/neutral.jpg',null),image('/en.jpg','en')],backdrops:[image('/ru_back.jpg','ru',999),image('/en_back.jpg','en')]}});
 };
 const english=await api.fetchEnglishMedia(identity,'fixture-token',fake);
 assert.equal(english.title,'Dune');assert.equal(english.description,'English synopsis');assert.equal(english.poster,'https://image.tmdb.org/t/p/w500/en.jpg');assert.equal(english.backdrop,'https://image.tmdb.org/t/p/w1280/en_back.jpg');
@@ -25,6 +25,9 @@ const env={TMDB_READ_TOKEN:'fixture-token'};
 const route=load('../app/api/localized-media/route.ts',{'cloudflare:workers':{env},'@/app/data/seed.json':[],'@/lib/index-store':{getMedia:async()=>null},'@/lib/shared-catalog':{sharedCatalogItem:async()=>null},'@/lib/localized-media':{...api,englishMediaCache:()=>async()=>english}});
 const req=query=>new Request('https://example.test/api/localized-media?'+query);
 assert.equal((await route.GET(req('language=en&imdb=tt1160419&section=movies'))).status,200);
-for(const query of ['language=ru&imdb=tt1160419&section=movies','language=en&id=https://evil.test','language=en&imdb=tt1160419&section=games','language=en&id=movies:../../x'])assert.equal((await route.GET(req(query))).status,400);
+assert.equal((await route.GET(req('language=ru&imdb=tt1160419&section=movies'))).status,200);
+assert.equal(english.cast[0].character,'Paul Atreides');
+calls=[];const russian=await api.fetchEnglishMedia(identity,'fixture-token',fake,'ru');assert.equal(russian.language,'ru');assert(calls[1].includes('language=ru-RU'));assert.equal(russian.poster,'https://image.tmdb.org/t/p/w500/ru.jpg');
+for(const query of ['language=es&imdb=tt1160419&section=movies','language=en&id=https://evil.test','language=en&imdb=tt1160419&section=games','language=en&id=movies:../../x'])assert.equal((await route.GET(req(query))).status,400);
 assert.equal((await route.GET(req('language=en&id=movies:unknown'))).status,404);
 console.log('PASS: English text/art, exact film/series identities, cache coalescing/expiry, redirects and route validation');

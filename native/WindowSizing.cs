@@ -24,8 +24,8 @@ public static class WindowSizing
     }
     // A poster cell is 144 wide plus a 16 gap, so rows hold as many whole cards as fit.
     public static int PosterColumns(double contentWidth)=>Math.Clamp((int)Math.Floor(contentWidth/160),1,10);
-    // Game cards are wide capsules, so a cell is 190 wide plus the same 16 gap.
-    public static int GameColumns(double contentWidth)=>Math.Clamp((int)Math.Floor(contentWidth/190),1,8);
+    // Games use the same portrait columns and gaps as films.
+    public static int GameColumns(double contentWidth)=>PosterColumns(contentWidth);
 }
 
 public partial class MainWindow
@@ -130,6 +130,7 @@ public partial class MainWindow
         // threshold is expressed in those units: 200 % on a 1080p laptop leaves roughly 960 x 520.
         var gutter=narrow?(tiny?16d:24d):ActualWidth<1180?24d:32d;
         FitDownloadsToolbar();
+        CenterHeaderSearch(narrow,gutter);
         ThemeButton.Visibility=RefreshCatalogButton.Visibility=ActualWidth>0&&ActualWidth<480?Visibility.Collapsed:Visibility.Visible;
         if(activeCatalogFilterScroll!=null)activeCatalogFilterScroll.MaxHeight=shortView?68:double.PositiveInfinity;
         if(layoutInitialized&&narrow==compactWidth&&tiny==tinyWidth&&shortView==compactHeight&&veryShort==veryCompactHeight&&narrowSearch==compactSearch&&gutter==contentGutter){UpdateFilterRail();UpdateDownloadsWidget();return;}
@@ -161,15 +162,25 @@ public partial class MainWindow
         HeaderArea.Margin=new Thickness(gutter,CaptionBand+(veryShort?2:shortView?6:10),gutter,veryShort?6:shortView?8:20);
         if(ReferenceEquals(FiltersPanel.Parent,HeaderArea))FiltersPanel.Margin=new Thickness(0,shortView?6:12,0,0);
         CenterRegion.Margin=new Thickness(gutter,0,gutter,0);StatusToast.Margin=new Thickness(gutter,0,gutter,20);
-        SearchBar.Margin=new Thickness(0,0,tiny?8:12,0);SearchBar.Height=control;Search.MinHeight=control;
+        SearchBar.Height=control;Search.MinHeight=control;CenterHeaderSearch(narrow,gutter);
         Search.Padding=new Thickness(narrowSearch?12:48,0,narrowSearch?72:110,0);
         SearchMagnifier.Visibility=narrowSearch?Visibility.Collapsed:Visibility.Visible;
-        SearchPlaceholder.Text=AppLanguage.T(narrowSearch?"Поиск":section=="Игры"?"Найти игру для Windows":"Найти фильм, сериал или человека");SearchPlaceholder.Margin=new Thickness(narrowSearch?12:48,0,narrowSearch?72:110,0);
+        SearchPlaceholder.Text=AppLanguage.T(narrowSearch?"Поиск":"Найти фильм, сериал или игру");SearchPlaceholder.Margin=new Thickness(narrowSearch?12:48,0,narrowSearch?72:110,0);
         foreach(var subtitle in PageHeader.Children.OfType<TextBlock>().Where(x=>Equals(x.Tag,"CatalogSubtitle")))subtitle.Visibility=shortView?Visibility.Collapsed:Visibility.Visible;
+        UpdateHeroPageLayout();
         RenderNavSelection();
         UpdateSavedCount();UpdateDownloadsWidget();
         UpdateFilterRail();
         UpdateCatalogColumns();RefreshSidebarUpdate();
+    }
+    void CenterHeaderSearch(bool narrow,double gutter)
+    {
+        // Search consumes the remaining row between Back and the trailing actions.
+        // No mirrored action inset or fixed width cap: all controls share one row.
+        Grid.SetRow(SearchBar,0);Grid.SetColumn(SearchBar,1);Grid.SetColumnSpan(SearchBar,1);
+        Grid.SetRow(FiltersPanel,1);
+        SearchBar.Margin=new Thickness(0,0,ActualWidth<780?8:12,0);
+        UpdateHeroPageLayout();
     }
     void UpdateFilterRail()
     {
@@ -231,8 +242,8 @@ public partial class MainWindow
         Body.Children.Add(catalogList);
         UpdateCatalogColumns(true);
     }
-    // Games, and the saved games tab, lay out wide capsules instead of portrait posters.
-    bool GameGrid=>section=="Игры"||section=="Сохранённое"&&savedCategory=="Игры"||section=="Актуальное"&&FeaturedGameGrid;
+    // Games retain their own price/review template with the same portrait sizing as films.
+    bool GameGrid=>SearchActive&&searchCategory=="Игры"||section=="Игры"||section=="Сохранённое"&&savedCategory=="Игры"||section=="Актуальное"&&FeaturedGameGrid;
     void UpdateCatalogColumns(bool force=false)
     {
         // The games home has shelves but no list, so it still follows the window width.

@@ -6,36 +6,32 @@
 
 [Все выпуски](https://github.com/peregond/ka4alka/releases) · [Описание возможностей](../README.md) · [Новости](https://t.me/ka4alkacc) · [Поддержка](https://t.me/+6sT2ocaKvLxlNmRi)
 
-## Скриншоты Mac
+## Скриншоты 0.44.27
 
-[Русский интерфейс](assets/macos/0.44.1/ru/catalog-dark.webp) · [English](assets/macos/0.44.1/en/catalog-dark.webp) · [Настройки](assets/macos/0.44.1/ru/settings-dark.webp). Сняты из опубликованной 0.44.1. [Порядок обновления галерей для двух ОС](SCREENSHOTS.md).
+Настоящие окна опубликованного приложения. Русский и английский интерфейсы сняты отдельно. Галерея включает «Актуальное» с курируемыми подборками и обновлённые баннеры; версии, SHA-256 пакетов и изображений сохранены в [метаданных Windows](assets/0.44.27/capture-info.json) и [Mac](assets/macos/0.44.27/capture-info.json).
 
-## Скриншоты опубликованной 0.43.4
-
-Настоящий WPF-интерфейс Windows из проверенного опубликованного пакета. Русский и английский наборы сняты отдельно с соответствующей настройкой языка; приложение и содержимое карточек не подменялись. Версия, SHA-256 пакета и DLL и сведения о загрузке постеров сохранены в [метаданных захвата](assets/0.43.4/capture-0.43.4.json).
-
-| Раздел | Русский | English |
+| Раздел | Windows | Mac |
 | --- | --- | --- |
-| Фильмы | [Тёмная тема](assets/0.43.4/ru/catalog-dark.png) · [Светлая](assets/0.43.4/ru/catalog-light.png) | [Dark](assets/0.43.4/en/catalog-dark.png) · [Light](assets/0.43.4/en/catalog-light.png) |
-| Сериалы | [Открыть](assets/0.43.4/ru/series-dark.png) | [TV shows](assets/0.43.4/en/series-dark.png) |
-| Игры | [Тёмная тема](assets/0.43.4/ru/games-dark.png) · [Светлая](assets/0.43.4/ru/games-light.png) | [Dark](assets/0.43.4/en/games-dark.png) · [Light](assets/0.43.4/en/games-light.png) |
-| Карточка фильма | [Открыть](assets/0.43.4/ru/detail-dark.png) | [Movie details](assets/0.43.4/en/detail-dark.png) |
-| Загрузки | [Открыть](assets/0.43.4/ru/downloads-dark.png) | [Downloads](assets/0.43.4/en/downloads-dark.png) |
-| Настройки | [Открыть](assets/0.43.4/ru/settings-dark.png) | [Settings](assets/0.43.4/en/settings-dark.png) |
+| Актуальное | [Русский](assets/0.44.27/ru/featured-dark.webp) · [English](assets/0.44.27/en/featured-dark.webp) | [Русский](assets/macos/0.44.27/ru/featured-dark.webp) · [English](assets/macos/0.44.27/en/featured-dark.webp) |
+| Фильмы | [Русский](assets/0.44.27/ru/catalog-dark.webp) · [English](assets/0.44.27/en/catalog-dark.webp) | [Русский](assets/macos/0.44.27/ru/catalog-dark.webp) · [English](assets/macos/0.44.27/en/catalog-dark.webp) |
+| Сериалы | [Русский](assets/0.44.27/ru/series-dark.webp) · [English](assets/0.44.27/en/series-dark.webp) | [Русский](assets/macos/0.44.27/ru/series-dark.webp) · [English](assets/macos/0.44.27/en/series-dark.webp) |
+| Игры | [Русский](assets/0.44.27/ru/games-dark.webp) · [English](assets/0.44.27/en/games-dark.webp) | [Русский](assets/macos/0.44.27/ru/games-dark.webp) · [English](assets/macos/0.44.27/en/games-dark.webp) |
+| Карточка фильма | [Русский](assets/0.44.27/ru/detail-dark.webp) · [English](assets/0.44.27/en/detail-dark.webp) | [Русский](assets/macos/0.44.27/ru/detail-dark.webp) · [English](assets/macos/0.44.27/en/detail-dark.webp) |
+| Загрузки | [Русский](assets/0.44.27/ru/downloads-dark.webp) · [English](assets/0.44.27/en/downloads-dark.webp) | [Русский](assets/macos/0.44.27/ru/downloads-dark.webp) · [English](assets/macos/0.44.27/en/downloads-dark.webp) |
+| Настройки | [Русский](assets/0.44.27/ru/settings-lite-dark.webp) · [English](assets/0.44.27/en/settings-lite-dark.webp) | [Русский](assets/macos/0.44.27/ru/settings-dark.webp) · [English](assets/macos/0.44.27/en/settings-dark.webp) |
+| Локальная сеть и телефон | [Русский](assets/0.44.27/ru/settings-lan-dark.webp) · [English](assets/0.44.27/en/settings-lan-dark.webp) | — |
+| Светлая тема | [Русский](assets/0.44.27/ru/catalog-light.webp) · [English](assets/0.44.27/en/catalog-light.webp) | [Русский](assets/macos/0.44.27/ru/catalog-light.webp) · [English](assets/macos/0.44.27/en/catalog-light.webp) |
 
-### Игры для Windows
+### Переключатели настроек Windows
 
-[![Игры — русский интерфейс](assets/0.43.4/ru/games-dark.png)](assets/0.43.4/ru/games-dark.png)
+- Лёгкий режим: [PNG на русском](assets/0.44.27/ru/settings-lite-dark.png) · [English PNG](assets/0.44.27/en/settings-lite-dark.png).
+- Локальная сеть и телефон: [PNG на русском](assets/0.44.27/ru/settings-lan-dark.png) · [English PNG](assets/0.44.27/en/settings-lan-dark.png). Видны кнопка подключения телефона и переключатель загрузок между компьютерами. Подключение для снимка выключено.
 
-[![Games — English interface](assets/0.43.4/en/games-dark.png)](assets/0.43.4/en/games-dark.png)
-
-### Фильмы и описания в баннерах
-
-[![Каталог фильмов](assets/0.43.4/ru/catalog-dark.png)](assets/0.43.4/ru/catalog-dark.png)
+[Метаданные оригиналов настроек](assets/0.44.27/settings-capture-info.json).
 
 ### Материалы для лендинга
 
-Оригиналы PNG находятся в `assets/0.43.4/ru/` и `assets/0.43.4/en/`. Лендинги в `landing/` и `web-index/` используют WebP без изменения содержимого: русский сайт показывает русский интерфейс, английский и испанский — английский. Галерея включает фильмы, сериалы, игры, карточку фильма, загрузки и светлую тему. [Текст описания](LANDING-COPY.md) · [Получение скриншотов](../scripts/screenshots/README.md).
+WebP находятся в `assets/0.44.27/{ru,en}/` и `assets/macos/0.44.27/{ru,en}/`. Копии включены в `landing/public/app/` и `web-index/public/app/`: лендинг показывает свою платформу и язык даже при недоступности изображений GitHub. Для испанского интерфейса используются английские снимки приложения. [Текст описания](LANDING-COPY.md) · [Получение скриншотов](../scripts/screenshots/README.md) · [Платформенные галереи](SCREENSHOTS.md).
 
 ## Установка
 
@@ -49,4 +45,4 @@
 
 Наличие карточки не гарантирует подходящую раздачу или активных участников. Доступность Steam и торрент-источников зависит от региона и сети. Игровые установщики не запускаются автоматически. Используйте приложение для материалов, которые вы вправе скачивать и распространять.
 
-[Что изменилось в 0.44.1](RELEASE-NOTES-0.44.1.md), [в 0.44.0](RELEASE-NOTES-0.44.0.md), [в 0.43.14](RELEASE-NOTES-0.43.14.md), [в 0.43.13](RELEASE-NOTES-0.43.13.md), [в 0.43.12](RELEASE-NOTES-0.43.12.md), [в 0.43.11](RELEASE-NOTES-0.43.11.md), [в 0.43.10](RELEASE-NOTES-0.43.10.md), [в 0.43.9](RELEASE-NOTES-0.43.9.md), [в 0.43.8](RELEASE-NOTES-0.43.8.md), [в 0.43.7](RELEASE-NOTES-0.43.7.md), [в 0.43.6](RELEASE-NOTES-0.43.6.md), [в 0.43.5](RELEASE-NOTES-0.43.5.md), [в 0.43.4](RELEASE-NOTES-0.43.4.md), [в 0.43.3](RELEASE-NOTES-0.43.3.md), [в 0.43.2](RELEASE-NOTES-0.43.2.md), [в 0.43.1](RELEASE-NOTES-0.43.1.md), [в 0.43.0](RELEASE-NOTES-0.43.0.md), [в 0.42.2](RELEASE-NOTES-0.42.2.md), [в 0.42.1](RELEASE-NOTES-0.42.1.md) и [в 0.42.0](RELEASE-NOTES-0.42.0.md). Лицензии используемых компонентов находятся в папке `licenses` сборки.
+[Что изменилось в 0.44.27](RELEASE-NOTES-0.44.27.md), [в 0.44.26](RELEASE-NOTES-0.44.26.md), [в 0.44.1](RELEASE-NOTES-0.44.1.md), [в 0.44.0](RELEASE-NOTES-0.44.0.md), [в 0.43.14](RELEASE-NOTES-0.43.14.md), [в 0.43.13](RELEASE-NOTES-0.43.13.md), [в 0.43.12](RELEASE-NOTES-0.43.12.md), [в 0.43.11](RELEASE-NOTES-0.43.11.md), [в 0.43.10](RELEASE-NOTES-0.43.10.md), [в 0.43.9](RELEASE-NOTES-0.43.9.md), [в 0.43.8](RELEASE-NOTES-0.43.8.md), [в 0.43.7](RELEASE-NOTES-0.43.7.md), [в 0.43.6](RELEASE-NOTES-0.43.6.md), [в 0.43.5](RELEASE-NOTES-0.43.5.md), [в 0.43.4](RELEASE-NOTES-0.43.4.md), [в 0.43.3](RELEASE-NOTES-0.43.3.md), [в 0.43.2](RELEASE-NOTES-0.43.2.md), [в 0.43.1](RELEASE-NOTES-0.43.1.md), [в 0.43.0](RELEASE-NOTES-0.43.0.md), [в 0.42.2](RELEASE-NOTES-0.42.2.md), [в 0.42.1](RELEASE-NOTES-0.42.1.md) и [в 0.42.0](RELEASE-NOTES-0.42.0.md). Лицензии используемых компонентов находятся в папке `licenses` сборки.

@@ -1,6 +1,6 @@
 // Series the Russian catalog lacks get their Russian text, genres and cast from TheTVDB by exact IMDb id.
 // Runs on the server with the project's licensed API key; the key and the session token never leave it.
-import { clean, readJson, UpstreamError, unique, yearOf, type TitleInfo } from "@/lib/title-info";
+import { castCredits, clean, readJson, UpstreamError, unique, yearOf, type TitleInfo } from "@/lib/title-info";
 
 type Row = Record<string, unknown>;
 const BASE = "https://api4.thetvdb.com/v4";
@@ -22,13 +22,15 @@ export function parseSeries(imdbId: string, extended: Row): TitleInfo | null {
   const title = clean(pick(translations.nameTranslations, "name", "rus"), 200) || original;
   if (!title) return null;
   const overview = clean(pick(translations.overviewTranslations, "overview", "rus") ?? pick(translations.overviewTranslations, "overview", "eng") ?? extended.overview, 4000);
-  const actors = rows(extended.characters).filter(row => row.peopleType === "Actor" || row.type === 3).sort((a, b) => Number(a.sort ?? 999) - Number(b.sort ?? 999)).map(row => row.personName);
+  const characters = rows(extended.characters).filter(row => row.peopleType === "Actor" || row.type === 3).sort((a, b) => Number(a.sort ?? 999) - Number(b.sort ?? 999));
+  const actors = characters.map(row => row.personName);
   return {
     imdbId, source: "TheTVDB", sourceId: id, section: "series", title, originalTitle: original && original !== title ? original : null,
     year: yearOf(extended.year ?? extended.firstAired), overview: overview || null,
     genres: unique(rows(extended.genres).map(row => row.name), 4), countries: unique([extended.originalCountry], 1),
     aliases: unique([title,original,...rows(translations.nameTranslations).filter(row=>row.language==="rus").map(row=>row.name),...rows(extended.aliases).filter(row=>row.language==="rus").map(row=>row.name)],16),
     actors: unique(actors, 12), directors: [],
+    cast: castCredits(characters.map(row => ({ name: row.personName, character: row.name }))),
   };
 }
 

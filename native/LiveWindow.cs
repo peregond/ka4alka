@@ -42,6 +42,7 @@ public partial class MainWindow
     readonly OnlineIndexClient onlineIndex;
     Task<MediaItem> Metadata(MediaItem item,bool priority=false,CancellationToken ct=default,Action<MediaItem>? updated=null,bool force=false)
     {
+        if(item.Section=="Игры")return Task.FromResult(item);
         if(prefs.UiLanguage=="en"&&item.Cinema)return EnglishMetadata(item,priority,ct,updated,force);
         // A title found only on IMDb has no catalog page to read. An opened card asks the site for its text and cast, TheTVDB for series and TMDB for films (shelf cards do not); TVmaze backs up series.
         if(ImdbSuggestions.IsImdbOnly(item))return priority?ImdbMetadata(item,ct,updated,force):Task.FromResult(item);
@@ -244,7 +245,9 @@ public partial class MainWindow
         footer.Children.Add(numbers);
         if(liveError.Length>0&&!favoritesOnly){var retry=Button("Повторить загрузку",()=>{onlineIndex.RetryNow();catalogPages.Clear();ResetDiscoveryData();catalogRefreshRequested=true;liveKey="";Render();});retry.Style=(Style)FindResource("QuietButton");footer.Children.Add(retry);}
         content.Children.Add(footer);
-        Body.Children.Add(new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=content,Margin=new(-6,-6,-6,0),VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});
+        var scroll=new ScrollViewer{Style=(Style)FindResource("PageScroll"),Content=content,Margin=new(-6,-6,-6,0),VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};
+        Body.Children.Add(scroll);
+        if(DiscoveryCatalog)UseHeroPageLayout(scroll,content,discoveryHero);
         UpdateFilterRail();
     }
     StackPanel? catalogEmptyHost;
@@ -383,14 +386,16 @@ public partial class MainWindow
             {
                 await Task.WhenAll(sharedCatalog.RestoreAsync(token),catalogIndex.RestoreAsync(token));
                 var result=await UnifiedSearch.FindAsync(query,
-                    (kind,t)=>searchProvider!=null?searchProvider(kind,query,t):CatalogBatches.ReadPage(c=>onlineIndex.Browse(kind,query,1,c),c=>new LiveCatalog(sourceClient).Browse(kind,query,1,c),false,t),
+                    (kind,t)=>searchProvider!=null?searchProvider(kind,query,t):onlineIndex.Browse(kind,query,1,t),
                     kind=>catalogIndex.Search(kind,query).Concat(sharedCatalog.Search(kind,query)).Concat(BundledCatalog.Search(kind,query)).ToArray(),token,
                     searchProvider!=null?null:t=>SearchSupplement(query,t),updated=>
                     {
                         if(!IsCurrent())return;
                         liveItems=updated.Items;
                         if(!closed&&current==null&&activePerson==null&&section==category&&!favoritesOnly)RenderCatalogKeepingPosition();
-                    },preferredLanguage:searchLanguage);
+                    },preferredLanguage:searchLanguage,games:searchProvider!=null&&gameCatalogProvider==null?null:async t=>
+                        (await (gameCatalogProvider?.Invoke(new(query,GameBrowse.Popular,"",1),t)??new GameCatalog(sourceClient,searchLanguage).Browse(new(query,GameBrowse.Popular,"",1),t))).Items,
+                    additional:searchProvider==null?(kind,t)=>new LiveCatalog(sourceClient).Browse(kind,query,1,t):null);
                 items=result.Items;if(result.Offline)liveError="Часть источников недоступна · добавлены результаты из сохранённого каталога";
             }
             try{await catalogIndex.AddAsync(items,token);}catch(IOException){}catch(UnauthorizedAccessException){}

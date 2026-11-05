@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Актуальное: a news-portal page. Masthead, banner, three top stories, then rubrics and shelves.
+/// Актуальное starts with the banner, then top stories, rubrics and shelves.
 struct FeaturedView: View {
     @EnvironmentObject private var model: AppModel
     /// The rubric at the top of the visible area. Saved to the model when the page goes away, so Back returns to the same place.
@@ -19,38 +19,53 @@ struct FeaturedView: View {
         let slices: [FeaturedGroupSlice] = visibleSlices()
         let plan = FeaturedPlan(slices: slices)
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: KD.Space.xl) {
-                masthead
-                content(slices: slices, plan: plan)
+            // The banner is outside the centred column: it runs from edge to edge and up under the toolbar.
+            VStack(spacing: 0) {
+                heroSection(slices: slices, plan: plan)
+                LazyVStack(alignment: .leading, spacing: KD.Space.xl) {
+                    content(slices: slices, plan: plan)
+                }
+                .scrollTargetLayout()
+                .padding(.top, KD.Space.xl)
+                .padding(.bottom, KD.gutter)
+                .frame(maxWidth: KD.Width.page)
+                .frame(maxWidth: .infinity)
             }
-            .scrollTargetLayout()
-            .padding(.vertical, KD.gutter)
-            .frame(maxWidth: KD.Width.page)
-            .frame(maxWidth: .infinity)
         }
+        // With the banner first, the page starts at the top of the window, under the toolbar.
+        .ignoresSafeArea(edges: .top)
         .scrollPosition(id: $anchor, anchor: .top)
         .onAppear { if anchor == nil { anchor = model.featuredAnchor } }
         .onDisappear { model.featuredAnchor = anchor }
         .task(id: model.revision) { await model.loadFeatured() }
     }
 
-    private var masthead: some View {
-        KDPageHeader(tr("Актуальное", "Featured"), subtitle: KDFormat.mastheadDate() + " · " + tr("Что смотреть и во что играть", "What to watch and play"))
-            .padding(.horizontal, KD.gutter)
-            .id("featured-masthead")
-            .settingsLayoutProbe("featured.masthead")
+    /// The banner, or its placeholder while the first page is loading.
+    @ViewBuilder private func heroSection(slices: [FeaturedGroupSlice], plan: FeaturedPlan) -> some View {
+        if slices.isEmpty {
+            if showsLoadingHero {
+                HeroPlaceholder()
+                    .settingsLayoutProbe("featured.hero")
+            }
+        } else if !plan.banner.isEmpty {
+            CatalogSpotlightView(items: plan.banner)
+                .id("featured-hero")
+                .settingsLayoutProbe("featured.hero")
+        }
+    }
+
+    private var showsLoadingHero: Bool {
+        guard model.curated.isEmpty else { return false }
+        switch model.featuredState {
+        case .failed, .empty: return false
+        default: return true
+        }
     }
 
     @ViewBuilder private func content(slices: [FeaturedGroupSlice], plan: FeaturedPlan) -> some View {
         if slices.isEmpty {
             emptyContent
         } else {
-            if !plan.banner.isEmpty {
-                CatalogSpotlightView(items: plan.banner)
-                    .padding(.horizontal, KD.gutter)
-                    .id("featured-hero")
-                    .settingsLayoutProbe("featured.hero")
-            }
             if !plan.digest.isEmpty {
                 FeaturedDigest(stories: plan.digest)
                     .id("featured-digest")
@@ -111,9 +126,6 @@ struct FeaturedView: View {
     }
 
     @ViewBuilder private var loadingContent: some View {
-        HeroPlaceholder()
-            .padding(.horizontal, KD.gutter)
-            .settingsLayoutProbe("featured.hero")
         KDShelfSkeleton()
             .padding(.horizontal, KD.gutter)
         KDShelfSkeleton()

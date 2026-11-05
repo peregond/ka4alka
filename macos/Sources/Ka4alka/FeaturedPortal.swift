@@ -256,7 +256,7 @@ struct FeaturedDigestCard: View {
 
     private var text: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(kicker).font(KDFont.kicker).textCase(.uppercase).foregroundStyle(KDPalette.accent).lineLimit(1)
+            Text(kicker).font(KDFont.kicker).textCase(.uppercase).foregroundStyle(Color.secondary).lineLimit(1)
             Text(card.title).font(KDFont.cardTitle).lineLimit(2).multilineTextAlignment(.leading)
             if !card.description.isEmpty {
                 Text(card.description).font(KDFont.secondary).foregroundStyle(.secondary).lineLimit(3).multilineTextAlignment(.leading)

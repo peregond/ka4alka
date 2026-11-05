@@ -19,11 +19,12 @@ await lookup('b',async()=>[item]);await lookup('c',async()=>[item]);
 await lookup('failed',async()=>{calls++;return [item]});assert.equal(calls,4);
 console.log('PASS: 32 concurrent searches share one lookup, cached replies expire, failures and empty results retry, cache remains bounded');
 
-let pending=[],requested=[];
-const context={createReleaseLookup:cache,Promise,Map,Set,URL,AbortSignal,TextDecoder,Date,
+let pending=[],requested=[],requests=[];
+const context={createReleaseLookup:cache,Promise,Map,Set,URL,URLSearchParams,AbortSignal,TextDecoder,Date,
   decodeHtml:x=>x,normalize:x=>x.toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim(),
-  fetch:async url=>{
+  fetch:async (url,options)=>{
     requested.push(String(url));
+    requests.push({url:new URL(url),options});
     const body=String(url).includes('rutor.info')?'<tr><td><a href="/torrent/1">Фильм (2026) 1080p</a><a href="magnet:?xt=urn:btih:'+('a'.repeat(40))+'">magnet</a></td></tr>':'{}';
     return new Promise(resolve=>pending.push(()=>resolve(new Response(body))));
   }};
@@ -50,7 +51,19 @@ const cached=await sources.collectReleases(known,()=>{throw Error('cached result
 assert(cached.length>0);
 assert(requested.some(x=>x.includes('rutor.info')&&x.includes('Film')),'original-title Russian queries remain available');
 assert(requested.some(x=>x.includes('knaben')),'English search resumes when aliases resolve');
+const knabenRequests=requests.filter(x=>x.url.hostname==='api.knaben.org');
+assert(knabenRequests.length>0);
+assert(knabenRequests.some(x=>x.url.searchParams.get('q')==='Film'),'Knaben receives the resolved original title');
+for(const {url,options} of knabenRequests){
+  assert.equal(url.pathname,'/v2/search');
+  assert.equal(options.method??'GET','GET');
+  assert(['Film','Фильм'].includes(url.searchParams.get('q')));
+  assert.equal(url.searchParams.get('s'),'150');
+  assert.equal(url.searchParams.get('sf'),'title');
+  for(const flag of ['unsafe','xxx','dead'])assert(!url.searchParams.has(flag),'unsafe/adult/dead results remain disabled');
+}
 console.log('PASS: metadata starts once on cache misses; RuTor queries start in parallel; Russian searches start before metadata; original-title searches are preserved');
+console.log('PASS: Knaben v2 uses bounded GET title searches without unsafe/adult/dead flags');
 
 // Empty provider replies must not suppress database-backed retries for four hours.
 const routeSource=stripTypeScriptTypes(fs.readFileSync(new URL('../app/api/releases/route.ts',import.meta.url),'utf8')).replace(/^import[^\n]*\n/gm,'').replace(/^export /gm,'');

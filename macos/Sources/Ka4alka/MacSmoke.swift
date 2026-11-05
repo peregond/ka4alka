@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import QuartzCore
 
 /// Marker shared with the notification observers of the close test.
 final class SmokeCloseMarker: @unchecked Sendable { var windowClosed = false }
@@ -32,7 +33,14 @@ final class SmokeCloseMarker: @unchecked Sendable { var windowClosed = false }
                 let report: [String: Bool] = ["connected": true, "windowClosedBeforeTerminate": marker.windowClosed, "terminated": true]
                 if let data = try? JSONEncoder().encode(report) { try? data.write(to: directory.appendingPathComponent("checks.json")) }
             }
-            window.performClose(nil)
+            guard let close = window.standardWindowButton(.closeButton),
+                  !close.isHiddenOrHasHiddenAncestor, close.isEnabled,
+                  let parent = close.superview,
+                  let hit = parent.hitTest(NSPoint(x: close.frame.midX, y: close.frame.midY)),
+                  hit === close || hit.isDescendant(of: close) else {
+                throw UpdateError("The real red close button must be visible and clickable")
+            }
+            close.performClick(nil)
         } catch {
             try? error.localizedDescription.write(to: directory.appendingPathComponent("error.txt"), atomically: true, encoding: .utf8)
             requestApplicationQuit()
@@ -171,8 +179,19 @@ struct SmokeShot {
         var fatal: String?
         do {
             try await bootstrapChecks()
-            try await runCombination(language: "ru", mode: AppearanceMode.dark, sizes: fullSizes)
-            try await runCombination(language: "en", mode: AppearanceMode.light, sizes: reducedSizes)
+            // KD_SMOKE_ONLY="detail-movie,settings" runs just those pages at one size in Russian/dark: a quick look
+            // while designing. A run limited like this is never a release check.
+            if let only = ProcessInfo.processInfo.environment["KD_SMOKE_ONLY"], !only.isEmpty {
+                let captureLanguage = ProcessInfo.processInfo.environment["KD_SMOKE_LANGUAGE"] ?? "ru"
+                let captureAppearance = ProcessInfo.processInfo.environment["KD_SMOKE_APPEARANCE"] ?? "dark"
+                guard ["ru", "en"].contains(captureLanguage), ["dark", "light"].contains(captureAppearance) else {
+                    throw UpdateError("Capture language must be ru/en and appearance dark/light")
+                }
+                try await runCombination(language: captureLanguage, mode: captureAppearance == "light" ? AppearanceMode.light : AppearanceMode.dark, sizes: [Self.requestedQuickSize() ?? CGSize(width: 1280, height: 820)], only: Set(only.split(separator: ",").map(String.init)))
+            } else {
+                try await runCombination(language: "ru", mode: AppearanceMode.dark, sizes: fullSizes)
+                try await runCombination(language: "en", mode: AppearanceMode.light, sizes: reducedSizes)
+            }
             await restoreDefaults()
             finalChecks()
         } catch {
@@ -207,9 +226,27 @@ struct SmokeShot {
         environment["reduceMotion"] = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? "yes" : "no"
         environment["increaseContrast"] = NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast ? "yes" : "no"
         checkGlobal(!environment["surfaceVariant", default: ""].isEmpty, "The active surface variant is recorded: " + environment["surfaceVariant", default: "?"])
+        if let sdk = smokeLinkedSDK() {
+            environment["linkedSDK"] = String(sdk.major) + "." + String(sdk.minor)
+            if smokeGlassBranchCompiled() {
+                checkGlobal(sdk.major >= 26, "The executable is linked against the macOS 26 SDK or later, so the system draws Liquid Glass chrome (linked against " + environment["linkedSDK", default: "?"] + ")")
+            } else {
+                // Built with a compiler that has no Liquid Glass API (Xcode before 26): there is no glass to draw.
+                notes.append("not-instrumented:linked-sdk: built without the Liquid Glass API (SDK " + environment["linkedSDK", default: "?"] + ")")
+            }
+        } else {
+            notes.append("not-instrumented:linked-sdk")
+        }
     }
 
-    private func runCombination(language next: String, mode: AppearanceMode, sizes: [CGSize]) async throws {
+    /// KD_SMOKE_SIZE="760x520" picks the window size of a KD_SMOKE_ONLY run.
+    private static func requestedQuickSize() -> CGSize? {
+        guard let text = ProcessInfo.processInfo.environment["KD_SMOKE_SIZE"] else { return nil }
+        let parts = text.split(separator: "x").compactMap { Double($0) }
+        return parts.count == 2 ? CGSize(width: parts[0], height: parts[1]) : nil
+    }
+
+    private func runCombination(language next: String, mode: AppearanceMode, sizes: [CGSize], only: Set<String>? = nil) async throws {
         language = next
         theme = mode == AppearanceMode.dark ? "dark" : "light"
         lastDigest = [:]
@@ -218,7 +255,7 @@ struct SmokeShot {
         await model.set("uiLanguage", .string(next))
         model.setAppearance(mode)
         await pause(400)
-        for page in SmokePage.allCases {
+        for page in SmokePage.allCases where only?.contains(page.rawValue) ?? true {
             try await runPage(page, sizes: sizes)
         }
     }
@@ -240,6 +277,29 @@ struct SmokeShot {
             currentSize = actual
             requestedText = sizeText(requested)
             await settle(page.rawValue)
+            if ProcessInfo.processInfo.environment["KD_SMOKE_LANGUAGE"] != nil {
+                // Documentation capture waits for the real source artwork; it
+                // never seeds a queue or substitutes media for unavailable data.
+                await pause(1000)
+                let loaded = await waitUntil("documentation artwork", timeout: 60) { ImageStore.shared.pendingCount == 0 && !model.loading }
+                try require(loaded, "Documentation artwork has finished loading")
+                await settle("documentation artwork")
+            }
+            let main = try window()
+            main.contentView?.layoutSubtreeIfNeeded()
+            main.displayIfNeeded()
+            CATransaction.flush()
+            await pause(50)
+            if page == .search {
+                // A toolbar item is hosted separately from page layout. Wait for its
+                // replacement toolbar host after a window resize.
+                _ = await waitUntil("native search field", timeout: 2) {
+                    (main.contentView?.superview ?? main.contentView)?.layoutSubtreeIfNeeded()
+                    SettingsLayoutMeasurements.refreshNativeViews()
+                    return SettingsLayoutMeasurements.nativeAttached["search.field"] == true &&
+                        (SettingsLayoutMeasurements.nativeFrames["search.field"]?.width ?? 0) > 100
+                }
+            }
             let before: Int = violations.count
             auditLayout(spec, width: actual.width)
             try await inspect(page, spec: spec, width: actual.width, primary: isPrimary(requested))
@@ -276,6 +336,10 @@ struct SmokeShot {
 
     private func prepare(_ page: SmokePage) async throws -> Bool {
         switch page {
+        case .search:
+            model.select(.movies)
+            model.openSearch()
+            return true
         case .featured:
             model.select(.featured)
             await model.loadFeatured()
@@ -397,6 +461,23 @@ struct SmokeShot {
     /// Runs after the last size of a page: back navigation, closing sheets, and cleaning up.
     private func finish(_ page: SmokePage) async throws {
         switch page {
+        case .search:
+            model.query = tr("гарри поттер", "Harry Potter")
+            model.submitSearch()
+            await model.loadCatalog()
+            let expectedYears = [2001, 2002, 2004, 2005, 2007, 2009, 2010, 2011]
+            let expectedIds: Set<String> = ["tt0241527", "tt0295297", "tt0304141", "tt0330373", "tt0373889", "tt0417741", "tt0926084", "tt1201607"]
+            let parts = (model.list?.items ?? []).filter {
+                $0.section == "movies" && expectedIds.contains($0.imdbId ?? "")
+            }
+            check(parts.map(\.year).sorted() == expectedYears && Set(parts.map(\.id)).count == 8,
+                  "search: Russian and English queries find all eight Potter films on a fresh profile")
+            check(parts.allSatisfy { $0.title.hasPrefix(tr("Гарри Поттер", "Harry Potter")) },
+                  "search: franchise titles follow the interface language")
+            await pause(500)
+            _ = try await capture(saveAs: "search-potter-" + theme + "-" + language)
+            model.clearSearch()
+            model.back()
         case .detailMovie:
             model.back()
             check(model.route == Route.section(.movies), "Back preserves the catalog route")
@@ -450,6 +531,7 @@ struct SmokeShot {
     // MARK: Layout audit
 
     private func auditLayout(_ spec: SmokePageSpec, width: CGFloat) {
+        SettingsLayoutMeasurements.refreshNativeViews()
         let frames: [String: CGRect] = SettingsLayoutMeasurements.frames
         for id in spec.required where frames[id] == nil {
             violate("layout", "probe " + id + " was not recorded, so the page lost its instrumentation")
@@ -478,6 +560,8 @@ struct SmokeShot {
             inspectBanner("movies")
         case .series:
             inspectBanner("series")
+        case .detailMovie, .detailSeries, .detailGame:
+            inspectDetailBanner(page.rawValue)
         case .settings:
             try await inspectSettings(width: width, primary: primary)
         case .downloadsQueue:
@@ -485,15 +569,58 @@ struct SmokeShot {
         default:
             break
         }
+        inspectWindowControls()
         if spec.toolbar { inspectToolbar(primary: primary) }
+    }
+
+    private func inspectWindowControls() {
+        guard let main = MacSmoke.mainWindow() else { return }
+        for (kind, name) in [(NSWindow.ButtonType.closeButton, "close"), (.miniaturizeButton, "minimize"), (.zoomButton, "zoom")] {
+            guard let button = main.standardWindowButton(kind), let parent = button.superview else {
+                check(false, "window controls: " + name + " is visible and clickable")
+                continue
+            }
+            let point = NSPoint(x: button.frame.midX, y: button.frame.midY)
+            let hit = parent.hitTest(point)
+            let visible = button.window === main && !button.isHiddenOrHasHiddenAncestor && button.alphaValue > 0.9 && button.frame.width > 8 && button.frame.height > 8
+            let clickable = hit.map { $0 === button || $0.isDescendant(of: button) } ?? false
+            // AppKit disables the parent's close button while an attached modal sheet
+            // is open. It must stay visible; normal pages must remain clickable.
+            if kind == .closeButton && main.attachedSheet != nil {
+                check(visible, "window controls: close stays visible with modal sheet (" + pageName + ")")
+                check(!button.isEnabled, "window controls: close follows native modal-sheet disabling (" + pageName + ")")
+            } else {
+                check(visible && button.isEnabled && clickable, "window controls: " + name + " is visible and clickable")
+            }
+        }
     }
 
     private func inspectBanner(_ section: String) {
         let frames: [String: CGRect] = SettingsLayoutMeasurements.frames
         guard let banner = frames["catalog.banner." + section], let content = MacSmoke.mainWindow()?.contentView else { return }
-        check(banner.width > 280 && banner.height >= 280 && banner.height < 420, section + ": spotlight banner has a complete native layout")
+        // The banner runs up under the toolbar, so it is taller by the strip the toolbar covers.
+        let strip = MacSmoke.mainWindow()?.contentView?.safeAreaInsets.top ?? 0
+        let maximumHeight = CatalogHeroMetrics.height(forWidth: banner.width) + strip
+        check(banner.width > 280 && banner.height >= 280 && banner.height <= maximumHeight + 2, section + ": spotlight banner has a complete native layout")
         let inside: Bool = banner.minX >= -2 && banner.maxX <= content.bounds.width + 2 && banner.minY >= -2 && banner.maxY <= content.bounds.height + 2
         check(inside, section + ": spotlight banner is visible at the top of the catalog")
+    }
+
+    private func inspectDetailBanner(_ page: String) {
+        guard let clip = SettingsLayoutMeasurements.scrollViewportFrame(for: "detail.banner"),
+              let column = SettingsLayoutMeasurements.frames["shell.detail"],
+              let banner = SettingsLayoutMeasurements.frames["detail.banner"] else {
+            check(false, page + ": full-width detail banner is measured")
+            return
+        }
+        let viewport = column.intersection(clip)
+        check(!viewport.isNull && abs(banner.minX - viewport.minX) <= 2 && abs(banner.maxX - viewport.maxX) <= 2,
+              page + ": detail artwork fills the visible content column without side gutters (banner " + String(Int(banner.minX)) + "..." + String(Int(banner.maxX)) +
+              ", viewport " + String(Int(viewport.minX)) + "..." + String(Int(viewport.maxX)) + ")")
+        if let body = SettingsLayoutMeasurements.frames["detail.body"] {
+            check(body.width <= KD.Width.page + 2 && body.width < banner.width,
+                  page + ": description and releases keep their inset reading column")
+        }
     }
 
     private func reportToolbar(_ primary: Bool, _ ok: Bool, _ text: String) {
@@ -501,27 +628,32 @@ struct SmokeShot {
     }
 
     private func inspectToolbar(primary: Bool) {
+        guard MacSmoke.mainWindow() != nil else { return }
+        SettingsLayoutMeasurements.refreshNativeViews()
+        reportToolbar(primary, SettingsLayoutMeasurements.nativeAttached["toolbar.add"] == true, "toolbar: the page actions are present at the top of the page")
+    }
+
+    private func inspectExpandedToolbar() {
         SettingsLayoutMeasurements.refreshNativeViews()
         guard let main = MacSmoke.mainWindow() else { return }
+        inspectWindowControls()
+        check(SettingsLayoutMeasurements.nativeAttached["toolbar.add"] == true, "toolbar: stays after scrolling")
+        check(!(main.accessibilityTitle() ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, "toolbar: page name is the window's accessibility title")
         for id in ["toolbar.add", "toolbar.refresh", "toolbar.appearance"] {
             guard SettingsLayoutMeasurements.nativeAttached[id] == true, let frame = SettingsLayoutMeasurements.nativeFrames[id], let visible = SettingsLayoutMeasurements.nativeVisibleFrames[id] else {
-                reportToolbar(primary, false, "toolbar: missing native control " + id)
+                check(false, "toolbar: missing native control " + id)
                 continue
             }
             let fits: Bool = frame.width > 12 && frame.height > 12 && frame.minX >= -2 && frame.maxX <= main.frame.width + 2 && frame.minY >= -2 && frame.maxY <= main.frame.height + 2
-            reportToolbar(primary, fits, "toolbar: " + id + " fits the native window")
+            check(fits, "toolbar: " + id + " fits the native window")
+            // AppKit window coordinates have their origin at the bottom. Native toolbar
+            // actions belong beside the traffic lights, never in a scrolled content overlay.
+            let topDistance = main.frame.height - frame.midY
+            check(topDistance >= 0 && topDistance <= 80, "toolbar: " + id + " belongs to the native titlebar")
             let shown: CGRect = frame.intersection(visible)
             let unclipped: Bool = !shown.isNull && shown.width * shown.height >= frame.width * frame.height * 0.9
-            reportToolbar(primary, unclipped, "toolbar: " + id + " is visible and not clipped by its native host")
+            check(unclipped, "toolbar: " + id + " is visible and not clipped by its native host")
         }
-        guard let field = SmokeViews.searchField(in: main) else {
-            reportToolbar(primary, false, "toolbar: the search field (NSSearchField) is missing from the window")
-            return
-        }
-        let frame: CGRect = field.convert(field.bounds, to: nil)
-        let windowRect: CGRect = CGRect(origin: .zero, size: main.frame.size).insetBy(dx: -2, dy: -2)
-        let usable: Bool = !field.isHiddenOrHasHiddenAncestor && field.window != nil && frame.width >= 24 && frame.height >= 18 && windowRect.contains(frame)
-        reportToolbar(primary, usable, "toolbar: the search field is visible, inside the window and large enough")
     }
 
     // MARK: Settings
@@ -547,7 +679,7 @@ struct SmokeShot {
         let low: CGFloat = document.bounds.minY - (document.isFlipped ? insets.top : insets.bottom)
         let high: CGFloat = max(low, document.bounds.maxY - scroll.contentView.bounds.height + (document.isFlipped ? insets.bottom : insets.top))
         let y: CGFloat = toBottom == document.isFlipped ? high : low
-        scroll.contentView.scroll(to: NSPoint(x: document.bounds.minX - insets.left, y: y))
+        scroll.contentView.scroll(to: NSPoint(x: scroll.contentView.bounds.origin.x, y: y))
         scroll.reflectScrolledClipView(scroll.contentView)
         await settle("settings scroll", timeout: 3)
     }
@@ -652,20 +784,48 @@ struct SmokeShot {
     // MARK: Screenshots and pixels
 
     private func capture(saveAs name: String?) async throws -> SmokeShot {
-        await pause(150)
         let main: NSWindow = try window()
         let target: NSWindow = main.attachedSheet ?? main
         guard let content = target.contentView else { throw UpdateError("The native application window is missing") }
         let view: NSView = content.superview ?? content
-        main.makeKeyAndOrderFront(nil)
+        target.makeKeyAndOrderFront(nil)
         view.layoutSubtreeIfNeeded()
-        guard let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { throw UpdateError("Could not capture the native content view") }
+        target.displayIfNeeded()
+        CATransaction.flush()
+        await pause(150)
+        guard var bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { throw UpdateError("Could not capture the native content view") }
         view.cacheDisplay(in: view.bounds, to: bitmap)
+        var bounds = view.bounds
+        // Some macOS 26 hosts return an empty cache for GPU-backed SwiftUI layers.
+        // Capture the same application's actual composited window; keep pixel checks strict.
+        if #available(macOS 26.0, *) {
+            let left: CGFloat = target === main ? min(260, bounds.width * 0.3) : 0
+            let region = CGRect(x: left, y: 0, width: max(1, bounds.width - left), height: bounds.height)
+            let stats = SmokePixelAudit.measure(bitmap, scale: target.backingScaleFactor, region: region)
+            if ProcessInfo.processInfo.operatingSystemVersion.majorVersion == 26 || stats.deviation < 0.001 {
+                bitmap = try await SmokeWindowCapture.bitmap(windowNumber: target.windowNumber)
+                // macOS 26 composites attached sheets into their parent's window image. Extract
+                // the sheet's real screen rectangle from those pixels, rather than accepting a
+                // parent-window-sized image as a dialog screenshot.
+                let scale = target.backingScaleFactor
+                if target !== main,
+                   abs(CGFloat(bitmap.pixelsWide) - main.frame.width * scale) <= 2,
+                   abs(CGFloat(bitmap.pixelsHigh) - main.frame.height * scale) <= 2 {
+                    let area = CGRect(x: (target.frame.minX - main.frame.minX) * scale,
+                                      y: (main.frame.maxY - target.frame.maxY) * scale,
+                                      width: target.frame.width * scale, height: target.frame.height * scale).integral
+                    guard let cropped = bitmap.cgImage?.cropping(to: area) else { throw UpdateError("Could not capture the attached sheet's actual pixels") }
+                    bitmap = NSBitmapImageRep(cgImage: cropped)
+                }
+                bounds = CGRect(origin: .zero, size: target.frame.size)
+                environment["screenshotFallback"] = "composited own window"
+            }
+        }
         if let name {
             guard let png = bitmap.representation(using: .png, properties: [:]) else { throw UpdateError("Could not encode the native screenshot") }
             try png.write(to: root.appendingPathComponent(name + ".png"))
         }
-        return SmokeShot(bitmap: bitmap, scale: target.backingScaleFactor, bounds: view.bounds, isSheet: target !== main)
+        return SmokeShot(bitmap: bitmap, scale: target.backingScaleFactor, bounds: bounds, isSheet: target !== main)
     }
 
     private func auditPixels(_ shot: SmokeShot, spec: SmokePageSpec) -> SmokePixelStats {
@@ -681,7 +841,16 @@ struct SmokeShot {
             region = shot.bounds
         } else {
             let guardWidth: CGFloat = min(260, shot.bounds.width * 0.3)
-            region = CGRect(x: guardWidth, y: 60, width: max(1, shot.bounds.width - guardWidth), height: max(1, shot.bounds.height - 60))
+            // An empty search page intentionally has a large blank lower area. Audit its actual
+            // controls and empty state, rather than diluting them over a tall, empty window.
+            let contentHeight: CGFloat = pageName == "search" ? min(420, shot.bounds.height - 60) : shot.bounds.height - 60
+            if pageName == "search" {
+                // Search now lives in the native titlebar. Include its actual controls rather
+                // than sampling only the intentionally blank lower content of a wide window.
+                region = CGRect(x: 0, y: 0, width: shot.bounds.width, height: min(360, shot.bounds.height))
+            } else {
+                region = CGRect(x: guardWidth, y: 60, width: max(1, shot.bounds.width - guardWidth), height: max(1, contentHeight))
+            }
         }
         let stats: SmokePixelStats = SmokePixelAudit.measure(shot.bitmap, scale: shot.scale, region: region)
         if stats.samples == 0 {
@@ -693,7 +862,11 @@ struct SmokeShot {
             if stats.darkShare < 0.25 { violate("pixel", "dark appearance did not take effect (only " + String(Int(stats.darkShare * 100)) + "% dark pixels)") }
             if spec.plain && stats.mean >= 0.30 { violate("pixel", "dark page is too bright (mean luminance " + String(format: "%.2f", stats.mean) + ")") }
         } else {
-            if stats.lightShare < 0.10 { violate("pixel", "light appearance did not take effect (only " + String(Int(stats.lightShare * 100)) + "% light pixels)") }
+            // A banner is dark in every theme and, with the page running up under the toolbar, fills most of a short wide
+            // window, so a page that opens with one has little light page left to count.
+            let bannerPages: Set<String> = ["featured", "movies", "series", "games-home"]
+            let needed: Double = bannerPages.contains(pageName) ? 0.03 : 0.10
+            if stats.lightShare < needed { violate("pixel", "light appearance did not take effect (only " + String(Int(stats.lightShare * 100)) + "% light pixels)") }
             if spec.plain && stats.mean <= 0.65 { violate("pixel", "light page is too dark (mean luminance " + String(format: "%.2f", stats.mean) + ")") }
         }
         if !shot.isSheet {
@@ -713,13 +886,131 @@ struct SmokeShot {
         dumpLayout(page)
         guard language == "ru" && theme == "dark" else { return }
         switch page {
+        case .search:
+            let main = MacSmoke.mainWindow()
+            let nativeSearch = main?.contentView.flatMap { content in
+                SmokeViews.all(in: content.superview ?? content).compactMap { $0 as? NSSearchField }.first { !$0.isHiddenOrHasHiddenAncestor }
+            }
+            if let field = nativeSearch, let main {
+                let frame = field.convert(field.bounds, to: nil)
+                check(frame.width >= 220 && frame.height >= 22, "search: the field is visible and large enough")
+                check(main.frame.height - frame.midY <= 80 && main.frame.height - frame.midY >= 0,
+                      "search: the native field belongs to the window toolbar")
+                let visible = field.visibleRect
+                check(visible.width >= field.bounds.width * 0.99 && visible.height >= field.bounds.height * 0.99,
+                      "search: the toolbar field is not clipped")
+            } else { check(false, "search: the field is missing") }
+            check(main?.firstResponder is NSTextView, "search: opening the page focuses the input")
+            let searchCell = nativeSearch?.cell as? NSSearchFieldCell
+            check(nativeSearch?.isBezeled == true && nativeSearch?.focusRingType == .default && searchCell?.searchButtonCell != nil && searchCell?.cancelButtonCell != nil,
+                  "search: the native field provides its search, cancel and keyboard focus controls")
+            keyViewLoop()
         case .featured:
+            // Preserve the existing page-scroll scenario. Sidebar collapse/restore changes
+            // image proposals and is a separate interaction test, not part of scroll timing.
             try await scrollStall("featured")
+            try await inspectSidebarToggle()
         case .movies:
             try await scrollStall("movies")
-            keyViewLoop()
+        case .detailMovie, .settings, .downloadsQueue:
+            // A page scrolled by half a screen: the toolbar must still show the page name and its buttons, and the
+            // content must not run under them. The captured frames are the review evidence.
+            try await captureScrolled(page)
         default:
             break
+        }
+    }
+
+    /// Scrolls the page by 420 pt, waits for it to settle, saves a screenshot and scrolls back to the top.
+    private func captureScrolled(_ page: SmokePage) async throws {
+        let main: NSWindow = try window()
+        guard let scroll = SmokeViews.largestScrollView(in: main), let document = scroll.documentView else { return }
+        let insets: NSEdgeInsets = scroll.contentInsets
+        let low: CGFloat = document.bounds.minY - (document.isFlipped ? insets.top : insets.bottom)
+        let topY: CGFloat = document.isFlipped ? low : max(low, document.bounds.maxY - scroll.contentView.bounds.height)
+        let step: CGFloat = document.isFlipped ? 420 : -420
+        scroll.contentView.scroll(to: NSPoint(x: scroll.contentView.bounds.origin.x, y: topY + step))
+        scroll.reflectScrolledClipView(scroll.contentView)
+        await pause(500)
+        // KD_SMOKE_HOLD keeps the scrolled page on screen for a while, so a screen recorder outside the app can take a
+        // composited picture of it (the in-process capture does not draw glass, blur or scroll-edge effects).
+        if ProcessInfo.processInfo.environment["KD_SMOKE_HOLD"] != nil {
+            stage("hold " + page.rawValue + "-scrolled")
+            await pause(5000)
+        }
+        _ = try await capture(saveAs: page.rawValue + "-scrolled-" + theme + "-" + language)
+        scroll.contentView.scroll(to: NSPoint(x: scroll.contentView.bounds.origin.x, y: topY))
+        scroll.reflectScrolledClipView(scroll.contentView)
+        await pause(200)
+    }
+
+    private func clickSidebarToggle(in window: NSWindow) -> Bool {
+        (window.contentView?.superview ?? window.contentView)?.layoutSubtreeIfNeeded()
+        window.displayIfNeeded()
+        SettingsLayoutMeasurements.refreshNativeViews()
+        guard let frame = SettingsLayoutMeasurements.nativeFrames["toolbar.sidebar"] else { return false }
+        let point = NSPoint(x: frame.midX, y: frame.midY)
+        let timestamp = ProcessInfo.processInfo.systemUptime
+        guard let down = NSEvent.mouseEvent(with: .leftMouseDown, location: point, modifierFlags: [],
+                                           timestamp: timestamp, windowNumber: window.windowNumber,
+                                           context: nil, eventNumber: 1, clickCount: 1, pressure: 1),
+              let up = NSEvent.mouseEvent(with: .leftMouseUp, location: point, modifierFlags: [],
+                                         timestamp: timestamp + 0.01, windowNumber: window.windowNumber,
+                                         context: nil, eventNumber: 2, clickCount: 1, pressure: 0) else { return false }
+        window.makeKeyAndOrderFront(nil)
+        // Queue both events before AppKit enters button tracking; a synchronous mouseDown
+        // could otherwise wait for a mouseUp that the main actor has not posted yet.
+        NSApp.postEvent(down, atStart: false)
+        NSApp.postEvent(up, atStart: false)
+        return true
+    }
+
+    private func inspectSidebarToggle() async throws {
+        guard let main = MacSmoke.mainWindow() else { return }
+        SettingsLayoutMeasurements.refreshNativeViews()
+        let expanded = SettingsLayoutMeasurements.nativeFrames["toolbar.sidebar"]
+        check(SettingsLayoutMeasurements.nativeAttached["sidebar"] == true &&
+              (SettingsLayoutMeasurements.nativeVisibleFrames["sidebar"]?.width ?? 0) > 100,
+              "sidebar: expanded content has native visibility measurements")
+        guard clickSidebarToggle(in: main) else {
+            check(false, "sidebar: toggle accepts a pointer click"); return
+        }
+        await waitForSidebar(in: main, visible: false)
+        let collapsed = SettingsLayoutMeasurements.nativeFrames["toolbar.sidebar"]
+        let sidebarHidden = SettingsLayoutMeasurements.nativeAttached["sidebar"] != true ||
+            (SettingsLayoutMeasurements.nativeVisibleFrames["sidebar"]?.width ?? 0) < 1
+        check(sidebarHidden, "sidebar: native action hides the sidebar content")
+        check(SettingsLayoutMeasurements.nativeAttached["toolbar.sidebar"] == true,
+              "sidebar: toggle remains visible when collapsed")
+        if let expanded, let collapsed {
+            check(abs(expanded.width - collapsed.width) <= 1 && abs(expanded.height - collapsed.height) <= 1,
+                  "sidebar: toggle keeps the same size in both states")
+        } else { check(false, "sidebar: toggle has native measurements in both states") }
+        inspectWindowControls()
+        _ = try await capture(saveAs: "sidebar-collapsed-" + theme + "-" + language)
+        let restored = clickSidebarToggle(in: main)
+        await waitForSidebar(in: main, visible: true)
+        let sidebarShown = SettingsLayoutMeasurements.nativeAttached["sidebar"] == true &&
+            (SettingsLayoutMeasurements.nativeVisibleFrames["sidebar"]?.width ?? 0) > 100
+        check(restored && sidebarShown && SettingsLayoutMeasurements.nativeAttached["toolbar.sidebar"] == true,
+              "sidebar: native toggle restores the sidebar")
+        check(main.isVisible, "sidebar: changing visibility keeps the window open")
+        _ = try await capture(saveAs: "sidebar-restored-" + theme + "-" + language)
+        // Sidebar animation changes the page proposal. Finish it before measuring unrelated scrolling.
+        await pause(700)
+    }
+
+    private func waitForSidebar(in window: NSWindow, visible: Bool) async {
+        var stable = 0
+        for _ in 0..<30 {
+            await pause(100)
+            (window.contentView?.superview ?? window.contentView)?.layoutSubtreeIfNeeded()
+            SettingsLayoutMeasurements.refreshNativeViews()
+            let attached = SettingsLayoutMeasurements.nativeAttached["sidebar"] == true
+            let width = SettingsLayoutMeasurements.nativeVisibleFrames["sidebar"]?.width ?? 0
+            let matches = visible ? attached && width >= 169 : !attached || width < 1
+            stable = matches ? stable + 1 : 0
+            if stable >= 3 { return }
         }
     }
 
@@ -788,7 +1079,7 @@ struct SmokeShot {
             if identities.contains(ObjectIdentifier(view)) { continue }
             identities.insert(ObjectIdentifier(view))
             visited.append(String(describing: type(of: view)))
-            if view is NSSearchField { reachedSearch = true }
+            if let field = view as? NSTextField, field.isEditable { reachedSearch = true }
             if view.alphaValue == 0 || view.isHiddenOrHasHiddenAncestor { hiddenVisited += 1 }
         }
         if let data = try? JSONEncoder().encode(visited) { try? data.write(to: root.appendingPathComponent("keyviews.json")) }
@@ -799,9 +1090,9 @@ struct SmokeShot {
         }
         check(hiddenVisited == 0, "keyboard: no invisible view is part of the key-view loop")
         if reachedSearch {
-            check(true, "keyboard: the toolbar search field is part of the key-view loop")
+            check(true, "keyboard: the search page input is part of the key-view loop")
         } else {
-            violate("keyboard", "the toolbar search field was not reached by Tab (keyboard UI mode " + String(UserDefaults.standard.integer(forKey: "AppleKeyboardUIMode")) + ")")
+            violate("keyboard", "the search page input was not reached by Tab (keyboard UI mode " + String(UserDefaults.standard.integer(forKey: "AppleKeyboardUIMode")) + ")")
         }
         if UserDefaults.standard.integer(forKey: "AppleKeyboardUIMode") == 0 {
             notes.append("[" + context + "] not-instrumented:keyview-controls: Full Keyboard Access is off, so only text fields and lists are in the loop")
@@ -828,12 +1119,17 @@ struct SmokeShot {
         monitor.start()
         for step in 1...40 {
             let y: CGFloat = topY + (bottomY - topY) * CGFloat(step) / 40
-            scroll.contentView.scroll(to: NSPoint(x: document.bounds.minX - insets.left, y: y))
+            scroll.contentView.scroll(to: NSPoint(x: scroll.contentView.bounds.origin.x, y: y))
             scroll.reflectScrolledClipView(scroll.contentView)
             await pause(16)
         }
         let result = monitor.stop()
-        scroll.contentView.scroll(to: NSPoint(x: document.bounds.minX - insets.left, y: topY))
+        if label == "movies" {
+            await pause(180)
+            inspectExpandedToolbar()
+            _ = try await capture(saveAs: "movies-scrolled-" + theme + "-" + language)
+        }
+        scroll.contentView.scroll(to: NSPoint(x: scroll.contentView.bounds.origin.x, y: topY))
         scroll.reflectScrolledClipView(scroll.contentView)
         metrics["scroll." + label + ".maxGapMs"] = result.maxGap
         metrics["scroll." + label + ".gapsOver100ms"] = Double(result.over100)
@@ -843,6 +1139,10 @@ struct SmokeShot {
         if !slowRunner && result.over100 >= 8 { violate("perf", "scrolling " + label + " had " + String(result.over100) + " stalls over 100 ms") }
         if result.maxGap < 600 && result.over100 < 8 { check(true, "perf: scrolling " + label + " keeps the main thread responsive") }
         await settle("after scrolling " + label, timeout: 3)
+        if label == "movies" {
+            SettingsLayoutMeasurements.refreshNativeViews()
+            check(SettingsLayoutMeasurements.nativeAttached["toolbar.add"] == true, "toolbar: is unchanged on return to the top")
+        }
     }
 
     // MARK: End of the run

@@ -167,7 +167,8 @@ struct FeaturedAwardsView: View {
         let selected: Bool = year == value
         let traits: AccessibilityTraits = selected ? AccessibilityTraits.isSelected : AccessibilityTraits()
         return Button { year = value } label: { KDChipLabel(text: title, isActive: selected) }
-            .buttonStyle(.plain)
+            .controlSize(.small)
+            .buttonStyle(KDSecondaryButtonStyle())
             .accessibilityAddTraits(traits)
     }
 

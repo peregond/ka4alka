@@ -1,17 +1,15 @@
 using System.IO;
 using System.Net.Http;
 using System.Net.Http.Headers;
-using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace Kachalka;
 
-// RuTracker video and verified PC game categories are read from Knaben's public index.
+// Verified video and PC game categories from RuTracker and The Pirate Bay.
 public static class KnabenSource
 {
     const int MaxResponseBytes=2_000_000;
-    static readonly Uri Endpoint=new("https://api.knaben.org/v1");
     static readonly HttpClient Http=CreateClient();
     static readonly SemaphoreSlim RequestGate=new(1,1);
     static DateTime nextRequest=DateTime.MinValue;
@@ -35,20 +33,14 @@ public static class KnabenSource
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Take(4)
             .ToArray();
-        if(queries.Length==0)return [];
-        var entries=new List<SourceEntry>();
-        Exception? last=null;var answered=false;
-        foreach(var query in queries)
-        {
-            try{entries.AddRange(await SearchQuery(query,item,ct));answered=true;}
-            catch(Exception error) when(!ct.IsCancellationRequested){last=error;/* Keep releases from the other title. */}
-        }
-        ct.ThrowIfCancellationRequested();
-        if(!answered&&last!=null)throw last;
-        return entries
-            .DistinctBy(entry=>entry.Id)
-            .OrderByDescending(entry=>entry.Seeds??-1)
-            .ToArray();
+        return await ReleaseAliasSearch.Run(queries,(query,token)=>SearchQuery(query,item,token),ct);
+    }
+
+    // v2 supports cached GET requests and tracker filtering; unrelated trackers no longer consume the first page.
+    public static Uri QueryUri(string title,bool games=false)
+    {
+        var query=games?"\""+title.Replace("\"","").Trim()+"\"":title.Trim();
+        return new("https://api.knaben.org/v2/search?q="+Uri.EscapeDataString(query)+"&sf=title&t=rutracker,thepiratebay&o=seeders&d=desc&s=150");
     }
 
     static async Task<IReadOnlyList<SourceEntry>> SearchQuery(string query,MediaItem item,CancellationToken ct)
@@ -60,20 +52,7 @@ public static class KnabenSource
             var delay=nextRequest-DateTime.UtcNow;
             if(delay>TimeSpan.Zero)await Task.Delay(delay,ct);
             nextRequest=DateTime.UtcNow.AddMilliseconds(2100);
-        using var request=new HttpRequestMessage(HttpMethod.Post,Endpoint)
-        {
-            Content=new StringContent(JsonSerializer.Serialize(new
-            {
-                query=item.Section=="Игры"?"\""+query.Replace("\"","")+"\"":query,
-                search_field="title",
-                search_type="100%",
-                order_by="seeders",
-                order_direction="desc",
-                size=75,
-                hide_unsafe=true,
-                hide_xxx=true
-            }),Encoding.UTF8,"application/json")
-        };
+        using var request=new HttpRequestMessage(HttpMethod.Get,QueryUri(query,item.Section=="Игры"));
         using var response=await Http.SendAsync(request,HttpCompletionOption.ResponseHeadersRead,ct);
         response.EnsureSuccessStatusCode();
         if(response.Content.Headers.ContentLength>MaxResponseBytes)throw new InvalidDataException("Ответ индекса превышает допустимый размер.");
@@ -93,14 +72,14 @@ public static class KnabenSource
     public static IReadOnlyList<SourceEntry> Parse(byte[] data,MediaItem item)
     {
         using var json=JsonDocument.Parse(data);
-        if(!json.RootElement.TryGetProperty("hits",out var hits)||hits.ValueKind!=JsonValueKind.Array)return [];
+        if(!json.RootElement.TryGetProperty("hits",out var hits)||hits.ValueKind!=JsonValueKind.Array)throw new InvalidDataException("Индекс не вернул список раздач.");
         var entries=new List<SourceEntry>();
-        foreach(var row in hits.EnumerateArray().Take(75))
+        foreach(var row in hits.EnumerateArray().Take(150))
         {
             if(row.ValueKind!=JsonValueKind.Object)continue;
             var tracker=String(row,"tracker")?.Trim();
             var source=string.Equals(tracker,"RuTracker",StringComparison.OrdinalIgnoreCase)||string.Equals(tracker,"RuTracker.org",StringComparison.OrdinalIgnoreCase)?"RuTracker":
-                item.Section=="Игры"&&string.Equals(tracker,"The Pirate Bay",StringComparison.OrdinalIgnoreCase)?"The Pirate Bay":null;
+                string.Equals(tracker,"The Pirate Bay",StringComparison.OrdinalIgnoreCase)?"The Pirate Bay":null;
             if(source==null)continue;
             var title=String(row,"title")?.Trim();
             if(string.IsNullOrWhiteSpace(title)||title.Length>500||!(item.Section=="Игры"?Regex.IsMatch(String(row,"category")??"",@"(?i)(?:games?.*(?:pc|windows)|pc.*games?|windows.*games?|игры.*(?:pc|пк))"):VideoCategoryPattern.IsMatch(String(row,"category")??"")))continue;
@@ -122,7 +101,7 @@ public static class KnabenSource
             if(item.Section=="Фильмы"&&item.Year>0&&!Regex.IsMatch(title,@"(?<!\d)"+item.Year+@"(?!\d)"))continue;
             entries.Add(entry);
         }
-        return entries.DistinctBy(entry=>entry.Id).ToArray();
+        return ReleaseSearch.Distinct(entries);
     }
 
     static string? String(JsonElement row,string name)=>row.TryGetProperty(name,out var value)&&value.ValueKind==JsonValueKind.String?value.GetString():null;
@@ -132,6 +111,13 @@ public static class KnabenSource
     static string SecurePage(string? value,string source)
     {
         if(!Uri.TryCreate(value,UriKind.Absolute,out var uri)||uri.Scheme!="https"||!string.IsNullOrEmpty(uri.UserInfo))return "";
+        // The index can return its own TPB proxy page. Preserve a usable canonical
+        // source page without trusting arbitrary proxy paths or query parameters.
+        if(source=="The Pirate Bay"&&uri.Host=="knaben.xyz"&&uri.IsDefaultPort&&uri.AbsolutePath=="/thepiratebay/description.php")
+        {
+            var id=Regex.Match(uri.Query,@"^\?id=(\d{1,15})$");
+            return id.Success?"https://thepiratebay.org/description.php?id="+id.Groups[1].Value:"";
+        }
         return ((uri.Host is "rutracker.org" or "www.rutracker.org" or "knaben.org" or "knaben.eu")||source=="The Pirate Bay"&&(uri.Host is "thepiratebay.org" or "www.thepiratebay.org"))?uri.AbsoluteUri:"";
     }
 }

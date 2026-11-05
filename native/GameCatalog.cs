@@ -38,6 +38,8 @@ public sealed class GameCatalog(SourceClient client,string language="ru")
     }
     // Steam keeps a wide hero picture for most games; where it is missing the banner falls back to the blurred capsule.
     public static string? HeroImage(MediaItem game)=>TryId(game.PageUrl,out var id)?"https://cdn.akamai.steamstatic.com/steam/apps/"+id+"/library_hero.jpg":null;
+    // Steam library artwork is a real 600×900 poster, independent of the store's landscape capsule.
+    public static string? PosterImage(MediaItem game)=>TryId(game.PageUrl,out var id)?"https://cdn.akamai.steamstatic.com/steam/apps/"+id+"/library_600x900.jpg":game.ImageUrl;
     public static MediaItem Item(int id,string name,string? image=null)=>new(-id,name,"Игры","Windows",0,"—","—","#526B69")
         {PageUrl="https://store.steampowered.com/app/"+id+"/",OnlineId="steam:"+id,ImageUrl=image,OriginalTitle=name};
     static string? String(JsonElement row,string name)=>row.TryGetProperty(name,out var value)&&value.ValueKind==JsonValueKind.String?value.GetString():null;

@@ -28,7 +28,30 @@ try:
  card=movies['items'][0];call('save',dict(id=card['id']));assert any(c['id']==card['id'] for c in call('saved')['items'])
  call('hide',dict(id=card['id']));assert all(c['id']!=card['id'] for c in call('catalog',dict(section='movies',page=1))['items'])
  s=call('settings');call('unhide',dict(id=s['hidden'][0]['id']))
+ reported_link='kachalka://movie/odnazhdy-na-blizhnem-vostoke?title=%D0%9E%D0%B4%D0%BD%D0%B0%D0%B6%D0%B4%D1%8B%2520%D0%BD%D0%B0%2520%D0%91%D0%BB%D0%B8%D0%B6%D0%BD%D0%B5%D0%BC%2520%D0%92%D0%BE%D1%81%D1%82%D0%BE%D0%BA%D0%B5&year=2026'
+ linked=call('openLink',dict(url=reported_link))
+ assert linked['title']=='Однажды на Ближнем Востоке' and linked['year']==2026,linked
+ from urllib.parse import urlparse,parse_qs
+ assert parse_qs(urlparse(call('share',dict(id=linked['id']))['url']).query)['title']==['Однажды на Ближнем Востоке']
+ print('PASS: reported double-escaped share title resolves through exact catalog page metadata and re-shares canonically')
+ potter_years=[2001,2002,2004,2005,2007,2009,2010,2011]
+ potter_ids={'tt0241527','tt0295297','tt0304141','tt0330373','tt0373889','tt0417741','tt0926084','tt1201607'}
+ for language,query in [('ru','гарри поттер'),('en','Harry Potter')]:
+  call('setSettings',dict(uiLanguage=language))
+  found=call('catalog',dict(section='movies',query=query))['items']
+  parts=[c for c in found if c['section']=='movies' and c.get('imdbId') in potter_ids]
+  assert sorted(c['year'] for c in parts)==potter_years,(language,[(c['title'],c['year']) for c in parts])
+  assert len({c['id'] for c in parts})==8
+  assert {c['imdbId'] for c in parts}==potter_ids
+  assert all(c['title'].startswith('Гарри Поттер' if language=='ru' else 'Harry Potter') for c in parts)
+ print('PASS: fresh shared-engine Russian and English searches return all eight Potter films with localized titles and distinct identities')
  assert call('setSettings',dict(uiLanguage='en'))['uiLanguage']=='en'
+ assert call('downloads')['items']==[]
+ assert call('phone',dict(action='state'))['running'] is False
+ for _ in range(2):
+  phone=call('phone',dict(action='start'));assert phone['running'] and len(phone['state']['code'])==6
+  assert call('phone',dict(action='state'))['running'] is True
+  assert call('phone',dict(action='stop'))['running'] is False
  assert call('downloads')['items']==[]
  assert 'text' in call('logs')
  call('shutdown');p.stdin.close();p.wait(timeout=15)

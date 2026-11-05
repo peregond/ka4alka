@@ -67,16 +67,11 @@ public sealed class CatalogIndex
     static bool Valid(MediaItem item)=>item.Section is "Фильмы" or "Сериалы"&&
         !string.IsNullOrWhiteSpace(item.Title)&&Uri.TryCreate(item.PageUrl,UriKind.Absolute,out var url)&&
         url.Scheme=="https"&&(url.Host.Equals("zona.plus",StringComparison.OrdinalIgnoreCase)||url.Host.EndsWith(".zona.plus",StringComparison.OrdinalIgnoreCase)||url.Host.Equals("www.imdb.com",StringComparison.OrdinalIgnoreCase)&&Regex.IsMatch(url.AbsolutePath,@"^/title/tt\d{5,10}/?$"));
-    static string Normalize(string text)=>Regex.Replace(text.Replace('ё','е').Replace('Ё','Е').ToLowerInvariant(),@"[^\p{L}\p{N}]+"," ").Trim();
 
     public IReadOnlyList<MediaItem> Search(string section,string query,int limit=80)
     {
-        CacheFiles.Touch(path);var term=Normalize(query);if(term.Length==0)return Recent(section,limit);
-        var tokens=term.Split(' ',StringSplitOptions.RemoveEmptyEntries);
-        return entries.Values.Where(x=>x.Item.Section==section)
-            .Select(x=>(x.Item,x.SeenUtc,Score:MediaIdentity.Score(x.Item,term,tokens)))
-            .Where(x=>x.Score>0).OrderByDescending(x=>x.Score).ThenByDescending(x=>x.SeenUtc)
-            .Take(Math.Clamp(limit,1,200)).Select(x=>x.Item).ToArray();
+        CacheFiles.Touch(path);if(string.IsNullOrWhiteSpace(query))return Recent(section,limit);
+        return CatalogSearch.Find(entries.Values.Where(x=>x.Item.Section==section).OrderByDescending(x=>x.SeenUtc).Select(x=>x.Item),query,limit,AppLanguage.Current);
     }
 
     public IReadOnlyList<MediaItem> Recent(string section,int limit=40)

@@ -49,16 +49,17 @@ export async function knaben(media:Media):Promise<Release[]> {
   return groups.flatMap(group=>group.status==="fulfilled"?group.value:[]);
 }
 async function knabenTitle(media:Media,query:string):Promise<Release[]> {
-  const response=await fetch("https://api.knaben.org/v1",{
-    method:"POST",headers:{"Content-Type":"application/json","Accept":"application/json","User-Agent":"KachalkaIndex/0.2"},
-    body:JSON.stringify({query,search_field:"title",search_type:"100%",order_by:"seeders",order_direction:"desc",size:75,hide_unsafe:true,hide_xxx:true}),
+  // v2 GET responses can be cached at the index edge. Unsafe/adult/dead results remain disabled by default.
+  const params=new URLSearchParams({q:query,sf:"title",o:"seeders",d:"desc",s:"150"});
+  const response=await fetch("https://api.knaben.org/v2/search?"+params,{
+    headers:{"Accept":"application/json","User-Agent":"KachalkaIndex/0.3"},
     signal:AbortSignal.timeout(9500),cache:"no-store"
   });
   if(!response.ok||Number(response.headers.get("content-length")??0)>2_000_000)throw new Error("Сводный индекс недоступен");
   const body=await response.text();if(body.length>2_000_000)throw new Error("Ответ сводного индекса слишком большой");
   const data=JSON.parse(body) as {hits?:{id?:string;title?:string;tracker?:string;category?:string;details?:string;link?:string;magnetUrl?:string;hash?:string;bytes?:number;seeders?:number}[]};
   const results:Release[]=[];
-  for(const row of data.hits??[]) {
+  for(const row of (data.hits??[]).slice(0,150)) {
     if(!row.title||!row.id||!matches(media,row.title,"Knaben")||!/(?:movie|tv|anime|video|film|кино|сериал)/i.test(row.category??""))continue;
     const hash=/^[a-f0-9]{40}$/i.test(row.hash??"")?row.hash!.toUpperCase():hashFrom(row.magnetUrl??"");
     let download:string|null=hash?`magnet:?xt=urn:btih:${hash}&dn=${encodeURIComponent(row.title)}&tr=${encodeURIComponent("udp://tracker.opentrackr.org:1337/announce")}`:null;

@@ -11,6 +11,10 @@ using System.Text;
 using System.Text.Json;
 using Kachalka.Lan;
 
+if(args.Contains("--phone-browser")){await PhoneBrowserFixture.Run();return 0;}
+await PhoneRemoteTests.Run();
+if(args.Contains("--phone"))return 0;
+
 // These checks use real TCP/TLS sessions and independent persisted identities.
 // They intentionally enable loopback only through the explicit test option.
 var directory = Path.Combine(Path.GetTempPath(), "kachalka-lan-tests-" + Guid.NewGuid().ToString("N"));

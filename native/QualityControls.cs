@@ -126,7 +126,7 @@ public partial class MainWindow
                 {
                     // A small fallback budget avoids a full multi-tracker source
                     // scan for every poster, and does not fetch movie metadata.
-                    var providers=NativeReleaseSources.Create(sourceClient,item).Where(x=>x.Name is "RuTor" or "RuTracker · через Knaben");
+                    var providers=NativeReleaseSources.Create(sourceClient,item).Where(x=>x.Name is "RuTor" or "Knaben");
                     var fallback=await ReleaseSearch.RunAsync(providers,ct:token,timeout:TimeSpan.FromSeconds(10));
                     fresh=ReleaseSearch.WithSaved(indexed,fallback.Items);sources=sources.Concat(fallback.Sources).ToArray();
                 }

@@ -12,6 +12,14 @@ static class UnifiedSearchTests
         Check(UnifiedSearch.Filter(result.Items,"").Length==2&&UnifiedSearch.Filter(result.Items,"Сериалы").Single()==series,"result type filters do not run another search");
         var partial=await UnifiedSearch.FindAsync("Искра",(kind,_)=>kind=="Сериалы"?throw new IOException("offline"):Task.FromResult<IReadOnlyList<MediaItem>>([film]),kind=>kind=="Сериалы"?[series]:[],default);
         Check(partial.Offline&&partial.Items.Length==2,"one catalog failure retains working and saved search results");
+        var game=Item("Игры",1,"Искра");var gameCalls=0;called.Clear();
+        var global=await UnifiedSearch.FindAsync("Искра",(kind,_)=>{called.Add(kind);return Task.FromResult<IReadOnlyList<MediaItem>>([kind=="Фильмы"?film:series]);},_=>[],default,
+            games:_=>{gameCalls++;return Task.FromResult<IReadOnlyList<MediaItem>>([game]);});
+        Check(global.Items.Length==3&&global.Items.Select(x=>x.Section).Distinct().Count()==3&&gameCalls==1&&called.Count==2,"one submission searches movies, series and games without merging equal ids across types");
+        Check(UnifiedSearch.Filter(global.Items,"Игры").Single()==game&&gameCalls==1,"the Games result filter reuses the unified response without another Steam request");
+        var gameOffline=await UnifiedSearch.FindAsync("Искра",(kind,_)=>Task.FromResult<IReadOnlyList<MediaItem>>([kind=="Фильмы"?film:series]),kind=>kind=="Игры"?[game]:[],default,
+            games:_=>throw new IOException("Steam unavailable"));
+        Check(gameOffline.Offline&&gameOffline.Items.Length==3,"a failed game source retains video results and cached games");
         using var cancel=new CancellationTokenSource();cancel.Cancel();bool cancelled=false;
         try{await UnifiedSearch.FindAsync("Искра",(_,token)=>Task.FromCanceled<IReadOnlyList<MediaItem>>(token),_=>[],cancel.Token);}catch(OperationCanceledException){cancelled=true;}
         Check(cancelled,"cancelled query cannot publish fallback results");
@@ -43,6 +51,38 @@ static class UnifiedSearchTests
         Check(early?.Items.Single().Id==51&&!preferredStreaming.IsCompleted,"cached alternatives remain usable without waiting for English sources");
         slowEnglish.SetResult([english]);
         Check((await preferredStreaming).Items.Select(x=>x.Id).SequenceEqual([50,51]),"an arriving English result is promoted without losing fallback rows");
+        // A fresh install has no saved Potter films. The Russian upstream returns
+        // only a documentary, although all eight films are known by the franchise.
+        var documentary=Item("Фильмы",9001,"Мир Гарри Поттера: Мастерство, стоящее за магией") with{Year=2026};
+        var potterIds=new[]{"tt0241527","tt0295297","tt0304141","tt0330373","tt0373889","tt0417741","tt0926084","tt1201607"};
+        var remotePotter=new TaskCompletionSource<IReadOnlyList<MediaItem>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        SearchResult? earlyPotter=null;
+        var russianPotter=UnifiedSearch.FindAsync("гарри поттер",(_,_)=>remotePotter.Task,_=>[],default,updated:value=>earlyPotter=value);
+        Check(earlyPotter?.Items.Select(x=>x.ImdbId).ToHashSet().SetEquals(potterIds)==true&&!russianPotter.IsCompleted,"a fresh Russian search immediately finds all eight franchise films before remote sources answer");
+        remotePotter.SetResult([documentary]);
+        var russianParts=await russianPotter;
+        Check(russianParts.Items.Length==9&&russianParts.Items.Any(x=>x.Id==documentary.Id),"a partial Russian source cannot replace the eight known films with a documentary");
+        var englishParts=await UnifiedSearch.FindAsync("Harry Potter",(_,_)=>Task.FromResult<IReadOnlyList<MediaItem>>([]),_=>[],default,preferredLanguage:"en");
+        Check(englishParts.Items.Select(x=>x.ImdbId).ToHashSet().SetEquals(potterIds),"Russian and English franchise searches find the same movie identities without IMDb suggestions");
+        var localizedPotter=Item("Фильмы",9002,"Гарри Поттер и философский камень") with{Year=2001,PageUrl="https://w6.zona.plus/movies/potter-search-fixture"};
+        var mergedPotter=await UnifiedSearch.FindAsync("гарри поттер",(kind,_)=>Task.FromResult<IReadOnlyList<MediaItem>>(kind=="Фильмы"?[localizedPotter]:[]),_=>[],default);
+        Check(mergedPotter.Items.Length==8&&mergedPotter.Items.Single(x=>x.ImdbId=="tt0241527").PageUrl==localizedPotter.PageUrl,"a real catalog result merges with its verified franchise film without duplicate cards or lost page links");
+        Check(UnifiedSearch.Filter(mergedPotter.Items,"Игры").Length==0,"known movie franchises do not leak into the Games search filter");
+        var newer=Item("Фильмы",9101,"Матрица: Воскрешение") with{Year=2021};
+        var older=Item("Фильмы",9102,"Матрица") with{Year=1999};
+        var directGate=new TaskCompletionSource<IReadOnlyList<MediaItem>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var gotNewer=new TaskCompletionSource<SearchResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var directCalls=new List<string>();
+        var complete=UnifiedSearch.FindAsync("матрица",(kind,_)=>Task.FromResult<IReadOnlyList<MediaItem>>(kind=="Фильмы"?[newer]:[]),_=>[],default,
+            updated:r=>{if(r.Items.Any(x=>x.Id==newer.Id))gotNewer.TrySetResult(r);},
+            additional:(kind,_)=>{directCalls.Add(kind);return kind=="Фильмы"?directGate.Task:Task.FromResult<IReadOnlyList<MediaItem>>([]);});
+        await gotNewer.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Check(!complete.IsCompleted,"a partial recent catalog is shown while the independent source continues looking for older films");
+        directGate.SetResult([older,newer]);var completed=await complete;
+        Check(completed.Items.Length==2&&completed.Items.Any(x=>x.Id==older.Id)&&directCalls.Count==2,"a nonempty partial answer never suppresses older source results and duplicate cards merge");
+        var directOffline=await UnifiedSearch.FindAsync("матрица",(kind,_)=>Task.FromResult<IReadOnlyList<MediaItem>>(kind=="Фильмы"?[newer]:[]),_=>[],default,
+            additional:(_,_)=>throw new IOException("direct source unavailable"));
+        Check(directOffline.Items.Single().Id==newer.Id&&!directOffline.Offline,"an unavailable optional source preserves working catalog results without a false offline warning");
         using var obsolete=new CancellationTokenSource();var never=new TaskCompletionSource<IReadOnlyList<MediaItem>>(TaskCreationOptions.RunContinuationsAsynchronously);var publishes=0;
         var obsoleteSearch=UnifiedSearch.FindAsync("Искра",(_,_)=>never.Task,_=>[],obsolete.Token,updated:_=>publishes++);
         obsolete.Cancel();try{await obsoleteSearch.WaitAsync(TimeSpan.FromSeconds(2));throw new Exception("Obsolete search remained alive");}catch(OperationCanceledException){}

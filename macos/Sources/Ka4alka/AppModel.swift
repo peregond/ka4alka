@@ -7,9 +7,9 @@ enum Section: String, CaseIterable, Identifiable { case featured, movies, series
     var title: String { switch self { case .featured: return tr("Актуальное", "Featured"); case .movies: return tr("Фильмы", "Movies"); case .series: return tr("Сериалы", "Series"); case .shows: return tr("ТВ Шоу", "TV Shows"); case .games: return tr("Игры", "Games"); case .saved: return tr("Сохранённое", "Saved"); case .downloads: return tr("Загрузки", "Downloads"); case .settings: return tr("Настройки", "Settings") } }
     var icon: String { switch self { case .featured: return "sparkles"; case .movies: return "film"; case .series: return "tv"; case .shows: return "theatermasks"; case .games: return "gamecontroller"; case .saved: return "heart"; case .downloads: return "arrow.down.circle"; case .settings: return "gearshape" } }
 }
-enum Route: Equatable { case section(Section), collection(String), detail(MediaCard), person(Person)
+enum Route: Equatable { case section(Section), search, collection(String), detail(MediaCard), person(Person)
     static func == (a: Route, b: Route) -> Bool { a.key == b.key }
-    var key: String { switch self { case .section(let v): return v.rawValue; case .collection(let id): return "collection:" + id; case .detail(let card): return "detail:" + card.id; case .person(let person): return "person:" + person.id } }
+    var key: String { switch self { case .section(let v): return v.rawValue; case .search: return "search"; case .collection(let id): return "collection:" + id; case .detail(let card): return "detail:" + card.id; case .person(let person): return "person:" + person.id } }
 }
 struct CatalogFilter: Equatable {
     var genre = ""; var country = ""; var year = 0; var rating = 0; var sort = "date"; var quality = ""; var kind = ""
@@ -40,10 +40,16 @@ struct CatalogFilter: Equatable {
     let transfers = TransferStore()
     @Published var settings: AppSettings?
     @Published var version = ""
+    @Published var sidebarVisibility: NavigationSplitViewVisibility = .all
+    func toggleSidebar() { sidebarVisibility = sidebarVisibility == .detailOnly ? .all : .detailOnly }
     @Published var connected = false
     @Published var bootstrapping = false
     @Published var query = ""
     @Published var submittedQuery = ""
+    @Published var searchFocus = 0
+    @Published var recentSearches: [RecentSearch] = []
+    @Published private var searchRevision = 0
+    private var searchOrigin: SearchOrigin?
     @Published var filter = CatalogFilter() { didSet { if filter != oldValue { page = 1; browseAnchor = nil } } }
     @Published var page = 1
     @Published var routes: [Route] = [.section(.featured)]
@@ -55,6 +61,7 @@ struct CatalogFilter: Equatable {
     @Published var releases: [ReleaseRow] = []
     @Published var sources: [SourceState] = []
     /// The card id `releases` and `sources` belong to. Use `releases(for:)` / `sources(for:)` so another title's rows never show.
+    @Published var scopedReleaseRecommendation: ScopedReleaseRecommendation?
     @Published var releasesOwner: String?
     @Published var releasesLoading = false
     @Published private var loadingKeys: [String: Int] = [:]
@@ -62,9 +69,12 @@ struct CatalogFilter: Equatable {
     @Published var toast: String?
     @Published var addTorrent = false { didSet { if addTorrent { addError = nil } } }
     @Published var magnet = ""
+    /// The "What's New" sheet, opened from the Help menu and from Settings.
+    @Published var releaseNotes = false
     @Published var addError: String?
     @Published var folderRequired = false
     @Published var pairingPrompt: PairingPrompt?
+    @Published var phoneState: PhoneResponse?
     @Published var lanState: LanState?
     @Published var revision = 0
     @Published var refreshing = false
@@ -216,9 +226,11 @@ struct CatalogFilter: Equatable {
     // MARK: Navigation
 
     func select(_ next: Section) {
+        let leavingSearch = searchOrigin != nil
+        searchOrigin = nil
         if section == next, route == .section(next) {
             submittedQuery = ""; query = ""; page = 1; filter = CatalogFilter(); revision += 1
-        } else if section != next {
+        } else if section != next || leavingSearch {
             submittedQuery = ""; query = ""; filter = CatalogFilter(); page = 1; browseAnchor = nil; list = nil
         }
         section = next; routes = [.section(next)]; error = nil
@@ -231,7 +243,29 @@ struct CatalogFilter: Equatable {
         awardYears[id] = nil
         list = nil; routes.append(.collection(id)); error = nil
     }
-    func back() { if routes.count > 1 { routes.removeLast(); error = nil } }
+    func back() {
+        guard routes.count > 1 else { return }
+        let leavingSearch = route == .search
+        routes.removeLast(); error = nil
+        if leavingSearch, let origin = searchOrigin {
+            section = origin.section; query = origin.query; submittedQuery = origin.submittedQuery
+            filter = origin.filter; page = origin.page; browseAnchor = origin.anchor; list = origin.list
+            searchOrigin = nil
+        }
+    }
+    /// Search is a navigation destination, not a modal: Back from a result keeps its query and results.
+    func openSearch() {
+        if let index = routes.firstIndex(of: .search) {
+            routes = Array(routes.prefix(index + 1))
+        } else {
+            searchOrigin = SearchOrigin(section: section, query: query, submittedQuery: submittedQuery,
+                                        filter: filter, page: page, anchor: browseAnchor, list: list)
+            section = .movies
+            query = ""; submittedQuery = ""; filter = CatalogFilter(); page = 1; browseAnchor = nil; list = nil
+            routes.append(.search)
+        }
+        error = nil; searchFocus += 1
+    }
     /// Opens a kachalka:// link (the title page) or hands a magnet link / torrent file to the add sheet.
     /// Returns false only when a kachalka:// link could not be opened.
     @discardableResult func openURL(_ url: URL) async -> Bool {
@@ -265,8 +299,16 @@ struct CatalogFilter: Equatable {
             return
         }
         submittedQuery = q; filter = CatalogFilter(); page = 1; browseAnchor = nil
-        let target: Section = section == .games ? .games : .movies
-        section = target; routes = [.section(target)]; revision += 1
+        let target: Section = .movies
+        section = target
+        if route != .search { routes = [.section(target)]; searchOrigin = nil }
+        if !q.isEmpty {
+            let entry = RecentSearch(query: q)
+            recentSearches.removeAll { $0.query.caseInsensitiveCompare(q) == .orderedSame }
+            recentSearches.insert(entry, at: 0)
+            recentSearches = Array(recentSearches.prefix(8))
+        }
+        if route == .search { searchRevision += 1 } else { revision += 1 }
     }
     /// The Return key in the search field: does nothing for an empty or blank query.
     func submitSearch() {
@@ -279,6 +321,10 @@ struct CatalogFilter: Equatable {
     func clearSearch() {
         query = ""
         guard !submittedQuery.isEmpty else { return }
+        if route == .search {
+            submittedQuery = ""; filter = CatalogFilter(); page = 1; browseAnchor = nil; list = nil
+            return
+        }
         if case .section = route {
             submit()
         } else {
@@ -290,7 +336,7 @@ struct CatalogFilter: Equatable {
 
     var requestKey: String {
         let parts: [String] = [section.rawValue, submittedQuery, String(page), String(revision), filter.genre, filter.country, String(filter.year), String(filter.rating), filter.sort, filter.kind, filter.quality, filter.scope]
-        return parts.joined(separator: "|")
+        return parts.joined(separator: "|") + (routes.contains(.search) ? "|search:" + String(searchRevision) : "")
     }
     func loadCatalog() async {
         let key = requestKey
@@ -369,6 +415,13 @@ struct CatalogFilter: Equatable {
             if route == .detail(card), !Task.isCancelled { detail = result }
         } catch { if route == .detail(card) { fail(error) } }
     }
+    func loadCast(_ card: MediaCard) async {
+        let language = settings?.uiLanguage
+        do {
+            let people = try await bridge.call("cast", ["id": .string(card.id)], as: [Person].self)
+            if route == .detail(card), !Task.isCancelled, settings?.uiLanguage == language, detail?.item.id == card.id { detail?.people = people }
+        } catch { /* Character names are optional; keep the loaded cast and page. */ }
+    }
     func loadReleases(_ card: MediaCard) async {
         pendingReleaseCard = card.id
         if releasesOwner != card.id { releases = []; sources = []; releasesOwner = card.id }
@@ -380,6 +433,14 @@ struct CatalogFilter: Equatable {
         } catch { if route == .detail(card) { fail(error) } }
     }
     func releases(for card: MediaCard) -> [ReleaseRow] { releasesOwner == card.id ? releases : [] }
+    func recommendedRelease(for card: MediaCard) -> ReleaseRow? {
+        let rows = releases(for: card)
+        if let selection = scopedReleaseRecommendation, selection.owner == card.id {
+            guard let id = selection.id else { return nil }
+            return rows.first { $0.id == id && $0.downloadable }
+        }
+        return rows.first { $0.recommended && $0.downloadable }
+    }
     func sources(for card: MediaCard) -> [SourceState] { releasesOwner == card.id ? sources : [] }
     func loadPerson(_ value: Person) async {
         person = nil
@@ -534,6 +595,12 @@ struct CatalogFilter: Equatable {
             fail(error)
             return false
         }
+    }
+    @discardableResult func phone(_ action: String) async -> Bool {
+        do {
+            phoneState = try await bridge.call("phone", ["action": .string(action)], as: PhoneResponse.self)
+            return true
+        } catch { fail(error); return false }
     }
     func approvePairing(_ accepted: Bool) async { guard let prompt = pairingPrompt else { return }; pairingPrompt = nil; await lan("approve", ["id": .string(prompt.id), "approved": .bool(accepted)]) }
     /// Copies the diagnostic report to the clipboard. Returns false when it could not be built (the failure is in `error`).

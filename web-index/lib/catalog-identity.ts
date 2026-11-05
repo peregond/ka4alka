@@ -1,7 +1,7 @@
 import verified from "@/app/data/title-aliases.json";
 import type { Media, Section } from "./catalog-source";
 
-const normalized=(value:string)=>value.toLowerCase().replaceAll("ё","е").replace(/[^\p{L}\p{N}]+/gu," ").trim();
+const normalized=(value:string)=>value.normalize("NFC").toLowerCase().replaceAll("ё","е").replace(/[^\p{L}\p{N}]+/gu," ").trim();
 export function mediaNames(media:Media):string[] {
   return [...new Map([media.title,media.originalTitle,...(media.aliases??[])].filter((x):x is string=>typeof x==="string"&&x.trim().length>0&&x.length<=200).map(x=>[normalized(x),x.trim()])).values()].slice(0,16);
 }

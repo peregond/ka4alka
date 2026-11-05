@@ -12,10 +12,12 @@
     <Compile Include="../native/CacheStorage.cs" Link="CacheStorage.cs" />
     <Compile Include="../native/CatalogBatch.cs" Link="CatalogBatch.cs" />
     <Compile Include="../native/CatalogChoices.cs" Link="CatalogChoices.cs" />
+    <Compile Include="../native/CatalogSearch.cs" Link="CatalogSearch.cs" />
     <Compile Include="../native/CatalogIndex.cs" Link="CatalogIndex.cs" />
     <Compile Include="../native/CatalogPaging.cs" Link="CatalogPaging.cs" />
     <Compile Include="../native/CatalogRegions.cs" Link="CatalogRegions.cs" />
     <Compile Include="../native/CinemaMetadata.cs" Link="CinemaMetadata.cs" />
+    <Compile Include="../native/CharacterCredits.cs" Link="CharacterCredits.cs" />
     <Compile Include="../native/CinemaPeople.cs" Link="CinemaPeople.cs" />
     <Compile Include="../native/CinemaPortraits.cs" Link="CinemaPortraits.cs" />
     <Compile Include="../native/CoverSource.cs" Link="CoverSource.cs" />
@@ -44,9 +46,11 @@
     <Compile Include="../native/ImdbSuggestions.cs" Link="ImdbSuggestions.cs" />
     <Compile Include="../native/IndexRelays.cs" Link="IndexRelays.cs" />
     <Compile Include="../native/KnabenSource.cs" Link="KnabenSource.cs" />
+    <Compile Include="../native/PhoneRemoteCatalog.cs" Link="PhoneRemoteCatalog.cs" />
     <Compile Include="../native/LanDownloadReceiver.cs" Link="LanDownloadReceiver.cs" />
     <Compile Include="../native/LiveCatalog.cs" Link="LiveCatalog.cs" />
     <Compile Include="../native/MagnetDiscovery.cs" Link="MagnetDiscovery.cs" />
+    <Compile Include="../native/MovieFranchiseCatalog.cs" Link="MovieFranchiseCatalog.cs" />
     <Compile Include="../native/MediaIdentity.cs" Link="MediaIdentity.cs" />
     <Compile Include="../native/MediaMetadata.cs" Link="MediaMetadata.cs" />
     <Compile Include="../native/MegaPeerSource.cs" Link="MegaPeerSource.cs" />
@@ -65,6 +69,7 @@
     <Compile Include="../native/ReleaseFreshness.cs" Link="ReleaseFreshness.cs" />
     <Compile Include="../native/ReleaseQuality.cs" Link="ReleaseQuality.cs" />
     <Compile Include="../native/ReleaseRecommendation.cs" Link="ReleaseRecommendation.cs" />
+    <Compile Include="../native/ReleaseAliasSearch.cs" Link="ReleaseAliasSearch.cs" />
     <Compile Include="../native/ReleaseSearch.cs" Link="ReleaseSearch.cs" />
     <Compile Include="../native/RussianAudio.cs" Link="RussianAudio.cs" />
     <Compile Include="../native/SearchLanguage.cs" Link="SearchLanguage.cs" />
@@ -87,6 +92,7 @@
     <EmbeddedResource Include="../web-index/app/data/starter.json" LogicalName="Kachalka.catalog-starter.json" />
     <EmbeddedResource Include="../web-index/app/data/title-aliases.json" LogicalName="Kachalka.title-aliases.json" />
     <EmbeddedResource Include="../scripts/catalog-collections.json" LogicalName="Kachalka.catalog-collections.json" />
+    <EmbeddedResource Include="../native/MovieFranchises.json" LogicalName="Kachalka.MovieFranchises.json" />
     <EmbeddedResource Include="../native/FeaturedCollections.json" LogicalName="Kachalka.FeaturedCollections.json" />
     <EmbeddedResource Include="../native/Localization/en.json" LogicalName="Kachalka.Localization.en.json" />
   </ItemGroup>

@@ -47,7 +47,11 @@ jobs:
           node tests/release-audio-rules.mjs
           node tests/title-lookup.mjs
           node tests/localized-media.mjs
+          node tests/movie-franchise.mjs
+          node tests/catalog-search.mjs
+          node tests/audit-catalog-search.mjs --report ../test-output/server-search-audit.json
           node tests/tmdb-backdrop.mjs
+          node tests/middle-east-releases.mjs
           node tests/release-performance.mjs
           node tests/title-identity.mjs
           node tests/source-integrity.mjs

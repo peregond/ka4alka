@@ -137,6 +137,7 @@ public partial class MainWindow
         var participants=RenderCinemaConnections(panel,item,cards);
         // The participant card sits below the banner at every width, using the full content width.
         Grid.SetRow(participants,1);Grid.SetColumn(participants,0);participants.Margin=new(0,20,0,0);
+        RenderDetailFranchise(panel,item);
         UpdateDetailLayout();
 
         // ---- releases ----
@@ -263,6 +264,7 @@ public partial class MainWindow
         {
             detailActions.Children.Add(Action("Выбрать раздачу","IconDownload",true,()=>ScrollToReleases()));
         }
+        if(MovieFranchiseCatalog.CanLookup(item))detailActions.Children.Add(Action("Другие части","IconFilm",false,()=>ToggleDetailFranchise(item)));
         // No separate "all releases" button: the list sits right below the banner on this page.
         var saved=IsSaved(item);
         Button favorite=null!;favorite=new Button{Name="DetailFavorite",Style=(Style)FindResource("IconButton"),Width=52,Height=52,Margin=new(0,0,10,8)};

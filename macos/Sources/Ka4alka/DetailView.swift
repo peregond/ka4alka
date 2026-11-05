@@ -8,6 +8,7 @@ struct DetailView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var card: MediaCard
     @State private var detailLoading = true
+    @State private var franchiseExpanded = false
     @State private var scrollTarget: String?
     private static let releasesAnchor = "detail-releases"
 
@@ -22,27 +23,34 @@ struct DetailView: View {
         ScrollView {
             page
         }
+        .ignoresSafeArea(edges: .top)
         .scrollPosition(id: $scrollTarget, anchor: .top)
         .task(id: loadKey) { await loadDetail() }
         .task(id: loadKey) { await model.loadReleases(card) }
     }
 
     private var page: some View {
-        VStack(alignment: .leading, spacing: KD.Space.l) {
-            DetailHero(card: card, detail: detail, onChooseRelease: { scrollToReleases() })
-            descriptionBlock
-            gameBlock
-            peopleBlock
-            awardsBlock
-            VStack(alignment: .leading, spacing: 0) {
-                DetailReleasesSection(transfers: model.transfers, card: card).id(card.id)
+        VStack(alignment: .leading, spacing: 0) {
+            // The artwork spans the scroll viewport; the reading column below stays inset.
+            DetailHero(card: card, detail: detail, onChooseRelease: { scrollToReleases() }, onOtherParts: card.section == "movies" ? { franchiseExpanded.toggle() } : nil)
+            VStack(alignment: .leading, spacing: KD.Space.l) {
+                descriptionBlock
+                gameBlock
+                peopleBlock
+                if franchiseExpanded { DetailFranchiseSection(card: item).id(card.id) }
+                awardsBlock
+                VStack(alignment: .leading, spacing: 0) {
+                    DetailReleasesSection(transfers: model.transfers, card: card).id(card.id)
+                }
+                .id(DetailView.releasesAnchor)
             }
-            .id(DetailView.releasesAnchor)
+            .scrollTargetLayout()
+            .frame(maxWidth: KD.Width.page, alignment: .leading)
+            .settingsLayoutProbe("detail.body")
+            .padding(KD.gutter)
+            .frame(maxWidth: .infinity)
         }
         .scrollTargetLayout()
-        .frame(maxWidth: KD.Width.page, alignment: .leading)
-        .padding(KD.gutter)
-        .frame(maxWidth: .infinity)
     }
 
     // MARK: Loading
@@ -51,6 +59,7 @@ struct DetailView: View {
         detailLoading = true
         await model.loadDetail(card)
         if !Task.isCancelled { detailLoading = false }
+        if !Task.isCancelled && !isGame { await model.loadCast(card) }
     }
 
     /// Retry runs both requests, so a failed page and an empty release list recover together.
@@ -136,7 +145,9 @@ struct DetailHero: View {
     var card: MediaCard
     var detail: DetailResult?
     var onChooseRelease: () -> Void
+    var onOtherParts: (() -> Void)? = nil
     @State private var width: CGFloat = 0
+    @Environment(\.kdSafeTop) private var safeTop
 
     private var item: MediaCard { detail?.item ?? card }
     private var isGame: Bool { card.section == "games" }
@@ -176,11 +187,11 @@ struct DetailHero: View {
     }
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: KD.Radius.hero, style: .continuous)
         content
             .background { layers }
-            .clipShape(shape)
+            .clipped()
             .kdReadWidth($width)
+            .preference(key: KDHeroPageKey.self, value: true)
             .settingsLayoutProbe("detail.banner")
     }
 
@@ -212,17 +223,21 @@ struct DetailHero: View {
             posterView
             textColumn
         }
-        .padding(compact ? KD.Space.m : KD.Space.l)
-        .frame(maxWidth: .infinity, minHeight: KD.Size.heroHeight, alignment: .bottomLeading)
+        .padding(.vertical, compact ? KD.Space.m : KD.Space.l)
+        .padding(.top, safeTop)
+        .frame(maxWidth: KD.Width.page, minHeight: KD.Size.heroHeight + safeTop, alignment: .bottomLeading)
+        .padding(.horizontal, KD.gutter)
+        .frame(maxWidth: .infinity)
         .kdOnBanner()
     }
 
     @ViewBuilder private var posterView: some View {
         if isGame {
-            Artwork(address: item.poster, width: 640, placeholderSymbol: "gamecontroller")
-                .aspectRatio(460.0 / 215.0, contentMode: .fit)
-                .frame(width: compact ? 220 : 320)
+            Artwork(address: item.poster, width: 400, placeholderSymbol: "gamecontroller", fallbackAddress: item.posterFallback)
+                .aspectRatio(2.0 / 3.0, contentMode: .fit)
+                .frame(width: compact ? 100 : 135)
                 .clipShape(RoundedRectangle(cornerRadius: KD.Radius.poster, style: .continuous))
+                .settingsLayoutProbe("detail.hero.poster", group: "detail.banner")
         } else {
             Artwork(address: item.poster, width: 400, placeholderSymbol: card.section == "series" ? "tv" : "film")
                 .aspectRatio(2.0 / 3.0, contentMode: .fit)
@@ -259,7 +274,7 @@ struct DetailHero: View {
                     }
                 }
             }
-            DetailActionRow(item: item, isGame: isGame, onChooseRelease: onChooseRelease)
+            DetailActionRow(item: item, isGame: isGame, onChooseRelease: onChooseRelease, onOtherParts: onOtherParts)
                 .padding(.top, KD.Space.xs)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -273,6 +288,7 @@ struct DetailActionRow: View {
     var item: MediaCard
     var isGame: Bool
     var onChooseRelease: () -> Void
+    var onOtherParts: (() -> Void)? = nil
     @State private var shareURL: URL?
 
     private var saved: Bool { model.isSaved(item) }
@@ -305,7 +321,7 @@ struct DetailActionRow: View {
     }
 
     @ViewBuilder private func secondaryButtons(labelled: Bool) -> some View {
-        heroButton(saved ? tr("Сохранено", "Saved") : tr("Сохранить", "Save"), saved ? "heart.fill" : "heart", labelled: labelled) {
+        heroButton(saved ? tr("Сохранено", "Saved") : tr("Сохранить", "Save"), saved ? "heart.fill" : "heart", iconTint: saved ? KDPalette.like : nil, labelled: labelled) {
             Task { @MainActor in await model.save(item) }
         }
         heroButton(tr("Не интересно", "Not interested"), "eye.slash", labelled: labelled) {
@@ -314,15 +330,23 @@ struct DetailActionRow: View {
                 if hidden { model.back() }
             }
         }
+        if let onOtherParts { heroButton(tr("Другие части", "Other parts"), "square.stack", labelled: labelled, action: onOtherParts) }
         shareControl(labelled: labelled)
     }
 
-    @ViewBuilder private func heroButton(_ title: String, _ systemImage: String, labelled: Bool, action: @escaping () -> Void) -> some View {
+    /// `iconTint` colours the icon alone (the filled heart of a saved title is red); the label keeps its colour.
+    @ViewBuilder private func heroButton(_ title: String, _ systemImage: String, iconTint: Color? = nil, labelled: Bool, action: @escaping () -> Void) -> some View {
         if labelled {
-            Button(action: action) { Label(title, systemImage: systemImage) }
-                .buttonStyle(KDOverlayButtonStyle())
+            Button(action: action) {
+                if let iconTint {
+                    Label { Text(title) } icon: { Image(systemName: systemImage).foregroundStyle(iconTint) }
+                } else {
+                    Label(title, systemImage: systemImage)
+                }
+            }
+            .buttonStyle(KDOverlayButtonStyle())
         } else {
-            Button(action: action) { Image(systemName: systemImage) }
+            Button(action: action) { Image(systemName: systemImage).foregroundStyle(iconTint ?? Color.white) }
                 .buttonStyle(KDOverlayButtonStyle(circular: true))
                 .help(title)
                 .accessibilityLabel(title)
@@ -377,7 +401,7 @@ struct DetailPrimaryAction: View {
         return own.first(where: { !$0.complete })
     }
     private var recommended: ReleaseRow? {
-        model.releases(for: card).first(where: { $0.recommended && $0.downloadable })
+        model.recommendedRelease(for: card)
     }
 
     var body: some View {
@@ -402,8 +426,7 @@ struct DetailPrimaryAction: View {
         } label: {
             Label(tr("Показать в папке", "Show in folder"), systemImage: "folder")
         }
-        .buttonStyle(KDPrimaryButtonStyle())
-        .controlSize(.large)
+        .buttonStyle(KDOverlayButtonStyle(prominent: true))
     }
 
     private func progressButton(_ transfer: Transfer) -> some View {
@@ -414,8 +437,7 @@ struct DetailPrimaryAction: View {
         } label: {
             Label(text, systemImage: "arrow.down.circle")
         }
-        .buttonStyle(KDPrimaryButtonStyle())
-        .controlSize(.large)
+        .buttonStyle(KDOverlayButtonStyle(prominent: true))
         .help(tr("Открыть загрузки", "Open Downloads"))
     }
 
@@ -437,8 +459,7 @@ struct DetailPrimaryAction: View {
                 Label(downloadTitle(row), systemImage: "arrow.down").lineLimit(1)
             }
         }
-        .buttonStyle(KDPrimaryButtonStyle())
-        .controlSize(.large)
+        .buttonStyle(KDOverlayButtonStyle(prominent: true))
         .disabled(adding)
     }
 
@@ -448,8 +469,7 @@ struct DetailPrimaryAction: View {
         } label: {
             Label(tr("Выбрать раздачу", "Choose a release"), systemImage: "list.bullet")
         }
-        .buttonStyle(KDPrimaryButtonStyle())
-        .controlSize(.large)
+        .buttonStyle(KDOverlayButtonStyle(prominent: true))
     }
 
     private func start(_ row: ReleaseRow) {
@@ -576,10 +596,12 @@ struct PersonView: View {
         if let profile {
             let films: [MediaCard] = newestFirst(model.visible(profile.items))
             if films.isEmpty {
-                emptyFilmography
+                if loading { KDShelfSkeleton() } else { emptyFilmography }
             } else {
                 filmographyContent(films)
             }
+        } else if loading {
+            KDShelfSkeleton()
         }
     }
 
@@ -599,13 +621,7 @@ struct PersonView: View {
         let best: [MediaCard] = films.count > 3 ? bestRated(films) : []
         return VStack(alignment: .leading, spacing: KD.Space.l) {
             if best.count >= 3 {
-                VStack(alignment: .leading, spacing: KD.Space.s) {
-                    KDSectionHeader(title: tr("Лучшие по рейтингу", "Top rated"))
-                    KDShelf(best) { card in
-                        PosterCard(card: card).frame(width: KD.Size.posterWidth)
-                    }
-                    .padding(.horizontal, -KD.gutter)
-                }
+                CollapsibleFilmGrid(title: tr("Лучшие по рейтингу", "Top rated"), items: best)
             }
             VStack(alignment: .leading, spacing: KD.Space.s) {
                 KDSectionHeader(

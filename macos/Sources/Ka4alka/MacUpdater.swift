@@ -87,7 +87,7 @@ private let updateFailurePathKey = "Ka4alkaUpdateFailurePath"
         return "x64"
 #endif
     }
-    var buttonTitle: String { ready ? tr("Обновить и перезапустить", "Update and restart") : busy ? tr("Загрузка…", "Loading…") : available ? tr("Скачать обновление", "Download update") : tr("Проверить обновления", "Check for updates") }
+    var buttonTitle: String { ready ? tr("Обновить", "Update") : busy ? tr("Загрузка…", "Loading…") : available ? tr("Скачать", "Download") : tr("Проверить обновления", "Check for updates") }
     private func setStatus(_ text: String, error: Bool = false) { statusText = text; isError = error }
     private func setFailure(_ error: Error) { setStatus(error.localizedDescription, error: true) }
     /// Forgets a prepared update that can no longer be installed, so the button offers to download it again.
@@ -296,6 +296,9 @@ enum MacUpdateInstaller {
                     if !child.isRunning { break }; Thread.sleep(forTimeInterval: 0.1)
                 }
                 try? files.removeItem(at: health)
+                // The new version was started as a child of this helper, so the system did not bring it forward. Ask
+                // LaunchServices to activate it; without this its window opened behind the other apps.
+                if healthy { try? runTool("/usr/bin/open", [old.path]) }
                 if !healthy { if child.isRunning { child.terminate(); child.waitUntilExit() }; throw UpdateError(tr("Новая версия не прошла проверку запуска. Возвращена предыдущая версия.", "The updated application failed its startup check; the previous version was restored.")) }
             }
             try? files.removeItem(at: backup)

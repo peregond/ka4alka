@@ -426,7 +426,9 @@ public partial class MainWindow
             if(state.OnlyRussian)filtered=filtered.Where(x=>RussianAudio.Rank(x)==3);
             filtered=state.Sort switch{"По языку интерфейса"=>SearchLanguage.AudioOrder(filtered,prefs.UiLanguage),"Английская озвучка"=>SearchLanguage.AudioOrder(filtered,"en"),"Русская озвучка"=>RussianAudio.Order(filtered),"Русские источники"=>filtered.OrderByDescending(RussianSource).ThenByDescending(SeedRank),"Меньше размер"=>filtered.OrderBy(x=>x.Size??long.MaxValue),"Выше качество"=>filtered.OrderByDescending(QualityRank).ThenByDescending(SeedRank),"По названию"=>filtered.OrderBy(x=>x.Title,StringComparer.CurrentCultureIgnoreCase),"По сезону и серии"=>filtered.OrderBy(x=>x.Series.Season??int.MaxValue).ThenBy(x=>x.Series.Episode??int.MaxValue),"По видео"=>filtered.OrderBy(x=>x.Type=="Не указано").ThenBy(x=>x.Type),"По субтитрам"=>filtered.OrderBy(x=>x.Subs=="Не указано").ThenBy(x=>x.Subs),"По озвучке"=>filtered.OrderByDescending(x=>RussianAudio.Rank(x)).ThenBy(x=>ReleaseFreshness.Audio(x)),_=>filtered.OrderByDescending(SeedRank)};
             if(state.Reverse)filtered=filtered.Reverse();
-            var visible=filtered.ToArray();var displayed=visible.Take(state.VisibleCount).ToArray();
+            var visible=filtered.ToArray();
+            recommended=ReleaseRecommendation.Pick(visible,QualityMinimum,prefs.UiLanguage);
+            var displayed=visible.Take(state.VisibleCount).ToArray();
             ApplyDetailReleaseFilters(filmId,visible);
             if(releaseCountLabel!=null)releaseCountLabel.Text=visible.Length.ToString();
             // The count already sits next to the section title and the list ends with "Показать ещё", so no extra notes here;

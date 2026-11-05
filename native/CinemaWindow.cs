@@ -27,10 +27,10 @@ public partial class MainWindow
             foreach(var person in item.DisplayPeople)
             {
                 var button=Button(person.Name,()=>OpenPerson(person,item));button.Name="CinemaPersonTile";button.Tag=person;button.Style=(Style)FindResource("PersonTileButton");
-                var tile=new StackPanel();var portrait=PersonPortrait(person,96,120,item);portrait.Name="CinemaPersonPortrait";portrait.BorderThickness=new(0);portrait.HorizontalAlignment=HorizontalAlignment.Center;tile.Children.Add(portrait);var name=TextRaw(person.Name,12);name.TextAlignment=TextAlignment.Center;name.MinHeight=28;name.MaxHeight=32;name.TextTrimming=TextTrimming.CharacterEllipsis;name.Margin=new(0);tile.Children.Add(name);
-                var role=Text(person.Role switch{"Актёры"=>"В ролях","Режиссёры"=>"Режиссёр","Операторы"=>"Оператор",_=>person.Role},10,true);role.TextAlignment=TextAlignment.Center;role.TextWrapping=TextWrapping.NoWrap;role.TextTrimming=TextTrimming.CharacterEllipsis;role.Margin=new(0,3,0,0);tile.Children.Add(role);button.Content=tile;
+                var tile=new StackPanel();var portrait=PersonPortrait(person,160,200,item);portrait.Name="CinemaPersonPortrait";portrait.BorderThickness=new(0);portrait.Width=double.NaN;portrait.HorizontalAlignment=HorizontalAlignment.Stretch;portrait.SizeChanged+=(_,e)=>{if(e.WidthChanged&&e.NewSize.Width>0)portrait.Height=e.NewSize.Width*5/4;};tile.Children.Add(portrait);var name=TextRaw(person.Name,12);name.TextAlignment=TextAlignment.Left;name.MinHeight=28;name.MaxHeight=32;name.TextTrimming=TextTrimming.CharacterEllipsis;name.Margin=new(0);tile.Children.Add(name);
+                var role=TextRaw(person.CreditLabel,10);role.Name="CinemaPersonCharacter";role.SetResourceReference(TextBlock.ForegroundProperty,"Muted");role.TextWrapping=TextWrapping.NoWrap;role.TextTrimming=TextTrimming.CharacterEllipsis;role.ToolTip=person.CreditLabel;role.Margin=new(0,3,0,0);tile.Children.Add(role);button.Content=tile;
                 button.Margin=new(0,0,8,8);button.BorderThickness=new(0);button.MinHeight=0;button.HorizontalContentAlignment=HorizontalAlignment.Stretch;button.VerticalContentAlignment=VerticalAlignment.Top;button.ToolTip=person.Name+" · "+person.Role;
-                AutomationProperties.SetName(button,AppLanguage.T("Открыть карточку: "+person.Name+", "+person.Role));row.Children.Add(button);
+                AutomationProperties.SetName(button,AppLanguage.T("Открыть карточку: "+person.Name+", ")+person.CreditLabel);row.Children.Add(button);
             }
         }
         var participantContent=new Grid();participantContent.RowDefinitions.Add(new(){Height=GridLength.Auto});participantContent.RowDefinitions.Add(new(){Height=GridLength.Auto});

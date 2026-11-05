@@ -1,5 +1,5 @@
 """Export screenshots from the signed published app, without modifying its binary."""
-import hashlib,json,plistlib,re,sys
+import hashlib,json,platform,plistlib,re,sys
 from pathlib import Path
 from PIL import Image
 version,published,captures,output=sys.argv[1:]
@@ -8,19 +8,26 @@ published,captures,output=map(Path,(published,captures,output))
 assert plistlib.loads((published/'app/Ka4alka.app/Contents/Info.plist').read_bytes())['CFBundleShortVersionString']==version
 output.mkdir(parents=True,exist_ok=True)
 archive=published/'Kachalka-macos-arm64.zip'
-info=dict(Version=version,Platform='macos',CaptureMethod='Native AppKit window pixels from verified published app',ReleaseArchiveSha256=hashlib.sha256(archive.read_bytes()).hexdigest(),Captures=[])
+info=dict(Version=version,Platform='macos',OperatingSystemVersion=platform.mac_ver()[0],Architecture=platform.machine(),CaptureMethod='Composited native macOS window from verified published app',ReleaseArchiveSha256=hashlib.sha256(archive.read_bytes()).hexdigest(),Captures=[])
 for language in ('ru','en'):
     root=captures/language
-    assert len(json.loads((root/'checks.json').read_text()))>=15
-    # The released diagnostic driver names its early screenshots *-ru, but
-    # these stages use the supplied profile language until Settings scenarios.
-    mapping={'catalog-dark':'movies-ru','series-dark':'series-ru','games-dark':'game-home-ru','downloads-dark':'downloads-ru','settings-dark':f'settings-{language}-dark-wide','settings-light':f'settings-{language}-light-wide'}
+    for appearance in ('dark','light'):
+        report=json.loads((root/appearance/'checks.json').read_text())
+        assert not report['failures'] and report['checks'], (language,appearance,report['failures'])
+        cells=json.loads((root/appearance/'matrix.json').read_text())
+        assert cells and all(cell['language']==language and cell['theme']==appearance for cell in cells)
+    mapping={'featured-dark':'featured','catalog-dark':'movies','series-dark':'series','games-dark':'games-grid','detail-dark':'detail-movie','downloads-dark':'downloads-empty','settings-dark':'settings','settings-light':'settings','catalog-light':'movies'}
     for name,source in mapping.items():
-        with Image.open(root/(source+'.png')) as image:
+        appearance='light' if name.endswith('-light') else 'dark'
+        filename_source=f'{source}-1280x820-{appearance}-{language}.png'
+        evidence=json.loads((root/appearance/'composited/capture-times.json').read_text())
+        assert filename_source in evidence
+        assert 0.19 <= evidence[filename_source]['SourceTimestamp']-evidence[filename_source]['CompositedTimestamp'] <= 2
+        with Image.open(root/appearance/'composited'/filename_source) as image:
             image=image.convert('RGB')
             assert image.width>=760 and image.height>=520
             filename=f'screenshots-macos-{language}-{name}.webp'
             image.save(output/filename,format='WEBP',quality=88,method=6)
             info['Captures'].append(dict(File=filename,Language=language,Width=image.width,Height=image.height,Sha256=hashlib.sha256((output/filename).read_bytes()).hexdigest()))
-(output/'screenshots-macos-info.json').write_text(json.dumps(info,ensure_ascii=False,indent=2)+'\n')
+(output/'screenshots-macos-info.json').write_text(json.dumps(info,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
 print('Verified Mac screenshots:',version,len(info['Captures']))

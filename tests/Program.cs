@@ -18,6 +18,7 @@ File.WriteAllText(diagnosticPath,new string('x',1024*1024+1));ErrorLog.Write(new
 if(!File.Exists(diagnosticPath+".previous")||!File.ReadAllText(diagnosticPath).Contains("after-rotation"))throw new Exception("Diagnostic log rotation failed.");
 Console.WriteLine("PASS: exception diagnostics retain details and rotate oversized log");
 if(args.Contains("--probe-magnet-discovery")){await MagnetDiscoveryProbe.Run(root);return;}
+if(args.Contains("--probe-middle-east")){await MiddleEastReleaseTests.Probe();return;}
 if(args.Contains("--probe-releases")){await ReleaseProbe.Run();return;}
 if(args.Contains("--probe-affected-films")){await ReleaseProbe.AffectedFilms();return;}
 if(args.Contains("--probe-backdrops")){await BackdropSourceProbe.Run(root);return;}
@@ -92,6 +93,7 @@ await SharedCatalogTests.Run();
 await UnifiedSearchTests.Run();
 if(args.Contains("--catalog-only"))return;
 await ReleaseSearchTests.Run();
+ReleaseNotesTests.Run();
 await ReleaseFreshnessTests.Run(root);
 await BugReportTests.Run(root);
 await MediaMetadataTests.Run();
@@ -103,6 +105,9 @@ await ProfessionalCinemaPeopleTests.Run();
 HiddenCatalogTests.Run();
 await UXReliabilityTests.Run(root);
 await WindowsIntegrationTests.Run();
+MiddleEastReleaseTests.Run();
+CharacterCreditsTests.Run();
+await CharacterCreditsTests.LoadTests();
 await ShareLinkTests.Run();
 await WindowsNotificationTests.Run();
 DownloadDiagnosticsTests.Run();

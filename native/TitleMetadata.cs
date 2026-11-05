@@ -44,6 +44,7 @@ public static class TitleMetadata
         // Credits the card already has (from another source) are kept; only missing roles are added.
         CinemaPerson[] Credits(string key,string role)=>people.Any(x=>x.Role==role)?[]:Strings(row,key,12).Select(name=>new CinemaPerson(name,role,"")).ToArray();
         people=people.Concat(Credits("directors","Режиссёры")).Concat(Credits("actors","Актёры")).ToArray();
+        people=CharacterCredits.Apply(people,CharacterCredits.Read(row));
         return item with
         {
             Title=ImdbSuggestions.IsImdbOnly(item)&&Text(row,"title") is {Length:>0} title?title:item.Title,

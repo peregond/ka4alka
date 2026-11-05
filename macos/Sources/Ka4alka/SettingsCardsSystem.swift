@@ -113,6 +113,8 @@ struct SettingsLanCard: View {
 
     var body: some View {
         SettingsCard(.lan) {
+            PhoneRemoteSettings()
+            Divider()
             SettingsToggleRow(
                 tr("Разрешить связь с другими компьютерами", "Enable local network devices"),
                 key: "lanEnabled",

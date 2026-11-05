@@ -7,6 +7,7 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
@@ -20,6 +21,7 @@ internal static class Program
     const BindingFlags Members=BindingFlags.Instance|BindingFlags.Public|BindingFlags.NonPublic;
     static string releaseDirectory="",outputDirectory="";
     static readonly string CaptureLanguage=Environment.GetEnvironmentVariable("KACHALKA_SCREENSHOT_LANGUAGE")??"ru";
+    static readonly bool SettingsOnly=Environment.GetEnvironmentVariable("KACHALKA_SCREENSHOT_SCOPE")=="settings";
     static readonly List<object> captures=[];
     static readonly List<string> skipped=[];
     static readonly DateTime Deadline=DateTime.UtcNow.AddSeconds(510);
@@ -126,6 +128,12 @@ internal static class Program
     }
     static Image[] VisiblePosters(MainWindow window)=>Visuals<Image>(window)
         .Where(image=>image.IsLoaded&&image.DataContext is MediaItem&&image.Tag?.ToString() is not ("FeaturePoster" or "FeaturePlaceholderPoster")&&PosterVisible(window,image)).ToArray();
+    static Image[] SourcePosters(MainWindow window)=>VisiblePosters(window).Where(image=>image.DataContext is MediaItem item&&!string.IsNullOrWhiteSpace(item.DisplayImageUrl)).ToArray();
+    static bool MetadataSettled(MainWindow window)
+    {
+        var pending=Field(window,"cardMetadata") as IDictionary;
+        return VisiblePosters(window).All(image=>image.DataContext is not MediaItem item||pending?[item.Id] is not Task task||task.IsCompleted);
+    }
     static bool Loaded(Image image)=>image.Source is BitmapSource bitmap&&bitmap.PixelWidth>8&&bitmap.PixelHeight>8;
 
     static bool CatalogSettled(MainWindow window)
@@ -140,16 +148,22 @@ internal static class Program
         while(DateTime.UtcNow<until&&DateTime.UtcNow<Deadline)
         {
             await Settle(window);
-            var posters=VisiblePosters(window);
-            var signature=CatalogSettled(window)+":"+string.Join("|",posters.Select(image=>((MediaItem)image.DataContext).PageUrl+":"+Loaded(image)));
+            var posters=SourcePosters(window);
+            var signature=(CatalogSettled(window)&&MetadataSettled(window))+":"+string.Join("|",posters.Select(image=>((MediaItem)image.DataContext).PageUrl+":"+Loaded(image)));
             if(signature!=last){last=signature;stable=DateTime.UtcNow;}
             // A real source may return fewer cards than a complete row. Require
             // every actual visible poster, plus settled source/quality work.
-            if(CatalogSettled(window)&&posters.Length>0&&posters.Count(Loaded)>=Math.Min(minimum,posters.Length)&&posters.All(Loaded)&&DateTime.UtcNow-stable>TimeSpan.FromSeconds(4))return;
+            if(CatalogSettled(window)&&MetadataSettled(window)&&posters.Length>0&&posters.Count(Loaded)>=Math.Min(minimum,posters.Length)&&posters.All(Loaded)&&DateTime.UtcNow-stable>TimeSpan.FromSeconds(4))return;
             await Task.Delay(200);
         }
-        var current=VisiblePosters(window);var loaded=current.Count(Loaded);
-        if(!CatalogSettled(window)||current.Length==0||loaded<Math.Min(minimum,current.Length)||current.Any(image=>!Loaded(image)))throw new InvalidOperationException(stage+": real application loaded only "+loaded+" visible source posters; pending="+current.Count(image=>!Loaded(image))+"; catalogue error: "+Field(window,"liveError"));
+        var current=SourcePosters(window);var loaded=current.Count(Loaded);
+        if(!CatalogSettled(window)||!MetadataSettled(window)||current.Length==0||loaded<Math.Min(minimum,current.Length)||current.Any(image=>!Loaded(image)))
+        {
+            var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(CaptureClient(window)));
+            using(var file=File.Create(Path.Combine(outputDirectory,"capture-error.png")))png.Save(file);
+            var missing=string.Join("; ",current.Where(image=>!Loaded(image)).Select(image=>image.DataContext is MediaItem item?item.DisplayTitle+" | "+item.DisplayImageUrl+" | "+image.Tag:"unknown"));
+            throw new InvalidOperationException(stage+": real application loaded only "+loaded+" visible source posters; pending="+current.Count(image=>!Loaded(image))+"; missing="+missing+"; catalogue error: "+Field(window,"liveError"));
+        }
         Console.WriteLine(stage+": actual source posters loaded="+loaded+", unavailable or still pending="+current.Count(image=>!Loaded(image)));
     }
     static async Task WaitFeature(MainWindow window)
@@ -166,12 +180,13 @@ internal static class Program
     static void Save(MainWindow window,string filename)
     {
         window.UpdateLayout();
-        if(VisiblePosters(window).Any(image=>!Loaded(image)))throw new InvalidOperationException("Refusing to capture pending visible posters: "+filename);
+        if(!MetadataSettled(window)||SourcePosters(window).Any(image=>!Loaded(image)))throw new InvalidOperationException("Refusing to capture pending visible posters: "+filename);
         var content=window.Content as FrameworkElement??throw new InvalidOperationException("Actual application client area is missing.");
         var bitmap=CaptureClient(window);var width=bitmap.PixelWidth;var height=bitmap.PixelHeight;
         var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(bitmap));using(var file=File.Create(Path.Combine(outputDirectory,filename)))png.Save(file);
-        var posters=VisiblePosters(window);
-        captures.Add(new{File=filename,Language=CaptureLanguage,Width=width,Height=height,LoadedVisiblePosters=posters.Count(Loaded),PendingVisiblePosters=posters.Count(image=>!Loaded(image)),
+        var posters=SourcePosters(window);
+        var unavailable=VisiblePosters(window).Where(image=>image.DataContext is MediaItem item&&string.IsNullOrWhiteSpace(item.DisplayImageUrl)&&!Loaded(image)).ToArray();
+        captures.Add(new{File=filename,Language=CaptureLanguage,Width=width,Height=height,LoadedVisiblePosters=posters.Count(Loaded),PendingVisiblePosters=posters.Count(image=>!Loaded(image)),UnavailableVisiblePosters=unavailable.Length,UnavailableTitles=unavailable.Select(image=>((MediaItem)image.DataContext).DisplayTitle).ToArray(),
             Titles=posters.Where(Loaded).Select(image=>((MediaItem)image.DataContext).Title).Distinct().ToArray()});
         Console.WriteLine("Captured "+filename+" from actual public "+typeof(Kachalka.App).Assembly.GetName().Version!.ToString(3)+" client area.");
     }
@@ -221,8 +236,18 @@ internal static class Program
         window.Topmost=true;window.Activate();
         window.WindowState=WindowState.Normal;window.MaxWidth=1920;window.MaxHeight=1200;window.Width=1440;window.Height=900;window.Left=0;window.Top=0;
         await Settle(window);
+        if(SettingsOnly)
+        {
+            await CaptureSettings(window);
+            WriteCaptureInfo();
+            return;
+        }
         await Until(()=>Field(window,"liveLoading") is false&&Field(window,"liveItems") is IEnumerable rows&&rows.Cast<object>().Any(),TimeSpan.FromSeconds(80),"Actual default source catalogue did not load.");
         await Task.Delay(2000);await WaitPosters(window,"Film catalogue");await Task.Delay(8000);await WaitPosters(window,"Final film catalogue");await WaitFeature(window);await WaitPosters(window,"Settled film catalogue");Save(window,"catalog-dark.png");
+        Call(window,"ShowFeatured");await Settle(window);
+        await Until(()=>Field(window,"featuredGroups") is IEnumerable groups&&groups.Cast<object>().Any()&&Field(window,"featuredDeferred") is IEnumerable pending&&!pending.Cast<object>().Any(),TimeSpan.FromSeconds(80),"Actual curated collections did not load.");
+        await WaitPosters(window,"Featured curated collections");Save(window,"featured-dark.png");
+        Call(window,"ShowCatalogSection","Фильмы");await Settle(window);await WaitPosters(window,"Returned film catalogue");
         Call(window,"ToggleTheme",window,new RoutedEventArgs());await Settle(window);await WaitPosters(window,"Light film catalogue");Save(window,"catalog-light.png");
         Call(window,"ToggleTheme",window,new RoutedEventArgs());await Settle(window);
         var movieButton=Visuals<Button>(window).FirstOrDefault(button=>button.Tag is MediaItem movie&&movie.Section=="Фильмы"&&movie.IsLive&&
@@ -255,8 +280,41 @@ internal static class Program
         await Until(()=>Field(window,"gameReleasesLoading") is false,TimeSpan.FromSeconds(30),"Real game source search did not complete.");
         await WaitPosters(window,"Steam game detail",1);Save(window,"game-detail-dark.png");
         Call(window,"ShowDownloads",window,new RoutedEventArgs());await Settle(window);Save(window,"downloads-dark.png");
+        await CaptureSettings(window);
+        WriteCaptureInfo();
+    }
+
+    static async Task CaptureSettings(MainWindow window)
+    {
         var settings=Visuals<Button>(window).FirstOrDefault(button=>button.Name=="SettingsButton")??throw new InvalidOperationException("Actual settings navigation is missing.");
-        settings.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await Settle(window);Save(window,"settings-dark.png");
+        settings.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await Settle(window);
+        if(!SettingsOnly)Save(window,"settings-dark.png");
+        foreach(var (section,filename,controls) in new[]
+        {
+            ("Внешний вид","settings-lite-dark.png",new[]{"SettingsLiteMode"}),
+            ("Устройства в сети","settings-lan-dark.png",new[]{"PhoneRemoteStart","SettingsLanEnabled"})
+        })
+        {
+            var jump=Visuals<Button>(window).SingleOrDefault(button=>AutomationProperties.GetName(button)==AppLanguage.T("Раздел: "+section))
+                ??throw new InvalidOperationException("Actual settings section navigation is missing: "+section);
+            jump.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));await Settle(window);
+            foreach(var name in controls)
+            {
+                var control=Visuals<FrameworkElement>(window).SingleOrDefault(element=>element.Name==name)
+                    ??throw new InvalidOperationException("Actual released settings control is missing: "+name);
+                DependencyObject? ancestor=control;
+                while(ancestor!=null&&ancestor is not ScrollViewer)ancestor=VisualTreeHelper.GetParent(ancestor);
+                var scroll=ancestor as ScrollViewer??throw new InvalidOperationException("Settings scroll viewport is missing: "+name);
+                var bounds=control.TransformToAncestor(scroll).TransformBounds(new Rect(control.RenderSize));
+                if(!control.IsVisible||bounds.Top<0||bounds.Bottom>scroll.ActualHeight||bounds.Left<0||bounds.Right>scroll.ActualWidth)
+                    throw new InvalidOperationException("Settings control is clipped or hidden: "+name);
+            }
+            Save(window,filename);
+        }
+    }
+
+    static void WriteCaptureInfo()
+    {
         var releasedDll=Path.Combine(releaseDirectory,"Kachalka.dll");
         File.WriteAllText(Path.Combine(outputDirectory,"capture-info.json"),JsonSerializer.Serialize(new
         {

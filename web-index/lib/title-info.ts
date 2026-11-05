@@ -1,10 +1,24 @@
 // Shared by the server's title lookups: the answer format, a bounded JSON reader and a small cache.
 // Credentials stay in the callers; nothing here sees them except as request headers passed through.
 export type TitleSection = "movies" | "series";
+export type CastCredit = { name: string; originalName: string | null; character: string | null };
+// One actor can play several characters. Keep their names together, without making extra portrait tiles.
+export function castCredits(rows: { name?: unknown; originalName?: unknown; character?: unknown }[]): CastCredit[] {
+  const result: CastCredit[] = [];
+  for (const row of rows) {
+    const name = clean(row?.name, 120); if (!name) continue;
+    let credit = result.find(item => item.name === name);
+    if (!credit) { if (result.length >= 12) continue; credit = { name, originalName: clean(row.originalName, 120) || null, character: null }; result.push(credit); }
+    const character = clean(row.character, 160);
+    if (character) credit.character = [...new Set([...(credit.character?.split(" / ") ?? []), character])].slice(0, 4).join(" / ").slice(0, 200);
+  }
+  return result;
+}
 export type TitleInfo = {
   imdbId: string; source: "TheTVDB" | "TMDB"; sourceId: number; section: TitleSection; title: string; originalTitle: string | null; year: number;
   overview: string | null; genres: string[]; countries: string[]; actors: string[]; directors: string[];
   aliases?: string[];
+  cast?: CastCredit[];
 };
 export const clean = (value: unknown, max: number) => typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, max) : "";
 export const unique = (values: unknown[], max: number) => [...new Set(values.map(value => clean(value, 120)).filter(Boolean))].slice(0, max);

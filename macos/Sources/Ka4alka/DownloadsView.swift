@@ -242,7 +242,7 @@ struct DownloadsView: View {
                 titleVisibility: Visibility.visible,
                 presenting: removeTarget
             ) { target in
-                Button(tr("Удалить из загрузок", "Remove from downloads")) { perform("remove", target, deleteFiles: false) }
+                Button(tr("Удалить из загрузок", "Remove from Downloads")) { perform("remove", target, deleteFiles: false) }
                 Button(tr("Отмена", "Cancel"), role: .cancel) {}
             } message: { target in
                 Text(target.title + "\n" + tr("Скачанные файлы останутся на диске.", "Downloaded files stay on disk."))
@@ -253,7 +253,7 @@ struct DownloadsView: View {
                 titleVisibility: Visibility.visible,
                 presenting: deleteTarget
             ) { target in
-                Button(tr("Удалить файлы", "Delete files"), role: .destructive) { perform("remove", target, deleteFiles: true) }
+                Button(tr("Удалить файлы", "Delete Files"), role: .destructive) { perform("remove", target, deleteFiles: true) }
                 Button(tr("Отмена", "Cancel"), role: .cancel) {}
             } message: { target in
                 Text(target.title + "\n" + tr("Скачанные и частично скачанные файлы будут удалены без возможности восстановления. Другие файлы в папке останутся.", "Downloaded and partial files will be deleted and cannot be restored. Other files in the folder are kept."))
@@ -297,7 +297,7 @@ struct DownloadsView: View {
             title: tr("Пока нет загрузок", "No downloads yet"),
             systemImage: "arrow.down.circle",
             message: tr("Найди фильм, сериал или игру и выбери раздачу. Или добавь magnet-ссылку либо .torrent-файл: перетащи его сюда или вставь из буфера обмена.", "Find a movie, series or game and choose a release. Or add a magnet link or a .torrent file: drop it here or paste it from the clipboard."),
-            actionTitle: tr("Добавить торрент", "Add torrent"),
+            actionTitle: tr("Добавить торрент", "Add Torrent"),
             action: { model.addTorrent = true }
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -326,7 +326,7 @@ struct DownloadsView: View {
     }
 
     private var addButton: some View {
-        Button { model.addTorrent = true } label: { Label(tr("Добавить торрент", "Add torrent"), systemImage: "plus") }
+        Button { model.addTorrent = true } label: { Label(tr("Добавить торрент", "Add Torrent"), systemImage: "plus") }
             .buttonStyle(KDPrimaryButtonStyle())
             .accessibilityIdentifier("downloads-add")
     }
@@ -354,10 +354,9 @@ struct DownloadsView: View {
             Divider()
             Button(tr("Ограничения скорости…", "Speed limits…")) { showLimits = true }
         } label: {
-            KDChipLabel(text: tr("Управление", "Controls"), systemImage: "slider.horizontal.3", showsChevron: true)
+            KDChipMenuContent(text: tr("Управление", "Controls"), systemImage: "slider.horizontal.3")
         }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
+        .kdChipMenu()
         .frame(minHeight: 24)
         .contentShape(Rectangle())
         .fixedSize()
@@ -379,7 +378,8 @@ struct DownloadsView: View {
         let selected = tab == effectiveFilter
         let label = tab.title + " " + String(count(tab))
         return Button { filter = tab } label: { KDChipLabel(text: label, isActive: selected) }
-            .buttonStyle(.plain)
+            .buttonStyle(KDSecondaryButtonStyle())
+            .controlSize(.small)
             .accessibilityLabel(label)
             .accessibilityAddTraits(selected ? AccessibilityTraits.isSelected : AccessibilityTraits())
     }
@@ -424,7 +424,7 @@ struct DownloadsView: View {
     // MARK: Summary tiles
 
     private var summaryTiles: some View {
-        let columns: [GridItem] = [GridItem(.adaptive(minimum: 150), spacing: KD.Space.s, alignment: .top)]
+        let columns: [GridItem] = [GridItem(.adaptive(minimum: 190), spacing: KD.Space.s, alignment: .top)]
         return LazyVGrid(columns: columns, alignment: .leading, spacing: KD.Space.s) {
             downloadTile
             uploadTile
@@ -860,7 +860,7 @@ struct TransferRow: View {
                 Button(tr("Скачать заново", "Download again")) { act("redownload") }
                     .buttonStyle(KDPrimaryButtonStyle())
                     .controlSize(.small)
-                Button(tr("Удалить из загрузок", "Remove from downloads")) { onRequest(DownloadsRowRequest.remove, item) }
+                Button(tr("Удалить из загрузок", "Remove from Downloads")) { onRequest(DownloadsRowRequest.remove, item) }
                     .buttonStyle(KDSecondaryButtonStyle())
                     .controlSize(.small)
             }
@@ -901,7 +901,7 @@ struct TransferRow: View {
                 ) { act("toggle") }
             }
             if item.complete {
-                KDIconButton(systemImage: "folder", label: tr("Открыть папку", "Open folder")) {
+                KDIconButton(systemImage: "folder", label: tr("Открыть папку", "Open Folder")) {
                     DownloadsActions.openFolder(of: item, model: model)
                 }
             }
@@ -918,8 +918,8 @@ struct TransferRow: View {
                 .frame(width: KD.Size.iconButton, height: KD.Size.iconButton)
                 .contentShape(Rectangle())
         }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
+        .menuStyle(.borderedButton)
+        .menuIndicator(.visible)
         .frame(minWidth: KD.Size.iconButton, minHeight: KD.Size.iconButton)
         .contentShape(Rectangle())
         .fixedSize()
@@ -928,23 +928,14 @@ struct TransferRow: View {
         .settingsLayoutProbe("menu.downloads.more." + item.id, kind: .control)
     }
 
+    /// No icons: macOS 27 asks for menu icons sparingly, and none of these has a symbol that says more than its label.
     @ViewBuilder private var menuItems: some View {
-        Button { onRequest(DownloadsRowRequest.files, item) } label: {
-            Label(tr("Файлы и серии", "Files and episodes"), systemImage: "list.bullet.rectangle")
-        }
-        Button { onRequest(DownloadsRowRequest.diagnostics, item) } label: {
-            Label(tr("Почему не скачивается?", "Why is it not downloading?"), systemImage: "info.circle")
-        }
-        Button { DownloadsActions.openFolder(of: item, model: model) } label: {
-            Label(tr("Открыть папку", "Open folder"), systemImage: "folder")
-        }
+        Button(tr("Файлы и серии", "Files and Episodes")) { onRequest(DownloadsRowRequest.files, item) }
+        Button(tr("Почему не скачивается?", "Why Isn’t It Downloading?")) { onRequest(DownloadsRowRequest.diagnostics, item) }
+        Button(tr("Открыть папку", "Open Folder")) { DownloadsActions.openFolder(of: item, model: model) }
         Divider()
-        Button { onRequest(DownloadsRowRequest.remove, item) } label: {
-            Label(tr("Удалить из загрузок", "Remove from downloads"), systemImage: "minus.circle")
-        }
-        Button(role: .destructive) { onRequest(DownloadsRowRequest.deleteFiles, item) } label: {
-            Label(tr("Удалить файлы…", "Delete files…"), systemImage: "trash")
-        }
+        Button(tr("Удалить из загрузок", "Remove from Downloads")) { onRequest(DownloadsRowRequest.remove, item) }
+        Button(tr("Удалить файлы…", "Delete Files…"), role: .destructive) { onRequest(DownloadsRowRequest.deleteFiles, item) }
     }
 
     private func act(_ method: String) {

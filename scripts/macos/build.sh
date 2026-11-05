@@ -8,7 +8,13 @@ output="dist/macos-$arch"
 bundle="$output/Ka4alka.app"
 mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources"
 dotnet publish desktop-host/Kachalka.DesktopHost.csproj -c Release -r "$rid" --self-contained true -p:Version="$version" -p:PublishReadyToRun=true -p:DebugType=None -p:DebugSymbols=false -o "$bundle/Contents/Resources/engine"
-(cd macos && swift build -c release --arch "$swift_arch" --jobs 3)
+# SwiftPM 6.4 stamps the executable with the deployment target (14.0) as the SDK it was linked against, and macOS then draws
+# the pre-Liquid-Glass sidebar and toolbar for it. Record the real SDK version, as Xcode's own builds do.
+sdk_version="$(xcrun --sdk macosx --show-sdk-version)"
+if ! (cd macos && swift build -c release --arch "$swift_arch" --jobs 3 -Xlinker -platform_version -Xlinker macos -Xlinker 14.0 -Xlinker "$sdk_version"); then
+  echo "The SDK version could not be recorded through the linker; building without it."
+  (cd macos && swift build -c release --arch "$swift_arch" --jobs 3)
+fi
 bin_dir="$(cd macos && swift build -c release --arch "$swift_arch" --show-bin-path)"
 cp "$bin_dir/Ka4alka" "$bundle/Contents/MacOS/Ka4alka"
 cp native/Localization/en.json "$bundle/Contents/Resources/en.json"
@@ -26,7 +32,7 @@ python3 - "$bundle" "$version" <<'PY'
 import plistlib,sys
 from pathlib import Path
 bundle=Path(sys.argv[1]); version=sys.argv[2]
-info=dict(CFBundleExecutable='Ka4alka',CFBundleIdentifier='org.ka4alka.app',CFBundleName='Ka4alka',CFBundleDisplayName='Качалка',CFBundleDevelopmentRegion='ru',CFBundleLocalizations=['ru','en'],CFBundleIconFile='AppIcon',CFBundlePackageType='APPL',CFBundleShortVersionString=version,CFBundleVersion=version,LSMinimumSystemVersion='14.0',NSHighResolutionCapable=True,NSLocalNetworkUsageDescription='Connect to your paired Windows and Mac computers to send download requests.',CFBundleURLTypes=[dict(CFBundleURLName='Ka4alka links',CFBundleURLSchemes=['magnet','kachalka'])],CFBundleDocumentTypes=[dict(CFBundleTypeName='BitTorrent',CFBundleTypeRole='Viewer',LSHandlerRank='Alternate',LSItemContentTypes=['org.bittorrent.torrent'])],UTImportedTypeDeclarations=[dict(UTTypeIdentifier='org.bittorrent.torrent',UTTypeConformsTo=['public.data'],UTTypeDescription='BitTorrent',UTTypeTagSpecification={'public.filename-extension':['torrent'],'public.mime-type':['application/x-bittorrent']})])
+info=dict(CFBundleExecutable='Ka4alka',CFBundleIdentifier='org.ka4alka.app',CFBundleName='Ka4alka',CFBundleDisplayName='Качалка',CFBundleDevelopmentRegion='ru',CFBundleLocalizations=['ru','en'],CFBundleIconFile='AppIcon',CFBundlePackageType='APPL',CFBundleShortVersionString=version,CFBundleVersion=version,LSMinimumSystemVersion='14.0',NSHighResolutionCapable=True,NSLocalNetworkUsageDescription='Connect to paired Windows and Mac computers and let your phone start downloads over your home network.',CFBundleURLTypes=[dict(CFBundleURLName='Ka4alka links',CFBundleURLSchemes=['magnet','kachalka'])],CFBundleDocumentTypes=[dict(CFBundleTypeName='BitTorrent',CFBundleTypeRole='Viewer',LSHandlerRank='Alternate',LSItemContentTypes=['org.bittorrent.torrent'])],UTImportedTypeDeclarations=[dict(UTTypeIdentifier='org.bittorrent.torrent',UTTypeConformsTo=['public.data'],UTTypeDescription='BitTorrent',UTTypeTagSpecification={'public.filename-extension':['torrent'],'public.mime-type':['application/x-bittorrent']})])
 (bundle/'Contents/Info.plist').write_bytes(plistlib.dumps(info))
 # Localized bundle resources: AppKit chooses the language of system menus and
 # open/save panels from the lproj folders, so both must exist next to Info.plist.

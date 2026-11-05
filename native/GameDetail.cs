@@ -64,7 +64,7 @@ public partial class MainWindow
         var coverGrid=new Grid();
         coverGrid.Children.Add(new TextBlock{Text=AppLanguage.T("Обложка\nнедоступна"),Foreground=(Brush)FindResource("BannerMuted"),Opacity=.75,TextAlignment=TextAlignment.Center,VerticalAlignment=VerticalAlignment.Center,FontSize=11});
         coverGrid.Children.Add(cover);
-        gameCapsule=new Border{Name="GameCapsule",Width=320,Height=320*215/460d,CornerRadius=new(14),ClipToBounds=true,Background=item.Cover,BorderBrush=(Brush)FindResource("BannerChip"),BorderThickness=new(1),HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,28,0),Child=coverGrid};
+        gameCapsule=new Border{Name="GameCapsule",Width=135,Height=202.5,CornerRadius=new(14),ClipToBounds=true,Background=item.Cover,BorderBrush=(Brush)FindResource("BannerChip"),BorderThickness=new(1),HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,28,0),Child=coverGrid};
         gameCapsule.SizeChanged+=(sender,_)=>ClipPoster((Border)sender);
         hero.Children.Add(gameCapsule);
 
@@ -332,8 +332,8 @@ public partial class MainWindow
         var narrow=width<760;var tiny=width<520;
         if(gameHeroGrid!=null&&gameCapsule!=null&&gameInfoPanel!=null)
         {
-            var capsuleWidth=tiny?Math.Min(360d,Math.Max(160d,width-64)):narrow?220d:320d;
-            gameCapsule.Width=capsuleWidth;gameCapsule.Height=capsuleWidth*215/460;
+            var capsuleWidth=tiny?100d:narrow?110d:135d;
+            gameCapsule.Width=capsuleWidth;gameCapsule.Height=capsuleWidth*1.5;
             gameHeroGrid.Margin=tiny?new(20,20,20,22):narrow?new(24,24,24,24):new(32,28,32,28);
             gameCapsule.Margin=tiny?new(0,0,0,18):new(0,0,narrow?20:28,0);
             // On a very narrow banner the cover moves above the text.

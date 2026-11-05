@@ -240,7 +240,7 @@ public sealed partial class DownloadService
         finally{item.Busy=false;item.Refresh();gate.Release();}
     }
     public Task Toggle(DownloadItem item)=>SetPausedAsync(item,!item.Paused);
-    async Task SetPausedAsync(DownloadItem item,bool paused,bool redownload=false)
+    public async Task SetPausedAsync(DownloadItem item,bool paused,bool redownload=false)
     {
         if(item.Busy)return;pendingResume.Remove(item.Id);item.Busy=true;item.Refresh();
         await gate.WaitAsync();
@@ -260,7 +260,13 @@ public sealed partial class DownloadService
                 if(!await EnsureSpaceAsync(item,manager,lifetime.Token)){Update();Save();await ReleaseIdleEngine();return;}
                 lifetime.Token.ThrowIfCancellationRequested();await manager.StartAsync();item.Paused=false;item.LowSpacePaused=false;item.SpacePauseMessage="";item.SpaceCheckFailed=false;item.LastStartedUtc=DateTime.UtcNow;
             }
-            else{await StopManager(manager);item.Paused=true;item.LowSpacePaused=false;item.SpacePauseMessage="";item.SpaceCheckFailed=false;}
+            else
+            {
+                // A pause may beat the next presentation tick after the final piece arrives.
+                // Keep completed-file protection even when Seeding was never displayed.
+                if(manager.HasMetadata&&manager.Progress>=100)item.HasCompletedDownload=true;
+                await StopManager(manager);item.Paused=true;item.LowSpacePaused=false;item.SpacePauseMessage="";item.SpaceCheckFailed=false;
+            }
             Update();Save();await ReleaseIdleEngine();
         }
         catch(Exception error){item.DownloadRate=0;item.UploadRate=0;item.Status="Ошибка: "+error.Message;item.Refresh();Save();throw;}

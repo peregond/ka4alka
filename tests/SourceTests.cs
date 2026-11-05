@@ -137,7 +137,7 @@ public static class SourceTests
         Check(knabenRows.Count==1&&knabenRows[0].Source=="RuTracker"&&knabenRows[0].Via=="Knaben"&&knabenRows[0].Id=="RuTracker:"+knabenHash.ToUpperInvariant()&&
               knabenRows[0].TorrentUrl!.StartsWith("magnet:?xt=urn:btih:"+knabenHash.ToUpperInvariant(),StringComparison.Ordinal)&&
               knabenRows[0].PageUrl=="https://rutracker.org/forum/viewtopic.php?t=123"&&knabenRows[0].Size==4294967296&&knabenRows[0].Seeds==27,
-              "Knaben accepts RuTracker video with a valid hash and rejects other trackers, years, titles, and categories");
+              "Knaben accepts verified video trackers, deduplicates hashes and rejects wrong years, titles and categories");
         static string NnmRow(string category,string title,string topic,string download,string size,string seeds)=>
             $"<tr class='prow1'><td></td><td><a href='tracker.php?f=1'>{category}</a></td><td><a class='genmed topictitle' href='{topic}'><b>{title}</b></a></td><td></td><td><a href='{download}'>DL</a></td><td><u>{size}</u> 4 GB</td><td title='Seeders'><b>{seeds}</b></td></tr>";
         var nnmHtml="<table>"+

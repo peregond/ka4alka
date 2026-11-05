@@ -5,10 +5,19 @@ using System.Security.Cryptography;
 using Kachalka;
 using MonoTorrent;
 using MonoTorrent.Client;
+if(args.Contains("--probe-middle-east")){await MiddleEastReleaseTests.Probe();return;}
+MiddleEastReleaseTests.Run();
+CharacterCreditsTests.Run();
+await CharacterCreditsTests.LoadTests();
 ReleaseAudioTests.Run();
 BackroomsAudioTests.Run();
 await ReleaseAudioRulesTests.Run();
 SearchLanguageTests.Run();
+await UnifiedSearchTests.Run();
+await ImdbSuggestionTests.Run();
+await SearchIndexerTests.Run();
+await MovieFranchiseTests.Run();
+if(args.Contains("--indexer"))return;
 if(args.Contains("--release-audio"))return;
 var root=Path.Combine(Path.GetTempPath(),"kachalka-portable-"+Guid.NewGuid().ToString("N"));
 Directory.CreateDirectory(root);
@@ -50,6 +59,7 @@ async Task Until(Func<bool> condition,string message){var until=DateTime.UtcNow.
 var seedDir=Path.Combine(root,"seed");Directory.CreateDirectory(seedDir);var payload=RandomNumberGenerator.GetBytes(256*1024);var original=Path.Combine(seedDir,"test.bin");await File.WriteAllBytesAsync(original,payload);
 var torrentPath=Path.Combine(root,"test.torrent");await new TorrentCreator().CreateAsync(new TorrentFileSource(original),torrentPath);
 var port=FreePort();using var seed=new ClientEngine(Settings("seed-cache",port));var seedManager=await seed.AddAsync(torrentPath,seedDir);await seedManager.StartAsync();await Until(()=>seedManager.State==TorrentState.Seeding,"local seeder ready");
+await PhoneDownloadTests.Run(root,seedManager,port,payload);
 var service=new DownloadService(Settings("download-cache",FreePort()));
 try {
  await service.SetLimitsAsync(1024,512);Check(!service.EngineCreated,"speed limits configured without creating idle engine");

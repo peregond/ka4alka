@@ -23,12 +23,17 @@ public static partial class ImdbSuggestions
 
     public static bool IsImdbOnly(MediaItem item)=>item.PageUrl?.StartsWith(Host,StringComparison.Ordinal)==true;
 
-    // Only Latin queries: IMDb answers Cyrillic ones with unrelated English titles.
-    public static bool Applies(string query)=>Latin().IsMatch(query)&&!Cyrillic().IsMatch(query)&&Words(query).Length>0;
+    // Only verified aliases are translated; arbitrary Cyrillic queries stay away from IMDb noise.
+    public static bool Applies(string query)
+    {
+        var original=MediaIdentity.OriginalQuery(query);
+        return Latin().IsMatch(original)&&!Cyrillic().IsMatch(original)&&Words(original).Length>0;
+    }
 
     public static async Task<IReadOnlyList<MediaItem>> SearchAsync(string query,CancellationToken ct)
     {
         if(!Applies(query))return [];
+        query=MediaIdentity.OriginalQuery(query);
         var term=query.Trim().ToLowerInvariant();
         var url="https://v3.sg.media-imdb.com/suggestion/"+Uri.EscapeDataString(term[..1])+"/"+Uri.EscapeDataString(term)+".json";
         var json=await http.GetStringAsync(url,ct);
@@ -39,7 +44,7 @@ public static partial class ImdbSuggestions
     {
         using var document=JsonDocument.Parse(json);
         if(!document.RootElement.TryGetProperty("d",out var rows)||rows.ValueKind!=JsonValueKind.Array)return [];
-        var words=Words(query);
+        var match=new CatalogSearchQuery(MediaIdentity.OriginalQuery(query));
         var items=new List<MediaItem>();
         foreach(var row in rows.EnumerateArray())
         {
@@ -48,13 +53,11 @@ public static partial class ImdbSuggestions
             if(id==null||!TitleId().IsMatch(id)||string.IsNullOrWhiteSpace(title))continue;
             var section=kind switch{"TV series" or "TV mini-series"=>"Сериалы","feature" or "TV movie"=>"Фильмы",_=>null};
             if(section==null)continue;
-            // Every query word must start a word of the title, so "solar" never returns "Polar Opposites".
-            var titleWords=Words(title);
-            if(!words.All(word=>titleWords.Any(part=>part.StartsWith(word,StringComparison.Ordinal))))continue;
             var year=row.TryGetProperty("y",out var y)&&y.ValueKind==JsonValueKind.Number&&y.TryGetInt32(out var value)?value:0;
             string? image=null;
             if(row.TryGetProperty("i",out var picture)&&picture.ValueKind==JsonValueKind.Object)image=Poster(Text(picture,"imageUrl"));
-            items.Add(Card(id,title.Trim(),title.Trim(),section,year,image));
+            var card=Card(id,title.Trim(),title.Trim(),section,year,image);
+            if(match.Score(card)>0)items.Add(card);
         }
         return items.DistinctBy(x=>x.Id).ToArray();
     }

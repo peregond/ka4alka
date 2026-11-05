@@ -173,8 +173,6 @@
   "Сериалы, описания и подборки — в одном разделе.": "TV shows, descriptions and collections — together in one section.",
   "Игры для Windows в Качалке: каталог Steam и поиск раздач": "Windows games in Kachalka: Steam catalog and torrent search",
   "Каталог игр для Windows — с описаниями и поиском раздач.": "A Windows games catalog with descriptions and torrent search.",
-  "Фильмы, сериалы, игры и загрузки — в одном приложении для Windows и Mac.": "Movies, TV shows, games and downloads — in one app for Windows and Mac.",
-  "Mac: открой DMG и перетащи Ka4alka в Applications. В этом выпуске нет нотариализации Apple; при первом запуске может потребоваться разрешение в настройках безопасности. Игровой каталог содержит игры для Windows.": "Mac: open the DMG and drag Ka4alka to Applications. This release is not notarized by Apple; the first launch may require approval in Privacy & Security settings. The game catalog contains Windows games.",
   "Версия приложения": "App version",
   "Посмотреть интерфейс:": "Preview interface:",
   "Ваша система": "Your system",
@@ -183,6 +181,7 @@
   "Выбери процессор Mac": "Choose your Mac processor",
   "Процессор указан в меню Apple → «Об этом Mac».": "Find the processor in Apple menu → About This Mac.",
   "Версия для macOS": "macOS version",
+  "Фильмы, сериалы, игры и загрузки — в одном приложении для Windows и Mac.": "Movies, TV shows, games and downloads — in one app for Windows and Mac.",
   "Качалка для Windows и macOS": "Ka4alka for Windows and macOS",
   "Качалка — фильмы, сериалы, игры и загрузки для Windows и macOS": "Ka4alka — movies, TV shows, games and downloads for Windows and macOS",
   "Твой вечер. Играй, смотри, качай. Фильмы, сериалы и игры, поиск раздач и управление загрузками в одном приложении. Скачать Качалку для Windows и macOS.": "Your evening. Play, watch, download. Movies, TV shows, games, release search and downloads in one app. Download Ka4alka for Windows and macOS.",
@@ -199,5 +198,13 @@
   "Настройки Качалки для macOS": "Ka4alka settings for macOS",
   "Язык, тема, загрузки и обновления — в настройках приложения.": "Language, appearance, downloads and updates — in app settings.",
   "Качалка в светлой теме": "Ka4alka in light appearance",
-  "Загрузка интерфейса…": "Loading interface…"
+  "Загрузка интерфейса…": "Loading interface…",
+  "Актуальное": "Featured",
+  "Актуальное в Качалке: курируемые подборки фильмов, сериалов и игр": "Featured in Ka4alka: curated movie, TV show and game collections",
+  "Не знаешь, с чего начать? В «Актуальном» уже собраны подборки фильмов, сериалов и игр.": "Not sure where to start? Featured brings together curated movie, TV show and game collections.",
+  "Начни с «Актуального»: курируемые подборки фильмов, сериалов и игр помогут выбрать, чем занять вечер. Или ищи по названию и уточняй выбор фильтрами.": "Start with Featured: curated movie, TV show and game collections help you plan your evening. Or search by title and narrow things down with filters.",
+  "Настройки Качалки": "Ka4alka settings",
+  "Локальная сеть": "Local network",
+  "Настройки локальной сети Качалки для Windows: подключение телефона": "Ka4alka local network settings for Windows: connect your phone",
+  "Подключи телефон по QR-коду в домашней сети и управляй загрузками из браузера.": "Connect your phone using a QR code on your home network and manage downloads in your browser."
 }

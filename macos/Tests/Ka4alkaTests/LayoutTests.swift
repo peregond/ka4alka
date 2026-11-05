@@ -102,6 +102,7 @@ private struct LayoutOutcome {
         model.releases = [row]
         model.section = .movies
         return [
+            LayoutCase(name: "search", build: { (_: AppModel) -> AnyView in AnyView(SearchView()) }),
             LayoutCase(name: "settings", build: { (_: AppModel) -> AnyView in AnyView(SettingsView()) }),
             LayoutCase(name: "downloads", build: { (m: AppModel) -> AnyView in AnyView(DownloadsView(store: m.transfers)) }),
             LayoutCase(name: "featured", build: { (_: AppModel) -> AnyView in AnyView(FeaturedView()) }),
@@ -188,6 +189,74 @@ private struct LayoutOutcome {
 
     // MARK: Tests
 
+    func testUpdateFooterFitsShortWindowsAcrossDownloadAndReadyStates() throws {
+        try requireWindowServer()
+        let priorProbeMode = SettingsLayoutMeasurements.enabledForTests
+        let savedLanguage = TestLanguage.current()
+        SettingsLayoutMeasurements.enabledForTests = true
+        defer {
+            SettingsLayoutMeasurements.enabledForTests = priorProbeMode
+            TestLanguage.restore(savedLanguage)
+        }
+        for language in ["ru", "en"] {
+            UserDefaults.standard.set(language, forKey: "UiLanguage")
+            for height: CGFloat in [468, 520, 700] {
+              for state in ["available", "waiting", "downloading", "ready", "error"] {
+                let model = try makeModel()
+                model.version = "0.44.12"
+                let updater = MacUpdater()
+                updater.available = true; updater.ready = state == "ready"
+                updater.busy = state == "waiting" || state == "downloading"
+                updater.progressValue = state == "downloading" ? 0.5 : nil
+                updater.isError = state == "error"
+                updater.statusText = state == "error" ? tr("Ошибка загрузки", "Download failed") : tr("Доступна новая версия", "A new version is available")
+                if state == "available" { XCTAssertEqual(updater.buttonTitle, language == "ru" ? "Скачать" : "Download") }
+                SettingsLayoutMeasurements.frames.removeAll()
+                let controller = NSHostingController(rootView: RootView().environmentObject(model).environmentObject(updater))
+                let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 760, height: height), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+                window.contentViewController = controller
+                window.setContentSize(NSSize(width: 760, height: height))
+                controller.view.frame = NSRect(x: 0, y: 0, width: 760, height: height)
+                window.orderFront(nil)
+                controller.view.layoutSubtreeIfNeeded()
+                RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+                controller.view.layoutSubtreeIfNeeded()
+                SettingsLayoutMeasurements.refreshNativeViews()
+                if updater.busy || updater.ready {
+                    XCTAssertNil(SettingsLayoutMeasurements.frames["sidebar.update.status"], "Progress and readiness belong inside the update button")
+                }
+                if state == "error" { XCTAssertNotNil(SettingsLayoutMeasurements.frames["sidebar.update.status"], "Download errors must remain visible") }
+                if state == "downloading" {
+                    let button = try XCTUnwrap(SettingsLayoutMeasurements.frames["sidebar.update.action"])
+                    let fill = try XCTUnwrap(SettingsLayoutMeasurements.frames["sidebar.update.action.fill"])
+                    XCTAssertEqual(fill.width, button.width * 0.5, accuracy: 1.5, "Received bytes fill half of the actual button")
+                }
+                for id in ["sidebar.update.action"] {
+                    guard let frame = SettingsLayoutMeasurements.nativeFrames[id], let visible = SettingsLayoutMeasurements.nativeVisibleFrames[id] else {
+                        XCTFail("Missing native " + id + " " + language); continue
+                    }
+                    XCTAssertGreaterThan(frame.height, 0, id)
+                    XCTAssertTrue(SettingsLayoutMeasurements.nativeAttached[id] == true, id)
+                    let shown = frame.intersection(visible)
+                    XCTAssertFalse(shown.isNull, id + " is clipped")
+                    XCTAssertGreaterThanOrEqual(shown.width * shown.height, frame.width * frame.height * 0.99,
+                                                id + " " + language + " height " + String(Int(height)))
+                }
+                if height == 520, let bitmap = controller.view.bitmapImageRepForCachingDisplay(in: controller.view.bounds) {
+                    controller.view.cacheDisplay(in: controller.view.bounds, to: bitmap)
+                    let folder = TestSources.repository.appendingPathComponent("test-output/macos/render")
+                    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                    if let png = bitmap.representation(using: .png, properties: [:]) {
+                        try png.write(to: folder.appendingPathComponent("update-" + state + "-" + language + ".png"))
+                    }
+                }
+                window.orderOut(nil)
+                window.contentViewController = nil
+              }
+            }
+        }
+    }
+
     func testPagesFitEveryWidthSchemeAndLanguage() throws {
         try requireWindowServer()
         let savedLanguage = TestLanguage.current()
@@ -215,7 +284,7 @@ private struct LayoutOutcome {
                 }
             }
         }
-        XCTAssertEqual(renders, 100)
+        XCTAssertEqual(renders, 120)
         if scrollViews == 0 { throw XCTSkip("SwiftUI scroll views are not visible to AppKit on this runner, so overflow cannot be measured.") }
         XCTAssertTrue(failures.isEmpty, failures.joined(separator: "\n"))
     }
@@ -276,7 +345,9 @@ private struct LayoutOutcome {
         UserDefaults.standard.set("ru", forKey: "UiLanguage")
         let model = try makeModel()
         func meanLuminance(dark: Bool) -> (mean: Double, deviation: Double) {
-            let controller = NSHostingController(rootView: AnyView(SettingsView().environmentObject(model).environmentObject(MacUpdater()).preferredColorScheme(dark ? ColorScheme.dark : ColorScheme.light)))
+            // Liquid Glass is drawn on the GPU and an offscreen cache of a scroll view that holds it comes back empty,
+            // so this colour test runs with the flat fallback (Lite mode) that has the same colours.
+            let controller = NSHostingController(rootView: AnyView(SettingsView().environmentObject(model).environmentObject(MacUpdater()).environment(\.kdLite, true).preferredColorScheme(dark ? ColorScheme.dark : ColorScheme.light)))
             let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1000, height: 700), styleMask: [.borderless], backing: .buffered, defer: false)
             window.appearance = NSAppearance(named: dark ? NSAppearance.Name.darkAqua : NSAppearance.Name.aqua)
             window.contentViewController = controller
@@ -337,7 +408,7 @@ private struct LayoutOutcome {
         var failures: [String] = []
         for name in [NSAppearance.Name.aqua, NSAppearance.Name.darkAqua] {
             let label: String = name == NSAppearance.Name.aqua ? "light" : "dark"
-            guard let page = rgb(NSColor.windowBackgroundColor, appearance: name), let surface = rgb(NSColor.controlBackgroundColor, appearance: name) else { continue }
+            guard let page = rgb(NSColor(KDPalette.pageBackground), appearance: name), let surface = rgb(NSColor(KDPalette.surface), appearance: name) else { continue }
             for (role, color, minimum) in roles {
                 guard let foreground = rgb(NSColor(color), appearance: name) else { continue }
                 for (backgroundName, background) in [("page", page), ("surface", surface)] {
@@ -395,7 +466,9 @@ private struct LayoutOutcome {
             all += file.text + "\n"
         }
         for identifier in SmokeProbeCatalog.identifiers {
-            XCTAssertTrue(all.contains("accessibilityIdentifier(\"" + identifier), "No view sets the accessibility identifier '" + identifier + "'")
+            let swiftUI = all.contains("accessibilityIdentifier(\"" + identifier)
+            let appKit = all.contains("setAccessibilityIdentifier(\"" + identifier)
+            XCTAssertTrue(swiftUI || appKit, "No view sets the accessibility identifier '" + identifier + "'")
         }
     }
 

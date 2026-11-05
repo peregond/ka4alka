@@ -9,4 +9,5 @@
     <DebugType>none</DebugType>
     <DebugSymbols>false</DebugSymbols>
   </PropertyGroup>
+  <ItemGroup><EmbeddedResource Include="Phone/*" LogicalName="Kachalka.Phone.%(Filename)%(Extension)" /></ItemGroup>
 </Project>

@@ -1,0 +1,114 @@
+import XCTest
+@testable import Ka4alka
+
+@MainActor final class SearchNavigationTests: XCTestCase {
+    func testNativeSearchUsesWideWindowsWithoutCrowdingToolbarControls() {
+        XCTAssertGreaterThan(SearchToolbarLayoutObserver.fieldWidth(windowWidth: 1440), 680)
+        for width: CGFloat in [720, 900, 1100, 1440, 1920, 2560] {
+            let field = SearchToolbarLayoutObserver.fieldWidth(windowWidth: width)
+            XCTAssertGreaterThanOrEqual(field, 176)
+            XCTAssertLessThanOrEqual(field, width - 540)
+            XCTAssertLessThanOrEqual(field, 1120)
+        }
+        XCTAssertEqual(SearchToolbarLayoutObserver.fieldWidth(windowWidth: 1440),
+                       SearchToolbarLayoutObserver.fieldWidth(windowWidth: 1441))
+    }
+
+    func testBackRestoresBrowseFiltersPageAndScrollAfterSearch() {
+        let model = AppModel()
+        model.bridge.disabled = true
+        model.select(.series)
+        model.filter.genre = "comedy"
+        model.page = 3
+        model.browseAnchor = "series:park"
+        let originalRequest = model.requestKey
+        model.openSearch()
+        XCTAssertEqual(model.route, .search)
+        XCTAssertEqual(model.section, .movies)
+        XCTAssertFalse(model.filter.active)
+        model.query = "South Park"
+        model.submitSearch()
+        XCTAssertEqual(model.route, .search)
+        XCTAssertEqual(model.submittedQuery, "South Park")
+        model.back()
+        XCTAssertEqual(model.route, .section(.series))
+        XCTAssertEqual(model.section, .series)
+        XCTAssertEqual(model.filter.genre, "comedy")
+        XCTAssertEqual(model.page, 3)
+        XCTAssertEqual(model.browseAnchor, "series:park")
+        XCTAssertEqual(model.submittedQuery, "")
+        XCTAssertEqual(model.requestKey, originalRequest, "Returning to the unchanged catalog reuses its existing cache entry")
+    }
+
+    func testOpeningResultAndReturningKeepsSearchAndDoesNotDuplicateItsRoute() throws {
+        let model = AppModel()
+        model.bridge.disabled = true
+        model.select(.games)
+        model.openSearch()
+        model.query = "Portal"
+        model.submitSearch()
+        model.open(try TestFixtures.card("games:portal", "Portal", section: "games"))
+        model.back()
+        XCTAssertEqual(model.route, .search)
+        XCTAssertEqual(model.section, .movies)
+        XCTAssertEqual(model.submittedQuery, "Portal")
+        let count = model.routes.count
+        let focus = model.searchFocus
+        model.openSearch()
+        XCTAssertEqual(model.routes.count, count)
+        XCTAssertGreaterThan(model.searchFocus, focus)
+    }
+
+    func testDraftDoesNotSubmitAndClearDoesNotOpenUnfilteredCatalog() {
+        let model = AppModel()
+        model.bridge.disabled = true
+        model.openSearch()
+        model.query = "Dune"
+        XCTAssertEqual(model.submittedQuery, "")
+        model.submitSearch()
+        model.clearSearch()
+        XCTAssertEqual(model.route, .search)
+        XCTAssertEqual(model.query, "")
+        XCTAssertEqual(model.submittedQuery, "")
+        XCTAssertNil(model.list)
+    }
+
+    func testHistoryIsBoundedDeduplicatedAcrossOriginsAndBlankIsNotRecorded() {
+        let model = AppModel()
+        model.bridge.disabled = true
+        model.openSearch()
+        for value in 0..<12 { model.query = "Title \(value)"; model.submitSearch() }
+        XCTAssertEqual(model.recentSearches.count, 8)
+        model.query = "title 11"; model.submitSearch()
+        XCTAssertEqual(model.recentSearches.count, 8)
+        XCTAssertEqual(model.recentSearches.first?.query, "title 11")
+        model.select(.games)
+        model.openSearch()
+        model.query = "title 11"
+        model.submitSearch()
+        XCTAssertEqual(model.recentSearches.filter { $0.query == "title 11" }.count, 1)
+        model.query = "  "
+        model.submitSearch()
+        XCTAssertFalse(model.recentSearches.contains { $0.query.trimmingCharacters(in: .whitespaces).isEmpty })
+    }
+
+    func testSidebarSelectionLeavesSearchWithoutLeakingQuery() {
+        let model = AppModel()
+        model.bridge.disabled = true
+        model.openSearch()
+        model.query = "Dune"; model.submitSearch()
+        model.select(.movies)
+        XCTAssertEqual(model.route, .section(.movies))
+        XCTAssertEqual(model.submittedQuery, "")
+        XCTAssertEqual(model.query, "")
+    }
+
+    func testScrollChromeIgnoresBounceAndChangesOnlyAcrossThresholds() {
+        XCTAssertFalse(ShellChromeVisibility.visible(offset: -30, wasVisible: false))
+        XCTAssertFalse(ShellChromeVisibility.visible(offset: 55, wasVisible: false))
+        XCTAssertTrue(ShellChromeVisibility.visible(offset: 56, wasVisible: false))
+        XCTAssertTrue(ShellChromeVisibility.visible(offset: 20, wasVisible: true))
+        XCTAssertFalse(ShellChromeVisibility.visible(offset: 8, wasVisible: true))
+        XCTAssertFalse(ShellChromeVisibility.visible(offset: 0, wasVisible: true))
+    }
+}

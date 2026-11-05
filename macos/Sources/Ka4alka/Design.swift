@@ -16,8 +16,8 @@ import SwiftUI
 //     groups, toasts, buttons over artwork. Never on whole pages or on every
 //     poster. Everything glass is behind `#if compiler(>=6.2)` AND
 //     `#available(macOS 26.0, *)` and has a material / opaque fallback.
-//  3. Primary actions use KDPrimaryButtonStyle on every OS version (dark ink on
-//     the light teal) so contrast never depends on the glass tint.
+//  3. Standard actions delegate to native SwiftUI button styles. Never draw
+//     pressed/hover/focus states or control borders ourselves.
 //  4. Continuous corners everywhere (`.continuous`).
 
 // MARK: Tokens
@@ -45,7 +45,7 @@ enum KD {
         static let minHit: CGFloat = 24
         static let iconButton: CGFloat = 28
         static let posterWidth: CGFloat = 155
-        static let wideCardWidth: CGFloat = 230
+        static let wideCardWidth: CGFloat = posterWidth
         static let rowPoster: CGFloat = 48
         static let digestPoster: CGFloat = 92
         static let heroHeight: CGFloat = 300
@@ -68,10 +68,10 @@ enum KD {
     static let titleBlockHeight: CGFloat = 36
 
     static func gutter(forWidth width: CGFloat) -> CGFloat { width < Width.compactContent ? compactGutter : gutter }
-    /// Tall posters are 2:3, Steam capsules are 460:215.
-    static func posterAspect(wide: Bool) -> CGFloat { wide ? 460.0 / 215.0 : 2.0 / 3.0 }
+    /// Film and game posters share a stable 2:3 frame.
+    static func posterAspect(wide: Bool) -> CGFloat { 2.0 / 3.0 }
     static func posterColumns(wide: Bool) -> [GridItem] {
-        [GridItem(.adaptive(minimum: wide ? 220 : 145, maximum: wide ? 360 : 220), spacing: posterSpacing)]
+        [GridItem(.adaptive(minimum: 145, maximum: 220), spacing: posterSpacing)]
     }
 }
 
@@ -108,33 +108,68 @@ private enum KDHex {
     }
 }
 
+/// The accent colour the person picked in System Settings → Appearance. Nil while it is "Multicolor", the default,
+/// where the app's own green applies: the rule the system itself uses for an app's AccentColor asset. Sidebar
+/// icons, links and selection show the colour the person chose.
+private enum KDChosenAccent {
+    static var color: NSColor? {
+        guard UserDefaults.standard.object(forKey: "AppleAccentColor") != nil else { return nil }
+        return NSColor.controlAccentColor
+    }
+}
+
+private func kdBrandColor(_ appearance: NSAppearance, light: UInt32, dark: UInt32, lightHC: UInt32?, darkHC: UInt32?) -> NSColor {
+    let match = appearance.bestMatch(from: [.darkAqua, .aqua, .accessibilityHighContrastDarkAqua, .accessibilityHighContrastAqua])
+    switch match {
+    case .some(.darkAqua): return KDHex.ns(dark)
+    case .some(.accessibilityHighContrastDarkAqua): return KDHex.ns(darkHC ?? dark)
+    case .some(.accessibilityHighContrastAqua): return KDHex.ns(lightHC ?? light)
+    default: return KDHex.ns(light)
+    }
+}
+
 extension Color {
     /// Appearance-adaptive colour. `lightHC` / `darkHC` apply under Increase Contrast.
     init(kdLight light: UInt32, dark: UInt32, lightHC: UInt32? = nil, darkHC: UInt32? = nil) {
         self.init(nsColor: NSColor(name: nil) { appearance in
-            let match = appearance.bestMatch(from: [.darkAqua, .aqua, .accessibilityHighContrastDarkAqua, .accessibilityHighContrastAqua])
-            switch match {
-            case .some(.darkAqua): return KDHex.ns(dark)
-            case .some(.accessibilityHighContrastDarkAqua): return KDHex.ns(darkHC ?? dark)
-            case .some(.accessibilityHighContrastAqua): return KDHex.ns(lightHC ?? light)
-            default: return KDHex.ns(light)
+            kdBrandColor(appearance, light: light, dark: dark, lightHC: lightHC, darkHC: darkHC)
+        })
+    }
+    /// An accent role: the app's green, replaced by the person's own system accent colour when they chose one.
+    init(kdAccentLight light: UInt32, dark: UInt32, lightHC: UInt32? = nil, darkHC: UInt32? = nil) {
+        self.init(nsColor: NSColor(name: nil) { appearance in
+            KDChosenAccent.color ?? kdBrandColor(appearance, light: light, dark: dark, lightHC: lightHC, darkHC: darkHC)
+        })
+    }
+    /// Text and icons on an accent fill: the given ink, or white / near-black chosen for contrast on the system accent.
+    init(kdAccentInk ink: UInt32) {
+        self.init(nsColor: NSColor(name: nil) { appearance in
+            guard let chosen = KDChosenAccent.color else { return KDHex.ns(ink) }
+            var brightness: CGFloat = 1
+            appearance.performAsCurrentDrawingAppearance {
+                if let rgb = chosen.usingColorSpace(.sRGB) { brightness = 0.299 * rgb.redComponent + 0.587 * rgb.greenComponent + 0.114 * rgb.blueComponent }
             }
+            return brightness > 0.6 ? KDHex.ns(0x06140F) : NSColor.white
         })
     }
 }
 
 enum KDPalette {
-    /// Text, icons, progress and links. 6.1:1 on white (light), high contrast on dark.
-    static let accent = Color(kdLight: 0x097055, dark: 0x5BE3B5, lightHC: 0x045A44, darkHC: 0x8CF0CB)
-    /// Fill of primary buttons. Always paired with `accentInk`.
-    static let accentFill = Color(kdLight: 0x3FD6A5, dark: 0x5BE3B5)
-    static let accentInk = Color(kdLight: 0x06140F, dark: 0x06140F)
+    /// The interface is neutral, like the Apple TV app, and green is the one colour it adds. Text, icons, progress and
+    /// links: a vivid grass green, 5.1:1 on white and 4.7:1 on the light tile, high contrast on dark. Follows the accent
+    /// colour chosen in System Settings; the app's green applies while that is "Multicolor".
+    static let accent = Color(kdAccentLight: 0x057F34, dark: 0x5BE3B5, lightHC: 0x04652A, darkHC: 0x8CF0CB)
+    /// Fill of primary buttons and progress: a bright emerald-grass in light. Always paired with `accentInk` (7.8:1).
+    static let accentFill = Color(kdAccentLight: 0x1ABF62, dark: 0x5BE3B5)
+    static let accentInk = Color(kdAccentInk: 0x06140F)
     static let accentSoft = accent.opacity(0.14)
     static let accentLine = accent.opacity(0.45)
 
+    /// A filled "saved" heart: the red of a Like.
+    static let like = Color(kdLight: 0xFF3B30, dark: 0xFF453A)
     static let danger = Color(kdLight: 0xC2362B, dark: 0xFF8A7A)
     static let warning = Color(kdLight: 0x9A5B00, dark: 0xF2B35B)
-    static let success = Color(kdLight: 0x16743F, dark: 0x5FD98F)
+    static let success = Color(kdLight: 0x0A7A3C, dark: 0x5FD98F)
     static let info = Color(kdLight: 0x2F62D6, dark: 0x7FA9FF)
 
     /// Rating source marks (same values as the Windows app).
@@ -142,10 +177,11 @@ enum KDPalette {
     static let imdbMark = Color(red: 0.961, green: 0.773, blue: 0.094)
 
     /// Theme-independent dark base under banners, so white text is always legible.
-    static let bannerTop = Color(red: 0.04, green: 0.23, blue: 0.27)
-    static let bannerBottom = Color(red: 0.08, green: 0.09, blue: 0.18)
+    static let bannerTop = Color(red: 0.11, green: 0.11, blue: 0.12)
+    static let bannerBottom = Color(red: 0, green: 0, blue: 0)
 
-    /// Near-black dark surfaces, the same values as the Windows app; light keeps the system colours.
+    /// Neutral surfaces, as in the Apple TV app: a black page with dark-grey tiles, or a white page with light-grey
+    /// tiles. Nothing is tinted, so the artwork carries the colour.
     private static func adaptive(dark: UInt32, light: NSColor) -> Color {
         Color(nsColor: NSColor(name: nil) { appearance in
             let match = appearance.bestMatch(from: [.darkAqua, .aqua, .accessibilityHighContrastDarkAqua, .accessibilityHighContrastAqua])
@@ -153,10 +189,9 @@ enum KDPalette {
             return light
         })
     }
-    static let pageBackground = adaptive(dark: 0x0A0C0F, light: .windowBackgroundColor)
-    static let sidebarBackground = adaptive(dark: 0x0E1115, light: .windowBackgroundColor)
-    static let surface = adaptive(dark: 0x111419, light: .controlBackgroundColor)
-    static let hairline = adaptive(dark: 0x1E232A, light: .separatorColor)
+    static let pageBackground = adaptive(dark: 0x000000, light: KDHex.ns(0xFFFFFF))
+    static let surface = adaptive(dark: 0x1C1C1E, light: KDHex.ns(0xF5F5F7))
+    static let hairline = adaptive(dark: 0x2C2C2E, light: .separatorColor)
     static let skeleton = Color.primary.opacity(0.08)
 }
 
@@ -181,6 +216,23 @@ enum KDTone: Equatable {
 }
 
 // MARK: Environment
+
+/// Height of the strip under the window toolbar at the top of the content column. A full-bleed banner starts at the
+/// top of the window, under the toolbar, and adds this to its height so the part below the toolbar keeps its size.
+private struct KDSafeTopKey: EnvironmentKey { static let defaultValue: CGFloat = 0 }
+extension EnvironmentValues {
+    var kdSafeTop: CGFloat {
+        get { self[KDSafeTopKey.self] }
+        set { self[KDSafeTopKey.self] = newValue }
+    }
+}
+
+/// Set by a page that opens with a full-bleed banner. The banner runs up under the toolbar, so such a page has no
+/// toolbar bar and no title there; every other page gets the system's toolbar bar with the page name.
+struct KDHeroPageKey: PreferenceKey {
+    static let defaultValue = false
+    static func reduce(value: inout Bool, nextValue: () -> Bool) { value = value || nextValue() }
+}
 
 private struct KDLiteKey: EnvironmentKey { static let defaultValue = false }
 extension EnvironmentValues {
@@ -214,11 +266,6 @@ enum KDFormat {
         let floored = (clamped * scale).rounded(.down) / scale
         return floored.formatted(.number.precision(.fractionLength(fractionDigits)).locale(locale)) + "%"
     }
-    /// "Среда, 14 октября" for the Актуальное masthead.
-    static func mastheadDate(_ date: Date = Date()) -> String {
-        let text = date.formatted(.dateTime.weekday(.wide).day().month(.wide).locale(locale))
-        return text.prefix(1).uppercased() + String(text.dropFirst())
-    }
 }
 
 // MARK: Surfaces
@@ -233,12 +280,14 @@ struct KDCardModifier: ViewModifier {
         let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
         content
             .background(level == .raised ? KDPalette.surface : Color.primary.opacity(0.04), in: shape)
-            .overlay(shape.strokeBorder(KDPalette.hairline, lineWidth: contrast == .increased ? 1.5 : 1).allowsHitTesting(false))
+            // A tile is a fill, not an outlined box; the outline returns only under Increase Contrast.
+            .overlay { if contrast == .increased { shape.strokeBorder(KDPalette.hairline, lineWidth: 1.5).allowsHitTesting(false) } }
     }
 }
 
 /// Floating chrome: glass on macOS 26, material on 14/15, opaque with Reduce Transparency.
 struct KDSurfaceModifier<S: InsettableShape>: ViewModifier {
+    @Environment(\.kdLite) private var lite
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorSchemeContrast) private var contrast
     var shape: S
@@ -247,7 +296,7 @@ struct KDSurfaceModifier<S: InsettableShape>: ViewModifier {
     var onArtwork: Bool
 
     @ViewBuilder func body(content: Content) -> some View {
-        if reduceTransparency { solid(content) } else { glassOrMaterial(content) }
+        if lite || reduceTransparency { solid(content) } else { glassOrMaterial(content) }
     }
 
     private var lineWidth: CGFloat { contrast == .increased ? 1.5 : 0.5 }
@@ -307,14 +356,28 @@ extension View {
     func kdPinnedHeader<H: View>(@ViewBuilder _ header: () -> H) -> some View {
         safeAreaInset(edge: .top, spacing: 0) {
             header()
-                .background(.bar)
+                // The page colour, not the bar material: over the near-black dark page the material was a light grey slab.
+                .background(KDPalette.pageBackground)
                 .overlay(alignment: .bottom) { Rectangle().fill(KDPalette.hairline).frame(height: 1).allowsHitTesting(false) }
         }
     }
-    /// macOS 26 soft scroll-edge effect under the toolbar; no-op before.
-    @ViewBuilder func kdSoftScrollEdge() -> some View {
+    /// Hides or shows the window toolbar's own bar (macOS 15 and later; before it the system bar stays).
+    @ViewBuilder func kdToolbarBarHidden(_ hidden: Bool) -> some View {
+        if #available(macOS 15.0, *) { self.toolbarBackgroundVisibility(hidden ? .hidden : .automatic, for: .windowToolbar) } else { self }
+    }
+    /// Hides the scroll-edge effect at the top of a page. At the top the banner runs under the toolbar and the system's
+    /// edge effect would draw a flat darker strip across the picture; it is shown again once the page is scrolled.
+    @ViewBuilder func kdTopScrollEdgeHidden(_ hidden: Bool) -> some View {
         #if compiler(>=6.2)
-        if #available(macOS 26.0, *) { self.scrollEdgeEffectStyle(.soft, for: .top) } else { self }
+        if #available(macOS 26.0, *) { self.scrollEdgeEffectHidden(hidden, for: .top) } else { self }
+        #else
+        self
+        #endif
+    }
+    /// macOS 26 soft scroll-edge effect under the toolbar; no-op before.
+    @ViewBuilder func kdSoftScrollEdge(_ on: Bool = true) -> some View {
+        #if compiler(>=6.2)
+        if #available(macOS 26.0, *) { self.scrollEdgeEffectStyle(on ? .soft : .hard, for: .top) } else { self }
         #else
         self
         #endif
@@ -327,45 +390,38 @@ extension View {
         self
         #endif
     }
-    /// System glass button on macOS 26, plain bordered before. Not for primary actions.
-    @ViewBuilder func kdGlassButtonStyle() -> some View {
-        #if compiler(>=6.2)
-        if #available(macOS 26.0, *) { self.buttonStyle(.glass) } else { self.buttonStyle(.bordered) }
-        #else
-        self.buttonStyle(.bordered)
-        #endif
+    /// Measures the top safe-area inset of this view: the strip under the window toolbar.
+    func kdReadSafeTop(_ inset: Binding<CGFloat>) -> some View {
+        background {
+            GeometryReader { proxy in
+                Color.clear.onChange(of: proxy.safeAreaInsets.top, initial: true) { _, value in
+                    if abs(inset.wrappedValue - value) > 0.5 { inset.wrappedValue = value }
+                }
+            }
+        }
     }
-    /// Search / text field chrome that shows focus and survives Increase Contrast.
-    func kdFieldChrome(focused: Bool) -> some View {
-        modifier(KDFieldChromeModifier(focused: focused))
+    /// Measures the height of this view (the sidebar column, to fit as many download rows as the window allows).
+    func kdReadHeight(_ height: Binding<CGFloat>) -> some View {
+        background {
+            GeometryReader { proxy in
+                Color.clear.onChange(of: proxy.size.height, initial: true) { _, value in
+                    if abs(height.wrappedValue - value) > 0.5 { height.wrappedValue = value }
+                }
+            }
+        }
     }
     /// Measures the width of this view (use on the detail column, not the window).
     func kdReadWidth(_ width: Binding<CGFloat>) -> some View {
-        background(GeometryReader { proxy in Color.clear.preference(key: KDWidthPreferenceKey.self, value: proxy.size.width) })
-            .onPreferenceChange(KDWidthPreferenceKey.self) { value in
-                if abs(width.wrappedValue - value) > 0.5 { width.wrappedValue = value }
+        background {
+            GeometryReader { proxy in
+                Color.clear.onChange(of: proxy.size.width, initial: true) { _, value in
+                    if abs(width.wrappedValue - value) > 0.5 { width.wrappedValue = value }
+                }
             }
+        }
     }
 }
 
-private struct KDWidthPreferenceKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
-}
-
-struct KDFieldChromeModifier: ViewModifier {
-    @Environment(\.colorSchemeContrast) private var contrast
-    var focused: Bool
-    func body(content: Content) -> some View {
-        let shape = RoundedRectangle(cornerRadius: KD.Radius.control, style: .continuous)
-        content
-            .padding(.horizontal, KD.Space.s)
-            .padding(.vertical, 7)
-            .background(KDPalette.surface, in: shape)
-            .overlay(shape.strokeBorder(focused ? KDPalette.accent : KDPalette.hairline, lineWidth: focused ? 2 : (contrast == .increased ? 1.5 : 1)).allowsHitTesting(false))
-            .contentShape(shape)
-    }
-}
 
 /// Groups nearby glass controls so they morph and sample together on macOS 26.
 struct KDGlassGroup<Content: View>: View {
@@ -407,77 +463,128 @@ struct KDBannerScrim: View {
 
 // MARK: Buttons
 
-/// Filled primary action: dark ink on light teal (9.9:1), identical on every OS.
-struct KDPrimaryButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View { KDPrimaryButtonBody(configuration: configuration) }
+// MARK: Liquid Glass controls
+
+enum KDGlass {
+    /// True when `glassEffect` exists at run time. Everything glass is also behind `#if compiler(>=6.2)`.
+    static var available: Bool {
+        #if compiler(>=6.2)
+        if #available(macOS 26.0, *) { return true }
+        #endif
+        return false
+    }
 }
-private struct KDPrimaryButtonBody: View {
+
+/// Capsule (or circle) Liquid Glass drawn with `glassEffect`, the way the buttons over artwork are. The system glass
+/// styles draw a rounded rectangle at regular size on macOS 27, which differed from those capsules: drawing every
+/// control through the same path keeps one shape and one material. `tint` makes the prominent, filled variant. Lite
+/// mode, Reduce Transparency, Increase Contrast and macOS before 26 get a flat fill of the same shape.
+private struct KDGlassControlChrome<S: InsettableShape>: ViewModifier {
+    var shape: S
+    var tint: Color?
+    /// A solid fill, for the filled primary button: tinted glass showed no colour at all on a plain page, so the
+    /// button looked like every other one. The rim highlight keeps it glassy.
+    var fill: Color? = nil
+    @Environment(\.kdLite) private var lite
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorSchemeContrast) private var contrast
+    @ViewBuilder func body(content: Content) -> some View {
+        if let fill {
+            content
+                .background(fill, in: shape)
+                .overlay(
+                    shape.strokeBorder(LinearGradient(colors: [Color.white.opacity(0.5), Color.white.opacity(0.1)], startPoint: .top, endPoint: .bottom), lineWidth: 1)
+                        .allowsHitTesting(false)
+                )
+                .shadow(color: fill.opacity(0.35), radius: 5, y: 2)
+                .contentShape(shape)
+        } else if lite || reduceTransparency || contrast == .increased || !KDGlass.available {
+            if let tint {
+                content
+                    .background(tint, in: shape)
+                    .overlay(shape.strokeBorder(Color.white.opacity(0.2), lineWidth: 1).allowsHitTesting(false))
+                    .contentShape(shape)
+            } else {
+                content
+                    .background(Color.primary.opacity(0.06), in: shape)
+                    .overlay(shape.strokeBorder(KDPalette.hairline, lineWidth: contrast == .increased ? 1.5 : 1).allowsHitTesting(false))
+                    .contentShape(shape)
+            }
+        } else {
+            content.kdSurface(in: shape, tint: tint, interactive: true).contentShape(shape)
+        }
+    }
+}
+
+/// The shared body of the filled and the quiet glass button.
+private struct KDGlassButtonBody: View {
     let configuration: ButtonStyleConfiguration
+    let prominent: Bool
     @Environment(\.isEnabled) private var enabled
     @Environment(\.controlSize) private var controlSize
-    @Environment(\.colorSchemeContrast) private var contrast
-    private var metrics: (h: CGFloat, v: CGFloat, r: CGFloat) {
+    private var metrics: (h: CGFloat, v: CGFloat, font: Font) {
         switch controlSize {
-        case .mini, .small: return (10, 4, 7)
-        case .large: return (18, 9, 11)
-        default:
-            if controlSize == .extraLarge { return (22, 12, 13) }
-            return (14, 6, 9)
+        case .mini, .small: return (10, 4, Font.callout)
+        case .large, .extraLarge: return (18, 8, Font.body)
+        default: return (14, 6, Font.body)
         }
     }
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: metrics.r, style: .continuous)
         configuration.label
-            .font(.body.weight(.semibold))
-            .foregroundStyle(KDPalette.accentInk)
+            .font(metrics.font.weight(prominent ? .semibold : .regular))
+            .foregroundStyle(prominent ? KDPalette.accentInk : Color.primary)
             .padding(.horizontal, metrics.h)
             .padding(.vertical, metrics.v)
-            .background(KDPalette.accentFill.opacity(configuration.isPressed ? 0.78 : 1), in: shape)
-            .overlay(shape.strokeBorder(Color.black.opacity(contrast == .increased ? 0.55 : 0.08), lineWidth: contrast == .increased ? 1.5 : 1).allowsHitTesting(false))
-            .contentShape(shape)
-            .opacity(enabled ? 1 : 0.45)
+            .modifier(KDGlassControlChrome(shape: Capsule(), tint: nil, fill: prominent ? KDPalette.accentFill : nil))
+            .opacity(configuration.isPressed ? 0.85 : (enabled ? 1 : 0.45))
     }
 }
 
-/// Quiet bordered action on a card.
-struct KDSecondaryButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View { KDSecondaryButtonBody(configuration: configuration) }
+/// The one filled action of a screen or card: green Liquid Glass with dark text.
+struct KDPrimaryButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View { KDGlassButtonBody(configuration: configuration, prominent: true) }
 }
-private struct KDSecondaryButtonBody: View {
+
+/// Every other button: clear Liquid Glass with the primary text colour.
+struct KDSecondaryButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View { KDGlassButtonBody(configuration: configuration, prominent: false) }
+}
+
+/// A round glass button for an icon, at least as large as the minimum pointer target.
+struct KDGlassCircleButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View { KDGlassCircleBody(configuration: configuration) }
+}
+private struct KDGlassCircleBody: View {
     let configuration: ButtonStyleConfiguration
     @Environment(\.isEnabled) private var enabled
-    @Environment(\.controlSize) private var controlSize
-    @Environment(\.colorSchemeContrast) private var contrast
-    @State private var hovered = false
     var body: some View {
-        let small = controlSize == .small || controlSize == .mini
-        let shape = RoundedRectangle(cornerRadius: small ? 7 : 9, style: .continuous)
         configuration.label
-            .font(small ? Font.callout : Font.body)
-            .foregroundStyle(Color.primary)
-            .padding(.horizontal, small ? 10 : 14)
-            .padding(.vertical, small ? 4 : 6)
-            .background(shape.fill(configuration.isPressed ? Color.primary.opacity(0.14) : (hovered ? Color.primary.opacity(0.09) : Color.primary.opacity(0.05))))
-            .overlay(shape.strokeBorder(KDPalette.hairline, lineWidth: contrast == .increased ? 1.5 : 1).allowsHitTesting(false))
-            .contentShape(shape)
-            .onHover { hovered = $0 }
-            .opacity(enabled ? 1 : 0.45)
+            .font(.system(size: 13, weight: .semibold))
+            .frame(minWidth: KD.Size.iconButton, minHeight: KD.Size.iconButton)
+            .modifier(KDGlassControlChrome(shape: Circle(), tint: nil))
+            .opacity(configuration.isPressed ? 0.85 : (enabled ? 1 : 0.45))
     }
 }
 
-/// Controls over artwork (hero, poster actions): glass on 26, dark material before.
+/// Controls over artwork (hero, poster actions): glass on 26, dark material before. `prominent` is the one filled
+/// action of a row: the same capsule and size as its neighbours, white with black text like the Play button of the
+/// Apple TV app and the hero's Details button, so it never differs in shape or height from the buttons beside it.
 struct KDOverlayButtonStyle: ButtonStyle {
     var circular = false
-    func makeBody(configuration: Configuration) -> some View { KDOverlayButtonBody(configuration: configuration, circular: circular) }
+    var solid = false
+    var prominent = false
+    func makeBody(configuration: Configuration) -> some View { KDOverlayButtonBody(configuration: configuration, circular: circular, solid: solid, prominent: prominent) }
 }
 private struct KDOverlayButtonBody: View {
     let configuration: ButtonStyleConfiguration
     let circular: Bool
+    let solid: Bool
+    let prominent: Bool
     @Environment(\.isEnabled) private var enabled
     var body: some View {
         let label = configuration.label
             .font(.callout.weight(.semibold))
-            .foregroundStyle(Color.white)
+            .foregroundStyle(prominent ? Color.black : Color.white)
             .padding(.horizontal, circular ? 0 : 14)
             .padding(.vertical, circular ? 0 : 7)
             .frame(minWidth: circular ? KD.Size.iconButton : nil, minHeight: circular ? KD.Size.iconButton : nil)
@@ -486,32 +593,33 @@ private struct KDOverlayButtonBody: View {
         }
         .opacity(configuration.isPressed ? 0.8 : (enabled ? 1 : 0.45))
     }
-    private func chrome<V: View, S: InsettableShape>(_ view: V, shape: S) -> some View {
-        view.kdSurface(in: shape, interactive: true, onArtwork: true)
-            .contentShape(shape)
-            .environment(\.colorScheme, .dark)
+    @ViewBuilder private func chrome<V: View, S: InsettableShape>(_ view: V, shape: S) -> some View {
+        if prominent {
+            view
+                .background(Color.white, in: shape)
+                .contentShape(shape)
+        } else if solid {
+            view
+                .background(Color.black.opacity(0.78), in: shape)
+                .overlay(shape.strokeBorder(Color.white.opacity(0.22), lineWidth: 1).allowsHitTesting(false))
+                .contentShape(shape)
+        } else {
+            view.kdSurface(in: shape, interactive: true, onArtwork: true)
+                .contentShape(shape)
+                .environment(\.colorScheme, .dark)
+        }
     }
 }
 
-/// Icon-only button with a 28 pt hit target and hover feedback.
-struct KDIconButtonStyle: ButtonStyle {
-    var tone: KDTone = .neutral
-    func makeBody(configuration: Configuration) -> some View { KDIconButtonBody(configuration: configuration, tone: tone) }
-}
-private struct KDIconButtonBody: View {
-    let configuration: ButtonStyleConfiguration
-    let tone: KDTone
-    @Environment(\.isEnabled) private var enabled
-    @State private var hovered = false
-    var body: some View {
-        configuration.label
-            .font(.system(size: 13, weight: .semibold))
-            .foregroundStyle(tone == .neutral ? Color.secondary : tone.foreground)
-            .frame(width: KD.Size.iconButton, height: KD.Size.iconButton)
-            .background(Circle().fill(Color.primary.opacity(configuration.isPressed ? 0.16 : (hovered ? 0.08 : 0))))
-            .contentShape(Circle())
-            .onHover { hovered = $0 }
-            .opacity(enabled ? 1 : 0.4)
+/// System icon buttons keep native focus and activation; only the minimum label size is supplied.
+struct KDIconButtonStyle: PrimitiveButtonStyle {
+    var surface = true
+    func makeBody(configuration: Configuration) -> some View {
+        let button = Button(role: configuration.role) { configuration.trigger() } label: {
+            configuration.label.frame(minWidth: KD.Size.minHit, minHeight: KD.Size.minHit)
+        }
+        if surface { button.buttonStyle(KDGlassCircleButtonStyle()) }
+        else { button.buttonStyle(.borderless) }
     }
 }
 
@@ -522,8 +630,8 @@ struct KDIconButton: View {
     var tone: KDTone = .neutral
     var action: () -> Void
     var body: some View {
-        Button(action: action) { Image(systemName: systemImage) }
-            .buttonStyle(KDIconButtonStyle(tone: tone))
+        Button(role: tone == .danger ? .destructive : nil, action: action) { Image(systemName: systemImage) }
+            .buttonStyle(KDIconButtonStyle())
             .help(label)
             .accessibilityLabel(label)
     }
@@ -540,19 +648,22 @@ private struct KDPosterButtonBody: View {
     @Environment(\.isFocused) private var focused
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var hovered = false
+    /// The ring marks keyboard focus. With the mouse the first control of the window holds focus from the start, and
+    /// its ring around the whole hero banner looked like a stray green outline.
+    private var showsFocus: Bool { focused && NSApp.isFullKeyboardAccessEnabled }
     var body: some View {
         configuration.label
             .opacity(configuration.isPressed ? 0.85 : 1)
             .overlay {
                 RoundedRectangle(cornerRadius: radius + 2, style: .continuous)
-                    .strokeBorder(KDPalette.accent.opacity(focused || hovered ? 0.95 : 0), lineWidth: focused ? 3 : 2)
+                    .strokeBorder(KDPalette.accent.opacity(showsFocus || hovered ? 0.95 : 0), lineWidth: showsFocus ? 3 : 2)
                     .padding(-3)
                     .allowsHitTesting(false)
             }
             .focusEffectDisabled()
             .onHover { hovered = $0 }
             .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: hovered)
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: focused)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: showsFocus)
     }
 }
 
@@ -566,6 +677,7 @@ struct KDToolbarButton: View {
     var action: () -> Void
     var body: some View {
         let button = Button(action: action) { Label(title, systemImage: systemImage).labelStyle(.iconOnly) }
+            .buttonStyle(KDIconButtonStyle(surface: false))
             .help(title)
             .disabled(isDisabled)
         if let shortcut { button.keyboardShortcut(shortcut, modifiers: modifiers) } else { button }
@@ -574,29 +686,54 @@ struct KDToolbarButton: View {
 
 // MARK: Chips, badges, pills
 
-/// Filter chip label. Draws its own chrome so it works inside `Menu` (use
-/// `.menuStyle(.borderlessButton).menuIndicator(.hidden)`) and inside plain Buttons.
+/// Labels carry content and selection only; native buttons and menus draw their own chrome.
 struct KDChipLabel: View {
     var text: String
     var systemImage: String? = nil
     var isActive = false
-    var showsChevron = false
-    @Environment(\.colorSchemeContrast) private var contrast
-    @State private var hovered = false
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: KD.Radius.chip, style: .continuous)
         HStack(spacing: 5) {
-            if let systemImage { Image(systemName: systemImage).font(.system(size: 11, weight: .semibold)) }
-            Text(text).font(.callout.weight(isActive ? .semibold : .regular)).lineLimit(1)
-            if showsChevron { Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold)).opacity(0.7) }
+            if let systemImage { Image(systemName: systemImage) }
+            if isActive { Image(systemName: "checkmark").accessibilityHidden(true) }
+            Text(text).lineLimit(1)
         }
-        .foregroundStyle(isActive ? KDPalette.accent : Color.primary)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 5)
-        .background(shape.fill(isActive ? KDPalette.accentSoft : Color.primary.opacity(hovered ? 0.09 : 0.05)))
-        .overlay(shape.strokeBorder(isActive ? KDPalette.accentLine : KDPalette.hairline, lineWidth: contrast == .increased ? 1.5 : 1).allowsHitTesting(false))
-        .contentShape(shape)
-        .onHover { hovered = $0 }
+    }
+}
+
+/// A filter chip's capsule. A `Menu` in the `.button` menu style takes its look from the button style, so the chip
+/// gets the same glass as every other button; the borderless and bordered menu styles hand the label to AppKit, which
+/// drops any background and reorders the label's image to the front.
+struct KDChipButtonStyle: ButtonStyle {
+    var isActive = false
+    @Environment(\.isEnabled) private var enabled
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.callout.weight(isActive ? .semibold : .regular))
+            .foregroundStyle(isActive ? KDPalette.accent : Color.primary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .modifier(KDGlassControlChrome(shape: Capsule(), tint: isActive ? KDPalette.accent.opacity(0.3) : nil))
+            .opacity(configuration.isPressed ? 0.85 : (enabled ? 1 : 0.45))
+    }
+}
+
+/// The content of a chip that opens a menu: the label and a chevron.
+struct KDChipMenuContent: View {
+    var text: String
+    var systemImage: String? = nil
+    var isActive = false
+    var body: some View {
+        HStack(spacing: 6) {
+            KDChipLabel(text: text, systemImage: systemImage, isActive: isActive)
+            Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold)).opacity(0.7).accessibilityHidden(true)
+        }
+    }
+}
+
+extension View {
+    /// Draws a `Menu` as a glass chip.
+    func kdChipMenu(active: Bool = false) -> some View {
+        menuStyle(.button).menuIndicator(.hidden).buttonStyle(KDChipButtonStyle(isActive: active))
     }
 }
 
@@ -612,9 +749,8 @@ struct KDChipMenu<Content: View>: View {
     }
     private var active: Bool { !(value ?? "").isEmpty }
     var body: some View {
-        Menu { content } label: { KDChipLabel(text: active ? (value ?? title) : title, isActive: active, showsChevron: true) }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
+        Menu { content } label: { KDChipMenuContent(text: active ? (value ?? title) : title, isActive: active) }
+            .kdChipMenu(active: active)
             .frame(minHeight: 24)
             // Not fixedSize: a long value (a release group name) has to be able to truncate instead of pushing
             // the row past the window edge. The cap keeps an extreme value from taking the whole row.
@@ -702,6 +838,7 @@ struct KDRatingMark: View {
                 Text(tag)
                     .font(.system(size: compact ? 8 : 9, weight: .heavy))
                     .foregroundStyle(source.ink)
+                    .fixedSize(horizontal: true, vertical: true)
                     .padding(.horizontal, 4)
                     .padding(.vertical, 1.5)
                     .background(source.fill, in: RoundedRectangle(cornerRadius: 3, style: .continuous))
@@ -772,16 +909,27 @@ struct KDPageHeader<Trailing: View>: View {
         self.subtitle = subtitle
         self.trailing = trailing()
     }
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: KD.Space.m) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title).font(KDFont.pageTitle).lineLimit(2).accessibilityAddTraits(.isHeader)
-                if let subtitle, !subtitle.isEmpty {
-                    Text(subtitle).font(KDFont.secondary).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                }
+    private var titleBlock: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title).font(KDFont.pageTitle).lineLimit(2).accessibilityAddTraits(.isHeader)
+            if let subtitle, !subtitle.isEmpty {
+                Text(subtitle).font(KDFont.secondary).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
-            Spacer(minLength: KD.Space.m)
-            trailing
+        }
+    }
+    /// The actions sit beside the title when both fit on one line, and under it when the window is narrow: squeezed
+    /// beside a pile of glass buttons the title and its subtitle would wrap onto many lines.
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline, spacing: KD.Space.m) {
+                titleBlock.fixedSize(horizontal: true, vertical: false)
+                Spacer(minLength: KD.Space.m)
+                trailing
+            }
+            VStack(alignment: .leading, spacing: KD.Space.s) {
+                titleBlock
+                HStack(spacing: 0) { trailing }
+            }
         }
     }
 }
@@ -789,7 +937,7 @@ extension KDPageHeader where Trailing == EmptyView {
     init(_ title: String, subtitle: String? = nil) { self.init(title, subtitle: subtitle) { EmptyView() } }
 }
 
-/// Shelf / card heading: optional accent kicker, title as a VoiceOver heading, one "more" action.
+/// Shelf / card heading: optional grey kicker, title as a VoiceOver heading, one "more" action.
 struct KDSectionHeader: View {
     var title: String
     var kicker: String? = nil
@@ -799,7 +947,7 @@ struct KDSectionHeader: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             if let kicker, !kicker.isEmpty {
-                Text(kicker).font(KDFont.kicker).textCase(.uppercase).foregroundStyle(KDPalette.accent)
+                Text(kicker).font(KDFont.kicker).textCase(.uppercase).foregroundStyle(Color.secondary)
             }
             HStack(alignment: .firstTextBaseline) {
                 Text(title).font(KDFont.section).lineLimit(2).accessibilityAddTraits(.isHeader)
@@ -1072,8 +1220,10 @@ struct KDShelfSkeleton: View {
 /// Hero placeholder on the same dark base as the real banner, so nothing flashes.
 struct KDHeroSkeleton: View {
     var height: CGFloat = KD.Size.heroHeight
+    /// False for a banner that runs edge to edge.
+    var rounded = true
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: KD.Radius.hero, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: rounded ? KD.Radius.hero : 0, style: .continuous)
         KDShimmerClock {
             ZStack(alignment: .bottomLeading) {
                 KDBannerBase()
@@ -1098,6 +1248,7 @@ struct KDHeroSkeleton: View {
 struct KDFlowLayout: Layout {
     var spacing: CGFloat = 8
     var lineSpacing: CGFloat = 8
+    var verticalAlignment: VerticalAlignment = .top
 
     /// The size a child takes. A child wider than the whole row is offered the row width instead,
     /// so a long label truncates rather than pushing the row past the window edge.
@@ -1131,20 +1282,32 @@ struct KDFlowLayout: Layout {
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        var x: CGFloat = bounds.minX
-        var y: CGFloat = bounds.minY
+        let sizes = subviews.map { childSize($0, maxWidth: bounds.width) }
+        var rowStart = 0
+        var rowWidth: CGFloat = 0
         var rowHeight: CGFloat = 0
-        for subview in subviews {
-            let size: CGSize = childSize(subview, maxWidth: bounds.width)
-            if x > bounds.minX, x + size.width > bounds.maxX {
-                y += rowHeight + lineSpacing
-                x = bounds.minX
-                rowHeight = 0
+        var y = bounds.minY
+        func placeRow(endingAt end: Int) {
+            var x = bounds.minX
+            for index in rowStart..<end {
+                let size = sizes[index]
+                let offset: CGFloat = verticalAlignment == .center ? (rowHeight - size.height) / 2
+                    : verticalAlignment == .bottom ? rowHeight - size.height : 0
+                subviews[index].place(at: CGPoint(x: x, y: y + offset), anchor: .topLeading, proposal: ProposedViewSize(size))
+                x += size.width + spacing
             }
-            subview.place(at: CGPoint(x: x, y: y), anchor: .topLeading, proposal: ProposedViewSize(size))
-            x += size.width + spacing
+        }
+        for index in sizes.indices {
+            let size = sizes[index]
+            if index > rowStart, rowWidth + spacing + size.width > bounds.width {
+                placeRow(endingAt: index)
+                y += rowHeight + lineSpacing
+                rowStart = index; rowWidth = 0; rowHeight = 0
+            }
+            rowWidth += (index > rowStart ? spacing : 0) + size.width
             rowHeight = max(rowHeight, size.height)
         }
+        placeRow(endingAt: sizes.count)
     }
 }
 

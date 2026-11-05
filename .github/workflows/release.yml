@@ -14,7 +14,7 @@ on:
       version:
         description: Version matching native/Kachalka.csproj
         required: true
-        default: '0.45.1'
+        default: '0.45.2'
       publish:
         description: Publish the release as soon as every release check passes
         type: boolean
@@ -37,7 +37,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 25
     env:
-      RELEASE_VERSION: ${{ inputs.version || '0.45.1' }}
+      RELEASE_VERSION: ${{ inputs.version || '0.45.2' }}
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
     steps:
       - uses: actions/checkout@v4
@@ -60,12 +60,20 @@ jobs:
           if($LASTEXITCODE -ne 0){throw 'Locked web dependencies failed'}
           node tests/release-audio-rules.mjs
           if($LASTEXITCODE -ne 0){throw 'Release audio rules checks failed'}
+          node tests/middle-east-releases.mjs
+          if($LASTEXITCODE -ne 0){throw 'Middle East indexed release regression failed'}
           node tests/release-performance.mjs
           if($LASTEXITCODE -ne 0){throw 'Server release search performance checks failed'}
           node tests/title-identity.mjs
           if($LASTEXITCODE -ne 0){throw 'Server multilingual identity checks failed'}
           node tests/title-lookup.mjs
           if($LASTEXITCODE -ne 0){throw 'Title lookup checks failed'}
+          node tests/movie-franchise.mjs
+          if($LASTEXITCODE -ne 0){throw 'Movie franchise checks failed'}
+          node tests/catalog-search.mjs
+          if($LASTEXITCODE -ne 0){throw 'Complete catalog search checks failed'}
+          node tests/audit-catalog-search.mjs --report ../test-output/server-search-audit.json
+          if($LASTEXITCODE -ne 0){throw 'Indexed server titles must remain searchable'}
           node tests/localized-media.mjs
           if($LASTEXITCODE -ne 0){throw 'Localized media checks failed'}
           node tests/tmdb-backdrop.mjs
@@ -100,6 +108,11 @@ jobs:
           $changed=$before -ne $after
           "changed=$($changed.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
           "Bundled verified daily text catalog. Embedded resources changed: $changed." >> $env:GITHUB_STEP_SUMMARY
+      - name: Audit every title in the exact bundled desktop catalog
+        shell: pwsh
+        run: |
+          dotnet run --project catalog-audit/Kachalka.CatalogAudit.csproj -c Release -- --catalog web-index/app/data/seed.json --report test-output/native-search-audit.json
+          if($LASTEXITCODE -ne 0){throw 'Bundled titles must remain searchable'}
       # A passed suite for HEAD can be reused only when the bundled resources
       # still match that checkout. A newer daily snapshot requires every check.
       - name: Find a passed Windows validation of this exact tree
@@ -135,6 +148,8 @@ jobs:
       - name: Verify metadata and actual release for affected new films
         if: steps.tested.outputs.verified != 'true'
         run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --probe-affected-films
+      - name: Verify the reported Middle East film through the live index
+        run: dotnet run --project tests/Kachalka.Tests.csproj -c Release -- --probe-middle-east
       - name: Verify public replacement site
         # The live backend can change independently of a previously tested desktop tree.
         shell: pwsh
@@ -180,9 +195,17 @@ jobs:
           $process=Start-Process $application -ArgumentList @('--cinema-smoke-test',$output) -PassThru
           if(-not $process.WaitForExit(60000)){$process.Kill();throw 'Person card UI smoke timed out'}
           if($process.ExitCode -ne 0 -or (Test-Path "$output/error.txt") -or -not (Test-Path "$output/checks.json")){throw 'Person card UI smoke failed'}
-      - name: Verify upgrade from previously published 0.44.8
+      - name: Verify upgrade from previously published 0.44.27
         shell: pwsh
-        run: ./tests/WindowsPublishedUpgrade.ps1 -FromVersion 0.44.8 -ReleaseDirectory ('dist/release-'+$env:RELEASE_VERSION)
+        run: ./tests/WindowsPublishedUpgrade.ps1 -FromVersion 0.44.27 -ReleaseDirectory ('dist/release-'+$env:RELEASE_VERSION)
+      - name: Preserve the verified signed Windows packages before uploading
+        uses: actions/upload-artifact@v4
+        with:
+          name: signed-windows-release-${{ env.RELEASE_VERSION }}-${{ github.sha }}
+          path: dist/release-${{ env.RELEASE_VERSION }}/*
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
       - name: Upload verified files to draft GitHub Release
         shell: pwsh
         env:
@@ -192,12 +215,18 @@ jobs:
           $tag='v'+$version
           $notes='distribution/RELEASE-NOTES-'+$version+'.md'
           if(-not (Test-Path $notes)){$notes='distribution/RELEASE-NOTES-'+([Version]$version).ToString(2)+'.md'}
-          $existing=gh release view $tag --json isDraft --jq '.isDraft' 2>$null
+          $existing=gh release view $tag --json isDraft,targetCommitish 2>$null
           if($LASTEXITCODE -ne 0){
             gh release create $tag --draft --target $env:GITHUB_SHA --title ('Качалка '+$version) --notes-file $notes
             if($LASTEXITCODE -ne 0){throw 'Cannot create draft release'}
-          } elseif($existing -ne 'true'){throw 'Refusing to overwrite a published release'}
-          gh release edit $tag --draft --target $env:GITHUB_SHA --notes-file $notes
+          } else {
+            $draft=$existing | ConvertFrom-Json
+            if(-not $draft.isDraft){throw 'Refusing to overwrite a published release'}
+            if($draft.targetCommitish -ne $env:GITHUB_SHA){throw 'Draft targets a different source revision'}
+          }
+          # The target is fixed above. Re-sending target_commitish needlessly
+          # asks GitHub to authorize changes to workflow files in that commit.
+          gh release edit $tag --notes-file $notes
           if($LASTEXITCODE -ne 0){throw 'Cannot update draft release'}
           $files=@(Get-ChildItem -LiteralPath ('dist/release-'+$version) -File | ForEach-Object {$_.FullName})
           gh release upload $tag @files --clobber
@@ -287,6 +316,7 @@ jobs:
             test-output/download-end-to-end/*.json
             test-output/download-end-to-end/error.txt
             test-output/published-site/checks.json
+            test-output/*search-audit.json
             test-output/transfer-*/backdrop-source/*
             test-output/published-upgrade/checks.txt
             test-output/published-upgrade/data/updates/*/result.txt
@@ -297,7 +327,7 @@ jobs:
     timeout-minutes: 15
     env:
       GH_TOKEN: ${{ github.token }}
-      RELEASE_VERSION: ${{ inputs.version || '0.45.1' }}
+      RELEASE_VERSION: ${{ inputs.version || '0.45.2' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4

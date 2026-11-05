@@ -98,7 +98,7 @@ public static class ZonaMovieMetadata
             {
                 PageUrl=current.PageUrl.Length>0?current.PageUrl:old.PageUrl,
                 ProfileUrl=current.ProfileUrl??old.ProfileUrl,PhotoUrl=current.PhotoUrl??PhotoUrl(old.PhotoUrl,current.SourcePersonId??old.SourcePersonId),
-                OriginalName=current.OriginalName??old.OriginalName,SourcePersonId=current.SourcePersonId??old.SourcePersonId
+                OriginalName=current.OriginalName??old.OriginalName,SourcePersonId=current.SourcePersonId??old.SourcePersonId,Character=current.Character??old.Character
             };
         }
         return result.OrderBy(x=>x.Role switch{"Режиссёры"=>0,"Операторы"=>1,"Актёры"=>2,_=>3}).Take(80).OrderBy(x=>x.Role switch{"Актёры"=>0,"Режиссёры"=>1,_=>2}).ToArray();

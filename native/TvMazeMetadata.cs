@@ -55,7 +55,7 @@ public static class TvMazeMetadata
         if(year<=0&&Text(root,"premiered") is {Length:>=4} premiered&&int.TryParse(premiered[..4],out var first)&&first is >=1880 and <=2100)year=first;
         string? poster=item.ImageUrl;
         if(string.IsNullOrWhiteSpace(poster)&&root.TryGetProperty("image",out var image)&&image.ValueKind==JsonValueKind.Object)poster=Picture(Text(image,"original")??Text(image,"medium"));
-        var people=cast==null||item.People.Any(x=>x.Role=="Актёры")?item.People:Cast(cast,item.People);
+        var people=cast==null?item.People:Cast(cast,item.People);
         return item with
         {
             Description=description??item.Description,
@@ -92,11 +92,16 @@ public static class TvMazeMetadata
         {
             using var json=JsonDocument.Parse(bytes);
             if(json.RootElement.ValueKind!=JsonValueKind.Array)return known;
-            var actors=json.RootElement.EnumerateArray()
-                .Select(row=>row.ValueKind==JsonValueKind.Object&&row.TryGetProperty("person",out var person)&&person.ValueKind==JsonValueKind.Object?Text(person,"name")?.Trim():null)
-                .Where(name=>!string.IsNullOrWhiteSpace(name)).Select(name=>name!).Distinct(StringComparer.CurrentCultureIgnoreCase).Take(12)
-                .Select(name=>new CinemaPerson(name,"Актёры","")).ToArray();
-            return actors.Length==0?known:known.Where(x=>x.Role!="Актёры").Concat(actors).ToArray();
+            var credits=json.RootElement.EnumerateArray().Where(row=>row.ValueKind==JsonValueKind.Object&&row.TryGetProperty("person",out var p)&&p.ValueKind==JsonValueKind.Object)
+                .Select(row=>new CastCredit(Text(row.GetProperty("person"),"name")?.Trim()??"",Character:row.TryGetProperty("character",out var c)&&c.ValueKind==JsonValueKind.Object?Text(c,"name")?.Trim():null))
+                .Where(row=>row.Name.Length is >0 and <=120).GroupBy(row=>row.Name,StringComparer.OrdinalIgnoreCase).Take(12)
+                .Select(group=>
+                {
+                    var character=string.Join(" / ",group.Select(row=>row.Character).Where(x=>!string.IsNullOrWhiteSpace(x)).Distinct().Take(4));
+                    return group.First() with{Character=character[..Math.Min(200,character.Length)]};
+                }).ToArray();
+            var people=known.Any(x=>x.Role=="Актёры")?known:known.Concat(credits.Select(x=>new CinemaPerson(x.Name,"Актёры",""))).ToArray();
+            return CharacterCredits.Apply(people,credits);
         }
         catch(JsonException){return known;}
     }

@@ -34,30 +34,24 @@ public static class GameReleaseSources
     public static IReadOnlyList<SourceEntry> ParseRutor(byte[] data,MediaItem game)=>LiveCatalog.ParseRutor(data).Where(row=>Matches(game,row)).ToArray();
     public static ReleaseSource[] Create(SourceClient client,MediaItem game,IEnumerable<SourceConfig> configured)
     {
-        async Task<IReadOnlyList<SourceEntry>> Rutor(CancellationToken ct)
-        {
-            Exception? last=null;var answered=false;
-            foreach(var query in Queries(game))
+        async Task<IReadOnlyList<SourceEntry>> Rutor(CancellationToken ct)=>
+            await ReleaseAliasSearch.Run(Queries(game),async(query,token)=>
             {
-            foreach(var host in new[]{"rutor.info","rutor.is"})
-            {
-                try
+                Exception? last=null;
+                foreach(var host in new[]{"rutor.info","rutor.is"})
                 {
-                    using var timeout=CancellationTokenSource.CreateLinkedTokenSource(ct);timeout.CancelAfter(TimeSpan.FromSeconds(8));
-                    var data=await client.Read(RutorQuery(query,host),4*1024*1024,timeout.Token);
-                    if(!System.Text.Encoding.UTF8.GetString(data).Contains("id=\"index\"",StringComparison.OrdinalIgnoreCase))throw new InvalidDataException("RuTor не вернул таблицу поиска.");
-                    answered=true;
-                    var rows=await Task.Run(()=>ParseRutor(data,game),ct);
-                    if(rows.Count>0)return rows;
-                    break; // A valid empty answer needs the next alias, not the same query on a mirror.
+                    try
+                    {
+                        using var timeout=CancellationTokenSource.CreateLinkedTokenSource(token);timeout.CancelAfter(TimeSpan.FromSeconds(8));
+                        var data=await client.Read(RutorQuery(query,host),4*1024*1024,timeout.Token);
+                        if(!System.Text.Encoding.UTF8.GetString(data).Contains("id=\"index\"",StringComparison.OrdinalIgnoreCase))throw new InvalidDataException("RuTor не вернул таблицу поиска.");
+                        return await Task.Run(()=>ParseRutor(data,game),token);
+                    }
+                    catch(Exception error)when(!token.IsCancellationRequested){last=error;}
                 }
-                catch(Exception error)when(!ct.IsCancellationRequested){last=error;}
-            }
-            }
-            if(answered)return [];
-            ct.ThrowIfCancellationRequested();throw last??new IOException("RuTor недоступен.");
-        }
+                token.ThrowIfCancellationRequested();throw last??new IOException("RuTor недоступен.");
+            },ct,TimeSpan.FromSeconds(11));
         return new[]{new ReleaseSource("RuTor · игры",ct=>Task.Run(()=>Rutor(ct),ct)),new ReleaseSource("Knaben",ct=>Task.Run(()=>KnabenSource.Search(game,ct),ct))}
-            .Concat(configured.Take(3).Select(source=>new ReleaseSource(source.Name,ct=>Task.Run<IReadOnlyList<SourceEntry>>(async ()=>(await client.SearchTorznab(source,Queries(game).FirstOrDefault()??game.Title,ct,4010)).Where(row=>Matches(game,row)).ToArray(),ct)))).DistinctBy(source=>source.Name).ToArray();
+            .Concat(configured.Take(3).Select(source=>new ReleaseSource(source.Name,ct=>ReleaseAliasSearch.Run(Queries(game),async(query,token)=>(await client.SearchTorznab(source,query,token,4010)).Where(row=>Matches(game,row)).ToArray(),ct)))).DistinctBy(source=>source.Name).ToArray();
     }
 }

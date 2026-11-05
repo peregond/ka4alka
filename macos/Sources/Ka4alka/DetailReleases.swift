@@ -127,7 +127,7 @@ struct DetailReleaseFilters: Equatable {
         if !studio.isEmpty, !(release.studios.contains(studio) || release.gameGroup == studio) { return false }
         if !audio.isEmpty, !release.audioTypes.contains(audio) { return false }
         if !quality.isEmpty, release.quality != quality { return false }
-        if russianOnly, !(release.russianDub ?? release.russianAudio) { return false }
+        if russianOnly, !release.russianAudio { return false }
         if !codec.isEmpty, release.codec != codec { return false }
         if !hdr.isEmpty, release.hdr != hdr { return false }
         if subtitles, !DetailReleaseText.meaningful(release.subs) { return false }
@@ -143,7 +143,12 @@ struct DetailReleaseFilters: Equatable {
 
     /// Filters, then orders. Equal rows keep the order the engine gave them.
     func arrange(_ rows: [ReleaseRow]) -> [ReleaseRow] {
-        let kept: [ReleaseRow] = rows.filter { matches($0) }
+        var kept: [ReleaseRow] = rows.filter { matches($0) }
+        // The shared engine ranks every eligible candidate. Re-select within the visible subset.
+        // Older engines omit this field, in which case their original recommendation is preserved.
+        if let best = kept.filter({ $0.recommendationOrder != nil }).min(by: { $0.recommendationOrder! < $1.recommendationOrder! }) {
+            for index in kept.indices { kept[index].recommended = kept[index].id == best.id }
+        }
         let indexed: [(offset: Int, element: ReleaseRow)] = Array(kept.enumerated())
         let ordered = indexed.sorted { (left: (offset: Int, element: ReleaseRow), right: (offset: Int, element: ReleaseRow)) -> Bool in
             if let result = precedes(left.element, right.element) { return result }
@@ -278,7 +283,7 @@ struct ReleaseFilterBar: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: KD.Space.xs) {
-            KDFlowLayout(spacing: KD.Space.xs, lineSpacing: KD.Space.xs) {
+            KDFlowLayout(spacing: KD.Space.xs, lineSpacing: KD.Space.xs, verticalAlignment: .center) {
                 if showsQualityPicker { qualityPicker }
                 if showsAudio { audioMenu }
                 if showsGameGroup { stringMenu(tr("Сборка", "Release group"), selection: $filters.studio, options: facets.gameGroups) }
@@ -289,6 +294,7 @@ struct ReleaseFilterBar: View {
             }
             if showsExtras && hasExtras { extraPanel }
         }
+        .controlSize(.regular)
     }
 
     // MARK: Primary controls
@@ -343,7 +349,6 @@ struct ReleaseFilterBar: View {
     private var russianToggle: some View {
         Toggle(tr("Только русская озвучка", "Russian audio only"), isOn: $filters.russianOnly)
             .toggleStyle(.switch)
-            .controlSize(.small)
             .fixedSize()
     }
 
@@ -365,19 +370,16 @@ struct ReleaseFilterBar: View {
         Button {
             showsExtras.toggle()
         } label: {
-            KDChipLabel(text: extrasTitle, systemImage: "slider.horizontal.3", isActive: filters.extraCount > 0, showsChevron: true)
+            KDChipLabel(text: extrasTitle, systemImage: "slider.horizontal.3", isActive: filters.extraCount > 0)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(KDSecondaryButtonStyle())
         .accessibilityLabel(tr("Ещё фильтры", "More filters"))
         .accessibilityValue(showsExtras ? tr("Раскрыто", "Expanded") : tr("Свёрнуто", "Collapsed"))
     }
 
     private var resetButton: some View {
         Button(tr("Сбросить", "Reset")) { filters = DetailReleaseFilters() }
-            .buttonStyle(.plain)
-            .font(.callout.weight(.semibold))
-            .foregroundStyle(KDPalette.accent)
-            .padding(.vertical, 4)
+            .buttonStyle(KDSecondaryButtonStyle())
     }
 
     // MARK: Extra filters
@@ -405,7 +407,7 @@ struct ReleaseFilterBar: View {
     }
 
     private var extraPanel: some View {
-        KDFlowLayout(spacing: KD.Space.xs, lineSpacing: KD.Space.xs) {
+        KDFlowLayout(spacing: KD.Space.xs, lineSpacing: KD.Space.xs, verticalAlignment: .center) {
             if showsCodec { stringMenu(tr("Видео", "Video"), selection: $filters.codec, options: facets.codecs) }
             if showsHDR { stringMenu("HDR", selection: $filters.hdr, options: facets.hdrs) }
             if showsSubtitles { subtitlesChip }
@@ -423,18 +425,13 @@ struct ReleaseFilterBar: View {
     private var poorQualityToggle: some View {
         Toggle(tr("Скрывать экранки и низкое качество", "Hide low quality"), isOn: poorQualityBinding)
             .toggleStyle(.switch)
-            .controlSize(.small)
             .fixedSize()
     }
 
     private var subtitlesChip: some View {
-        Button {
-            filters.subtitles.toggle()
-        } label: {
-            KDChipLabel(text: tr("С субтитрами", "With subtitles"), systemImage: filters.subtitles ? "checkmark" : nil, isActive: filters.subtitles)
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(filters.subtitles ? .isSelected : [])
+        Toggle(tr("С субтитрами", "With subtitles"), isOn: $filters.subtitles)
+            .toggleStyle(.checkbox)
+            .fixedSize()
     }
 
     private var languageMenu: some View {
@@ -560,7 +557,9 @@ struct ReleaseListRow: View {
         var parts: [String] = []
         let label = DetailReleaseText.qualityText(release, isGame: false)
         if label != "—" { parts.append(label) }
-        if release.russianDub ?? release.russianAudio { parts.append(tr("русская озвучка", "Russian audio")) }
+        if release.russianDub == true { parts.append(tr("русский дубляж", "Russian dubbing")) }
+        else if release.russianAudio { parts.append(tr("русская озвучка", "Russian audio")) }
+        if let seeds = release.seeds, seeds > 0 && seeds < 20 { parts.append(tr("мало отдающих", "few seeders")) }
         if let seeds = release.seeds, seeds >= 50 { parts.append(tr("много раздающих", "many seeders")) }
         if parts.isEmpty { return tr("Рекомендуем", "Recommended") }
         return tr("Рекомендуем: ", "Recommended: ") + parts.joined(separator: ", ")
@@ -748,11 +747,6 @@ struct ReleaseListRow: View {
 
     private var menuLabel: some View {
         Label(downloadTitle, systemImage: "arrow.down")
-            .font(.callout.weight(.semibold))
-            .foregroundStyle(KDPalette.accentInk)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
-            .background(KDPalette.accentFill, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
     }
 
     private var deviceMenu: some View {
@@ -766,7 +760,7 @@ struct ReleaseListRow: View {
         } primaryAction: {
             start()
         }
-        .menuStyle(.borderlessButton)
+        .menuStyle(.borderedButton)
         .fixedSize()
         .disabled(!release.downloadable)
         .help(noLinkHelp)
@@ -879,12 +873,16 @@ struct DetailReleasesSection: View {
             header(all: all, shown: rows.count)
             if !all.isEmpty {
                 ReleaseFilterBar(filters: $filters, showsExtras: $showsExtras, facets: facets, card: card, isGame: isGame, isSeries: isSeries)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .settingsLayoutProbe("detail.releases.toolbar")
             }
             SourceStatusView(sources: model.sources(for: card))
             listContent(all: all, rows: rows)
         }
         .onChange(of: filters) { limit = DetailReleasesSection.pageSize }
+        .onChange(of: ScopedReleaseRecommendation(owner: card.id, id: rows.first(where: { $0.recommended })?.id), initial: true) { _, selection in
+            if model.scopedReleaseRecommendation != selection { model.scopedReleaseRecommendation = selection }
+        }
     }
 
     private func header(all: [ReleaseRow], shown: Int) -> some View {

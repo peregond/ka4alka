@@ -8,7 +8,7 @@ public sealed record FeaturedCollection(string Id,string Title,string TitleEn,st
 {
     public string Label=>AppLanguage.Current=="en"?TitleEn:Title;
     public string Summary=>AppLanguage.Current=="en"?DescriptionEn:Description;
-    // A shelf of games only has wide capsules; one that mixes films, series and games is an ordinary poster shelf.
+    // A game-only shelf keeps its price/review template; mixed shelves share the same portrait proportions.
     public bool IsGames=>Games is {Length:>0}&&MediaIds is not {Length:>0};
     public bool IsMixed=>Games is {Length:>0}&&MediaIds is {Length:>0};
     // The small caps rubric above the heading.

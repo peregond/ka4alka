@@ -164,8 +164,17 @@ public partial class MainWindow
                 try
                 {
                     var cachePath=item is MediaItem or DownloadItem?CoverPath(url):null;
-                    var (decoded,_)=await PosterBitmapCache.Load(cachePath,decodeWidth,ct=>CoverBytes(url,1024*1024,ct),sharedToken).ConfigureAwait(false);
-                    return decoded;
+                    try
+                    {
+                        var (decoded,_)=await PosterBitmapCache.Load(cachePath,decodeWidth,ct=>CoverBytes(url,1024*1024,ct),sharedToken).ConfigureAwait(false);
+                        return decoded;
+                    }
+                    catch(Exception)when(!sharedToken.IsCancellationRequested&&item is MediaItem {Section:"Игры",ImageUrl: {} fallbackUrl}&&fallbackUrl!=url)
+                    {
+                        var fallback=((MediaItem)item!).ImageUrl!;
+                        var (decoded,_)=await PosterBitmapCache.Load(CoverPath(fallback),decodeWidth,ct=>CoverBytes(fallback,1024*1024,ct),sharedToken).ConfigureAwait(false);
+                        return decoded;
+                    }
                 }
                 finally{slots.Release();}
             },token);
@@ -203,7 +212,11 @@ public partial class MainWindow
             if(version!=state.PresentationVersion)return;
             state.PresentationPending=false;
             if(!closing&&!closed&&image.IsLoaded&&ReferenceEquals(image.DataContext,item)&&CoverUrl(image.DataContext)==url&&CoverViewportFor(image)?.Measure(image).Near==true)
+            {
+                // A missing library poster keeps the complete landscape capsule inside the same tall frame.
+                if(item is MediaItem media)image.Stretch=media.Section=="Игры"&&bitmap.PixelWidth>bitmap.PixelHeight?Stretch.Uniform:Stretch.UniformToFill;
                 image.Source=bitmap;
+            }
             SyncPosterShimmer(image,state);
         });
     }
