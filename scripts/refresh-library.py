@@ -226,9 +226,9 @@ def main():
     match_imdb = args.match_imdb == 'yes' or args.match_imdb == 'auto' and now.weekday() == 0
     rows = enrich(rows, limit=args.detail_limit, max_age_days=args.metadata_max_age_days,
                   budget_seconds=args.metadata_budget_seconds, now=now, match_imdb=match_imdb)
-    from kinopoisk_ratings import fill_missing_descriptions, refresh as refresh_kinopoisk
+    from kinopoisk_ratings import fill_missing_texts, refresh as refresh_kinopoisk
     rows, _ = refresh_kinopoisk(rows, os.environ.get('KINOPOISK_API_TOKEN', '').strip(), args.kinopoisk_limit, now)
-    rows = fill_missing_descriptions(rows)
+    rows = fill_missing_texts(rows)
     feed = dict(schemaVersion=1, generatedAtUtc=now.isoformat().replace('+00:00', 'Z'),
                 source='https://w6.zona.plus', metadataVersion=2, items=rows,
                 metadataCoverage=dict(descriptions=sum(bool(row.get('description')) for row in rows),
