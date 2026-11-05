@@ -4,7 +4,7 @@ import concurrent.futures
 import json
 import unittest
 from unittest.mock import patch
-from library_metadata import parse_detail, imdb_identity, official_scores, enrich_one, enrich, select_details, merge_metadata
+from library_metadata import parse_detail, imdb_identity, official_scores, enrich_one, enrich, select_details, merge_metadata, match_imdb_ids
 
 
 class MetadataTests(unittest.TestCase):
@@ -29,6 +29,36 @@ class MetadataTests(unittest.TestCase):
         self.assertIsNone(imdb_identity(item, {'d': [dict(id='tt9999999', l='Another film', y=2026, qid='movie')]}))
         self.assertIsNone(imdb_identity(item, {'d': rows+[dict(id='tt9999999', l='The Weight', y=2026, qid='movie')]}))
         self.assertEqual(imdb_identity(dict(section='movies',year=2026,originalTitle="L'objet du délit"), {'d':[dict(id='tt37535559', l='Crescendo', y=2026, qid='movie')]}), 'tt37535559')
+
+    def test_titles_without_an_imdb_id_are_matched_by_name_year_and_kind(self):
+        header = 'tconst\ttitleType\tprimaryTitle\toriginalTitle\tisAdult\tstartYear\tendYear\truntimeMinutes\tgenres\n'
+        def entry(tconst, kind, primary, original, year):
+            return f'{tconst}\t{kind}\t{primary}\t{original}\t0\t{year}\t\\N\t100\tDrama\n'
+        lines = [header,
+                 entry('tt0000001', 'movie', 'The Weight', 'The Weight', 2026),
+                 entry('tt0000002', 'movie', 'The Weight', 'The Weight', 2012),    # another year
+                 entry('tt0000003', 'short', 'The Weight', 'The Weight', 2026),    # not a film
+                 entry('tt0000004', 'movie', 'Holop', 'Холоп', 2026),              # a Cyrillic original
+                 entry('tt0000005', 'tvSeries', 'Twin', 'Twin', 2026),
+                 entry('tt0000006', 'tvSeries', 'Twin', 'Twin', 2026),             # two entries share the name
+                 entry('tt0000007', 'tvMovie', 'Only For TV', 'Only For TV', 2026)]
+        rows = [self.item('weight', originalTitle='The Weight'),
+                dict(self.item('holop'), title='Холоп'),
+                dict(id='series:twin', section='series', title='Близнец', originalTitle='Twin', year=2026, pageUrl='https://w6.zona.plus/tvseries/twin'),
+                dict(self.item('known'), originalTitle='The Weight', imdbId='tt1234567'),
+                dict(self.item('tv'), originalTitle='Only For TV')]
+        matched = {row['id']: row for row in match_imdb_ids(rows, lines)}
+        self.assertEqual(matched['movies:weight']['imdbId'], 'tt0000001')
+        self.assertEqual(matched['movies:holop']['imdbId'], 'tt0000004')
+        self.assertEqual(matched['movies:tv']['imdbId'], 'tt0000007')
+        self.assertNotIn('imdbId', matched['series:twin'])
+        self.assertEqual(matched['movies:known']['imdbId'], 'tt1234567')
+        self.assertEqual(len(matched), len(rows))
+        # Nothing to identify: the list is not even read.
+        def unreadable():
+            raise AssertionError('the title list was read')
+            yield
+        self.assertEqual(match_imdb_ids([matched['movies:known']], unreadable()), [matched['movies:known']])
 
     def test_official_votes_required_and_unrelated_ids_omitted(self):
         data = gzip.compress(b'tconst\taverageRating\tnumVotes\ntt10794054\t6.9\t3425\ntt9999999\t8.8\t500\ntt37535559\t0.0\t0\n')
