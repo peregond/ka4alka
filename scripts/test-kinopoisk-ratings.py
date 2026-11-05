@@ -121,18 +121,24 @@ class KinopoiskTests(unittest.TestCase):
 
     def test_card_never_read_for_texts_is_read_whatever_the_cooldown(self):
         recent = row('a', imdbId='tt1000001', kinopoiskId=3, kinopoisk='7.0', kinopoiskCheckedAtUtc='2026-11-04T00:00:00Z')
-        self.assertTrue(needs_text(recent))
+        self.assertTrue(needs_text(recent, NOW))
         self.assertEqual(select_rows([recent], 5, NOW), ['movies:a'])
         done = dict(recent, kinopoiskTextAtUtc='2026-11-04T00:00:00Z')
-        self.assertFalse(needs_text(done))
+        self.assertFalse(needs_text(done, NOW))
         self.assertEqual(select_rows([done], 5, NOW), [])
         old = dict(done, year=2015)
-        self.assertEqual(select_rows([dict(old, kinopoiskTextAtUtc=None)], 5, NOW), ['movies:a'])
+        # An old film that has its own description is not read for texts; one without it is.
+        with_text = dict(old, kinopoiskTextAtUtc=None, description='Своё описание')
+        self.assertFalse(needs_text(with_text, NOW))
+        self.assertEqual(select_rows([with_text], 5, NOW), [])
+        without = dict(old, kinopoiskTextAtUtc=None)
+        self.assertTrue(needs_text(without, NOW))
+        self.assertEqual(select_rows([without], 5, NOW), ['movies:a'])
         self.assertEqual(select_rows([old], 5, NOW), [])
 
     def test_refresh_stores_texts_once_and_failure_does_not_mark_them_read(self):
         card = dict(nameRu='Тест', description='Описание', genres=[dict(genre='драма')], countries=[dict(country='США')], ratingKinopoisk=6.5)
-        rows = [row('a', kinopoiskId=1), row('b', kinopoiskId=2, description='Описание'), row('c', kinopoiskId=3)]
+        rows = [row('a', kinopoiskId=1), row('b', kinopoiskId=2, description='Описание'), row('c', kinopoiskId=3)]  # all this year's films
         def get(url, token):
             if url.endswith('/3'):
                 raise urllib.error.URLError('down')
