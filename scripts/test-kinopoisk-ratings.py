@@ -2,7 +2,7 @@ import datetime
 import unittest
 import urllib.error
 
-from kinopoisk_ratings import QuotaReached, details, fill_missing_descriptions, film_text, lookup, needs_text, refresh, score, search, select_rows
+from kinopoisk_ratings import QuotaReached, details, fill_missing_texts, film_text, lookup, needs_text, refresh, score, search, select_rows
 from library_metadata import merge_metadata
 
 NOW = datetime.datetime(2026, 11, 5, 5, 0, tzinfo=datetime.timezone.utc)
@@ -152,11 +152,16 @@ class KinopoiskTests(unittest.TestCase):
         self.assertIn('kinopoiskTextAtUtc', b)
         self.assertNotIn('kinopoiskTextAtUtc', c)
 
-    def test_a_title_without_description_shows_the_kinopoisk_one(self):
-        rows = [dict(row('a'), kinopoiskDescription='Из Кинопоиска'), dict(row('b', description='Своё'), kinopoiskDescription='Из Кинопоиска'),
-                dict(row('c'), description='  ', kinopoiskDescription='Из Кинопоиска'), row('d')]
-        filled = fill_missing_descriptions(rows)
-        self.assertEqual([x.get('description') for x in filled], ['Из Кинопоиска', 'Своё', 'Из Кинопоиска', None])
+    def test_a_title_lacking_texts_shows_the_kinopoisk_ones(self):
+        rows = [dict(row('a'), kinopoiskDescription='Из Кинопоиска', kinopoiskGenre='драма', kinopoiskCountry='США'),
+                dict(row('b', description='Своё', genre='комедия', country='Россия'), kinopoiskDescription='Из Кинопоиска',
+                     kinopoiskGenre='драма', kinopoiskCountry='США'),
+                dict(row('c'), description='  ', genre='', kinopoiskDescription='Из Кинопоиска', kinopoiskGenre='триллер'),
+                row('d')]
+        filled = fill_missing_texts(rows)
+        self.assertEqual([(x.get('description'), x.get('genre'), x.get('country')) for x in filled],
+                         [('Из Кинопоиска', 'драма', 'США'), ('Своё', 'комедия', 'Россия'), ('Из Кинопоиска', 'триллер', None), (None, None, None)])
+        self.assertIs(filled[1], rows[1])
 
     def test_page_score_does_not_replace_the_official_one(self):
         self.assertEqual(merge_metadata(row('a', kinopoiskId=3, kinopoisk='8.1'), {'kinopoisk': '7.0'})['kinopoisk'], '8.1')

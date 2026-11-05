@@ -88,10 +88,16 @@ def details(row, token, get=fetch):
     return known, score(data.get('ratingKinopoisk')), film_text(data, row.get('description'))
 
 
-def fill_missing_descriptions(rows):
-    """A title without any description shows the Kinopoisk one."""
-    return [dict(row, description=row['kinopoiskDescription']) if not (row.get('description') or '').strip() and row.get('kinopoiskDescription') else row
-            for row in rows]
+def fill_missing_texts(rows):
+    """A title that lacks its description, genres or countries shows the Kinopoisk ones.
+
+    The app reads these fields as they are, so no update of the app is needed."""
+    pairs = (('description', 'kinopoiskDescription'), ('genre', 'kinopoiskGenre'), ('country', 'kinopoiskCountry'))
+    filled = []
+    for row in rows:
+        gaps = {field: row[source] for field, source in pairs if not (row.get(field) or '').strip() and row.get(source)}
+        filled.append(dict(row, **gaps) if gaps else row)
+    return filled
 
 
 def lookup(row, token, get=fetch):
