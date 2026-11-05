@@ -2,7 +2,7 @@ import datetime
 import unittest
 import urllib.error
 
-from kinopoisk_ratings import QuotaReached, lookup, refresh, score, select_rows
+from kinopoisk_ratings import QuotaReached, lookup, refresh, score, search, select_rows
 from library_metadata import merge_metadata
 
 NOW = datetime.datetime(2026, 11, 5, 5, 0, tzinfo=datetime.timezone.utc)
@@ -26,7 +26,7 @@ class KinopoiskTests(unittest.TestCase):
         self.assertEqual(lookup(row('a', imdbId='tt1234567'), 't', lambda url, token: two), (None, None))
         other = {'items': [{'kinopoiskId': 5, 'imdbId': 'tt7654321', 'ratingKinopoisk': 7.3}]}
         self.assertEqual(lookup(row('a', imdbId='tt1234567'), 't', lambda url, token: other), (None, None))
-        self.assertEqual(lookup(row('a'), 't', lambda url, token: self.fail('no identity, no request')), (None, None))
+        self.assertEqual(lookup(dict(row('a'), year=0), 't', lambda url, token: self.fail('nothing to search by, no request')), (None, None))
 
     def test_known_id_is_refreshed_by_id_and_rating_may_be_missing(self):
         urls = []
@@ -41,7 +41,7 @@ class KinopoiskTests(unittest.TestCase):
                 row('new', imdbId='tt1000002'),
                 row('fresh', imdbId='tt1000003', kinopoiskCheckedAtUtc='2026-11-04T00:00:00Z'),
                 row('noid')]
-        self.assertEqual(select_rows(rows, 10, NOW), ['movies:new', 'movies:scored'])
+        self.assertEqual(select_rows(rows, 10, NOW), ['movies:new', 'movies:noid', 'movies:scored'])  # a title without any id is searched by name
         self.assertEqual(select_rows(rows, 1, NOW), ['movies:new'])
 
     def test_old_scored_films_are_frozen_and_old_misses_retried_monthly(self):
@@ -82,6 +82,33 @@ class KinopoiskTests(unittest.TestCase):
         rows = [row('a', imdbId='tt1000001')]
         result, done = refresh(rows, '', 10, NOW, lambda *a: self.fail('request without token'))
         self.assertEqual((result, done), (rows, 0))
+
+    def test_title_without_identity_is_found_by_name_year_and_kind(self):
+        def item(kp, year=2026, kind='FILM', **names):
+            return dict(kinopoiskId=kp, year=year, type=kind, ratingKinopoisk=7.4, **names)
+        film = dict(row('x'), title='Тест', originalTitle='The Test')
+        urls = []
+        def get(items):
+            def fetch(url, token):
+                urls.append(url)
+                return {'items': items}
+            return fetch
+        self.assertEqual(search(film, 't', get([item(1, nameRu='Тест')])), (1, '7.4'))
+        self.assertIn('keyword=%D0%A2%D0%B5%D1%81%D1%82', urls[0])
+        self.assertIn('yearFrom=2026', urls[0])
+        # An English name of the entry is enough when it matches the original title.
+        self.assertEqual(search(film, 't', get([item(2, nameRu='Другой', nameOriginal='The Test')])), (2, '7.4'))
+        # Wrong year, wrong kind, other name or more than one candidate: nothing is guessed.
+        self.assertEqual(search(film, 't', get([item(3, year=2025, nameRu='Тест')])), (None, None))
+        self.assertEqual(search(film, 't', get([item(4, kind='TV_SERIES', nameRu='Тест')])), (None, None))
+        self.assertEqual(search(film, 't', get([item(5, nameRu='Тестовый')])), (None, None))
+        self.assertEqual(search(film, 't', get([item(6, nameRu='Тест'), item(7, nameRu='Тест')])), (None, None))
+        series = dict(row('s'), section='series', title='Тест')
+        self.assertEqual(search(series, 't', get([item(8, kind='MINI_SERIES', nameRu='Тест')])), (8, '7.4'))
+        self.assertEqual(search(dict(film, year=0), 't', lambda *a: self.fail('no year, no request')), (None, None))
+        # The id is kept even when Kinopoisk has no score yet.
+        unrated = dict(item(9, nameRu='Тест'), ratingKinopoisk=None)
+        self.assertEqual(search(film, 't', get([unrated])), (9, None))
 
     def test_page_score_does_not_replace_the_official_one(self):
         self.assertEqual(merge_metadata(row('a', kinopoiskId=3, kinopoisk='8.1'), {'kinopoisk': '7.0'})['kinopoisk'], '8.1')
