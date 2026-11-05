@@ -60,6 +60,24 @@ class MetadataTests(unittest.TestCase):
             yield
         self.assertEqual(match_imdb_ids([matched['movies:known']], unreadable()), [matched['movies:known']])
 
+    def test_an_id_shared_by_different_films_stays_only_with_the_one_the_list_names(self):
+        header = 'tconst\ttitleType\tprimaryTitle\toriginalTitle\tisAdult\tstartYear\tendYear\truntimeMinutes\tgenres\n'
+        lines = [header, 'tt0000009\tmovie\tCutthroat\tCutthroat\t0\t2026\t\\N\t100\tDrama\n']
+        rows = [dict(self.item('ad'), title='Адский Голливуд', originalTitle='Hollywood Hells', imdbId='tt0000009', imdb='6.1'),
+                dict(self.item('ad2'), title='Голливудский ад', originalTitle='Cutthroat', imdbId='tt0000009', imdb='6.1'),
+                dict(self.item('twin1'), originalTitle='Same', imdbId='tt0000008', imdb='7.0'),
+                dict(self.item('twin2'), originalTitle='Same', imdbId='tt0000008', imdb='7.0')]
+        result = {row['id']: row for row in match_imdb_ids(rows, lines)}
+        self.assertNotIn('imdbId', result['movies:ad'])
+        self.assertNotIn('imdb', result['movies:ad'])
+        self.assertEqual((result['movies:ad2']['imdbId'], result['movies:ad2']['imdb']), ('tt0000009', '6.1'))
+        # The same film listed twice is not a conflict.
+        self.assertEqual(result['movies:twin1']['imdbId'], 'tt0000008')
+        self.assertEqual(result['movies:twin2']['imdbId'], 'tt0000008')
+        # The official list does not know the id: nothing is guessed, nothing is removed.
+        unknown = match_imdb_ids(rows[:2], [header])
+        self.assertEqual([row.get('imdbId') for row in unknown], ['tt0000009', 'tt0000009'])
+
     def test_official_votes_required_and_unrelated_ids_omitted(self):
         data = gzip.compress(b'tconst\taverageRating\tnumVotes\ntt10794054\t6.9\t3425\ntt9999999\t8.8\t500\ntt37535559\t0.0\t0\n')
         self.assertEqual(official_scores(data, {'tt10794054','tt37535559'}), {'tt10794054':'6.9'})

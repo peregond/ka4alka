@@ -114,11 +114,23 @@ def basics_lines(url=BASICS):
             yield line
 
 
+def shared_ids(rows):
+    """IMDb ids held by titles whose original names differ: at most one of them can be right."""
+    holders = {}
+    for row in rows:
+        if row.get('imdbId'):
+            holders.setdefault(row['imdbId'], []).append(row)
+    return {imdb for imdb, group in holders.items()
+            if len({normalize(r['originalTitle']) for r in group if isinstance(r.get('originalTitle'), str) and normalize(r['originalTitle'])}) > 1}
+
+
 def match_imdb_ids(rows, lines):
     """Give titles without an IMDb ID the one official entry of the same name, year and kind.
 
     Both the original and the shown title are tried, so a Russian production matches its Cyrillic entry.
-    A name that more than one entry shares, and any title already identified, is left alone."""
+    A name that more than one entry shares, and any title already identified, is left alone.
+    An id claimed by titles with different original names stays only with the title the
+    official list names that way; the others lose it, and with it the score that was not theirs."""
     wanted = {}
     for row in rows:
         year = row.get('year')
@@ -128,19 +140,32 @@ def match_imdb_ids(rows, lines):
             name = normalize(row[field]) if isinstance(row.get(field), str) else ''
             if name:
                 wanted.setdefault((name, year, row['section']), []).append(row['id'])
-    if not wanted:
+    suspect = shared_ids(rows)
+    if not wanted and not suspect:
         return rows
-    found = {}
+    found, names = {}, {}
     for line in lines:
         parts = line.rstrip('\n').split('\t')
-        if len(parts) < 9 or parts[1] not in BASICS_KINDS or not parts[5].isdigit() or not re.fullmatch(r'tt\d{6,12}', parts[0]):
+        if len(parts) < 9 or not re.fullmatch(r'tt\d{6,12}', parts[0]):
+            continue
+        if parts[0] in suspect:
+            names[parts[0]] = {normalize(parts[2]), normalize(parts[3])}
+        if parts[1] not in BASICS_KINDS or not parts[5].isdigit():
             continue
         section, year = BASICS_KINDS[parts[1]], int(parts[5])
         for name in {normalize(parts[2]), normalize(parts[3])}:
             for row_id in wanted.get((name, year, section), ()):
                 found.setdefault(row_id, set()).add(parts[0])
-    return [{**row, 'imdbId': next(iter(found[row['id']]))} if len(found.get(row['id'], ())) == 1 and not row.get('imdbId') else row
-            for row in rows]
+    result = []
+    for row in rows:
+        if len(found.get(row['id'], ())) == 1 and not row.get('imdbId'):
+            row = {**row, 'imdbId': next(iter(found[row['id']]))}
+        if row.get('imdbId') in suspect and names.get(row['imdbId']) is not None:
+            own = {normalize(row[field]) for field in ('originalTitle', 'title') if isinstance(row.get(field), str)}
+            if not own & names[row['imdbId']]:
+                row = {key: value for key, value in row.items() if key not in ('imdbId', 'imdb')}
+        result.append(row)
+    return result
 
 
 def official_scores(data, ids):
