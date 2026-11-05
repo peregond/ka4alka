@@ -17,7 +17,8 @@ ITEM_FIELDS = frozenset(['id', 'section', 'title', 'year', 'poster', 'pageUrl',
     'originalTitle', 'description', 'kinopoisk', 'imdb', 'imdbId', 'genre',
     'genreKeys', 'country', 'countryKeys', 'countryKeysComplete', 'people',
     'awards', 'collections', 'metadataCheckedAtUtc', 'metadataUpdatedAtUtc',
-    'kinopoiskId', 'kinopoiskCheckedAtUtc'])
+    'kinopoiskId', 'kinopoiskCheckedAtUtc', 'kinopoiskTextAtUtc', 'kinopoiskTitle',
+    'kinopoiskDescription', 'kinopoiskGenre', 'kinopoiskCountry'])
 
 
 def checked_item(value):
@@ -49,8 +50,12 @@ def checked_item(value):
             row.pop(field)
     if 'kinopoiskId' in row and (type(row['kinopoiskId']) is not int or row['kinopoiskId'] <= 0):
         row.pop('kinopoiskId')
-    if 'kinopoiskCheckedAtUtc' in row and (not isinstance(row['kinopoiskCheckedAtUtc'], str) or len(row['kinopoiskCheckedAtUtc']) > 40):
-        row.pop('kinopoiskCheckedAtUtc')
+    for field in ['kinopoiskCheckedAtUtc', 'kinopoiskTextAtUtc']:
+        if field in row and (not isinstance(row[field], str) or len(row[field]) > 40):
+            row.pop(field)
+    for field, limit in [('kinopoiskTitle', 200), ('kinopoiskDescription', 2500), ('kinopoiskGenre', 120), ('kinopoiskCountry', 160)]:
+        if field in row and (not isinstance(row[field], str) or not row[field].strip() or len(row[field]) > limit):
+            row.pop(field)
     if 'imdbId' in row and (not isinstance(row['imdbId'], str) or not re.fullmatch(r'tt\d{6,12}', row['imdbId'])):
         row.pop('imdbId')
     for field in ['people', 'awards', 'collections', 'genreKeys', 'countryKeys']:
@@ -221,8 +226,9 @@ def main():
     match_imdb = args.match_imdb == 'yes' or args.match_imdb == 'auto' and now.weekday() == 0
     rows = enrich(rows, limit=args.detail_limit, max_age_days=args.metadata_max_age_days,
                   budget_seconds=args.metadata_budget_seconds, now=now, match_imdb=match_imdb)
-    from kinopoisk_ratings import refresh as refresh_kinopoisk
+    from kinopoisk_ratings import fill_missing_descriptions, refresh as refresh_kinopoisk
     rows, _ = refresh_kinopoisk(rows, os.environ.get('KINOPOISK_API_TOKEN', '').strip(), args.kinopoisk_limit, now)
+    rows = fill_missing_descriptions(rows)
     feed = dict(schemaVersion=1, generatedAtUtc=now.isoformat().replace('+00:00', 'Z'),
                 source='https://w6.zona.plus', metadataVersion=2, items=rows,
                 metadataCoverage=dict(descriptions=sum(bool(row.get('description')) for row in rows),
