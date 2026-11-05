@@ -17,7 +17,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Check the probe
-        run: python3 scripts/test-tmdb-coverage.py
+        run: |
+          python3 scripts/test-tmdb-coverage.py
+          python3 scripts/test-tmdb-feed.py
       - name: Download the published library
         env:
           GH_TOKEN: ${{ github.token }}
@@ -26,9 +28,15 @@ jobs:
         env:
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
         run: python3 scripts/probe-tmdb-coverage.py --catalog probe-input/catalog.json --sample "${{ inputs.sample || '300' }}" --report tmdb-coverage.json
+      - name: Compare TMDB's list of new titles, Russian names and cast photos
+        env:
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+        run: python3 scripts/probe-tmdb-feed.py --catalog probe-input/catalog.json --report tmdb-feed.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: tmdb-coverage
-          path: tmdb-coverage.json
+          path: |
+            tmdb-coverage.json
+            tmdb-feed.json
           if-no-files-found: ignore
