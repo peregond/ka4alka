@@ -56,6 +56,8 @@ def merge_metadata(prior, fresh):
             continue
         if key == 'people':
             merged[key] = merge_people(prior.get('people') or [], value)
+        elif key == 'kinopoisk' and prior.get('kinopoiskId'):
+            continue  # the official API score outranks the page score
         elif key in ['country', 'countryKeys', 'countryKeysComplete'] and prior.get('countryKeysComplete') and not fresh.get('countryKeysComplete'):
             continue
         else:

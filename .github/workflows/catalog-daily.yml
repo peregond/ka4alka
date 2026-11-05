@@ -47,6 +47,7 @@ jobs:
         run: |
           python scripts/test-refresh-library.py
           python scripts/test-library-metadata.py
+          python scripts/test-kinopoisk-ratings.py
           python scripts/test-catalog-text.py
           python scripts/test-catalog-snapshot.py
           python scripts/test-catalog-collections.py
@@ -82,6 +83,7 @@ jobs:
           CATALOG_DETAIL_LIMIT: ${{ inputs.detail_limit || '1000' }}
           CATALOG_METADATA_BUDGET: ${{ inputs.metadata_budget_seconds || '600' }}
           CATALOG_MATCH_IMDB: ${{ inputs.match_imdb || 'auto' }}
+          KINOPOISK_API_TOKEN: ${{ secrets.KINOPOISK_API_TOKEN }}
         run: python scripts/refresh-library.py --previous catalog-previous/catalog.json --output catalog-output/catalog.json --detail-limit $env:CATALOG_DETAIL_LIMIT --metadata-budget-seconds $env:CATALOG_METADATA_BUDGET --match-imdb $env:CATALOG_MATCH_IMDB
       - name: Publish complete library independently of application updates
         shell: pwsh
