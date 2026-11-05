@@ -119,6 +119,22 @@ public partial class MainWindow
             }
             finally{WindowsIntegration.SetStartup(originalStartup);}
             updateActionButton.BringIntoView();await Task.Delay(150);Shot(this,"update-ready-dark");
+            // "Что нового" opens the notes of the offered release in a window of the application, never the browser.
+            var notesRequests=new List<Uri>();var notesPages=new List<Uri>();
+            var notesJson=System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new Dictionary<string,object?>{["tag_name"]="v99.0.0",["name"]="Качалка 99.0.0",["draft"]=false,["prerelease"]=false,["html_url"]="https://github.com/peregond/ka4alka/releases/tag/v99.0.0",["body"]="# Проверка окна\n\n- **Первое** изменение\n- Второе изменение\n\nОписание выпуска."});
+            var notesWindow=CreateReleaseNotes((uri,_)=>{notesRequests.Add(uri);return Task.FromResult(notesJson);},uri=>notesPages.Add(uri));
+            try
+            {
+                notesWindow.Show();await Task.Delay(300);notesWindow.UpdateLayout();
+                Check(notesRequests.Count==1&&notesRequests[0].AbsolutePath.EndsWith("/releases/tags/v99.0.0",StringComparison.Ordinal),"The release notes window did not ask for the offered release.");
+                var notesBody=FindVisual<StackPanel>(notesWindow,b=>b.Name=="ReleaseNotesBody")??throw new Exception("The release notes window has no text area.");
+                Check(notesBody.Children.Count==3&&VisualElements<TextBlock>(notesWindow).Any(t=>t.Text=="Проверка окна")&&VisualElements<TextBlock>(notesWindow).Any(t=>t.Text.Contains("99.0.0")),"The release notes window did not show the title, version and three blocks of the notes.");
+                var notesGitHub=FindVisual<Button>(notesWindow,b=>b.Name=="ReleaseNotesGitHub")??throw new Exception("The release notes window has no GitHub button.");
+                notesGitHub.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+                Check(notesPages.Count==1&&notesPages[0].AbsoluteUri=="https://github.com/peregond/ka4alka/releases/tag/v99.0.0","The release notes window did not offer the release page of the shown notes.");
+                Shot(notesWindow,"release-notes-dark");
+            }
+            finally{notesWindow.Close();}
             // This UI fixture never downloads, invokes the updater, or modifies the firewall.
             preparedUpdateJob=null;updateOffer=null;UpdateStatus(originalStatus);
             using(var setupScope=new SetupWindowScope(CreateFirstRunSetup()))

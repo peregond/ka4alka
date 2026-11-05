@@ -60,7 +60,6 @@ struct ShellCommands: Commands {
     var canGoBack: Bool
     var refreshing: Bool
     var language: String
-    private static let releaseNotes = URL(string: "https://github.com/peregond/ka4alka/releases/latest")
     /// Library section number n opens with Command-n.
     private static func key(for section: Section) -> KeyEquivalent {
         let number = (Section.allCases.firstIndex(of: section) ?? 0) + 1
@@ -100,7 +99,7 @@ struct ShellCommands: Commands {
         }
         CommandGroup(replacing: .help) {
             Button(tr("Что нового в Качалке", "What’s New in Ka4alka")) {
-                if let url = ShellCommands.releaseNotes { NSWorkspace.shared.open(url) }
+                Task { @MainActor in model.releaseNotes = true }
             }
         }
     }

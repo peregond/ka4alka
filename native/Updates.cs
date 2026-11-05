@@ -159,7 +159,7 @@ public partial class MainWindow
         var link=new System.Windows.Documents.Hyperlink(new System.Windows.Documents.Run("Что нового"));link.SetResourceReference(System.Windows.Documents.TextElement.ForegroundProperty,"Accent");
         link.Click+=(_,_)=>
         {
-            try{Process.Start(new ProcessStartInfo(updateOffer?.Manifest.ReleaseNotesUrl??"https://github.com/"+UpdateManifest.Repository+"/releases"){UseShellExecute=true});}
+            try{ShowReleaseNotes();}
             catch(Exception error){UpdateStatus("Не удалось открыть описание обновления: "+error.Message);}
         };
         notes.Inlines.Add(link);actions.Children.Add(notes);

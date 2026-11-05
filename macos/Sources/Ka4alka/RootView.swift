@@ -8,11 +8,13 @@ private enum ShellSheet: Identifiable, Equatable {
     case folder
     case addTorrent
     case pairing(String)
+    case releaseNotes
     var id: String {
         switch self {
         case .folder: return "folder"
         case .addTorrent: return "add-torrent"
         case .pairing(let value): return "pairing:" + value
+        case .releaseNotes: return "release-notes"
         }
     }
 }
@@ -87,6 +89,7 @@ struct RootView: View {
         if model.folderRequired { return ShellSheet.folder }
         if model.addTorrent { return ShellSheet.addTorrent }
         if let prompt = model.pairingPrompt { return ShellSheet.pairing(prompt.id) }
+        if model.releaseNotes { return ShellSheet.releaseNotes }
         return nil
     }
     private var sheetBinding: Binding<ShellSheet?> {
@@ -96,6 +99,7 @@ struct RootView: View {
                 // Only the add sheet can be dismissed by the system. The folder and
                 // pairing sheets close when their own buttons answer them.
                 if next == nil, activeSheet == ShellSheet.addTorrent { model.addTorrent = false }
+                if next == nil, activeSheet == ShellSheet.releaseNotes { model.releaseNotes = false }
             }
         )
     }
@@ -107,6 +111,8 @@ struct RootView: View {
             AddTorrentSheet()
         case .pairing:
             if let prompt = model.pairingPrompt { ShellPairingSheet(prompt: prompt) }
+        case .releaseNotes:
+            ReleaseNotesSheet()
         }
     }
 

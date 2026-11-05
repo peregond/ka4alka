@@ -22,6 +22,28 @@ final class PlatformTests: XCTestCase {
             XCTAssertFalse(MacComponentCatalog.safePath(path), path.debugDescription)
         }
     }
+    func testReleaseNotesParsing() throws {
+        let body: String = "# Качалка 9.9.9 — заголовок\r\n\r\n- **Windows:** новое окно\r\n- Второй пункт\r\n\r\nТекст из\r\nдвух строк."
+        let valid: [String: Any] = ["tag_name": "v9.9.9", "name": "Качалка 9.9.9", "body": body, "draft": false, "prerelease": false,
+                                    "html_url": "https://github.com/peregond/ka4alka/releases/tag/v9.9.9"]
+        let notes: ReleaseNotes = try ReleaseNotesSource.parse(JSONSerialization.data(withJSONObject: valid))
+        XCTAssertEqual(notes.version, "9.9.9")
+        XCTAssertEqual(notes.title, "Качалка 9.9.9 — заголовок")
+        XCTAssertEqual(notes.blocks, [ReleaseNotesBlock.bullet("**Windows:** новое окно"), ReleaseNotesBlock.bullet("Второй пункт"), ReleaseNotesBlock.paragraph("Текст из двух строк.")])
+        let broken: [[String: Any]] = [
+            ["tag_name": "9.9.9"],
+            ["draft": true],
+            ["prerelease": true],
+            ["html_url": "https://example.com/peregond/ka4alka/releases/tag/v9.9.9"],
+            ["html_url": "https://github.com/other/repo/releases/tag/v9.9.9"],
+            ["body": "  "]
+        ]
+        for change in broken {
+            var item: [String: Any] = valid
+            for (key, value) in change { item[key] = value }
+            XCTAssertThrowsError(try ReleaseNotesSource.parse(JSONSerialization.data(withJSONObject: item)), String(describing: change))
+        }
+    }
     func testStableCardDecoding() throws {
         let data = Data(#"{"id":"series:series:yuzhnyi-park","title":"Южный парк","section":"series","year":1997,"rating":"8.2","poster":null,"description":"Описание","genre":"комедия","quality":"Full HD","saved":true,"platform":null}"#.utf8)
         let card = try JSONDecoder().decode(MediaCard.self, from: data)
