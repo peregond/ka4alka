@@ -47,12 +47,54 @@ def score(value):
     return f'{number:.1f}' if 0 < number <= 10 else None
 
 
+def clean(value, limit):
+    """A short Russian text from the service, or None."""
+    if not isinstance(value, str):
+        return None
+    text = re.sub(r'[ \t\xa0]+', ' ', value).strip()
+    return text[:limit] if text else None
+
+
+def film_text(data, current_description=None):
+    """The Russian texts of a film card; a description equal to the one already stored is not stored twice."""
+    found = {}
+    if name := clean(data.get('nameRu'), 200):
+        found['kinopoiskTitle'] = name
+    description = clean(data.get('description'), 2500)
+    if description and description != (current_description or '').strip():
+        found['kinopoiskDescription'] = description
+    for key, field, limit, names in (('kinopoiskGenre', 'genres', 120, 'genre'), ('kinopoiskCountry', 'countries', 160, 'country')):
+        values = [clean(item.get(names), 60) for item in data.get(field) or [] if isinstance(item, dict)]
+        if joined := ', '.join(value for value in values if value)[:limit]:
+            found[key] = joined
+    return found
+
+
+def needs_text(row):
+    """A film with a Kinopoisk id whose card was never read for its Russian texts."""
+    return type(row.get('kinopoiskId')) is int and row['kinopoiskId'] > 0 and not row.get('kinopoiskTextAtUtc')
+
+
+def details(row, token, get=fetch):
+    """The card of a film with a known id: (id, score, texts)."""
+    known = row['kinopoiskId']
+    data = get(f'{BASE}/{known}', token)
+    if not isinstance(data, dict):
+        return known, None, {}
+    return known, score(data.get('ratingKinopoisk')), film_text(data, row.get('description'))
+
+
+def fill_missing_descriptions(rows):
+    """A title without any description shows the Kinopoisk one."""
+    return [dict(row, description=row['kinopoiskDescription']) if not (row.get('description') or '').strip() and row.get('kinopoiskDescription') else row
+            for row in rows]
+
+
 def lookup(row, token, get=fetch):
     """Returns (kinopoiskId, score) for a row; either may be None."""
     known = row.get('kinopoiskId')
     if type(known) is int and known > 0:
-        data = get(f'{BASE}/{known}', token)
-        return (known, score(data.get('ratingKinopoisk'))) if isinstance(data, dict) else (known, None)
+        return details(row, token, get)[:2]
     imdb = row.get('imdbId')
     if not isinstance(imdb, str) or not re.fullmatch(r'tt\d{6,12}', imdb):
         return search(row, token, get)
@@ -102,7 +144,7 @@ def searchable(row):
 
 def settled(row, now):
     """A score of a film from before last year is final: it is kept as is and never asked again."""
-    return bool(row.get('kinopoisk') and row.get('kinopoiskId')) and row['year'] < now.year - 1
+    return bool(row.get('kinopoisk') and row.get('kinopoiskId')) and row['year'] < now.year - 1 and not needs_text(row)
 
 
 def select_rows(rows, limit, now, max_age_days=7, retry_days=30):
@@ -117,7 +159,8 @@ def select_rows(rows, limit, now, max_age_days=7, retry_days=30):
             continue
         recent = row['year'] >= now.year - 1
         checked = stamp(row) or oldest
-        if checked > now + datetime.timedelta(minutes=15) or checked > now - datetime.timedelta(days=max_age_days if recent else retry_days):
+        # A card never read for its texts is read at once, whatever the cooldown.
+        if not needs_text(row) and (checked > now + datetime.timedelta(minutes=15) or checked > now - datetime.timedelta(days=max_age_days if recent else retry_days)):
             continue
         candidates.append((bool(row.get('kinopoisk')), checked, row['id']))
     return [row_id for _, _, row_id in sorted(candidates)[:limit]]
@@ -137,8 +180,13 @@ def refresh(rows, token, limit=450, now=None, get=fetch, pause=0.06):
         if row['id'] not in wanted or stopped:
             result.append(row)
             continue
+        texts = {}
+        failed = False
         try:
-            found_id, found_score = lookup(row, token, get)
+            if needs_text(row) or type(row.get('kinopoiskId')) is int:
+                found_id, found_score, texts = details(row, token, get)
+            else:
+                found_id, found_score = lookup(row, token, get)
         except QuotaReached as error:
             stopped = error.args[0]
             result.append(row)
@@ -147,12 +195,16 @@ def refresh(rows, token, limit=450, now=None, get=fetch, pause=0.06):
             # A failed attempt moves behind untouched titles; its old score stays.
             failures.append(f'{type(error).__name__}: {error}')
             found_id, found_score = row.get('kinopoiskId'), None
+            failed = True
         done += 1
         fresh = dict(row, kinopoiskCheckedAtUtc=now.isoformat().replace('+00:00', 'Z'))
         if found_id:
             fresh['kinopoiskId'] = found_id
         if found_score:
             fresh['kinopoisk'] = found_score
+        if type(row.get('kinopoiskId')) is int and found_id == row['kinopoiskId'] and not failed:
+            fresh.update(texts)
+            fresh['kinopoiskTextAtUtc'] = fresh['kinopoiskCheckedAtUtc']
         result.append(fresh)
         time.sleep(pause)
     if stopped:
