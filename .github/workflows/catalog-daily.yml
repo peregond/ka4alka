@@ -12,6 +12,10 @@ on:
         type: string
         default: '600'
         required: false
+      match_imdb:
+        type: string
+        default: auto
+        required: false
   workflow_dispatch:
     inputs:
       detail_limit:
@@ -21,6 +25,12 @@ on:
       metadata_budget_seconds:
         description: Time budget for starting detail requests (0..1200 seconds)
         default: '600'
+        required: false
+      match_imdb:
+        description: Match titles without an IMDb ID in the official title list (auto = Mondays only; yes; no)
+        type: choice
+        options: [auto, 'yes', 'no']
+        default: auto
         required: false
 permissions:
   contents: write
@@ -71,7 +81,8 @@ jobs:
         env:
           CATALOG_DETAIL_LIMIT: ${{ inputs.detail_limit || '1000' }}
           CATALOG_METADATA_BUDGET: ${{ inputs.metadata_budget_seconds || '600' }}
-        run: python scripts/refresh-library.py --previous catalog-previous/catalog.json --output catalog-output/catalog.json --detail-limit $env:CATALOG_DETAIL_LIMIT --metadata-budget-seconds $env:CATALOG_METADATA_BUDGET
+          CATALOG_MATCH_IMDB: ${{ inputs.match_imdb || 'auto' }}
+        run: python scripts/refresh-library.py --previous catalog-previous/catalog.json --output catalog-output/catalog.json --detail-limit $env:CATALOG_DETAIL_LIMIT --metadata-budget-seconds $env:CATALOG_METADATA_BUDGET --match-imdb $env:CATALOG_MATCH_IMDB
       - name: Publish complete library independently of application updates
         shell: pwsh
         env:

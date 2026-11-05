@@ -193,6 +193,8 @@ def main():
     parser.add_argument('--detail-limit', type=int, default=1000, help='Maximum detail lookups in one daily run')
     parser.add_argument('--metadata-max-age-days', type=int, default=7)
     parser.add_argument('--metadata-budget-seconds', type=int, default=600, help='Stop starting detail requests after this daily budget')
+    parser.add_argument('--match-imdb', choices=['auto', 'yes', 'no'], default='auto',
+                        help='Match titles without an IMDb ID in the official title list; auto does it on Mondays')
     args = parser.parse_args()
     if not 0 <= args.detail_limit <= 1000 or not 1 <= args.metadata_max_age_days <= 365:
         parser.error('Metadata limits must be 0..1000 records and 1..365 days')
@@ -208,8 +210,9 @@ def main():
     now = datetime.datetime.now(datetime.timezone.utc)
     rows = order_library(rows, current, now)
     from library_metadata import enrich
+    match_imdb = args.match_imdb == 'yes' or args.match_imdb == 'auto' and now.weekday() == 0
     rows = enrich(rows, limit=args.detail_limit, max_age_days=args.metadata_max_age_days,
-                  budget_seconds=args.metadata_budget_seconds, now=now)
+                  budget_seconds=args.metadata_budget_seconds, now=now, match_imdb=match_imdb)
     feed = dict(schemaVersion=1, generatedAtUtc=now.isoformat().replace('+00:00', 'Z'),
                 source='https://w6.zona.plus', metadataVersion=2, items=rows,
                 metadataCoverage=dict(descriptions=sum(bool(row.get('description')) for row in rows),
