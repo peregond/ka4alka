@@ -56,6 +56,8 @@ def merge_metadata(prior, fresh):
             continue
         if key == 'people':
             merged[key] = merge_people(prior.get('people') or [], value)
+        elif key == 'kinopoisk' and prior.get('kinopoiskId'):
+            continue  # the official API score outranks the page score
         elif key in ['country', 'countryKeys', 'countryKeysComplete'] and prior.get('countryKeysComplete') and not fresh.get('countryKeysComplete'):
             continue
         else:
@@ -96,6 +98,51 @@ def enrich_one(item, now=None):
     return row
 
 
+BASICS = 'https://datasets.imdbws.com/title.basics.tsv.gz'
+BASICS_KINDS = {'movie': 'movies', 'tvMovie': 'movies', 'tvSeries': 'series', 'tvMiniSeries': 'series'}
+
+
+def basics_lines(url=BASICS):
+    """Stream the official IMDb title list; it is large, so it is never held in memory."""
+    request = urllib.request.Request(url, headers={'User-Agent': 'KachalkaCatalog/0.40'})
+    with urllib.request.urlopen(request, timeout=60) as response, gzip.GzipFile(fileobj=response) as stream:
+        total = 0
+        for line in io.TextIOWrapper(stream, encoding='utf-8', newline='\n'):
+            total += len(line)
+            if total > 2_500_000_000:
+                raise ValueError('Oversized decompressed title list')
+            yield line
+
+
+def match_imdb_ids(rows, lines):
+    """Give titles without an IMDb ID the one official entry of the same name, year and kind.
+
+    Both the original and the shown title are tried, so a Russian production matches its Cyrillic entry.
+    A name that more than one entry shares, and any title already identified, is left alone."""
+    wanted = {}
+    for row in rows:
+        year = row.get('year')
+        if row.get('imdbId') or type(year) is not int or year <= 0:
+            continue
+        for field in ('originalTitle', 'title'):
+            name = normalize(row[field]) if isinstance(row.get(field), str) else ''
+            if name:
+                wanted.setdefault((name, year, row['section']), []).append(row['id'])
+    if not wanted:
+        return rows
+    found = {}
+    for line in lines:
+        parts = line.rstrip('\n').split('\t')
+        if len(parts) < 9 or parts[1] not in BASICS_KINDS or not parts[5].isdigit() or not re.fullmatch(r'tt\d{6,12}', parts[0]):
+            continue
+        section, year = BASICS_KINDS[parts[1]], int(parts[5])
+        for name in {normalize(parts[2]), normalize(parts[3])}:
+            for row_id in wanted.get((name, year, section), ()):
+                found.setdefault(row_id, set()).add(parts[0])
+    return [{**row, 'imdbId': next(iter(found[row['id']]))} if len(found.get(row['id'], ())) == 1 and not row.get('imdbId') else row
+            for row in rows]
+
+
 def official_scores(data, ids):
     scores = {}
     with gzip.GzipFile(fileobj=io.BytesIO(data)) as stream:
@@ -127,7 +174,7 @@ def select_details(rows, limit=1000, now=None, max_age_days=7):
     return sorted(stale, key=lambda row: (checked(row), -row['year'], row['id']))[:limit]
 
 
-def enrich(rows, limit=1000, now=None, max_age_days=7, budget_seconds=600):
+def enrich(rows, limit=1000, now=None, max_age_days=7, budget_seconds=600, match_imdb=False):
     now = now or datetime.datetime.now(datetime.timezone.utc)
     selected = select_details(rows, limit, now, max_age_days)
     deadline = time.monotonic() + max(0, budget_seconds)
@@ -157,6 +204,13 @@ def enrich(rows, limit=1000, now=None, max_age_days=7, budget_seconds=600):
             # prequeued work keeps crawling beyond the daily time budget.
             submit_available()
     rows = [updates.get(x['id'], x) for x in rows]
+    if match_imdb:
+        try:
+            before = sum(bool(x.get('imdbId')) for x in rows)
+            rows = match_imdb_ids(rows, basics_lines())
+            print('IMDb identities:', before, '->', sum(bool(x.get('imdbId')) for x in rows), flush=True)
+        except Exception as error:
+            print('IMDb title matching unavailable; previous identities preserved:', type(error).__name__, flush=True)
     ids = {x['imdbId'] for x in rows if isinstance(x.get('imdbId'), str) and re.fullmatch(r'tt\d{6,12}', x['imdbId'])}
     if ids:
         try:

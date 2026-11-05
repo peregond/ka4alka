@@ -3,6 +3,7 @@ import argparse
 import datetime
 import html
 import json
+import os
 import re
 import time
 import urllib.request
@@ -15,7 +16,8 @@ BUNDLED_CATALOG_PATH = Path(__file__).resolve().parents[1] / 'web-index/app/data
 ITEM_FIELDS = frozenset(['id', 'section', 'title', 'year', 'poster', 'pageUrl',
     'originalTitle', 'description', 'kinopoisk', 'imdb', 'imdbId', 'genre',
     'genreKeys', 'country', 'countryKeys', 'countryKeysComplete', 'people',
-    'awards', 'collections', 'metadataCheckedAtUtc', 'metadataUpdatedAtUtc'])
+    'awards', 'collections', 'metadataCheckedAtUtc', 'metadataUpdatedAtUtc',
+    'kinopoiskId', 'kinopoiskCheckedAtUtc'])
 
 
 def checked_item(value):
@@ -45,6 +47,10 @@ def checked_item(value):
                 row.pop(field)
         except (TypeError, ValueError):
             row.pop(field)
+    if 'kinopoiskId' in row and (type(row['kinopoiskId']) is not int or row['kinopoiskId'] <= 0):
+        row.pop('kinopoiskId')
+    if 'kinopoiskCheckedAtUtc' in row and (not isinstance(row['kinopoiskCheckedAtUtc'], str) or len(row['kinopoiskCheckedAtUtc']) > 40):
+        row.pop('kinopoiskCheckedAtUtc')
     if 'imdbId' in row and (not isinstance(row['imdbId'], str) or not re.fullmatch(r'tt\d{6,12}', row['imdbId'])):
         row.pop('imdbId')
     for field in ['people', 'awards', 'collections', 'genreKeys', 'countryKeys']:
@@ -193,6 +199,10 @@ def main():
     parser.add_argument('--detail-limit', type=int, default=1000, help='Maximum detail lookups in one daily run')
     parser.add_argument('--metadata-max-age-days', type=int, default=7)
     parser.add_argument('--metadata-budget-seconds', type=int, default=600, help='Stop starting detail requests after this daily budget')
+    parser.add_argument('--match-imdb', choices=['auto', 'yes', 'no'], default='auto',
+                        help='Match titles without an IMDb ID in the official title list; auto does it on Mondays')
+    parser.add_argument('--kinopoisk-limit', type=int, default=450,
+                        help='Maximum Kinopoisk API lookups in one run (free plan: 500 a day)')
     args = parser.parse_args()
     if not 0 <= args.detail_limit <= 1000 or not 1 <= args.metadata_max_age_days <= 365:
         parser.error('Metadata limits must be 0..1000 records and 1..365 days')
@@ -208,13 +218,17 @@ def main():
     now = datetime.datetime.now(datetime.timezone.utc)
     rows = order_library(rows, current, now)
     from library_metadata import enrich
+    match_imdb = args.match_imdb == 'yes' or args.match_imdb == 'auto' and now.weekday() == 0
     rows = enrich(rows, limit=args.detail_limit, max_age_days=args.metadata_max_age_days,
-                  budget_seconds=args.metadata_budget_seconds, now=now)
+                  budget_seconds=args.metadata_budget_seconds, now=now, match_imdb=match_imdb)
+    from kinopoisk_ratings import refresh as refresh_kinopoisk
+    rows, _ = refresh_kinopoisk(rows, os.environ.get('KINOPOISK_API_TOKEN', '').strip(), args.kinopoisk_limit, now)
     feed = dict(schemaVersion=1, generatedAtUtc=now.isoformat().replace('+00:00', 'Z'),
                 source='https://w6.zona.plus', metadataVersion=2, items=rows,
                 metadataCoverage=dict(descriptions=sum(bool(row.get('description')) for row in rows),
                     credits=sum(bool(row.get('people')) for row in rows),
-                    imdbScores=sum(bool(row.get('imdb')) for row in rows)))
+                    imdbScores=sum(bool(row.get('imdb')) for row in rows),
+                    kinopoiskScores=sum(bool(row.get('kinopoisk')) for row in rows)))
     from catalog_collections import attach_collections
     attach_collections(feed, Path(__file__).with_name('catalog-collections.json'), now)
     payload = snapshot_bytes(feed)
