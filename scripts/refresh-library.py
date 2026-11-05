@@ -144,6 +144,17 @@ def parse_cards(data, section, path):
     return rows[:60]
 
 
+def order_library(rows, current, now):
+    """Newest first: by year, then in the order of the source's own date-sorted pages.
+
+    The merge keeps every title ever seen in its old position, so a year-only sort left the first page of every
+    section frozen as of the first collection. Titles on the current pages now rise above older ones of the same
+    year, in the source's order; titles that left those pages keep their relative order below the ones still on them."""
+    rank = {row['id']: index for index, row in enumerate(current)}
+    absent = len(rank)
+    return sorted(rows, key=lambda row: (-min(row['year'], now.year), rank.get(row['id'], absent)))
+
+
 def collect():
     items = {}
     for section, path, pages in [('movies', 'movies', 60), ('series', 'tvseries', 10)]:
@@ -192,9 +203,10 @@ def main():
         # A server snapshot can predate titles added to the shipped primary library.
         # Keep those titles while preferring the server's refreshed rich metadata.
         previous = merge_catalog(previous, load_previous(args.previous))
-    rows = merge_catalog(previous, collect())
+    current = collect()
+    rows = merge_catalog(previous, current)
     now = datetime.datetime.now(datetime.timezone.utc)
-    rows.sort(key=lambda row: min(row['year'], now.year), reverse=True)
+    rows = order_library(rows, current, now)
     from library_metadata import enrich
     rows = enrich(rows, limit=args.detail_limit, max_age_days=args.metadata_max_age_days,
                   budget_seconds=args.metadata_budget_seconds, now=now)
