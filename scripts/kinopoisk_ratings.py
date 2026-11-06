@@ -154,13 +154,15 @@ def refresh_people(rows, token, limit=100, now=None, get=fetch, pause=0.06):
 
 
 def fill_missing_texts(rows):
-    """A title that lacks its description, genres or countries shows the Kinopoisk ones.
+    """A title that lacks its description, genres or countries shows the Kinopoisk ones, or else the TMDB ones.
 
     The app reads these fields as they are, so no update of the app is needed."""
-    pairs = (('description', 'kinopoiskDescription'), ('genre', 'kinopoiskGenre'), ('country', 'kinopoiskCountry'))
+    pairs = (('description', ('kinopoiskDescription', 'tmdbOverview')), ('genre', ('kinopoiskGenre', 'tmdbGenre')),
+             ('country', ('kinopoiskCountry', 'tmdbCountry')))
     filled = []
     for row in rows:
-        gaps = {field: row[source] for field, source in pairs if not (row.get(field) or '').strip() and row.get(source)}
+        gaps = {field: next(row[source] for source in sources if row.get(source))
+                for field, sources in pairs if not (row.get(field) or '').strip() and any(row.get(source) for source in sources)}
         if not row.get('people') and row.get('kinopoiskPeople'):
             gaps['people'] = row['kinopoiskPeople']
         filled.append(dict(row, **gaps) if gaps else row)

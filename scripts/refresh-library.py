@@ -18,7 +18,8 @@ ITEM_FIELDS = frozenset(['id', 'section', 'title', 'year', 'poster', 'pageUrl',
     'genreKeys', 'country', 'countryKeys', 'countryKeysComplete', 'people',
     'awards', 'collections', 'metadataCheckedAtUtc', 'metadataUpdatedAtUtc',
     'kinopoiskId', 'kinopoiskCheckedAtUtc', 'kinopoiskTextAtUtc', 'kinopoiskTitle',
-    'kinopoiskDescription', 'kinopoiskGenre', 'kinopoiskCountry', 'kinopoiskPeople', 'kinopoiskPeopleAtUtc'])
+    'kinopoiskDescription', 'kinopoiskGenre', 'kinopoiskCountry', 'kinopoiskPeople', 'kinopoiskPeopleAtUtc', 'tmdbId', 'tmdbCheckedAtUtc',
+    'tmdbTextAtUtc', 'tmdbPoster', 'tmdbOverview', 'tmdbGenre', 'tmdbCountry'])
 
 
 def checked_item(value):
@@ -50,7 +51,14 @@ def checked_item(value):
             row.pop(field)
     if 'kinopoiskId' in row and (type(row['kinopoiskId']) is not int or row['kinopoiskId'] <= 0):
         row.pop('kinopoiskId')
-    for field in ['kinopoiskCheckedAtUtc', 'kinopoiskTextAtUtc', 'kinopoiskPeopleAtUtc']:
+    if 'tmdbId' in row and (type(row['tmdbId']) is not int or row['tmdbId'] <= 0):
+        row.pop('tmdbId')
+    if 'tmdbPoster' in row and (not isinstance(row['tmdbPoster'], str) or not re.fullmatch(r'/[A-Za-z0-9_-]{5,60}\.(jpg|png)', row['tmdbPoster'])):
+        row.pop('tmdbPoster')
+    for field, limit in [('tmdbOverview', 2500), ('tmdbGenre', 120), ('tmdbCountry', 160)]:
+        if field in row and (not isinstance(row[field], str) or not row[field].strip() or len(row[field]) > limit):
+            row.pop(field)
+    for field in ['kinopoiskCheckedAtUtc', 'kinopoiskTextAtUtc', 'kinopoiskPeopleAtUtc', 'tmdbCheckedAtUtc', 'tmdbTextAtUtc']:
         if field in row and (not isinstance(row[field], str) or len(row[field]) > 40):
             row.pop(field)
     for field, limit in [('kinopoiskTitle', 200), ('kinopoiskDescription', 2500), ('kinopoiskGenre', 120), ('kinopoiskCountry', 160)]:
@@ -215,6 +223,7 @@ def main():
                         help='Match titles without an IMDb ID in the official title list; auto does it on Mondays')
     parser.add_argument('--kinopoisk-limit', type=int, default=400,
                         help='Maximum Kinopoisk API lookups in one run (free plan: 500 a day, shared with the cast reads)')
+    parser.add_argument('--tmdb-budget-seconds', type=int, default=300, help='Time budget for TMDB requests')
     parser.add_argument('--kinopoisk-people-limit', type=int, default=100,
                         help='Maximum Kinopoisk cast reads in one run')
     args = parser.parse_args()
@@ -239,6 +248,8 @@ def main():
     token = os.environ.get('KINOPOISK_API_TOKEN', '').strip()
     rows, _ = refresh_kinopoisk(rows, token, args.kinopoisk_limit, now)
     rows, _ = refresh_people(rows, token, args.kinopoisk_people_limit, now)
+    from tmdb_enrich import enrich as enrich_tmdb
+    rows = enrich_tmdb(rows, os.environ.get('TMDB_API_KEY', '').strip(), now, budget_seconds=args.tmdb_budget_seconds)
     rows = fill_missing_texts(rows)
     feed = dict(schemaVersion=1, generatedAtUtc=now.isoformat().replace('+00:00', 'Z'),
                 source='https://w6.zona.plus', metadataVersion=2, items=rows,
