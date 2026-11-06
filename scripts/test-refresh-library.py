@@ -50,6 +50,17 @@ class CollectorTests(unittest.TestCase):
             self.assertNotIn(field, bad)
         self.assertEqual(bad['kinopoiskCountry'], 'США')
 
+    def test_kinopoisk_cast_survives_a_round_trip_and_junk_is_dropped(self):
+        cast = [{'name': 'Иван', 'role': 'Актёры', 'originalName': 'Ivan'}, {'name': 'Мария', 'role': 'Режиссёры'}]
+        kept = module.checked_item(self.item('cast', kinopoiskPeople=cast, kinopoiskPeopleAtUtc='2026-11-06T00:00:00Z'))
+        self.assertEqual(kept['kinopoiskPeople'], cast)
+        self.assertIn('kinopoiskPeopleAtUtc', kept)
+        junk = [{'name': 'X', 'role': 'Композиторы'}, 'text', {'role': 'Актёры'}, {'name': 'Y' * 121, 'role': 'Актёры'}]
+        self.assertNotIn('kinopoiskPeople', module.checked_item(self.item('junk', kinopoiskPeople=junk)))
+        self.assertNotIn('kinopoiskPeople', module.checked_item(self.item('bad', kinopoiskPeople='x')))
+        many = [{'name': f'Актёр {i}', 'role': 'Актёры'} for i in range(30)]
+        self.assertEqual(len(module.checked_item(self.item('many', kinopoiskPeople=many))['kinopoiskPeople']), 20)
+
     def test_titles_new_in_the_source_rise_above_older_ones_of_the_same_year(self):
         now = datetime.datetime(2026, 11, 5, tzinfo=datetime.timezone.utc)
         old = [self.item('old-' + str(index)) for index in range(3)]
