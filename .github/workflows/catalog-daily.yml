@@ -32,8 +32,15 @@ on:
         options: [auto, 'yes', 'no']
         default: auto
         required: false
+      simulate_failure:
+        description: Fail on purpose at the start, to test the alert (no; yes)
+        type: choice
+        options: ['no', 'yes']
+        default: 'no'
+        required: false
 permissions:
   contents: write
+  issues: write
 concurrency:
   group: shared-catalog
   cancel-in-progress: false
@@ -43,6 +50,10 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - name: Simulated failure (alert test)
+        if: ${{ inputs.simulate_failure == 'yes' }}
+        shell: pwsh
+        run: throw 'Simulated failure to test the alert'
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
@@ -54,6 +65,7 @@ jobs:
           python scripts/test-refresh-library.py
           python scripts/test-library-metadata.py
           python scripts/test-kinopoisk-ratings.py
+          python scripts/test-tmdb-enrich.py
           python scripts/test-catalog-text.py
           python scripts/test-catalog-snapshot.py
           python scripts/test-catalog-collections.py
@@ -90,6 +102,7 @@ jobs:
           CATALOG_METADATA_BUDGET: ${{ inputs.metadata_budget_seconds || '600' }}
           CATALOG_MATCH_IMDB: ${{ inputs.match_imdb || 'auto' }}
           KINOPOISK_API_TOKEN: ${{ secrets.KINOPOISK_API_TOKEN }}
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
         run: python scripts/refresh-library.py --previous catalog-previous/catalog.json --output catalog-output/catalog.json --detail-limit $env:CATALOG_DETAIL_LIMIT --metadata-budget-seconds $env:CATALOG_METADATA_BUDGET --match-imdb $env:CATALOG_MATCH_IMDB
       - name: Audit every collected title before publication
         shell: pwsh
@@ -140,3 +153,28 @@ jobs:
           if((Get-FileHash catalog-output/manifest.json).Hash -ne (Get-FileHash catalog-verified/manifest.json).Hash){throw 'Manifest readback checksum mismatch'}
           $feed=Get-Content catalog-verified/catalog.json -Raw | ConvertFrom-Json
           "Published $($feed.items.Count) entries, generated $($feed.generatedAtUtc)." >> $env:GITHUB_STEP_SUMMARY
+      - name: Close the alert after a good run
+        if: success()
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $title='Ежедневное обновление библиотеки упало'
+          $open=@(gh issue list --state open --search "$title in:title" --json number,title | ConvertFrom-Json | Where-Object title -eq $title)
+          foreach($issue in $open){
+            gh issue close $issue.number --comment "Следующий запуск прошёл успешно: $env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
+          }
+      - name: Open an alert when the run fails
+        if: failure()
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $title='Ежедневное обновление библиотеки упало'
+          $url="$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
+          $open=@(gh issue list --state open --search "$title in:title" --json number,title | ConvertFrom-Json | Where-Object title -eq $title)
+          if($open.Count -gt 0){
+            gh issue comment $open[0].number --body "Снова упал: $url"
+          } else {
+            gh issue create --title $title --body "Запуск не опубликовал библиотеку: $url`n`nПрежняя опубликованная версия осталась без изменений, пользователи ничего не потеряли. Обращение закроется само после следующего успешного запуска."
+          }

@@ -15,6 +15,7 @@ import urllib.request
 from library_metadata import normalize
 
 BASE = 'https://kinopoiskapiunofficial.tech/api/v2.2/films'
+STAFF = 'https://kinopoiskapiunofficial.tech/api/v1/staff'
 STOP_STATUSES = (401, 402, 429)  # bad token, daily quota spent, throttled: nothing more today
 
 
@@ -88,14 +89,82 @@ def details(row, token, get=fetch):
     return known, score(data.get('ratingKinopoisk')), film_text(data, row.get('description'))
 
 
+ROLES = {'ACTOR': ('Актёры', 12), 'DIRECTOR': ('Режиссёры', 3), 'OPERATOR': ('Операторы', 2)}
+
+
+def staff_people(data):
+    """Russian names of the cast and crew of a film: a few actors, directors and cinematographers."""
+    people, taken = [], {}
+    for person in data if isinstance(data, list) else []:
+        if not isinstance(person, dict) or person.get('professionKey') not in ROLES:
+            continue
+        role, limit = ROLES[person['professionKey']]
+        name, original = clean(person.get('nameRu'), 120), clean(person.get('nameEn'), 120)
+        shown = name or original
+        if not shown or taken.get(role, 0) >= limit:
+            continue
+        taken[role] = taken.get(role, 0) + 1
+        entry = {'name': shown, 'role': role}
+        if name and original:
+            entry['originalName'] = original
+        people.append(entry)
+    return people
+
+
+def people_rows(rows, limit, now):
+    """Recent films with a known id whose cast was never read; the newest first."""
+    wanted = [row for row in rows if type(row.get('kinopoiskId')) is int and row['kinopoiskId'] > 0
+              and not row.get('kinopoiskPeopleAtUtc') and row['year'] >= now.year - 1]
+    return [row['id'] for row in sorted(wanted, key=lambda row: (-row['year'], row['id']))[:limit]]
+
+
+def refresh_people(rows, token, limit=100, now=None, get=fetch, pause=0.06):
+    """Reads the cast of up to `limit` recent films; returns new rows and the number of requests."""
+    now = now or datetime.datetime.now(datetime.timezone.utc)
+    if not token or limit <= 0:
+        return rows, 0
+    wanted = set(people_rows(rows, limit, now))
+    done, failures, result, stopped = 0, [], [], None
+    for row in rows:
+        if row['id'] not in wanted or stopped:
+            result.append(row)
+            continue
+        try:
+            people = staff_people(get(f"{STAFF}?{urllib.parse.urlencode({'filmId': row['kinopoiskId']})}", token))
+        except QuotaReached as error:
+            stopped = error.args[0]
+            result.append(row)
+            continue
+        except Exception as error:
+            failures.append(f'{type(error).__name__}: {error}')
+            result.append(row)  # not marked as read: it is asked again
+            continue
+        done += 1
+        fresh = dict(row, kinopoiskPeopleAtUtc=now.isoformat().replace('+00:00', 'Z'))
+        if people:
+            fresh['kinopoiskPeople'] = people
+        result.append(fresh)
+        time.sleep(pause)
+    if stopped:
+        print('Kinopoisk cast stopped by HTTP', stopped, 'after', done, 'requests', flush=True)
+    if failures:
+        print('Kinopoisk cast requests failed:', len(failures), 'first:', failures[0][:200], flush=True)
+    print('Kinopoisk cast:', done, 'films read;', sum(bool(x.get('kinopoiskPeople')) for x in result), 'with cast', flush=True)
+    return result, done
+
+
 def fill_missing_texts(rows):
-    """A title that lacks its description, genres or countries shows the Kinopoisk ones.
+    """A title that lacks its description, genres or countries shows the Kinopoisk ones, or else the TMDB ones.
 
     The app reads these fields as they are, so no update of the app is needed."""
-    pairs = (('description', 'kinopoiskDescription'), ('genre', 'kinopoiskGenre'), ('country', 'kinopoiskCountry'))
+    pairs = (('description', ('kinopoiskDescription', 'tmdbOverview')), ('genre', ('kinopoiskGenre', 'tmdbGenre')),
+             ('country', ('kinopoiskCountry', 'tmdbCountry')))
     filled = []
     for row in rows:
-        gaps = {field: row[source] for field, source in pairs if not (row.get(field) or '').strip() and row.get(source)}
+        gaps = {field: next(row[source] for source in sources if row.get(source))
+                for field, sources in pairs if not (row.get(field) or '').strip() and any(row.get(source) for source in sources)}
+        if not row.get('people') and row.get('kinopoiskPeople'):
+            gaps['people'] = row['kinopoiskPeople']
         filled.append(dict(row, **gaps) if gaps else row)
     return filled
 

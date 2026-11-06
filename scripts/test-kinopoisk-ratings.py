@@ -2,7 +2,7 @@ import datetime
 import unittest
 import urllib.error
 
-from kinopoisk_ratings import QuotaReached, details, fill_missing_texts, film_text, lookup, needs_text, refresh, score, search, select_rows
+from kinopoisk_ratings import QuotaReached, details, people_rows, refresh_people, staff_people, fill_missing_texts, film_text, lookup, needs_text, refresh, score, search, select_rows
 from library_metadata import merge_metadata
 
 NOW = datetime.datetime(2026, 11, 5, 5, 0, tzinfo=datetime.timezone.utc)
@@ -173,6 +173,49 @@ class KinopoiskTests(unittest.TestCase):
         self.assertEqual([(x.get('description'), x.get('genre'), x.get('country')) for x in filled],
                          [('Из Кинопоиска', 'драма', 'США'), ('Своё', 'комедия', 'Россия'), ('Из Кинопоиска', 'триллер', None), (None, None, None)])
         self.assertIs(filled[1], rows[1])
+
+    def test_cast_is_taken_in_russian_with_limits_per_role(self):
+        crew = [dict(professionKey='ACTOR', nameRu=f'Актёр {i}', nameEn=f'Actor {i}') for i in range(15)]
+        crew += [dict(professionKey='DIRECTOR', nameRu='Режиссёр', nameEn=''), dict(professionKey='OPERATOR', nameRu='', nameEn='Camera Man'),
+                 dict(professionKey='COMPOSER', nameRu='Композитор'), dict(professionKey='ACTOR', nameRu=' ', nameEn=''), 'junk']
+        people = staff_people(crew)
+        self.assertEqual(sum(1 for p in people if p['role'] == 'Актёры'), 12)
+        self.assertEqual(people[0], {'name': 'Актёр 0', 'role': 'Актёры', 'originalName': 'Actor 0'})
+        self.assertIn({'name': 'Режиссёр', 'role': 'Режиссёры'}, people)
+        self.assertIn({'name': 'Camera Man', 'role': 'Операторы'}, people)
+        self.assertEqual(staff_people({'error': 1}), [])
+
+    def test_cast_is_read_once_for_recent_films_with_an_id_and_newest_first(self):
+        rows = [dict(row('old', kinopoiskId=1), year=2015), row('noid'), row('b', kinopoiskId=2), dict(row('a', kinopoiskId=3), year=2025),
+                row('done', kinopoiskId=4, kinopoiskPeopleAtUtc='2026-11-01T00:00:00Z')]
+        self.assertEqual(people_rows(rows, 10, NOW), ['movies:b', 'movies:a'])
+        self.assertEqual(people_rows(rows, 1, NOW), ['movies:b'])
+
+    def test_cast_refresh_marks_only_successful_reads_and_stops_on_quota(self):
+        seen = []
+        def get(url, token):
+            seen.append(url)
+            if 'filmId=2' in url:
+                raise urllib.error.URLError('down')
+            if 'filmId=3' in url:
+                raise QuotaReached(402)
+            return [dict(professionKey='ACTOR', nameRu='Иван')]
+        rows = [row('a', kinopoiskId=1), row('b', kinopoiskId=2), row('c', kinopoiskId=3), row('d', kinopoiskId=4)]
+        result, done = refresh_people(rows, 't', 10, NOW, get, pause=0)
+        self.assertEqual(done, 1)
+        self.assertEqual(result[0]['kinopoiskPeople'], [{'name': 'Иван', 'role': 'Актёры'}])
+        self.assertIn('kinopoiskPeopleAtUtc', result[0])
+        for later in result[1:]:
+            self.assertNotIn('kinopoiskPeopleAtUtc', later)
+        self.assertEqual(len(seen), 3)
+        self.assertEqual(refresh_people(rows, '', 10, NOW, get)[1], 0)
+
+    def test_a_title_with_no_cast_shows_the_kinopoisk_cast(self):
+        cast = [{'name': 'Иван', 'role': 'Актёры'}]
+        rows = [dict(row('a'), kinopoiskPeople=cast), dict(row('b'), people=[{'name': 'Свой', 'role': 'Актёры'}], kinopoiskPeople=cast),
+                dict(row('c'), people=[], kinopoiskPeople=cast)]
+        filled = fill_missing_texts(rows)
+        self.assertEqual([x['people'] for x in filled], [cast, [{'name': 'Свой', 'role': 'Актёры'}], cast])
 
     def test_page_score_does_not_replace_the_official_one(self):
         self.assertEqual(merge_metadata(row('a', kinopoiskId=3, kinopoisk='8.1'), {'kinopoisk': '7.0'})['kinopoisk'], '8.1')
