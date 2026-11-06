@@ -52,6 +52,7 @@ jobs:
           python3 scripts/test-refresh-library.py
           python3 scripts/test-library-metadata.py
           python3 scripts/test-kinopoisk-ratings.py
+          python3 scripts/test-tmdb-enrich.py
           python3 scripts/test-catalog-text.py
           python3 scripts/test-catalog-snapshot.py
           python3 scripts/test-catalog-collections.py
