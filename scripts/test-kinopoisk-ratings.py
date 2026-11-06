@@ -53,7 +53,7 @@ class KinopoiskTests(unittest.TestCase):
                 dict(row('never', imdbId='tt1000005'), **old),
                 dict(row('no-id-score', imdbId='tt1000006', kinopoisk='6.0'), **old)]
         # A page score without a Kinopoisk id is not final: it is confirmed once through the API.
-        chosen = select_rows(rows, 10, NOW)
+        chosen = select_rows(rows, 10, NOW, text_share=0)
         self.assertNotIn('movies:frozen', chosen)
         self.assertNotIn('movies:miss-recent', chosen)
         self.assertEqual(set(chosen), {'movies:never', 'movies:miss-old', 'movies:lastyear', 'movies:no-id-score'})
@@ -135,6 +135,17 @@ class KinopoiskTests(unittest.TestCase):
         self.assertTrue(needs_text(without, NOW))
         self.assertEqual(select_rows([without], 5, NOW), ['movies:a'])
         self.assertEqual(select_rows([old], 5, NOW), [])
+
+    def test_a_share_of_every_run_is_kept_for_cards_never_read_for_texts(self):
+        unscored = [row(f'u{i}', imdbId=f'tt20000{i:02d}') for i in range(10)]
+        texts = [row(f't{i}', imdbId=f'tt30000{i:02d}', kinopoiskId=100 + i, kinopoisk='7.0', kinopoiskCheckedAtUtc='2026-11-04T00:00:00Z') for i in range(5)]
+        chosen = select_rows(unscored + texts, 8, NOW, text_share=3)
+        self.assertEqual(len(chosen), 8)
+        self.assertEqual(sum(1 for item in chosen if item.startswith('movies:t')), 3)
+        # With no cards waiting, the whole run goes to the others; with a share of zero, the old order holds.
+        self.assertEqual(len(select_rows(unscored, 8, NOW, text_share=3)), 8)
+        self.assertEqual(sum(1 for item in select_rows(unscored + texts, 8, NOW, text_share=0) if item.startswith('movies:t')), 0)
+        self.assertEqual(len(select_rows(unscored + texts, 2, NOW, text_share=5)), 2)
 
     def test_refresh_stores_texts_once_and_failure_does_not_mark_them_read(self):
         card = dict(nameRu='Тест', description='Описание', genres=[dict(genre='драма')], countries=[dict(country='США')], ratingKinopoisk=6.5)

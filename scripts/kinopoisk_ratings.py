@@ -157,11 +157,12 @@ def settled(row, now):
     return bool(row.get('kinopoisk') and row.get('kinopoiskId')) and row['year'] < now.year - 1 and not needs_text(row, now)
 
 
-def select_rows(rows, limit, now, max_age_days=7, retry_days=30):
+def select_rows(rows, limit, now, max_age_days=7, retry_days=30, text_share=25):
     """Weekly for this and last year's titles; older ones only until they have a score.
 
     Never scored titles go first. Old titles that could not be scored are retried monthly.
-    """
+    A few requests of every run are kept for cards never read for their texts, so that the
+    texts accumulate (and the card format is confirmed) while the unscored titles are served."""
     oldest = datetime.datetime.min.replace(tzinfo=datetime.timezone.utc)
     candidates = []
     for row in rows:
@@ -172,8 +173,12 @@ def select_rows(rows, limit, now, max_age_days=7, retry_days=30):
         # A card never read for its texts is read at once, whatever the cooldown.
         if not needs_text(row, now) and (checked > now + datetime.timedelta(minutes=15) or checked > now - datetime.timedelta(days=max_age_days if recent else retry_days)):
             continue
-        candidates.append((bool(row.get('kinopoisk')), checked, row['id']))
-    return [row_id for _, _, row_id in sorted(candidates)[:limit]]
+        candidates.append((bool(row.get('kinopoisk')), checked, row['id'], needs_text(row, now)))
+    ordered = sorted(candidates)
+    texts = [item for item in ordered if item[3]][:max(0, min(text_share, limit))]
+    chosen = {item[2] for item in texts}
+    rest = [item for item in ordered if item[2] not in chosen]
+    return [item[2] for item in (texts + rest)[:limit]]
 
 
 def refresh(rows, token, limit=450, now=None, get=fetch, pause=0.06):
