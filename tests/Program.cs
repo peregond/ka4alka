@@ -98,6 +98,7 @@ await ReleaseFreshnessTests.Run(root);
 await BugReportTests.Run(root);
 await MediaMetadataTests.Run();
 FeatureSummaryTests.Run();
+HeroRotationTests.Run();
 await ZonaMovieMetadataTests.Run();
 await CinemaPortraitTests.Run();
 await PersonProfileLoadingTests.Run();

@@ -135,7 +135,7 @@ public partial class MainWindow
     }
     FrameworkElement BannerSkeleton()
     {
-        var frame=new Border{Name="FeatureSkeleton",CornerRadius=new(22),MinHeight=300,Margin=new(0,0,0,28),Padding=new(36,32,36,32),IsHitTestVisible=false};frame.SetResourceReference(Border.BackgroundProperty,"Panel");
+        var frame=new Border{Name="FeatureSkeleton",CornerRadius=new(0),MinHeight=400,Margin=new(0,0,0,28),Padding=new(94,32,36,58),IsHitTestVisible=false};frame.SetResourceReference(Border.BackgroundProperty,"Panel");
         AutomationProperties.SetName(frame,AppLanguage.T("Загружаем подборку"));
         // The big frame stays flat; the light runs over the title, the line under it and the button.
         var wave=NewShimmer();
