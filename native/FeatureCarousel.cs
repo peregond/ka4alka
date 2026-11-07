@@ -215,8 +215,17 @@ public partial class MainWindow
             view.Meta.Children.Add(badge);
         }
     }
-    // The macOS banner shows no cast line, and neither does this one: the title, the facts and the summary are enough.
-    void UpdateFeaturePeople(FeatureCarouselView view,MediaItem item)=>view.People.Visibility=Visibility.Collapsed;
+    void UpdateFeaturePeople(FeatureCarouselView view,MediaItem item)
+    {
+        if(item.Section=="Игры")
+        {
+            // A game's studio comes with its details, which the games home loads for the banner slides.
+            var studio=gameDetails.TryGetValue(item.Id,out var game)?game.Developers:"";
+            view.People.Text=AppLanguage.T(studio.Length>0?"Разработчик "+studio:"");view.People.Visibility=studio.Length>0&&!featureCompactText?Visibility.Visible:Visibility.Collapsed;return;
+        }
+        // The macOS banner shows no cast line for films and series, and neither does this one: the title, the facts and the summary are enough.
+        view.People.Visibility=Visibility.Collapsed;
+    }
     void UpdateFeatureFavorite(FeatureCarouselView view)
     {
         var saved=view.Bound!=null&&IsSaved(view.Bound);
