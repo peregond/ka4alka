@@ -43,8 +43,10 @@ jobs:
           foreach($name in @('catalog-dark','catalog-light','catalog-dark-125')){
             $path=Join-Path $PWD.Path "test-output/design-modern/$name.png"
             if(-not(Test-Path $path)){Write-Output "Missing $name";continue}
-            $content=[Convert]::ToBase64String([IO.File]::ReadAllBytes($path))
-            gh api -X PUT "repos/$repo/contents/previews/banner-$env:GITHUB_RUN_ID-$name.png" -f message="Banner preview $name" -f content=$content -f branch=ui-previews | Out-Null
+            # The picture goes in a file: as a command-line argument it is too long for Windows.
+            $body=Join-Path $env:RUNNER_TEMP "$name.json"
+            @{message="Banner preview $name";content=[Convert]::ToBase64String([IO.File]::ReadAllBytes($path));branch='ui-previews'} | ConvertTo-Json | Set-Content $body -Encoding utf8NoBOM
+            gh api -X PUT "repos/$repo/contents/previews/banner-$env:GITHUB_RUN_ID-$name.png" --input $body | Out-Null
             if($LASTEXITCODE -ne 0){throw "Cannot store $name"}
             Write-Output "https://raw.githubusercontent.com/$repo/ui-previews/previews/banner-$env:GITHUB_RUN_ID-$name.png"
           }
