@@ -239,7 +239,7 @@ public partial class MainWindow
         {
             var active=index==view.Index;var target=index;
             var dot=new Border{Width=30,Height=28,Cursor=System.Windows.Input.Cursors.Hand,Background=Brushes.Transparent};
-            dot.Child=new Border{Width=active?24:7,Height=7,CornerRadius=new(3.5),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center,Background=active?Brushes.White:(Brush)FindResource("HeroDotOff")};
+            dot.Child=new Border{Width=active?26:8,Height=8,CornerRadius=new(4),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center,Background=active?Brushes.White:(Brush)FindResource("HeroDotOff")};
             AutomationProperties.SetName(dot,AppLanguage.T(view.Slides[index].DisplayTitle));
             dot.MouseLeftButtonUp+=(_,_)=>ShowFeatureSlide(view,target,true);
             view.Dots.Children.Add(dot);

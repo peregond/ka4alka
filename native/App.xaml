@@ -20,7 +20,7 @@
   <!-- The banner of the macOS version: a vertical fade (5% to 78% black, top to bottom) under a side fade (55% black to clear, left to right). -->
   <LinearGradientBrush x:Key="HeroScrimVertical" StartPoint="0.5,0" EndPoint="0.5,1" po:Freeze="True"><GradientStop Color="#0D000000" Offset="0"/><GradientStop Color="#C7000000" Offset="1"/></LinearGradientBrush>
   <LinearGradientBrush x:Key="HeroScrimHorizontal" StartPoint="0,0.5" EndPoint="1,0.5" po:Freeze="True"><GradientStop Color="#8C000000" Offset="0"/><GradientStop Color="#00000000" Offset="1"/></LinearGradientBrush>
-  <SolidColorBrush x:Key="HeroDotOff" Color="#73FFFFFF" po:Freeze="True"/><SolidColorBrush x:Key="HeroBadgeFill" Color="#B8000000" po:Freeze="True"/>
+  <SolidColorBrush x:Key="HeroDotOff" Color="#B3FFFFFF" po:Freeze="True"/><SolidColorBrush x:Key="HeroBadgeFill" Color="#B8000000" po:Freeze="True"/>
   <SolidColorBrush x:Key="PosterBadge" Color="#CC0A0C0F" po:Freeze="True"/><SolidColorBrush x:Key="BannerText" Color="#EEF1F4" po:Freeze="True"/><SolidColorBrush x:Key="BannerMuted" Color="#C9D0D8" po:Freeze="True"/><SolidColorBrush x:Key="BannerDot" Color="#59EEF1F4" po:Freeze="True"/><SolidColorBrush x:Key="BannerChip" Color="#1AEEF1F4" po:Freeze="True"/><SolidColorBrush x:Key="BannerBadgeEdge" Color="#47EEF1F4" po:Freeze="True"/><SolidColorBrush x:Key="BannerEdge" Color="#29EEF1F4" po:Freeze="True"/><SolidColorBrush x:Key="BannerButtonFill" Color="#990A0C0F" po:Freeze="True"/>
   <!-- Use native screen metrics and honor Windows antialiasing at fractional monitor DPI. -->
   <Style TargetType="Window">
