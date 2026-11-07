@@ -92,7 +92,7 @@ public partial class MainWindow
         }
         // The fixture stays outside the window so Loaded cannot request artwork
         // or change the catalog while its sizes are checked. The carousel is a
-        // single 22 px rounded frame without a stroke; its artwork follows it.
+        // single square frame (edge to edge, as the macOS banner) without a stroke; its artwork follows it.
         var savedCarousel=carousel;
         try
         {
@@ -110,8 +110,8 @@ public partial class MainWindow
                 foreach(var scale in new[]{1d,1.25,1.5,2d})
                 {
                     var stage=$"banner-{size.Width}-{scale}";
-                    CheckContour(banner,22,0,scale,stage);
-                    CheckContour(artwork,22,0,scale,stage+"-artwork");
+                    CheckContour(banner,0,0,scale,stage);
+                    CheckContour(artwork,0,0,scale,stage+"-artwork");
                     checks.Add(new{Width=size.Width,Height=size.Height,Scale=scale,AllFourCorners=true});
                     if(scale==1.25&&size.Width==1140)Save(Raster(banner,scale),"banner-primary-normal-125");
                 }

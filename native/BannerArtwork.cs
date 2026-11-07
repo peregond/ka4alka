@@ -6,7 +6,8 @@ namespace Kachalka;
 
 public partial class MainWindow
 {
-    void AddBannerArtwork(Grid artwork,Image backdrop,Image portrait)
+    // hero: the scrims of the catalog banner (as in the macOS version); the detail card keeps its own.
+    void AddBannerArtwork(Grid artwork,Image backdrop,Image portrait,bool hero=false)
     {
         var placeholder=new Grid{Name="BannerPlaceholder",IsHitTestVisible=false};
         placeholder.Children.Add(new Border{Background=(Brush)FindResource("BannerPlaceholderBase")});
@@ -21,7 +22,7 @@ public partial class MainWindow
         var picture=new ImageBrush{Stretch=Stretch.UniformToFill,AlignmentX=AlignmentX.Center,AlignmentY=AlignmentY.Top};
         BindingOperations.SetBinding(picture,ImageBrush.ImageSourceProperty,new Binding("Source"){Source=backdrop});
         artwork.Children.Add(new Border{Background=picture,IsHitTestVisible=false});
-        artwork.Children.Add(new Border{Background=(Brush)FindResource("ScrimHorizontal"),IsHitTestVisible=false});
-        artwork.Children.Add(new Border{Background=(Brush)FindResource("ScrimVertical"),IsHitTestVisible=false});
+        artwork.Children.Add(new Border{Background=(Brush)FindResource(hero?"HeroScrimVertical":"ScrimHorizontal"),IsHitTestVisible=false});
+        artwork.Children.Add(new Border{Background=(Brush)FindResource(hero?"HeroScrimHorizontal":"ScrimVertical"),IsHitTestVisible=false});
     }
 }

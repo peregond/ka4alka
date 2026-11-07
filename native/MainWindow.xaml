@@ -38,6 +38,7 @@
   <Geometry x:Key="IconFilter">M4,6 L20,6 M7,12 L17,12 M10,18 L14,18</Geometry>
   <Geometry x:Key="IconPlay">M7,4 L20,12 7,20 Z</Geometry>
   <Geometry x:Key="IconPause">M8,4 L8,20 M16,4 L16,20</Geometry>
+  <Geometry x:Key="IconSparkle">M12,2 C12.7,7.6 16.4,11.3 22,12 C16.4,12.7 12.7,16.4 12,22 C11.3,16.4 7.6,12.7 2,12 C7.6,11.3 11.3,7.6 12,2 Z</Geometry>
   <Geometry x:Key="IconInfo">M12,3 A9,9 0 1 1 11.99,3 M12,10 L12,17 M12,7 L12,7.1</Geometry>
   <Geometry x:Key="IconFolder">M3,6 L10,6 12,8 21,8 21,20 3,20 Z</Geometry>
   <Geometry x:Key="IconMore">M5,11 A1,1 0 1 1 4.99,11 M12,11 A1,1 0 1 1 11.99,11 M19,11 A1,1 0 1 1 18.99,11</Geometry>
