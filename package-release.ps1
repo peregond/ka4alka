@@ -1,5 +1,5 @@
 param(
- [string]$Version='0.45.2',
+ [string]$Version='0.45.3',
  [string]$ArchivePath='',
  [string]$Repository='peregond/ka4alka',
  [string]$SigningKeyPath=$env:KACHALKA_SIGNING_KEY

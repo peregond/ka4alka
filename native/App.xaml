@@ -17,6 +17,10 @@
   <SolidColorBrush x:Key="BannerPlaceholderTint" Color="#66303F4A" po:Freeze="True"/>
   <LinearGradientBrush x:Key="ScrimHorizontal" StartPoint="0,0.5" EndPoint="1,0.5" po:Freeze="True"><GradientStop Color="#F00A0C0F" Offset="0"/><GradientStop Color="#B80A0C0F" Offset="0.38"/><GradientStop Color="#0F0A0C0F" Offset="0.78"/></LinearGradientBrush>
   <LinearGradientBrush x:Key="ScrimVertical" StartPoint="0.5,1" EndPoint="0.5,0" po:Freeze="True"><GradientStop Color="#CC0A0C0F" Offset="0"/><GradientStop Color="#000A0C0F" Offset="0.45"/></LinearGradientBrush>
+  <!-- The banner of the macOS version: a vertical fade (5% to 78% black, top to bottom) under a side fade (55% black to clear, left to right). -->
+  <LinearGradientBrush x:Key="HeroScrimVertical" StartPoint="0.5,0" EndPoint="0.5,1" po:Freeze="True"><GradientStop Color="#0D000000" Offset="0"/><GradientStop Color="#C7000000" Offset="1"/></LinearGradientBrush>
+  <LinearGradientBrush x:Key="HeroScrimHorizontal" StartPoint="0,0.5" EndPoint="1,0.5" po:Freeze="True"><GradientStop Color="#8C000000" Offset="0"/><GradientStop Color="#00000000" Offset="1"/></LinearGradientBrush>
+  <SolidColorBrush x:Key="HeroDotOff" Color="#B3FFFFFF" po:Freeze="True"/><SolidColorBrush x:Key="HeroBadgeFill" Color="#B8000000" po:Freeze="True"/>
   <SolidColorBrush x:Key="PosterBadge" Color="#CC0A0C0F" po:Freeze="True"/><SolidColorBrush x:Key="BannerText" Color="#EEF1F4" po:Freeze="True"/><SolidColorBrush x:Key="BannerMuted" Color="#C9D0D8" po:Freeze="True"/><SolidColorBrush x:Key="BannerDot" Color="#59EEF1F4" po:Freeze="True"/><SolidColorBrush x:Key="BannerChip" Color="#1AEEF1F4" po:Freeze="True"/><SolidColorBrush x:Key="BannerBadgeEdge" Color="#47EEF1F4" po:Freeze="True"/><SolidColorBrush x:Key="BannerEdge" Color="#29EEF1F4" po:Freeze="True"/><SolidColorBrush x:Key="BannerButtonFill" Color="#990A0C0F" po:Freeze="True"/>
   <!-- Use native screen metrics and honor Windows antialiasing at fractional monitor DPI. -->
   <Style TargetType="Window">
@@ -90,6 +94,24 @@
    <Setter Property="Width" Value="40"/><Setter Property="Height" Value="40"/><Setter Property="MinHeight" Value="0"/><Setter Property="Padding" Value="0"/><Setter Property="Margin" Value="0"/>
   </Style>
   <!-- Round 40x40 control used on top of artwork (carousel arrows). -->
+  <!-- The white pill of the banner's main action, as in the macOS version. -->
+  <Style x:Key="HeroPrimaryButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+   <Setter Property="Background" Value="#FFFFFFFF"/><Setter Property="Foreground" Value="#FF000000"/><Setter Property="BorderThickness" Value="0"/>
+   <Setter Property="Template"><Setter.Value>
+    <ControlTemplate TargetType="Button">
+     <Grid>
+      <Border x:Name="Frame" Background="{TemplateBinding Background}" CornerRadius="22" Padding="{TemplateBinding Padding}"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" RecognizesAccessKey="True" TextElement.Foreground="{TemplateBinding Foreground}"/></Border>
+      <Border x:Name="FocusRing" CornerRadius="22" BorderBrush="#FF000000" BorderThickness="2" Margin="3" Visibility="Collapsed" IsHitTestVisible="False"/>
+     </Grid>
+     <ControlTemplate.Triggers>
+      <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Frame" Property="Background" Value="#E6FFFFFF"/></Trigger>
+      <Trigger Property="IsPressed" Value="True"><Setter TargetName="Frame" Property="Background" Value="#CCFFFFFF"/></Trigger>
+      <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="FocusRing" Property="Visibility" Value="Visible"/></Trigger>
+      <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value=".5"/></Trigger>
+     </ControlTemplate.Triggers>
+    </ControlTemplate>
+   </Setter.Value></Setter>
+  </Style>
   <Style x:Key="RoundIconButton" TargetType="Button" BasedOn="{StaticResource IconButton}">
    <Setter Property="Background" Value="{StaticResource BannerButtonFill}"/><Setter Property="BorderBrush" Value="{StaticResource BannerEdge}"/>
    <Setter Property="Template"><Setter.Value>
