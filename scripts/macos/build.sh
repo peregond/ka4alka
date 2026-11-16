@@ -42,10 +42,17 @@ for language,name in (('ru','Качалка'),('en','Ka4alka')):
     (folder/'InfoPlist.strings').write_text('"CFBundleName" = "'+name+'";\n"CFBundleDisplayName" = "'+name+'";\n',encoding='utf-8')
     (folder/'Localizable.strings').write_text('/* The application localizes its own text. */\n',encoding='utf-8')
 PY
-# Sign nested Mach-O files first. Ad-hoc signing is intentional when an Apple
-# Developer identity has not been configured; it is not Apple notarization.
-find "$bundle/Contents/Resources/engine" -type f \( -name '*.dylib' -o -name 'Kachalka.Engine' -o -name 'createdump' \) -print0 | while IFS= read -r -d '' file; do codesign --force --sign - "$file"; done
-codesign --force --sign - "$bundle"
+# Sign nested Mach-O files first. With APPLE_SIGNING_IDENTITY (a "Developer ID Application" certificate) the app is signed for
+# distribution with the hardened runtime and can be notarized below; without it the signature is ad-hoc, which Gatekeeper
+# does not accept without a manual override.
+entitlements="scripts/macos/entitlements.plist"
+if [[ -n "${APPLE_SIGNING_IDENTITY:-}" ]]; then
+  sign=(codesign --force --timestamp --options runtime --entitlements "$entitlements" --sign "$APPLE_SIGNING_IDENTITY")
+else
+  sign=(codesign --force --sign -)
+fi
+find "$bundle/Contents/Resources/engine" -type f \( -name '*.dylib' -o -name 'Kachalka.Engine' -o -name 'createdump' \) -print0 | while IFS= read -r -d '' file; do "${sign[@]}" "$file"; done
+"${sign[@]}" "$bundle"
 # The installed bundle, ZIP and signed component catalog must describe identical
 # permissions (codesign may create resource files with a restrictive umask).
 python3 - "$bundle" <<'PY'
@@ -55,6 +62,18 @@ for file in Path(sys.argv[1]).rglob('*'):
     if file.is_file(): file.chmod(0o755 if os.access(file,os.X_OK) else 0o644)
 PY
 codesign --verify --deep --strict "$bundle"
+# Notarization (needs APPLE_SIGNING_IDENTITY plus APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD and APPLE_TEAM_ID). The ticket is stapled
+# to the app before the ZIP and DMG are made, so both carry it and the app opens offline.
+notarize=0
+if [[ -n "${APPLE_SIGNING_IDENTITY:-}" && -n "${APPLE_ID:-}" && -n "${APPLE_APP_SPECIFIC_PASSWORD:-}" && -n "${APPLE_TEAM_ID:-}" ]]; then notarize=1; fi
+notary_submit() { xcrun notarytool submit "$1" --apple-id "$APPLE_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait --timeout 30m; }
+if [[ "$notarize" == 1 ]]; then
+  ditto -c -k --keepParent "$bundle" "$output/notarize.zip"
+  notary_submit "$output/notarize.zip"
+  rm -f "$output/notarize.zip"
+  xcrun stapler staple "$bundle"
+  xcrun stapler validate "$bundle"
+fi
 python3 scripts/macos/package.py "$bundle" "$output/Kachalka-macos-$arch.zip"
 if [[ "${KACHALKA_SKIP_DMG:-0}" != 1 ]]; then
   disk="$output/disk"
@@ -62,5 +81,10 @@ if [[ "${KACHALKA_SKIP_DMG:-0}" != 1 ]]; then
   ditto "$bundle" "$disk/Ka4alka.app"
   ln -s /Applications "$disk/Applications"
   hdiutil create -quiet -volname Ka4alka -srcfolder "$disk" -ov -format UDZO "$output/Kachalka-macos-$arch.dmg"
+  if [[ "$notarize" == 1 ]]; then
+    codesign --force --timestamp --sign "$APPLE_SIGNING_IDENTITY" "$output/Kachalka-macos-$arch.dmg"
+    notary_submit "$output/Kachalka-macos-$arch.dmg"
+    xcrun stapler staple "$output/Kachalka-macos-$arch.dmg"
+  fi
 fi
 printf '%s\n' "Built Ka4alka $version for $arch"
