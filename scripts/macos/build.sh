@@ -66,7 +66,28 @@ codesign --verify --deep --strict "$bundle"
 # to the app before the ZIP and DMG are made, so both carry it and the app opens offline.
 notarize=0
 if [[ -n "${APPLE_SIGNING_IDENTITY:-}" && -n "${APPLE_ID:-}" && -n "${APPLE_APP_SPECIFIC_PASSWORD:-}" && -n "${APPLE_TEAM_ID:-}" ]]; then notarize=1; fi
-notary_submit() { xcrun notarytool submit "$1" --apple-id "$APPLE_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait --timeout 90m; }
+# Submits without --wait and polls the status ourselves: the first notarizations of an account queue for an hour, and a dropped
+# connection on the runner must not fail a submission that Apple is still processing.
+notary_auth=(--apple-id "$APPLE_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD" --team-id "$APPLE_TEAM_ID")
+notary_submit() {
+  local id="" attempt status deadline=$((SECONDS + 7200))
+  for attempt in 1 2 3 4 5; do
+    id="$(xcrun notarytool submit "$1" "${notary_auth[@]}" --output-format json 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin).get("id",""))' 2>/dev/null || true)"
+    [[ -n "$id" ]] && break
+    echo "Notarization upload failed (attempt $attempt); retrying."; sleep 20
+  done
+  [[ -n "$id" ]] || { echo "::error::Could not submit $1 for notarization"; return 1; }
+  echo "Notarization submission $id"
+  while (( SECONDS < deadline )); do
+    status="$(xcrun notarytool info "$id" "${notary_auth[@]}" --output-format json 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin).get("status",""))' 2>/dev/null || true)"
+    case "$status" in
+      Accepted) echo "Notarization $id accepted"; return 0;;
+      Invalid|Rejected) xcrun notarytool log "$id" "${notary_auth[@]}" || true; echo "::error::Notarization $id was $status"; return 1;;
+      *) echo "Notarization $id: ${status:-no answer yet}"; sleep 60;;
+    esac
+  done
+  echo "::error::Notarization $id did not finish in time"; return 1
+}
 if [[ "$notarize" == 1 ]]; then
   ditto -c -k --keepParent "$bundle" "$output/notarize.zip"
   notary_submit "$output/notarize.zip"
