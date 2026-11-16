@@ -68,8 +68,8 @@ notarize=0
 if [[ -n "${APPLE_SIGNING_IDENTITY:-}" && -n "${APPLE_ID:-}" && -n "${APPLE_APP_SPECIFIC_PASSWORD:-}" && -n "${APPLE_TEAM_ID:-}" ]]; then notarize=1; fi
 # Submits without --wait and polls the status ourselves: the first notarizations of an account queue for an hour, and a dropped
 # connection on the runner must not fail a submission that Apple is still processing.
-notary_auth=(--apple-id "$APPLE_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD" --team-id "$APPLE_TEAM_ID")
 notary_submit() {
+  local notary_auth=(--apple-id "${APPLE_ID:-}" --password "${APPLE_APP_SPECIFIC_PASSWORD:-}" --team-id "${APPLE_TEAM_ID:-}")
   local id="" attempt status deadline=$((SECONDS + 7200))
   for attempt in 1 2 3 4 5; do
     id="$(xcrun notarytool submit "$1" "${notary_auth[@]}" --output-format json 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin).get("id",""))' 2>/dev/null || true)"
