@@ -66,7 +66,7 @@ codesign --verify --deep --strict "$bundle"
 # to the app before the ZIP and DMG are made, so both carry it and the app opens offline.
 notarize=0
 if [[ -n "${APPLE_SIGNING_IDENTITY:-}" && -n "${APPLE_ID:-}" && -n "${APPLE_APP_SPECIFIC_PASSWORD:-}" && -n "${APPLE_TEAM_ID:-}" ]]; then notarize=1; fi
-notary_submit() { xcrun notarytool submit "$1" --apple-id "$APPLE_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait --timeout 30m; }
+notary_submit() { xcrun notarytool submit "$1" --apple-id "$APPLE_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait --timeout 90m; }
 if [[ "$notarize" == 1 ]]; then
   ditto -c -k --keepParent "$bundle" "$output/notarize.zip"
   notary_submit "$output/notarize.zip"

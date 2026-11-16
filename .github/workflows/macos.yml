@@ -30,7 +30,8 @@ jobs:
           - runner: macos-15-intel
             arch: x64
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 60
+    # Apple's first notarizations of a new account can take over an hour.
+    timeout-minutes: 150
     env:
       KACHALKA_DATA: ${{ github.workspace }}/test-output/macos/profile
     steps:
