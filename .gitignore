@@ -53,3 +53,9 @@ __pycache__/
 **/.build/
 **/.swiftpm/
 *.dmg
+android/.gradle/
+android/**/build/
+android/local.properties
+android/.kotlin/
+*.keystore
+*.jks
