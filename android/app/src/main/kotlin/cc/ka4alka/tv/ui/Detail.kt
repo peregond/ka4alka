@@ -137,11 +137,11 @@ private fun Cast(people: List<Person>) {
         Text("В ролях", color = Color.White, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 14.dp))
         LazyRow(Modifier.bleed(56.dp), horizontalArrangement = Arrangement.spacedBy(22.dp), contentPadding = PaddingValues(start = 56.dp, end = 56.dp, top = 8.dp, bottom = 8.dp)) {
             items(people, key = { it.role + it.name }) { person ->
-                // Everything in a card is left-aligned to the photo: a square with rounded corners, then the name, then the role.
-                Column(Modifier.width(124.dp), horizontalAlignment = Alignment.Start) {
-                    Poster(person.photoUrl, Modifier.size(124.dp), RoundedCornerShape(22.dp), person = true)
-                    Text(person.name, color = Color.White, style = MaterialTheme.typography.bodyMedium, minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = androidx.compose.ui.text.style.TextAlign.Start, modifier = Modifier.fillMaxWidth().padding(top = 10.dp))
-                    Text(if (person.role.startsWith("Режисс")) "Режиссёр" else "Актёр", color = KD.textTertiary, fontSize = 13.sp, modifier = Modifier.fillMaxWidth().padding(top = 2.dp))
+                // Round photo, then the name and the role, all centred on the photo; names reserve two lines so the roles line up.
+                Column(Modifier.width(120.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Poster(person.photoUrl, Modifier.size(104.dp), CircleShape, person = true)
+                    Text(person.name, color = Color.White, style = MaterialTheme.typography.bodyMedium, minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 10.dp))
+                    Text(if (person.role.startsWith("Режисс")) "Режиссёр" else "Актёр", color = KD.textTertiary, fontSize = 13.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 2.dp))
                 }
             }
         }
