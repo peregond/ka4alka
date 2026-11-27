@@ -37,6 +37,7 @@ import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.unit.dp
@@ -68,10 +69,19 @@ fun AppShell(vm: AppViewModel) {
     // Focus goes into the page whenever it changes, so the rail stays collapsed until the user steps left.
     val focusManager = LocalFocusManager.current
     var railFocused by remember { mutableStateOf(true) }
+    val railProgress by androidx.compose.animation.core.animateFloatAsState(if (railFocused) 1f else 0f, label = "railProgress")
     val ready = library is LibraryState.Ready
     LaunchedEffect(screen, ready) { delay(500); if (railFocused) focusManager.moveFocus(FocusDirection.Right) }
-    Box(Modifier.fillMaxSize().background(Color.Black)) {
-        Box(Modifier.fillMaxSize().padding(start = 92.dp)) {
+    Box(Modifier.fillMaxSize().background(Color.Black).background(Brush.radialGradient(listOf(Color(0x2E5BE3B5), Color.Transparent), center = androidx.compose.ui.geometry.Offset(0f, 0f), radius = 1500f))) {
+        // While the menu is open the page slides aside, shrinks a little and dims.
+        Box(
+            Modifier.fillMaxSize().padding(start = 84.dp).graphicsLayer {
+                val shift = 70.dp.toPx() * railProgress
+                translationX = shift; alpha = 1f - 0.55f * railProgress
+                scaleX = 1f - 0.04f * railProgress; scaleY = scaleX
+                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(1f, 0.5f)
+            },
+        ) {
             when (val state = library) {
                 LibraryState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(18.dp)) {
@@ -97,25 +107,29 @@ fun AppShell(vm: AppViewModel) {
                 }
             }
         }
-        if (screen.isTopLevel) Rail(vm, screen) { railFocused = it }
+        if (screen.isTopLevel) Rail(vm, screen, railFocused) { railFocused = it }
     }
 }
 
 @Composable
-private fun Rail(vm: AppViewModel, current: Screen, onFocus: (Boolean) -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
-    val width by animateDpAsState(if (expanded) 280.dp else 92.dp, label = "railWidth")
-    Row(Modifier.fillMaxHeight().width(width).background(Brush.horizontalGradient(listOf(if (expanded) Color(0xFA000000) else Color(0x99000000), if (expanded) Color(0xE6000000) else Color.Transparent, Color.Transparent))).onFocusChanged { expanded = it.hasFocus; onFocus(it.hasFocus) }) {
-        Column(Modifier.fillMaxHeight().width(280.dp).padding(start = 14.dp, top = 28.dp), verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically)) {
+private fun Rail(vm: AppViewModel, current: Screen, open: Boolean, onFocus: (Boolean) -> Unit) {
+    val width by animateDpAsState(if (open) 250.dp else 72.dp, label = "railWidth")
+    Box(
+        Modifier.padding(start = 12.dp, top = 12.dp, bottom = 12.dp).fillMaxHeight().width(width)
+            .clip(RoundedCornerShape(32.dp))
+            .background(if (open) Color(0xF2171D1A) else Color.Transparent)
+            .onFocusChanged { onFocus(it.hasFocus) },
+    ) {
+        Column(Modifier.fillMaxHeight().padding(horizontal = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically)) {
             for (item in destinations) {
                 val selected = item.screen == current
-                Focusable(onClick = { vm.open(item.screen) }, modifier = Modifier.width(if (expanded) 240.dp else 64.dp), shape = RoundedCornerShape(32.dp), focusedScale = 1.0f) { focused ->
+                Focusable(onClick = { vm.open(item.screen) }, modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(26.dp), focusedScale = 1.0f, ring = false) { focused ->
                     Row(
-                        Modifier.height(60.dp).background(if (focused) Color.White else if (selected) Color(0x33FFFFFF) else Color.Transparent).padding(horizontal = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(18.dp),
+                        Modifier.fillMaxSize().background(if (focused) KD.accent else if (selected && open) KD.secondaryContainer else Color.Transparent).padding(horizontal = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
-                        Icon(item.icon, item.label, tint = if (focused) KD.accentInk else if (selected) KD.accent else Color.White, modifier = Modifier.size(32.dp))
-                        if (expanded) Text(item.label, color = if (focused) KD.accentInk else Color.White, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+                        Icon(item.icon, item.label, tint = if (focused) KD.accentInk else if (selected) KD.accent else Color.White, modifier = Modifier.size(28.dp))
+                        if (open) Text(item.label, color = if (focused) KD.accentInk else if (selected) KD.onSecondaryContainer else Color.White, style = MaterialTheme.typography.titleSmall, maxLines = 1)
                     }
                 }
             }

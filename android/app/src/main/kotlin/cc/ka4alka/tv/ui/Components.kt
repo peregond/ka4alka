@@ -51,7 +51,7 @@ import java.util.Locale
 fun Focusable(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(14.dp),
+    shape: Shape = RoundedCornerShape(16.dp),
     focusedScale: Float = 1.06f,
     ring: Boolean = true,
     content: @Composable BoxScope.(focused: Boolean) -> Unit,
@@ -98,12 +98,12 @@ fun RoundButton(icon: ImageVector, description: String, onClick: () -> Unit, mod
 /** A filter chip (genre, season, limit). Selected chips are filled with the accent. */
 @Composable
 fun Chip(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Focusable(onClick = onClick, modifier = modifier.height(44.dp), shape = CircleShape, focusedScale = 1.06f) { focused ->
+    Focusable(onClick = onClick, modifier = modifier.height(44.dp), shape = RoundedCornerShape(14.dp), focusedScale = 1.06f) { focused ->
         Box(
-            Modifier.background(if (selected) KD.accent else if (focused) KD.surfaceHigh else KD.surface).padding(horizontal = 22.dp).height(44.dp),
+            Modifier.background(if (selected) KD.secondaryContainer else if (focused) KD.surfaceHigh else KD.surface).padding(horizontal = 22.dp).height(44.dp),
             contentAlignment = Alignment.Center,
         ) {
-            Text(text, color = if (selected) KD.accentInk else Color.White, style = MaterialTheme.typography.titleSmall, maxLines = 1)
+            Text(text, color = if (selected) KD.onSecondaryContainer else Color.White, style = MaterialTheme.typography.titleSmall, maxLines = 1)
         }
     }
 }
@@ -137,7 +137,7 @@ fun Poster(url: String?, modifier: Modifier = Modifier, shape: Shape = RoundedCo
 @Composable
 fun PosterCard(title: Title, onClick: () -> Unit, modifier: Modifier = Modifier, width: Int = 176) {
     Column(modifier.width(width.dp)) {
-        Focusable(onClick = onClick, modifier = Modifier.width(width.dp).height((width * 3 / 2).dp)) {
+        Focusable(onClick = onClick, modifier = Modifier.width(width.dp).height((width * 3 / 2).dp), shape = RoundedCornerShape(20.dp)) {
             Poster(title.poster, Modifier.fillMaxSize(), RoundedCornerShape(0.dp))
             val rating = title.rating
             if (rating != null) RatingBadge(rating, title.ratingSource ?: "", Modifier.align(Alignment.TopEnd).padding(8.dp))

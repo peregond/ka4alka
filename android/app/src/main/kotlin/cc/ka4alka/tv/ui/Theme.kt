@@ -4,6 +4,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -15,8 +18,11 @@ object KD {
     val accentFill = Color(0xFF1ABF62)
     val accentInk = Color(0xFF06140F)
     val background = Color(0xFF000000)
-    val surface = Color(0xFF1C1C1E)
-    val surfaceHigh = Color(0xFF2C2C2E)
+    // Tonal surfaces tinted toward the brand mint, as Material 3 derives them from the accent colour.
+    val surface = Color(0xFF171D1A)
+    val surfaceHigh = Color(0xFF232B27)
+    val secondaryContainer = Color(0xFF1B4A3B)
+    val onSecondaryContainer = Color(0xFFB8F5DF)
     val hairline = Color(0xFF3A3A3C)
     val text = Color.White
     val textSecondary = Color(0xB3FFFFFF)
@@ -47,16 +53,20 @@ private val tvTypography = Typography(
 
 @Composable
 fun KachalkaTheme(content: @Composable () -> Unit) {
+    // Designed for a 55-65" screen seen from a sofa: everything is drawn a fifth smaller than the 320 dpi default, so more fits on screen.
+    val base = LocalDensity.current
+    CompositionLocalProvider(LocalDensity provides Density(base.density * 0.8f, base.fontScale)) {
     MaterialTheme(
         colorScheme = darkColorScheme(
             primary = KD.accent, onPrimary = KD.accentInk,
             secondary = KD.accentFill, onSecondary = KD.accentInk,
             background = KD.background, onBackground = KD.text,
             surface = KD.surface, onSurface = KD.text,
-            surfaceVariant = KD.surfaceHigh, onSurfaceVariant = KD.textSecondary,
+            surfaceVariant = KD.surfaceHigh, secondaryContainer = KD.secondaryContainer, onSecondaryContainer = KD.onSecondaryContainer, onSurfaceVariant = KD.textSecondary,
             outline = KD.hairline, error = KD.danger,
         ),
         typography = tvTypography,
         content = content,
     )
+    }
 }

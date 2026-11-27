@@ -69,9 +69,11 @@ fun HomeScreen(vm: AppViewModel, library: Library) {
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
     // Taking focus must not leave the page scrolled past the top of the banner.
     LaunchedEffect(library) { delay(1200); if (listState.firstVisibleItemIndex == 0) listState.scrollToItem(0) }
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
+    val heroH = maxHeight * 0.72f
     LazyColumn(Modifier.fillMaxSize(), state = listState, verticalArrangement = Arrangement.spacedBy(30.dp)) {
         if (update is UpdateUi.Available) item { UpdateBanner(vm, update as UpdateUi.Available) }
-        if (hero.isNotEmpty()) item { HeroBanner(vm, hero) }
+        if (hero.isNotEmpty()) item { HeroBanner(vm, hero, heroH) }
         items(shelves, key = { it.id }) { shelf ->
             Column {
                 SectionTitle(shelf.title)
@@ -81,6 +83,7 @@ fun HomeScreen(vm: AppViewModel, library: Library) {
             }
         }
         item { Box(Modifier.height(60.dp)) }
+    }
     }
 }
 
@@ -101,9 +104,7 @@ private fun UpdateBanner(vm: AppViewModel, update: UpdateUi.Available) {
 
 /** The big banner on top of the home page: wide artwork, scrims, title, rating and two actions. */
 @Composable
-fun HeroBanner(vm: AppViewModel, items: List<Title>) {
-    // A 1080p TV is 540 dp tall: the banner takes about two thirds and the first shelf peeks out below it.
-    val heroHeight = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * 0.77f).dp.coerceIn(340.dp, 560.dp)
+fun HeroBanner(vm: AppViewModel, items: List<Title>, heroHeight: androidx.compose.ui.unit.Dp) {
     var index by remember { mutableIntStateOf(0) }
     var restart by remember { mutableIntStateOf(0) }
     val backdrops by vm.backdrops.collectAsStateWithLifecycleCompat()
