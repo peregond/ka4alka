@@ -1,6 +1,9 @@
 name: Android TV screenshots
 on:
   workflow_dispatch:
+  push:
+    branches: ['claude/awesome-bohr-**']
+    paths: ['.github/workflows/android-preview.yml', 'scripts/android/shots.sh']
 permissions:
   contents: write
 jobs:
