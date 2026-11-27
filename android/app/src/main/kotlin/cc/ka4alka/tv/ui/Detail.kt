@@ -135,7 +135,7 @@ private fun Cast(people: List<Person>) {
         LazyRow(Modifier.bleed(56.dp), horizontalArrangement = Arrangement.spacedBy(22.dp), contentPadding = PaddingValues(start = 56.dp, end = 56.dp, top = 8.dp, bottom = 8.dp)) {
             items(people, key = { it.role + it.name }) { person ->
                 Column(Modifier.width(110.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Poster(person.photoUrl, Modifier.size(96.dp), CircleShape)
+                    Poster(person.photoUrl, Modifier.size(96.dp), CircleShape, person = true)
                     Text(person.name, color = Color.White, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp))
                     if (person.role.startsWith("Режисс")) Text("Режиссёр", color = KD.textTertiary, fontSize = 13.sp)
                 }

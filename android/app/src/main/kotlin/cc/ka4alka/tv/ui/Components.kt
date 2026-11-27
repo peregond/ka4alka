@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Person
 import coil.compose.AsyncImage
 import cc.ka4alka.core.Title
 import java.util.Locale
@@ -127,10 +128,11 @@ fun TagText(text: String, modifier: Modifier = Modifier, color: Color = Color.Wh
 }
 
 @Composable
-fun Poster(url: String?, modifier: Modifier = Modifier, shape: Shape = RoundedCornerShape(12.dp)) {
+fun Poster(url: String?, modifier: Modifier = Modifier, shape: Shape = RoundedCornerShape(12.dp), person: Boolean = false) {
     Box(modifier.clip(shape).background(KD.surface), contentAlignment = Alignment.Center) {
+        // The placeholder stays under the picture, so a photo that fails to load still shows an icon instead of an empty circle.
+        Icon(if (person) Icons.Filled.Person else Icons.Filled.Movie, null, tint = KD.textTertiary, modifier = Modifier.size(if (person) 40.dp else 48.dp))
         if (url != null) AsyncImage(model = url, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-        else Icon(Icons.Filled.Movie, null, tint = KD.textTertiary, modifier = Modifier.size(48.dp))
     }
 }
 
