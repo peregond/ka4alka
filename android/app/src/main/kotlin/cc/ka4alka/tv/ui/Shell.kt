@@ -109,7 +109,8 @@ fun AppShell(vm: AppViewModel) {
                 }
             }
         }
-        if (screen.isTopLevel) Rail(vm, screen, railFocused) { railFocused = it }
+        // The rail stays on every page (also on a title page), so the left strip is never empty.
+        Rail(vm, screen, railFocused) { railFocused = it }
     }
 }
 
