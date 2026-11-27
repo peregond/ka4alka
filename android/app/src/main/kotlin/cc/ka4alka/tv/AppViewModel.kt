@@ -106,6 +106,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         if (screen.isTopLevel) { stack.clear(); stack.add(screen) } else stack.add(screen)
     }
 
+    /** Opens a top-level page by name; used by the launcher intent (and by the screenshot script). */
+    fun openByName(name: String?) {
+        when (name) {
+            "home" -> open(Screen.Home); "movies" -> open(Screen.Movies); "series" -> open(Screen.Series)
+            "search" -> open(Screen.Search); "saved" -> open(Screen.Saved); "downloads" -> open(Screen.Downloads); "settings" -> open(Screen.Settings)
+        }
+    }
+
     /** Returns false when there is nothing left to go back to. */
     fun back(): Boolean {
         if (current is Screen.Player) { stopPlayback(); stack.removeAt(stack.lastIndex); return true }

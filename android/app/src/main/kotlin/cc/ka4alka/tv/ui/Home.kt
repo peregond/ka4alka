@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Favorite
@@ -35,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -120,7 +122,10 @@ fun HeroBanner(vm: AppViewModel, items: List<Title>) {
             Box(Modifier.fillMaxSize()) {
                 val wide = backdrops[item.id]
                 if (wide != null) AsyncImage(wide, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                else if (item.poster != null) AsyncImage(item.poster, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().blur(36.dp))
+                else if (item.poster != null) {
+                    AsyncImage(item.poster, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().blur(60.dp).alpha(0.55f))
+                    Poster(item.poster, Modifier.align(Alignment.CenterEnd).padding(end = 130.dp).width(300.dp).height(450.dp), RoundedCornerShape(18.dp))
+                }
                 Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0x33000000), Color(0x00000000), Color(0xD9000000), Color.Black))))
                 Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(Color(0xE6000000), Color(0x99000000), Color(0x00000000)))))
                 HeroText(vm, item, item.id in saved)

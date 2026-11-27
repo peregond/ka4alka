@@ -111,7 +111,7 @@ fun Chip(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifie
 @Composable
 fun RatingBadge(value: Double, source: String, modifier: Modifier = Modifier) {
     val color = if (source == "КП") KD.kinopoisk else KD.imdb
-    Row(modifier.clip(RoundedCornerShape(8.dp)).background(Color(0x40FFFFFF)).padding(horizontal = 10.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(modifier.clip(RoundedCornerShape(8.dp)).background(Color(0xB3000000)).padding(horizontal = 10.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(source, color = color, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
         Text(String.format(Locale.US, "%.1f", value), color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
     }

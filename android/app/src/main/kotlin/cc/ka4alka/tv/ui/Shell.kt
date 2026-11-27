@@ -2,6 +2,7 @@ package cc.ka4alka.tv.ui
 
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,12 +27,15 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -42,6 +46,7 @@ import cc.ka4alka.tv.AppViewModel
 import cc.ka4alka.tv.LibraryState
 import cc.ka4alka.tv.Screen
 import cc.ka4alka.tv.isTopLevel
+import kotlinx.coroutines.delay
 
 private data class Destination(val screen: Screen, val label: String, val icon: ImageVector)
 
@@ -61,8 +66,12 @@ fun AppShell(vm: AppViewModel) {
     val library by vm.library.collectAsStateWithLifecycleCompat()
     val screen = vm.current
     if (screen is Screen.Player) { PlayerScreen(vm); return }
+    // Focus goes into the page whenever it changes, so the rail stays collapsed until the user steps left.
+    val content = remember { FocusRequester() }
+    val ready = library is LibraryState.Ready
+    LaunchedEffect(screen, ready) { delay(300); runCatching { content.requestFocus() } }
     Box(Modifier.fillMaxSize().background(Color.Black)) {
-        Box(Modifier.fillMaxSize().padding(start = 92.dp)) {
+        Box(Modifier.fillMaxSize().padding(start = 92.dp).focusRequester(content).focusGroup()) {
             when (val state = library) {
                 LibraryState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(18.dp)) {
@@ -96,7 +105,7 @@ fun AppShell(vm: AppViewModel) {
 private fun Rail(vm: AppViewModel, current: Screen) {
     var expanded by remember { mutableStateOf(false) }
     val width by animateDpAsState(if (expanded) 280.dp else 92.dp, label = "railWidth")
-    Row(Modifier.fillMaxHeight().width(width).background(Brush.horizontalGradient(listOf(if (expanded) Color(0xF2000000) else Color(0xB3000000), Color.Transparent))).onFocusChanged { expanded = it.hasFocus }) {
+    Row(Modifier.fillMaxHeight().width(width).background(Brush.horizontalGradient(listOf(if (expanded) Color(0xFA000000) else Color(0x99000000), if (expanded) Color(0xE6000000) else Color.Transparent, Color.Transparent))).onFocusChanged { expanded = it.hasFocus }) {
         Column(Modifier.fillMaxHeight().width(280.dp).padding(start = 14.dp, top = 28.dp), verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically)) {
             for (item in destinations) {
                 val selected = item.screen == current
