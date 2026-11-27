@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Runs inside the Android TV emulator: walks through the app with remote keys and saves screenshots.
-set -u  # screenshots, fourth pass
+set -u  # screenshots, fifth pass
 out="${1:-shots}"; apk="$2"; mkdir -p "$out"
 adb install -r "$apk" >/dev/null
 adb shell settings put global window_animation_scale 0; adb shell settings put global transition_animation_scale 0; adb shell settings put global animator_duration_scale 0
@@ -11,17 +11,17 @@ adb shell am start -n cc.ka4alka.tv/.MainActivity >/dev/null
 shot 01-loading 3
 sleep 40
 shot 02-home 3
-key KEYCODE_DPAD_LEFT
-shot 03-rail
-key KEYCODE_DPAD_RIGHT
-key KEYCODE_DPAD_DOWN KEYCODE_DPAD_DOWN
-shot 04-home-shelves
-key KEYCODE_DPAD_UP KEYCODE_DPAD_UP KEYCODE_DPAD_UP
 key KEYCODE_DPAD_CENTER
 sleep 30
 shot 05-detail 3
 key KEYCODE_DPAD_DOWN KEYCODE_DPAD_DOWN KEYCODE_DPAD_DOWN
 shot 06-detail-releases
+key KEYCODE_BACK
+sleep 3
+key KEYCODE_DPAD_DOWN
+shot 04-home-shelves 2
+key KEYCODE_DPAD_UP KEYCODE_DPAD_LEFT
+shot 03-rail 2
 go movies 8; shot 07-movies 3
 key KEYCODE_DPAD_DOWN KEYCODE_DPAD_DOWN KEYCODE_DPAD_DOWN
 shot 08-movies-scrolled 2

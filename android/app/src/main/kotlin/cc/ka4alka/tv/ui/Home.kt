@@ -99,6 +99,8 @@ private fun UpdateBanner(vm: AppViewModel, update: UpdateUi.Available) {
 /** The big banner on top of the home page: wide artwork, scrims, title, rating and two actions. */
 @Composable
 fun HeroBanner(vm: AppViewModel, items: List<Title>) {
+    // A 1080p TV is 540 dp tall: the banner takes about two thirds and the first shelf peeks out below it.
+    val heroHeight = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * 0.68f).dp.coerceIn(340.dp, 560.dp)
     var index by remember { mutableIntStateOf(0) }
     var restart by remember { mutableIntStateOf(0) }
     val backdrops by vm.backdrops.collectAsStateWithLifecycleCompat()
@@ -109,7 +111,7 @@ fun HeroBanner(vm: AppViewModel, items: List<Title>) {
     }
     val step: (Int) -> Unit = { delta -> index = Math.floorMod(index + delta, items.size); restart++ }
     Box(
-        Modifier.fillMaxWidth().height(470.dp).onPreviewKeyEvent { event ->
+        Modifier.fillMaxWidth().height(heroHeight).onPreviewKeyEvent { event ->
             if (event.type == KeyEventType.KeyDown && items.size > 1) when (event.key) {
                 Key.DirectionRight -> { step(1); true }
                 Key.DirectionLeft -> if (index > 0) { step(-1); true } else false
@@ -133,12 +135,12 @@ fun HeroBanner(vm: AppViewModel, items: List<Title>) {
         }
         // The buttons stay put while slides change, so remote focus is never lost to a slide swap.
         val current = items[index]
-        Row(Modifier.align(Alignment.BottomStart).padding(start = 56.dp, bottom = 62.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        Row(Modifier.align(Alignment.BottomStart).padding(start = 56.dp, bottom = 44.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             PillButton("Подробнее", onClick = { vm.open(Screen.Detail(current.id)) }, primary = true)
             val isSaved = current.id in saved
             RoundButton(if (isSaved) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder, if (isSaved) "Убрать из сохранённого" else "В сохранённое", onClick = { vm.toggleSaved(current.id) }, active = isSaved)
         }
-        Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 22.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             items.forEachIndexed { i, _ ->
                 Box(Modifier.height(8.dp).width(if (i == index) 26.dp else 8.dp).clip(CircleShape).background(if (i == index) Color.White else Color(0xB3FFFFFF).copy(alpha = 0.45f)))
             }
@@ -148,16 +150,16 @@ fun HeroBanner(vm: AppViewModel, items: List<Title>) {
 
 @Composable
 private fun HeroText(item: Title) {
-    Column(Modifier.fillMaxSize().padding(start = 56.dp, end = 56.dp, bottom = 134.dp), verticalArrangement = Arrangement.Bottom) {
+    Column(Modifier.fillMaxSize().padding(start = 56.dp, end = 56.dp, bottom = 108.dp), verticalArrangement = Arrangement.Bottom) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Icon(Icons.Filled.AutoAwesome, null, tint = KD.accent, modifier = Modifier.size(22.dp))
             Text("Актуальное", color = KD.accent, style = MaterialTheme.typography.titleMedium)
         }
-        Text(item.title, color = Color.White, style = MaterialTheme.typography.displayMedium, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp).fillMaxWidth(0.62f))
+        Text(item.title, color = Color.White, style = MaterialTheme.typography.headlineLarge, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp).fillMaxWidth(0.62f))
         Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             item.rating?.let { RatingBadge(it, item.ratingSource ?: "") }
             Text(listOfNotNull(item.year.takeIf { it > 0 }?.toString(), item.genres.take(3).joinToString(", ").ifBlank { null }, item.country.ifBlank { null }).joinToString(" · "), color = KD.textSecondary, style = MaterialTheme.typography.titleMedium, maxLines = 1)
         }
-        Text(item.description, color = Color(0xD9FFFFFF), style = MaterialTheme.typography.bodyLarge, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 12.dp).fillMaxWidth(0.5f))
+        Text(item.description, color = Color(0xD9FFFFFF), style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp).fillMaxWidth(0.5f))
     }
 }
