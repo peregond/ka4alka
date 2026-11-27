@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Runs inside the Android TV emulator: walks through the app with remote keys and saves screenshots.
-set -u  # screenshots, seventh pass
+set -u  # screenshots, eighth pass
 out="${1:-shots}"; apk="$2"; mkdir -p "$out"
 adb install -r "$apk" >/dev/null
 adb shell settings put global window_animation_scale 0; adb shell settings put global transition_animation_scale 0; adb shell settings put global animator_duration_scale 0
