@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Runs inside the Android TV emulator: walks through the app with remote keys and saves screenshots.
-set -u  # screenshots, fifth pass
+set -u  # screenshots, sixth pass
 out="${1:-shots}"; apk="$2"; mkdir -p "$out"
 adb install -r "$apk" >/dev/null
 adb shell settings put global window_animation_scale 0; adb shell settings put global transition_animation_scale 0; adb shell settings put global animator_duration_scale 0
@@ -14,7 +14,8 @@ shot 02-home 3
 key KEYCODE_DPAD_CENTER
 sleep 30
 shot 05-detail 3
-key KEYCODE_DPAD_DOWN KEYCODE_DPAD_DOWN KEYCODE_DPAD_DOWN
+sleep 15
+key KEYCODE_DPAD_DOWN KEYCODE_DPAD_DOWN KEYCODE_DPAD_DOWN KEYCODE_DPAD_DOWN KEYCODE_DPAD_DOWN
 shot 06-detail-releases
 key KEYCODE_BACK
 sleep 3
