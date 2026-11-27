@@ -89,3 +89,210 @@
 /* Platform choice is shared by previews, downloads and installation. */
 .platform-switcher{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:8px;margin-top:24px;font-size:12px;color:var(--muted)}.platform-switcher>span{margin-right:5px}.platform-switcher button{display:flex;align-items:center;gap:8px;border:1px solid #3d5148;border-radius:9px;background:#15221c;color:#d8e6df;padding:10px 14px;cursor:pointer}.platform-switcher button[aria-pressed=true]{border-color:var(--mint);background:#25483b;color:#a0f0d0}.platform-switcher small{font-size:9px;color:#a7c5b7}.platform-download{display:flex;justify-content:center;align-items:flex-start;gap:12px;flex-wrap:wrap}.button-alternative{border:1px solid #455b50;color:#d5e3dc;min-height:59px;padding:16px 20px;background:#15251c}.download-panel .platform-download{margin-top:28px}.download-panel .platform-download .button{margin-top:0}.mac-package-picker{position:relative}.mac-package-picker summary{list-style:none;cursor:pointer}.mac-package-picker summary::-webkit-details-marker{display:none}.mac-package-options{z-index:20;position:absolute;top:calc(100% + 8px);left:0;width:310px;max-width:80vw;text-align:left;background:#14251d;border:1px solid #526b5b;border-radius:12px;padding:16px;box-shadow:0 15px 40px #0006;color:#d9e8dd}.mac-package-options a{display:block;color:#98edc8;padding:12px 8px;border-radius:6px}.mac-package-options a:hover{background:#2e4a3b}.mac-package-options small{display:block;line-height:1.5;color:#b0c8bb}.hero-actions{flex-wrap:wrap}.preview-loading{height:100%;display:grid;place-items:center;color:var(--muted)}.capture-version{display:block;margin-top:5px;font-size:10px;color:#82978b}.preview-tabs{overflow-x:auto}.preview-tabs button{flex-shrink:0}.download-panel{overflow:visible}.preview-caption{min-height:65px}
 @media(max-width:760px){.platform-download{width:100%;gap:10px}.platform-download>.button,.platform-download>.mac-package-picker{width:100%;max-width:340px}.mac-package-picker .button{width:100%}.hero-actions>.button-telegram{max-width:340px;width:100%}.preview-tabs{justify-content:flex-start}.platform-switcher>span{width:100%;margin-bottom:4px}.preview-live{display:none}.preview-caption{min-height:82px}}
+
+.landing-hero {
+  isolation: isolate;
+  padding: 0 0 44px;
+  border-bottom: 1px solid var(--border);
+}
+.landing-hero::before {
+  width: 100%;
+  height: 100%;
+  top: 0;
+  background: radial-gradient(ellipse at 50% 45%, #1c55436b, transparent 68%);
+}
+.hero-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-height: 72px;
+  text-align: left;
+}
+.landing-hero .hero-language { margin: 0; }
+.landing-hero h1 {
+  margin: clamp(16px, 4svh, 42px) auto 0;
+  font-size: clamp(30px, 5.4vw, 74px);
+  line-height: 1.16;
+  text-wrap: balance;
+}
+.landing-hero .hero-description {
+  margin-top: 16px;
+  line-height: 1.55;
+  text-wrap: balance;
+}
+.landing-hero .hero-description strong { color: var(--text); font-weight: 600; }
+.hero-stage {
+  position: relative;
+  width: min(100%, 1020px);
+  height: clamp(160px, 32vw, 390px);
+  max-height: clamp(160px, calc(100svh - 450px), 390px);
+  margin: 26px auto 0;
+  overflow: hidden;
+  mask-image: linear-gradient(#000 72%, transparent);
+}
+.hero-screen {
+  position: absolute;
+  height: auto;
+  border: 1px solid #43594f;
+  border-radius: clamp(8px, 1.6vw, 20px);
+  box-shadow: 0 24px 50px #0008;
+}
+.hero-screen-secondary {
+  width: 64%;
+  left: 1%;
+  top: 16%;
+  opacity: .82;
+}
+.hero-screen-primary {
+  width: 76%;
+  right: 1%;
+  top: 2%;
+}
+.hero-downloads {
+  position: relative;
+  z-index: 2;
+  margin: -28px auto 0;
+}
+.download-tiles {
+  width: min(100%, 850px);
+  margin-inline: auto;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  text-align: left;
+}
+.download-tile {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 72px;
+  height: 100%;
+  padding: 10px 13px;
+  border: 1px solid #42574d;
+  border-radius: 14px;
+  background: #15221c;
+  color: var(--text);
+  box-shadow: 0 10px 24px #0004;
+  transition: border-color .2s, background .2s, transform .2s;
+}
+.download-tile:hover {
+  border-color: var(--mint);
+  background: #20392e;
+  transform: translateY(-2px);
+}
+.download-tile[data-current="true"] { border-color: var(--mint); }
+.download-tile-android {
+  border-color: #61dfba;
+  background: #61dfba;
+  color: #10241f;
+}
+.download-tile-android:hover { color: #10241f; background: #89ebcc; }
+.download-tile-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: #61dfba1a;
+  color: var(--mint);
+}
+.download-tile-android .download-tile-icon { background: #10241f18; color: inherit; }
+.download-tile-label { display: grid; gap: 3px; line-height: 1.2; }
+.download-tile-label strong { font-size: 17px; }
+.download-tile-label small { color: var(--muted); font-size: 12px; }
+.download-tile-android small { color: #205244; }
+.download-tile > svg { opacity: .8; }
+.download-tiles .mac-package-options {
+  left: 50%;
+  width: min(310px, calc(100vw - 36px));
+  transform: translateX(-50%);
+}
+.download-tiles .mac-package-options p { font-size: 14px; font-weight: 600; }
+.landing-hero .hero-feature-link { margin-top: 10px; }
+
+.landing-heading {
+  display: block;
+  text-align: center;
+}
+.landing-heading h2 { margin-top: 0; font-size: clamp(26px, 4vw, 48px); text-wrap: balance; }
+.landing-heading .section-description {
+  max-width: 530px;
+  margin: 16px auto 0;
+  text-wrap: balance;
+}
+.features .steps-grid {
+  gap: 16px;
+  border: 0;
+  padding: 6px;
+}
+.features .feature-step {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: 230px;
+  padding: 28px;
+  border: 1px solid #30443a;
+  border-radius: 18px;
+  background: linear-gradient(145deg, #1b3128, var(--surface) 85%);
+}
+.features .feature-step > svg {
+  position: absolute;
+  z-index: -1;
+  right: -12px;
+  bottom: -17px;
+  width: 124px;
+  height: 124px;
+  color: #61dfba27;
+  stroke-width: 1.25;
+}
+.features .feature-step h3 { margin-top: 0; }
+.features .feature-step p { font-size: 14px; }
+.landing-preview { padding-top: 104px; }
+.landing-preview .product-preview { margin-top: 22px; }
+.download-panel .download-tiles { margin-top: 24px; }
+
+@media (max-width: 760px) {
+  .landing-hero { padding-bottom: 28px; }
+  .hero-top { min-height: 64px; }
+  .landing-hero .hero-language select { max-width: 122px; }
+  .landing-hero h1 { font-size: clamp(26px, 6.6vw, 42px); line-height: 1.23; }
+  .landing-hero .hero-description { font-size: 14px; }
+  .hero-stage { margin-top: 20px; }
+  .hero-downloads { margin-top: -20px; }
+  .features .steps-grid {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: min(82%, 350px);
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: 6px;
+    overflow-x: auto;
+    margin-top: 23px;
+    padding-bottom: 14px;
+  }
+  .features .feature-step {
+    scroll-snap-align: start;
+    padding: 22px;
+    min-height: 192px;
+  }
+  .landing-preview { padding-top: 72px; }
+}
+
+@media (max-width: 560px) {
+  .download-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .download-tile { padding: 9px; gap: 7px; min-height: 62px; }
+  .download-tile:not(.download-tile-android) { grid-template-columns: auto minmax(0, 1fr); }
+  .download-tile:not(.download-tile-android) > svg { display: none; }
+  .download-tile-android { grid-column: 1 / -1; }
+  .download-tile-icon { width: 31px; height: 31px; }
+  .download-tile-icon svg { width: 18px; height: 18px; }
+  .download-tile-label strong { font-size: 15px; }
+  .download-tile-label small { font-size: 11px; }
+  .download-tiles .mac-package-options { left: auto; right: 0; transform: none; }
+}
+
+@media (max-width: 360px) {
+  .download-tile:not(.download-tile-android) { grid-template-columns: 1fr; }
+  .download-tile:not(.download-tile-android) .download-tile-icon { display: none; }
+}

@@ -37,7 +37,7 @@ export function ProductPreview({ release }: { release: AppRelease }) {
     event.preventDefault(); setSelectedId(platformScreens[next].id);
     document.getElementById(`preview-tab-${platformScreens[next].id}`)?.focus();
   }
-  return <div className="product-preview" id="interface">
+  return <div className="product-preview">
     <div className="preview-toolbar">
       <div className="preview-tabs" role="tablist" aria-label={t("Скриншоты приложения")}>
         {platformScreens.map((item, index) => <button key={item.id} id={`preview-tab-${item.id}`} role="tab" type="button" aria-selected={selected === index} aria-controls="preview-panel" tabIndex={selected === index ? 0 : -1} onClick={() => setSelectedId(item.id)} onKeyDown={event => selectWithKeyboard(event, index)}><item.icon size={16} aria-hidden="true" />{t(item.label)}</button>)}
@@ -45,7 +45,7 @@ export function ProductPreview({ release }: { release: AppRelease }) {
       <span className="preview-live"><span />{t("Реальный интерфейс")}</span>
     </div>
     <div id="preview-panel" role="tabpanel" aria-labelledby={`preview-tab-${screen.id}`} tabIndex={0} className="preview-image">
-      {ready ? <img key={`${platform}-${language}-${screen.id}-${version}`} data-platform={platform} src={remote ?? appScreenshot(language, file, platform)} onError={() => { if (remote) setLocalFallback(true); }} alt={t(screen.alt)} width="1424" height="892" decoding="async" fetchPriority={selected === 0 ? "high" : "auto"} /> : <div className="preview-loading" role="status">{t("Загрузка интерфейса…")}</div>}
+      {ready ? <img key={`${platform}-${language}-${screen.id}-${version}`} data-platform={platform} src={remote ?? appScreenshot(language, file, platform)} onError={() => { if (remote) setLocalFallback(true); }} alt={t(screen.alt)} width="1424" height="892" loading="lazy" decoding="async" /> : <div className="preview-loading" role="status">{t("Загрузка интерфейса…")}</div>}
     </div>
     <div className="preview-caption"><p>{t(screen.caption)} <span className="capture-version">{platform === "macos" ? "macOS" : "Windows"} · {version}</span></p><a href={`https://github.com/peregond/ka4alka/releases/tag/v${version}`} target="_blank" rel="noreferrer">{t("Скриншоты из GitHub")} <ArrowUpRight size={14} aria-hidden="true" /></a></div>
   </div>;

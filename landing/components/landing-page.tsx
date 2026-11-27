@@ -4,8 +4,9 @@ import { ArrowDown, ArrowDownToLine, ArrowRight, ArrowUpRight, Check, Code2, Lap
 import { ScrollHeader } from "@/components/scroll-header";
 import { ProductPreview } from "@/components/product-preview";
 import { SitePlatformProvider, PlatformSwitcher, useSitePlatform } from "@/components/site-platform";
-import { PlatformDownload, DownloadMeta } from "@/components/platform-download";
+import { PlatformDownload } from "@/components/platform-download";
 import type { AppRelease } from "@/lib/app-release";
+import { appScreenshot } from "@/lib/app-screenshots";
 import { LanguageSwitcher, LocalizedMetadata, useSiteLanguage } from "@/components/site-language";
 
 function SavedHeartIcon() {
@@ -18,34 +19,50 @@ function TelegramIcon() {
 
 export function LandingPage({ release }: { release: AppRelease }) { return <SitePlatformProvider><LandingContent release={release} /></SitePlatformProvider>; }
 function LandingContent({ release }: { release: AppRelease }) {
-  const { t } = useSiteLanguage();
+  const { language, t } = useSiteLanguage();
   const { platform } = useSitePlatform();
   const mac = platform === "macos";
   return <>
-    <LocalizedMetadata title="Качалка — фильмы, сериалы, игры и загрузки для Windows и macOS" description="Твой вечер. Играй, смотри, качай. Фильмы, сериалы и игры, поиск раздач и управление загрузками в одном приложении. Скачать Качалку для Windows и macOS." />
+    <LocalizedMetadata title="Качалка для Windows, macOS и Android TV" description="Твой вечер. Играй, смотри, качай. Фильмы, сериалы и игры для Windows и macOS. Качалка теперь и на Android TV — скачай APK." />
     <a className="skip-link" href="#main">{t("Перейти к содержимому")}</a>
     <ScrollHeader />
     <main id="main">
-      <section className="hero section-wrap" aria-labelledby="hero-title">
-        <div className="hero-language"><LanguageSwitcher /></div>
-        <a className="release-badge" href={release.releaseUrl} target="_blank" rel="noreferrer"><span className="status-dot" />{t("Версия")} {release.version}<span className="badge-divider" />{t("Уже на GitHub")}<ArrowUpRight size={13} aria-hidden="true" /></a>
-        <h1 id="hero-title">{t("Твой вечер.")}<br /><span>{t("Играй, смотри, качай.")}</span></h1>
-        <p className="hero-description">{t("Фильмы, сериалы, игры и загрузки — в одном приложении для Windows и Mac.")}<br className="desktop-break" /> {t("Выбери, во что играть или что смотреть, и добавь загрузку в очередь.")}</p>
-        <PlatformSwitcher />
-        <div className="hero-actions"><PlatformDownload release={release} /><a className="button button-telegram" href="https://t.me/ka4alkacc" target="_blank" rel="noopener noreferrer"><TelegramIcon />{t("Мы в Telegram")}<ArrowUpRight size={16} aria-hidden="true" /></a></div>
-        <div className="hero-feature-link"><a className="button-secondary" href="#features">{t("Что умеет Качалка")}<ArrowDown size={17} aria-hidden="true" /></a></div>
-        <DownloadMeta release={release} />
-        <ProductPreview release={release} />
-        <div className="product-facts"><span><Check size={17} aria-hidden="true" />{t("Бесплатно и без рекламы")}</span><span><Code2 size={16} aria-hidden="true" />{t("Открытый исходный код")}</span><span><Check size={17} aria-hidden="true" />{t("Без регистрации")}</span></div>
+      <section className="hero landing-hero" aria-labelledby="hero-title">
+        <div className="hero-top section-wrap">
+          <span className="brand"><img src="/brand/logo.png" width="36" height="36" alt="" />{t("Качалка")}</span>
+          <div className="hero-language"><LanguageSwitcher /></div>
+        </div>
+        <div className="section-wrap">
+          <h1 id="hero-title">{t("Твой вечер.")}<br /><span>{t("Играй, смотри, качай.")}</span></h1>
+          <p className="hero-description">
+            {t("Фильмы, сериалы, игры и загрузки — в одном приложении для Windows и Mac.")}
+            {" "}<strong>{t("Теперь и на Android TV.")}</strong>
+          </p>
+          <div className="hero-stage" aria-hidden="true">
+            <img className="hero-screen hero-screen-secondary" src={appScreenshot(language, "series-dark.webp", "macos")} width="1424" height="892" alt="" decoding="async" />
+            <img className="hero-screen hero-screen-primary" src={appScreenshot(language, "featured-dark.webp")} width="1424" height="892" alt="" decoding="async" fetchPriority="high" />
+          </div>
+          <div className="hero-downloads" id="download">
+            <PlatformDownload release={release} />
+          </div>
+          <div className="product-facts"><span><Check size={17} aria-hidden="true" />{t("Бесплатно и без рекламы")}</span><span><Code2 size={16} aria-hidden="true" />{t("Открытый исходный код")}</span><span><Check size={17} aria-hidden="true" />{t("Без регистрации")}</span></div>
+          <a className="button-secondary hero-feature-link" href="#features">{t("Что умеет Качалка")}<ArrowDown size={17} aria-hidden="true" /></a>
+        </div>
       </section>
 
       <section id="features" className="features section-wrap" aria-labelledby="features-title">
-        <div className="section-heading"><div><p className="eyebrow">{t("ОТ ВЫБОРА ДО ЗАГРУЗКИ")}</p><h2 id="features-title">{t("Меньше переключений.")}<br />{t("Больше кино и игр.")}</h2></div><p className="section-description">{t("Каталог, поиск раздач и торрент-клиент работают вместе. Всё нужное — под рукой.")}</p></div>
-        <div className="steps-grid">
-          <article className="feature-step"><div className="step-top"><span>{t("01 / НАЙДИ")}</span><Search size={23} aria-hidden="true" /></div><h3>{t("Что посмотреть? Во что играть?")}</h3><p>{t("Начни с «Актуального»: курируемые подборки фильмов, сериалов и игр помогут выбрать, чем занять вечер. Или ищи по названию и уточняй выбор фильтрами.")}</p><div className="feature-tags"><span>{t("Актуальное")}</span><span>{t("Фильмы")}</span><span>{t("Сериалы")}</span><span>{t("Игры")}</span></div></article>
-          <article className="feature-step"><div className="step-top"><span>{t("02 / ВЫБЕРИ")}</span><Settings2 size={23} aria-hidden="true" /></div><h3>{t("Твоя раздача.")}</h3><p>{t("Сравни качество, размер и число сидов. Отфильтруй озвучку, субтитры и кодек, чтобы загрузить подходящий вариант.")}</p><div className="feature-tags"><span>HD</span><span>Full HD</span><span>4K</span></div></article>
-          <article className="feature-step"><div className="step-top"><span>{t("03 / ЗАГРУЗИ")}</span><ArrowDownToLine size={23} aria-hidden="true" /></div><h3>{t("Дальше — очередь.")}</h3><p>{t("Скачивай через magnet и .torrent прямо в Качалке. Следи за скоростью и прогрессом, ставь на паузу и продолжай позже.")}</p><div className="feature-tags"><span>Magnet</span><span>.torrent</span><span>{t("Пауза / продолжение")}</span></div></article>
+        <div className="section-heading landing-heading"><h2 id="features-title">{t("Меньше переключений.")}<br />{t("Больше кино и игр.")}</h2><p className="section-description">{t("Каталог, поиск раздач и торрент-клиент работают вместе. Всё нужное — под рукой.")}</p></div>
+        <div className="steps-grid" role="region" aria-labelledby="features-title" tabIndex={0}>
+          <article className="feature-step"><Search size={30} aria-hidden="true" /><h3>{t("Что посмотреть? Во что играть?")}</h3><p>{t("Начни с «Актуального»: курируемые подборки фильмов, сериалов и игр помогут выбрать, чем занять вечер. Или ищи по названию и уточняй выбор фильтрами.")}</p></article>
+          <article className="feature-step"><Settings2 size={30} aria-hidden="true" /><h3>{t("Твоя раздача.")}</h3><p>{t("Сравни качество, размер и число сидов. Отфильтруй озвучку, субтитры и кодек, чтобы загрузить подходящий вариант.")}</p></article>
+          <article className="feature-step"><ArrowDownToLine size={30} aria-hidden="true" /><h3>{t("Дальше — очередь.")}</h3><p>{t("Скачивай через magnet и .torrent прямо в Качалке. Следи за скоростью и прогрессом, ставь на паузу и продолжай позже.")}</p></article>
         </div>
+      </section>
+
+      <section id="interface" className="landing-preview section-wrap" aria-labelledby="interface-title">
+        <div className="section-heading landing-heading"><h2 id="interface-title">{t("Интерфейс Качалки")}</h2></div>
+        <PlatformSwitcher />
+        <ProductPreview release={release} />
       </section>
 
       <section className="comfort section-wrap" aria-labelledby="comfort-title">
@@ -61,12 +78,24 @@ function LandingContent({ release }: { release: AppRelease }) {
         </div>
       </section>
 
-      <section id="download" className="download-section section-wrap" aria-labelledby="download-title">
-        <div className="download-panel"><img className="download-app-icon" src="/brand/logo.png" alt="" width="88" height="88" /><p className="eyebrow">{t("Качалка для Windows и macOS")}</p><h2 id="download-title">{t("Пора выбрать кино или игру.")}</h2><p>{t("Установи приложение, выбери папку для загрузок —")}<br className="desktop-break" /> {t("и выбирай, как провести свой вечер.")}</p><PlatformDownload release={release} /><div className="download-options"><span>{t("Версия")} {release.version} · {mac ? "macOS 14+" : "Windows x64"}</span><a href={mac ? "/download?format=mac-arm64-zip" : "/download?format=zip"}>{mac ? "ZIP · Apple Silicon" : t("Скачать ZIP")}<ArrowUpRight size={14} aria-hidden="true" /></a>{mac && <a href="/download?format=mac-x64-zip">ZIP · Intel</a>}<a href={release.releaseUrl} target="_blank" rel="noreferrer">{t("Что нового")}<ArrowUpRight size={14} aria-hidden="true" /></a></div></div>
+      <section className="download-section section-wrap" aria-labelledby="download-title">
+        <div className="download-panel">
+          <h2 id="download-title">{t("Скачать Качалку")}</h2>
+          <PlatformDownload release={release} />
+          <div className="download-options">
+            <a href="/download?format=zip">Windows · ZIP</a>
+            {release.mac && <>
+              <a href="/download?format=mac-arm64-zip">Apple Silicon · ZIP</a>
+              <a href="/download?format=mac-x64-zip">Intel · ZIP</a>
+            </>}
+            <a href={release.releaseUrl} target="_blank" rel="noreferrer">{t("Что нового")} · {release.version}<ArrowUpRight size={14} aria-hidden="true" /></a>
+          </div>
+        </div>
       </section>
 
       <section id="installation" className="installation section-wrap" aria-labelledby="installation-title">
-        <p className="eyebrow">{t("НЕСКОЛЬКО ПРОСТЫХ ШАГОВ")}</p><h2 id="installation-title">{t("Как установить.")}</h2>
+        <h2 id="installation-title">{t("Как установить.")}</h2>
+        <PlatformSwitcher label="Выбери систему:" />
         {mac ? <ol className="install-steps">
           <li><span className="install-number">1</span><div><h3>{t("Скачай DMG для своего Mac")}</h3><p>{t("Выбери Apple Silicon или Intel. Процессор указан в меню Apple → «Об этом Mac».")}</p></div></li>
           <li><span className="install-number">2</span><div><h3>{t("Перенеси в Applications")}</h3><p>{t("Открой DMG и перетащи Ka4alka в папку «Программы» (Applications).")}</p></div></li>
@@ -81,13 +110,18 @@ function LandingContent({ release }: { release: AppRelease }) {
       </section>
 
       <section id="questions" className="faq section-wrap" aria-labelledby="faq-title"><div className="faq-heading"><p className="eyebrow">{t("ПЕРЕД ПЕРВЫМ ЗАПУСКОМ")}</p><h2 id="faq-title">{t("Пара вопросов.")}</h2><p>{t("Будем рады вашим идеям и обратной связи.")}<br /><a href="https://t.me/+6sT2ocaKvLxlNmRi" target="_blank" rel="noopener noreferrer">{t("Присоединяйтесь к нашей группе в Telegram")} <ArrowUpRight size={15} aria-hidden="true" /></a></p></div><div className="faq-list">
+        <details><summary>{t("Как установить Качалку на Android TV?")}<Plus size={20} aria-hidden="true" /></summary><p>{t("Скачай APK и открой его на устройстве с Android TV. Если система попросит, разреши установку из источника, которым открываешь файл.")}</p></details>
         <details><summary>{t("Какая система нужна?")}<Plus size={20} aria-hidden="true" /></summary><p>{t("Windows 10/11 x64 или macOS 14+ на Apple Silicon и Intel. .NET включён в сборки. Каталог игр содержит версии для Windows.")}</p></details>
         <details><summary>{t("Как установить Качалку?")}<Plus size={20} aria-hidden="true" /></summary><p>{t(mac ? "Открой DMG и перетащи Ka4alka в папку «Программы» (Applications)." : "Нажми «Скачать для Windows», открой установщик и следуй его шагам. При первом запуске выбери папку для загрузок. Если предпочитаешь ZIP, распакуй архив целиком и запусти Kachalka.exe, оставив остальные файлы рядом.")}</p></details>
         <details><summary>{t("Нужен отдельный торрент-клиент?")}<Plus size={20} aria-hidden="true" /></summary><p>{t("Нет. Качалка сама работает с magnet-ссылками и .torrent-файлами: добавляет задачи, скачивает и позволяет управлять очередью внутри приложения.")}</p></details>
         <details><summary>{t("Как получать новые версии?")}<Plus size={20} aria-hidden="true" /></summary><p>{t("Приложение проверяет обновления с GitHub. Управлять проверкой и установкой можно в настройках. Очередь и пользовательские настройки сохраняются при обновлении.")}</p></details>
       </div></section>
     </main>
-    <footer className="site-footer section-wrap"><a className="brand" href="#"><img src="/brand/logo.png" width="32" height="32" alt="" /><span>{t("Качалка")}</span></a><p>{t("Твой вечер. Играй, смотри, качай.")}</p><a className="footer-github" href="https://github.com/peregond/ka4alka" target="_blank" rel="noreferrer"><Code2 size={17} aria-hidden="true" />{t("Исходный код")}<ArrowUpRight size={14} aria-hidden="true" /></a></footer>
+    <footer className="site-footer section-wrap">
+      <a className="brand" href="#"><img src="/brand/logo.png" width="32" height="32" alt="" /><span>{t("Качалка")}</span></a>
+      <a className="footer-github" href="https://t.me/ka4alkacc" target="_blank" rel="noopener noreferrer"><TelegramIcon />{t("Мы в Telegram")}<ArrowUpRight size={14} aria-hidden="true" /></a>
+      <a className="footer-github" href="https://github.com/peregond/ka4alka" target="_blank" rel="noreferrer"><Code2 size={17} aria-hidden="true" />{t("Исходный код")}<ArrowUpRight size={14} aria-hidden="true" /></a>
+    </footer>
   </>;
 }
 

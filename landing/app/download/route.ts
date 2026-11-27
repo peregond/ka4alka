@@ -1,7 +1,10 @@
-import { getLatestRelease } from "@/lib/app-release";
+import { getAndroidDownloadUrl, getLatestRelease } from "@/lib/app-release";
 
 export async function GET(request: Request) {
   const format = new URL(request.url).searchParams.get("format") ?? "installer";
+  if (format === "android-tv") {
+    return new Response(null, { status: 302, headers: { Location: await getAndroidDownloadUrl(), "Cache-Control": "public, max-age=300" } });
+  }
   if (format === "mac") {
     const release = await getLatestRelease();
     if (!release.mac) return Response.redirect(release.releaseUrl, 302);

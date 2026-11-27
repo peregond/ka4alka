@@ -26,4 +26,20 @@ for(const [format,file] of [['installer',`Kachalka-Setup-${version}.exe`],['zip'
 }
 const choice=await route.GET(new Request('https://ka4alka.cc/download?format=mac'));assert.equal(choice.status,200);const html=await choice.text();assert.ok(html.includes(release.mac.arm64)&&html.includes(release.mac.x64));
 assert.equal((await route.GET(new Request('https://ka4alka.cc/download?format=evil'))).status,400);
+const androidBase = 'https://github.com/peregond/ka4alka/releases/download/android-tv/';
+const androidVersion = '0.45.4';
+const apk = androidBase + `Kachalka-AndroidTV-${androidVersion}.apk`;
+const androidManifest = { platform: 'android-tv', version: androidVersion, apk: { url: apk } };
+const androidRelease = load('../lib/app-release.ts', { fetch: async url => {
+ assert.equal(url, androidBase + 'android-latest.json');
+ return Response.json(androidManifest);
+} });
+const androidRoute = load('../app/download/route.ts', { require: () => androidRelease });
+const android = await androidRoute.GET(new Request('https://ka4alka.cc/download?format=android-tv'));
+assert.equal(android.status, 302);
+assert.equal(android.headers.get('location'), apk);
+for (const unsafe of ['https://other.test/Kachalka-AndroidTV-0.45.4.apk', apk.replace(androidVersion, '0.45.2')]) {
+ const invalid = load('../lib/app-release.ts', { fetch: async () => Response.json({ ...androidManifest, apk: { url: unsafe } }) });
+ assert.equal(await invalid.getAndroidDownloadUrl(), androidBase + 'Kachalka-AndroidTV-0.45.3.apk');
+}
 console.log('Platform checks passed: OS/mobile detection, truthful CPU choice, signed release URLs, both gallery sets and explicit cross-platform downloads.');

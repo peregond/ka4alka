@@ -21,6 +21,25 @@ export function releaseAssetUrl(value: unknown, tag: string): string | null {
   } catch { return null; }
 }
 
+const androidFallback = "https://github.com/peregond/ka4alka/releases/download/android-tv/Kachalka-AndroidTV-0.45.3.apk";
+
+export async function getAndroidDownloadUrl(): Promise<string> {
+  try {
+    const response = await fetch("https://github.com/peregond/ka4alka/releases/download/android-tv/android-latest.json", {
+      signal: AbortSignal.timeout(2500),
+    });
+    if (!response.ok) return androidFallback;
+
+    const release = await response.json();
+    if (release?.platform !== "android-tv" || typeof release.version !== "string" || !/^\d+\.\d+\.\d+$/.test(release.version)) return androidFallback;
+
+    const url = releaseAssetUrl(release.apk?.url, "android-tv");
+    return url?.endsWith(`/Kachalka-AndroidTV-${release.version}.apk`) ? url : androidFallback;
+  } catch {
+    return androidFallback;
+  }
+}
+
 export async function getLatestRelease(): Promise<AppRelease> {
   if (expires > Date.now()) return cached;
   if (pending) return pending;

@@ -23,11 +23,11 @@ export function SitePlatformProvider({ children }: { children: ReactNode }) {
   return <PlatformContext.Provider value={{ platform: selected ?? detected ?? "windows", detected, ready, architecture: detected === "macos" ? architecture : null, setPlatform: setSelected }}>{children}</PlatformContext.Provider>;
 }
 export function useSitePlatform() { return useContext(PlatformContext); }
-export function PlatformSwitcher() {
+export function PlatformSwitcher({ label = "Посмотреть интерфейс:" }: { label?: string }) {
   const { platform, setPlatform, ready, detected } = useSitePlatform();
   const { t } = useSiteLanguage();
   return <div className="platform-switcher" role="group" aria-label={t("Версия приложения")}>
-    <span>{t("Посмотреть интерфейс:")}</span>
+    <span>{t(label)}</span>
     {(["windows", "macos"] as const).map(os => <button type="button" key={os} aria-pressed={ready && platform === os} onClick={() => setPlatform(os)}>{os === "windows" ? "Windows" : "macOS"}{ready && detected === os && <small>{t("Ваша система")}</small>}</button>)}
   </div>;
 }

@@ -17,7 +17,26 @@ with sync_playwright() as p:
    context.route('https://github.com/**',lambda route:route.abort())
    page=context.new_page();errors=[];page.on('pageerror',lambda error:errors.append(str(error)))
    page.goto(base,wait_until='networkidle')
-   expect(page.locator('.platform-switcher button[aria-pressed=true]')).to_have_text(('macOS' if expected=='macos' else 'Windows')+('Your system' if name=='mac' else 'Ваша система' if name=='windows' else 'Tu sistema' if name=='mac-arm' else ''))
+   gallery_platform=page.locator('#interface .platform-switcher')
+   expect(gallery_platform.locator('button[aria-pressed=true]')).to_have_text(('macOS' if expected=='macos' else 'Windows')+('Your system' if name=='mac' else 'Ваша система' if name=='windows' else 'Tu sistema' if name=='mac-arm' else ''))
+   primary=page.locator('#download .download-tiles')
+   expect(primary.locator('a[href="/download?format=installer"]')).to_be_visible()
+   expect(primary.locator('a[href="/download?format=android-tv"]')).to_be_visible()
+   expect(primary.locator('.download-tile-android')).to_contain_text('Android TV')
+   for screen in page.locator('.hero-screen').all():
+    expect(screen).to_have_js_property('complete',True)
+    assert screen.evaluate('(i)=>i.naturalWidth')>700
+   if arch:
+    expect(primary.locator('a[href="/download?format=mac-arm64"]')).to_be_visible()
+   else:
+    picker=primary.locator('details')
+    picker.locator('summary').click()
+    expect(picker).to_have_attribute('open','')
+    expect(picker.locator('a[href="/download?format=mac-arm64"]')).to_be_visible()
+    expect(picker.locator('a[href="/download?format=mac-x64"]')).to_be_visible()
+    picker.locator('summary').click()
+    assert picker.get_attribute('open') is None
+   page.locator('.preview-image').scroll_into_view_if_needed()
    expect(page.locator('.preview-image img')).to_have_attribute('data-platform',expected)
    image=page.locator('.preview-image img');expect(image).to_have_js_property('complete',True);assert image.evaluate('(i)=>i.naturalWidth')>700
    assert ('/macos/' in image.get_attribute('src'))==(expected=='macos')
@@ -33,34 +52,25 @@ with sync_playwright() as p:
     assert current.evaluate('(i)=>i.naturalWidth')>700,f'{name}: unavailable gallery frame {index}'
     assert ('/macos/' in current.get_attribute('src'))==(expected=='macos')
    gallery.first.click()
-   primary=page.locator('.hero-actions .platform-download')
    if expected=='macos':
-    expect(primary.locator('.button-alternative')).to_have_attribute('href','/download?format=installer')
     assert page.locator('.installation').inner_text().find('SmartScreen')==-1
-    if arch:expect(primary.locator('a.button-download')).to_have_attribute('href','/download?format=mac-arm64')
-    else:
-     picker=primary.locator('details');picker.locator('summary').click();expect(picker).to_have_attribute('open','')
-     expect(picker.locator('a[href="/download?format=mac-arm64"]')).to_be_visible();expect(picker.locator('a[href="/download?format=mac-x64"]')).to_be_visible()
-     picker.locator('summary').click();assert picker.get_attribute('open') is None
-   else:
-    expect(primary.locator('a.button-download')).to_have_attribute('href','/download?format=installer')
-   # OS override changes downloads, installation and gallery together.
+   # The gallery and installation share a platform choice.
    if expected=='windows':
     page.locator('#preview-tab-network').click()
     expect(page.locator('.preview-image img')).to_have_attribute('src',re.compile('settings-lan-dark'))
    other='windows' if expected=='macos' else 'macos'
-   page.locator('.platform-switcher button').nth(0 if other=='windows' else 1).click()
+   page.locator('#installation .platform-switcher button').nth(0 if other=='windows' else 1).click()
    expect(page.locator('.preview-image img')).to_have_attribute('data-platform',other)
-   expect(page.locator('.hero-actions .platform-download')).to_have_attribute('data-platform',other)
    expect(page.locator('.preview-tabs [role=tab]')).to_have_count(9 if other=='windows' else 8)
+   page.locator('.preview-image').scroll_into_view_if_needed()
    page.wait_for_function("() => { const image = document.querySelector('.preview-image img'); return image?.complete && image.naturalWidth > 700; }")
    expect(page.locator('.preview-image img')).to_have_js_property('complete',True)
-   page.locator('.platform-switcher button').nth(0 if expected=='windows' else 1).click()
+   gallery_platform.locator('button').nth(0 if expected=='windows' else 1).click()
    tabs=page.locator('.preview-tabs [role=tab]');tabs.first.focus();page.keyboard.press('ArrowRight');expect(tabs.nth(1)).to_have_attribute('aria-selected','true')
    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),f'{name}: horizontal page overflow'
    # Language override must survive OS switches and a reload.
    page.locator('.hero-language select').select_option('es');expect(page.locator('html')).to_have_attribute('lang','es')
-   page.locator('.platform-switcher button').nth(1).click();expect(page.locator('html')).to_have_attribute('lang','es')
+   gallery_platform.locator('button').nth(1).click();expect(page.locator('html')).to_have_attribute('lang','es')
    page.reload(wait_until='networkidle');expect(page.locator('html')).to_have_attribute('lang','es')
    page.locator('.hero-language select').select_option('auto')
    page.screenshot(path=str(output/(name+'.png')),full_page=True)
@@ -72,5 +82,8 @@ with sync_playwright() as p:
    assert response.headers['location'].startswith('https://github.com/peregond/ka4alka/releases/download/') and filename in response.headers['location']
    assert 'no-store' in response.headers['cache-control']
   choice=request.get(base+'/download?format=mac');assert choice.status==200 and 'Kachalka-macos-arm64.dmg' in choice.text() and 'Kachalka-macos-x64.dmg' in choice.text()
-  print('PASS explicit package redirects and Mac architecture chooser',flush=True)
+  android=request.get(base+'/download?format=android-tv',max_redirects=0)
+  assert android.status==302
+  assert re.fullmatch(r'https://github\.com/peregond/ka4alka/releases/download/android-tv/Kachalka-AndroidTV-\d+\.\d+\.\d+\.apk',android.headers['location'])
+  print('PASS explicit package redirects, Android TV APK and Mac architecture chooser',flush=True)
  finally:browser.close()
