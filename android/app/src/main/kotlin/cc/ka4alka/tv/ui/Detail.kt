@@ -35,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -66,10 +67,12 @@ fun DetailScreen(vm: AppViewModel, library: Library, id: String) {
 
     Box(Modifier.fillMaxSize()) {
         val wide = backdrops[title.id]
+        // The cover fills the page behind the text: the wide artwork when the server has it, otherwise the poster scaled up and softened.
         if (wide != null) AsyncImage(wide, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-        else if (title.poster != null) AsyncImage(title.poster, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().blur(40.dp))
-        Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(Color(0xF2000000), Color(0xCC000000), Color(0x80000000)))))
-        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0x00000000), Color(0x66000000), Color.Black))))
+        else if (title.poster != null) AsyncImage(title.poster, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().blur(22.dp).alpha(0.9f))
+        // Light scrims: dark enough on the left and at the bottom to read the text, open elsewhere so the picture shows.
+        Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(Color(0xD9000000), Color(0x80000000), Color(0x1A000000)))))
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.45f to Color(0x00000000), 1f to Color(0xF2000000))))
 
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 56.dp, end = 56.dp, top = 40.dp, bottom = 80.dp), verticalArrangement = Arrangement.spacedBy(28.dp)) {
             item { Header(vm, title, title.id in saved, loaded) }
