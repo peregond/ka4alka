@@ -152,9 +152,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     // ---- downloads
 
+    // One folder per release: two releases with the same file name must never share a file, nor delete each other's video.
     private fun record(title: Title, release: Release) = DownloadRecord(
         id = release.hash, mediaId = title.id, title = title.title, releaseTitle = release.title, poster = title.poster,
-        magnet = release.magnet, savePath = app.prefs.downloadDir().absolutePath, addedUtc = System.currentTimeMillis(),
+        magnet = release.magnet, savePath = File(app.prefs.downloadDir(), release.hash.take(10).lowercase()).absolutePath, addedUtc = System.currentTimeMillis(),
     )
 
     fun download(title: Title, release: Release) {

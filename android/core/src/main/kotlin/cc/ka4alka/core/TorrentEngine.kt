@@ -133,7 +133,10 @@ class TorrentEngine(
                 val data = session.fetchMagnet(record.magnet, 120, File(stateDir, "tmp").apply { mkdirs() })
                 if (data == null || data.isEmpty()) { errors[record.id] = "Не удалось получить список файлов раздачи. Нет источников."; return@execute }
                 torrentFile.writeBytes(data)
-                if (records.containsKey(record.id)) session.download(TorrentInfo(data), saveDir, null, null, peers, flags)
+                // The user may have paused or removed the download while the file list was being fetched: honour the state as it is now.
+                val current = records[record.id] ?: return@execute
+                val startFlags = if (current.paused) TorrentFlags.PAUSED else org.libtorrent4j.swig.torrent_flags_t()
+                session.download(TorrentInfo(data), saveDir, null, null, peers, startFlags)
             } catch (e: Exception) {
                 errors[record.id] = e.message ?: "Ошибка получения раздачи"
             } finally { pending.remove(record.id) }
