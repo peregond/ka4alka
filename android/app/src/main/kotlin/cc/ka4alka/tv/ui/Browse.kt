@@ -71,7 +71,7 @@ fun BrowseScreen(vm: AppViewModel, library: Library, section: Section) {
         item(span = { GridItemSpan(maxLineSpan) }) {
             Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
                 Text(section.label, color = Color.White, style = MaterialTheme.typography.headlineLarge)
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
+                LazyRow(Modifier.bleed(56.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(start = 56.dp, end = 56.dp, top = 10.dp, bottom = 10.dp)) {
                     items(genreChips) { (key, label) -> Chip(label, selected = genre == key, onClick = { genre = key }) }
                 }
             }

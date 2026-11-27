@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -179,3 +180,12 @@ fun formatEta(seconds: Long?): String = when {
     seconds >= 60 -> "осталось ${seconds / 60} мин"
     else -> "осталось меньше минуты"
 }
+
+/** Lets a row run to the screen edges while its first item still lines up with the page margin (the parent clips at its padding). */
+fun Modifier.bleed(margin: androidx.compose.ui.unit.Dp): Modifier = this.then(
+    Modifier.layout { measurable, constraints ->
+        val extra = margin.roundToPx()
+        val placeable = measurable.measure(constraints.copy(maxWidth = constraints.maxWidth + 2 * extra))
+        layout(constraints.maxWidth, placeable.height) { placeable.place(-extra, 0) }
+    },
+)

@@ -85,7 +85,7 @@ fun DetailScreen(vm: AppViewModel, library: Library, id: String) {
                 is Releases.Loaded -> {
                     val seasons = loaded.items.mapNotNull { it.season }.distinct().sorted()
                     if (title.section == Section.Series && seasons.isNotEmpty()) item {
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        LazyRow(Modifier.bleed(56.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(start = 56.dp, end = 56.dp, top = 10.dp, bottom = 10.dp)) {
                             item { Chip("Все сезоны", season == null, { season = null }) }
                             items(seasons) { s -> Chip("Сезон $s", season == s, { season = s }) }
                         }
@@ -132,7 +132,7 @@ private fun Header(vm: AppViewModel, title: Title, saved: Boolean, releases: Rel
 private fun Cast(people: List<Person>) {
     Column {
         Text("В ролях", color = Color.White, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 14.dp))
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(22.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
+        LazyRow(Modifier.bleed(56.dp), horizontalArrangement = Arrangement.spacedBy(22.dp), contentPadding = PaddingValues(start = 56.dp, end = 56.dp, top = 8.dp, bottom = 8.dp)) {
             items(people, key = { it.role + it.name }) { person ->
                 Column(Modifier.width(110.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Poster(person.photoUrl, Modifier.size(96.dp), CircleShape)

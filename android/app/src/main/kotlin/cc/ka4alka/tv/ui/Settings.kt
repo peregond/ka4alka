@@ -70,7 +70,7 @@ fun SettingsScreen(vm: AppViewModel) {
 
         item {
             Card("Куда скачивать", "Папка Ka4alka создаётся внутри выбранного накопителя. USB-диск или карта памяти появятся в списке, когда подключены.") {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
                     items(prefs.folders()) { (name, dir) ->
                         Chip("$name · ${formatBytes(dir.usableSpace)} свободно", selected = folder == dir.absolutePath, onClick = { prefs.folder = dir.absolutePath; folder = dir.absolutePath })
                     }
@@ -82,13 +82,13 @@ fun SettingsScreen(vm: AppViewModel) {
         item {
             Card("Скорость", "Ограничения действуют сразу. Раздача помогает другим и ускоряет загрузку.") {
                 Text("Загрузка", color = KD.textSecondary, style = MaterialTheme.typography.titleSmall)
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
                     items(listOf(0 to "Без ограничений", 2048 to "2 МБ/с", 5120 to "5 МБ/с", 10240 to "10 МБ/с", 20480 to "20 МБ/с")) { (kb, label) ->
                         Chip(label, downloadLimit == kb, { downloadLimit = kb; prefs.downloadLimitKbps = kb; vm.applyLimits() })
                     }
                 }
                 Text("Отдача", color = KD.textSecondary, style = MaterialTheme.typography.titleSmall)
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
                     items(listOf(0 to "Без ограничений", 256 to "256 КБ/с", 1024 to "1 МБ/с", 5120 to "5 МБ/с")) { (kb, label) ->
                         Chip(label, uploadLimit == kb, { uploadLimit = kb; prefs.uploadLimitKbps = kb; vm.applyLimits() })
                     }
