@@ -137,10 +137,10 @@ private fun Cast(people: List<Person>) {
         Text("В ролях", color = Color.White, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 14.dp))
         LazyRow(Modifier.bleed(56.dp), horizontalArrangement = Arrangement.spacedBy(22.dp), contentPadding = PaddingValues(start = 56.dp, end = 56.dp, top = 8.dp, bottom = 8.dp)) {
             items(people, key = { it.role + it.name }) { person ->
-                // Round photo, then the name and the role, all centred on the photo; names reserve two lines so the roles line up.
+                // Round photo, then the name and the role, all centred on the photo. The first name always sits on the first line and the rest on the second, so every card has the same shape.
                 Column(Modifier.width(120.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Poster(person.photoUrl, Modifier.size(104.dp), CircleShape, person = true)
-                    Text(person.name, color = Color.White, style = MaterialTheme.typography.bodyMedium, minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 10.dp))
+                    Text(person.name.trim().split(Regex("\\s+"), limit = 2).joinToString("\n"), color = Color.White, style = MaterialTheme.typography.bodyMedium, minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 10.dp))
                     Text(if (person.role.startsWith("Режисс")) "Режиссёр" else "Актёр", color = KD.textTertiary, fontSize = 13.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 2.dp))
                 }
             }
