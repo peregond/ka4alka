@@ -128,8 +128,15 @@ fun HeroBanner(vm: AppViewModel, items: List<Title>) {
                 }
                 Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0x33000000), Color(0x00000000), Color(0xD9000000), Color.Black))))
                 Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(Color(0xE6000000), Color(0x99000000), Color(0x00000000)))))
-                HeroText(vm, item, item.id in saved)
+                HeroText(item)
             }
+        }
+        // The buttons stay put while slides change, so remote focus is never lost to a slide swap.
+        val current = items[index]
+        Row(Modifier.align(Alignment.BottomStart).padding(start = 56.dp, bottom = 62.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            PillButton("Подробнее", onClick = { vm.open(Screen.Detail(current.id)) }, primary = true)
+            val isSaved = current.id in saved
+            RoundButton(if (isSaved) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder, if (isSaved) "Убрать из сохранённого" else "В сохранённое", onClick = { vm.toggleSaved(current.id) }, active = isSaved)
         }
         Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 22.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             items.forEachIndexed { i, _ ->
@@ -140,8 +147,8 @@ fun HeroBanner(vm: AppViewModel, items: List<Title>) {
 }
 
 @Composable
-private fun HeroText(vm: AppViewModel, item: Title, saved: Boolean) {
-    Column(Modifier.fillMaxSize().padding(start = 56.dp, end = 56.dp, bottom = 62.dp), verticalArrangement = Arrangement.Bottom) {
+private fun HeroText(item: Title) {
+    Column(Modifier.fillMaxSize().padding(start = 56.dp, end = 56.dp, bottom = 134.dp), verticalArrangement = Arrangement.Bottom) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Icon(Icons.Filled.AutoAwesome, null, tint = KD.accent, modifier = Modifier.size(22.dp))
             Text("Актуальное", color = KD.accent, style = MaterialTheme.typography.titleMedium)
@@ -152,9 +159,5 @@ private fun HeroText(vm: AppViewModel, item: Title, saved: Boolean) {
             Text(listOfNotNull(item.year.takeIf { it > 0 }?.toString(), item.genres.take(3).joinToString(", ").ifBlank { null }, item.country.ifBlank { null }).joinToString(" · "), color = KD.textSecondary, style = MaterialTheme.typography.titleMedium, maxLines = 1)
         }
         Text(item.description, color = Color(0xD9FFFFFF), style = MaterialTheme.typography.bodyLarge, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 12.dp).fillMaxWidth(0.5f))
-        Row(Modifier.padding(top = 20.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            PillButton("Подробнее", onClick = { vm.open(Screen.Detail(item.id)) }, primary = true)
-            RoundButton(if (saved) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder, if (saved) "Убрать из сохранённого" else "В сохранённое", onClick = { vm.toggleSaved(item.id) }, active = saved)
-        }
     }
 }
