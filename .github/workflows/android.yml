@@ -1,0 +1,123 @@
+name: Android TV app
+on:
+  push:
+    branches: [claude/quirky-hopper-1vlmj6, 'claude/android-**', 'claude/awesome-bohr-**']
+    paths: ['android/**', 'update-core/update-public.pem', '.github/workflows/android.yml']
+  pull_request:
+    paths: ['android/**', 'update-core/update-public.pem', '.github/workflows/android.yml']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version x.y.z; empty only builds and tests'
+        required: false
+        default: ''
+      publish:
+        description: 'Publish the signed APK to the android-tv release (needs a version)'
+        type: boolean
+        default: false
+      notes:
+        description: 'What is new, one or two sentences (shown in the app)'
+        required: false
+        default: ''
+permissions:
+  contents: read
+concurrency:
+  group: android-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/claude/quirky-hopper-1vlmj6' }}
+      - name: Library logic and the real torrent engine over loopback
+        working-directory: android
+        run: ./gradlew --no-daemon :core:test :core:torrentTest
+      - name: Build the debug app
+        working-directory: android
+        run: ./gradlew --no-daemon :app:assembleDebug -PappVersion=${{ inputs.version != '' && inputs.version || '0.45.3' }}
+      - name: Check the packaged native libraries
+        run: |
+          apk=$(ls android/app/build/outputs/apk/debug/*.apk | head -1)
+          echo "$apk"
+          unzip -l "$apk" | grep -E 'lib/(arm64-v8a|armeabi-v7a|x86_64)/libtorrent4j.so' | tee /tmp/native.txt
+          test "$(wc -l < /tmp/native.txt)" -eq 3
+          ls -l "$apk"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kachalka-tv-debug
+          path: android/app/build/outputs/apk/debug/*.apk
+          retention-days: 7
+
+  publish:
+    needs: build
+    if: github.event_name == 'workflow_dispatch' && inputs.publish && inputs.version != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: write
+    env:
+      CI: 'true'
+      VERSION: ${{ inputs.version }}
+      NOTES: ${{ inputs.notes }}
+      GH_TOKEN: ${{ github.token }}
+      KEY_PEM: ${{ secrets.KACHALKA_UPDATE_SIGNING_KEY_PEM }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: true
+      - name: Check the inputs
+        run: |
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'version must be x.y.z'; exit 1; }
+          [ -n "$KEY_PEM" ] || { echo 'Missing KACHALKA_UPDATE_SIGNING_KEY_PEM repository secret'; exit 1; }
+      - name: Build the release app
+        working-directory: android
+        run: ./gradlew --no-daemon :app:assembleRelease -PappVersion="$VERSION"
+      - name: Sign the app and write the update manifest
+        run: |
+          set -euo pipefail
+          pip install --quiet cryptography
+          work=$RUNNER_TEMP/sign; mkdir -p "$work"; umask 077
+          printf '%s' "$KEY_PEM" > "$work/key.pem"
+          python3 scripts/android-release.py cert "$work/key.pem" "$work/cert.pem" "$work/key.pk8"
+          tools=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          out=$RUNNER_TEMP/out; mkdir -p "$out"
+          unsigned=$(ls android/app/build/outputs/apk/release/*-unsigned.apk | head -1)
+          "$tools/zipalign" -f -p 4 "$unsigned" "$work/aligned.apk"
+          apk="$out/Kachalka-AndroidTV-$VERSION.apk"
+          "$tools/apksigner" sign --key "$work/key.pk8" --cert "$work/cert.pem" --min-sdk-version 23 --out "$apk" "$work/aligned.apk"
+          "$tools/apksigner" verify --print-certs --min-sdk-version 23 "$apk"
+          notes="${NOTES:-Первая версия для Android TV.}"
+          python3 scripts/android-release.py manifest "$apk" "$VERSION" "$notes" "$out/android-latest.json"
+          openssl dgst -sha256 -sign "$work/key.pem" -out "$out/android-latest.sig" "$out/android-latest.json"
+          openssl dgst -sha256 -verify update-core/update-public.pem -signature "$out/android-latest.sig" "$out/android-latest.json"
+          rm -rf "$work"
+          ls -l "$out"
+          echo "OUT=$out" >> "$GITHUB_ENV"
+      - name: Publish to the android-tv release
+        run: |
+          set -euo pipefail
+          tag=android-tv
+          gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --target "$GITHUB_SHA" --title 'Качалка для Android TV' --notes 'Сборки приложения для Android TV. Приложение обновляется само: подписанное описание последней версии лежит в android-latest.json.' --latest=false
+          apk="$OUT/Kachalka-AndroidTV-$VERSION.apk"
+          gh release upload "$tag" "$apk" --clobber
+          mkdir -p "$RUNNER_TEMP/readback"
+          gh release download "$tag" --pattern "Kachalka-AndroidTV-$VERSION.apk" --dir "$RUNNER_TEMP/readback" --clobber
+          [ "$(sha256sum "$apk" | cut -d' ' -f1)" = "$(sha256sum "$RUNNER_TEMP/readback/Kachalka-AndroidTV-$VERSION.apk" | cut -d' ' -f1)" ] || { echo 'APK readback mismatch'; exit 1; }
+          # The manifest is switched last, only after the APK it points at has passed its readback check.
+          gh release upload "$tag" "$OUT/android-latest.json" "$OUT/android-latest.sig" --clobber
+          echo "Published Android TV $VERSION" >> "$GITHUB_STEP_SUMMARY"
