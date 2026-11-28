@@ -30,7 +30,8 @@ jobs:
           - runner: macos-15-intel
             arch: x64
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 60
+    # Apple's first notarizations of a new account can take over an hour.
+    timeout-minutes: 180
     env:
       KACHALKA_DATA: ${{ github.workspace }}/test-output/macos/profile
     steps:
@@ -56,7 +57,16 @@ jobs:
           echo "::notice title=Selected Xcode::${selected}"
           echo "::notice title=macOS SDKs::${sdks}"
           echo "::notice title=Swift::$(swift --version 2>&1 | head -n 1)"
+      - name: Import the Developer ID certificate (skipped without secrets)
+        env:
+          APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: bash scripts/macos/import-signing-cert.sh
       - name: Build native application and self-contained shared engine
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           set -o pipefail
           bash scripts/macos/build.sh '${{ matrix.arch }}' 2>&1 | tee "$RUNNER_TEMP/build.log" || {

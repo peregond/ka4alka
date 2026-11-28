@@ -31,6 +31,7 @@ concurrency:
 jobs:
   macos:
     uses: ./.github/workflows/macos.yml
+    secrets: inherit
   portable:
     uses: ./.github/workflows/portable-core.yml
   release:
