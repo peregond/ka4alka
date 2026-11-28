@@ -29,6 +29,7 @@ public partial class MainWindow:Window
         // A double click in the search field selects the whole query, not just the word under the pointer.
         Search.PreviewMouseLeftButtonDown+=(_,e)=>e.Handled=SearchDoubleClick(e.ClickCount)||e.Handled;
         onlineIndex=new(sourceClient,relays:new IndexRelays(sourceClient));sourceClient.TorrentRelay=onlineIndex.RelayTorrent;sharedCatalog=new(sourceClient);
+        Loaded+=(_,_)=>_=StartRememberedPhoneAccessAsync();
         catalogRefreshTimer.Tick+=(_,_)=>
         {
             if(closed)return;

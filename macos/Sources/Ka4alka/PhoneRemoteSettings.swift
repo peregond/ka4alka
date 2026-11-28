@@ -46,8 +46,24 @@ struct PhoneRemoteSettings: View {
                     Text(tr("Код на 2 минуты: ", "Code, valid for 2 minutes: ") + code)
                         .font(.system(.body, design: .monospaced)).textSelection(.enabled)
                 }
-                Text(tr("Доступ работает до закрытия приложения. Используй доверенную сеть.", "Access ends when the app closes. Use a trusted network."))
-                    .font(KDFont.secondary).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                if let devices = state.devices, !devices.isEmpty {
+                    Text(tr("Запомненные устройства", "Remembered devices")).font(KDFont.rowTitle).padding(.top, KD.Space.s)
+                    ForEach(devices) { device in
+                        HStack(spacing: KD.Space.s) {
+                            Text(device.name + (device.expires.map { tr(" · до ", " · until ") + String($0.prefix(10)) } ?? ""))
+                                .font(KDFont.secondary).fixedSize(horizontal: false, vertical: true)
+                            Spacer(minLength: KD.Space.s)
+                            Button(tr("Забыть", "Forget")) { perform("forget", id: device.id) }
+                                .buttonStyle(KDSecondaryButtonStyle()).disabled(busy)
+                                .accessibilityLabel(tr("Забыть устройство ", "Forget device ") + device.name)
+                        }
+                    }
+                    Text(tr("Запомненные устройства подключаются сами, пока Качалка запущена. Используй доверенную сеть.", "Remembered devices reconnect by themselves while the app is running. Use a trusted network."))
+                        .font(KDFont.secondary).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                } else {
+                    Text(tr("Доступ работает до закрытия приложения. Используй доверенную сеть.", "Access ends when the app closes. Use a trusted network."))
+                        .font(KDFont.secondary).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
         .onChange(of: model.phoneState?.state?.urls ?? [], initial: true) { _, addresses in
@@ -79,8 +95,8 @@ struct PhoneRemoteSettings: View {
                 .buttonStyle(KDSecondaryButtonStyle()).disabled(busy)
         }
     }
-    private func perform(_ action: String) {
+    private func perform(_ action: String, id: String? = nil) {
         busy = true
-        Task { await model.phone(action); busy = false }
+        Task { await model.phone(action, id: id); busy = false }
     }
 }

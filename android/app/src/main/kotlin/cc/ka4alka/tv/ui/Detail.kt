@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Computer
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -61,6 +62,7 @@ fun DetailScreen(vm: AppViewModel, library: Library, id: String) {
     val backdrops by vm.backdrops.collectAsStateWithLifecycleCompat()
     val releases by vm.releases.collectAsStateWithLifecycleCompat()
     val saved by vm.saved.collectAsStateWithLifecycleCompat()
+    val computer by vm.computer.collectAsStateWithLifecycleCompat()
     LaunchedEffect(title.id) { vm.loadBackdrop(title); vm.loadReleases(title) }
     val loaded = releases[title.id]
     var season by remember(title.id) { mutableStateOf<Int?>(null) }
@@ -101,7 +103,7 @@ fun DetailScreen(vm: AppViewModel, library: Library, id: String) {
                             color = KD.textSecondary, style = MaterialTheme.typography.bodyLarge,
                         )
                     }
-                    items(rows, key = { it.id }) { release -> ReleaseRow(release, onWatch = { vm.watch(title, release) }, onDownload = { vm.download(title, release) }) }
+                    items(rows, key = { it.id }) { release -> ReleaseRow(release, linked = computer.linked, onWatch = { vm.watch(title, release) }, onDownload = { vm.downloadWithTip { vm.download(title, release) } }, onComputer = { vm.sendToComputer(title, release) }) }
                 }
             }
         }
@@ -149,7 +151,7 @@ private fun Cast(people: List<Person>) {
 }
 
 @Composable
-private fun ReleaseRow(release: Release, onWatch: () -> Unit, onDownload: () -> Unit) {
+private fun ReleaseRow(release: Release, linked: Boolean, onWatch: () -> Unit, onDownload: () -> Unit, onComputer: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xCC1C1C1E)).padding(horizontal = 22.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp),
@@ -167,5 +169,6 @@ private fun ReleaseRow(release: Release, onWatch: () -> Unit, onDownload: () -> 
         }
         PillButton("Смотреть", onClick = onWatch, icon = Icons.Filled.PlayArrow, primary = release.recommended)
         PillButton("Скачать", onClick = onDownload, icon = Icons.Filled.Download)
+        if (linked) PillButton("На ПК", onClick = onComputer, icon = Icons.Filled.Computer)
     }
 }

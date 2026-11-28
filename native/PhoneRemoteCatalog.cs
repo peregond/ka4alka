@@ -8,7 +8,7 @@ using MonoTorrent;
 namespace Kachalka;
 
 /// <summary>Shared phone catalog; all entry points run on the desktop download owner's context.</summary>
-public sealed class PhoneRemoteCatalog(DownloadService downloads, Preferences prefs) : IDisposable
+public sealed class PhoneRemoteCatalog(DownloadService downloads, Preferences prefs, Func<string, MediaItem?>? findCatalogItem = null) : IDisposable
 {
     readonly SourceClient source = new();
     readonly Dictionary<string,MediaItem> cards = [];
@@ -98,8 +98,58 @@ public sealed class PhoneRemoteCatalog(DownloadService downloads, Preferences pr
                     progress=double.IsFinite(x.Progress)?Math.Clamp(x.Progress,0,100):0,paused=x.Paused,filesMissing=x.FilesMissing,busy=x.Busy,complete=x.Completed,
                     poster=RemotePoster(x.ImageUrl),downloadRate=Math.Max(0,x.DownloadRate),uploadRate=Math.Max(0,x.UploadRate),totalBytes=x.TotalBytes
                 }).ToArray()};
+            case "files":
+                var owner=downloads.Items.FirstOrDefault(x=>x.Id==S(p,"id"))??throw new ArgumentException("Unknown download.");
+                return new{items=owner.Files.Select((file,index)=>new{index,name=file.Name,size=file.Size,complete=file.Progress>=100&&File.Exists(file.FullPath)}).Where(x=>VideoFile(x.name)).Take(500).ToArray()};
+            case "saved":
+                return SyncFavorites(p);
             default:throw new ArgumentException("Unknown phone operation.");
         }
+    }
+    static readonly string[] VideoExtensions=[".mkv",".mp4",".avi",".m4v",".mov",".ts",".m2ts",".webm",".wmv",".mpg",".mpeg"];
+    static bool VideoFile(string name)=>VideoExtensions.Contains(Path.GetExtension(name),StringComparer.OrdinalIgnoreCase);
+    static string ContentType(string name)=>Path.GetExtension(name).ToLowerInvariant() switch
+    {
+        ".mp4" or ".m4v"=>"video/mp4",".mkv"=>"video/x-matroska",".webm"=>"video/webm",".avi"=>"video/x-msvideo",".mov"=>"video/quicktime",".ts" or ".m2ts"=>"video/mp2t",_=>"video/mpeg"
+    };
+
+    /// <summary>
+    /// The file a paired device asked to play. Only a finished video inside the folder of that download qualifies: the index comes from
+    /// the download's own file list, the path is checked against the download folder (no links, no escapes), and nothing else is served.
+    /// </summary>
+    public MediaFile? Media(string downloadId,int index)
+    {
+        var item=downloads.Items.FirstOrDefault(x=>x.Id==downloadId);
+        if(item==null||index<0||index>=item.Files.Count)return null;
+        var file=item.Files[index];
+        if(!VideoFile(file.Name)||file.Progress<100||string.IsNullOrWhiteSpace(file.FullPath))return null;
+        try{DownloadFiles.ValidatePath(item.Folder,file.FullPath);}catch(IOException){return null;}
+        return File.Exists(file.FullPath)?new MediaFile(file.FullPath,ContentType(file.Name)):null;
+    }
+
+    object SyncFavorites(JsonElement p)
+    {
+        var now=DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        string? Id(MediaItem item)=>OnlineIndexClient.IdFor(item);
+        FavoriteSync.Reconcile(prefs.FavoriteMarks,prefs.LiveFavorites.Select(Id).OfType<string>().ToArray(),now);
+        var incoming=new List<FavoriteMark>();
+        if(p.TryGetProperty("marks",out var rows)&&rows.ValueKind==JsonValueKind.Array)
+            foreach(var row in rows.EnumerateArray().Take(FavoriteSync.MaxMarks))
+                if(row.ValueKind==JsonValueKind.Object&&S(row,"id") is {Length:>0} id&&row.TryGetProperty("at",out var at)&&at.TryGetInt64(out var time)&&row.TryGetProperty("removed",out var removed)&&removed.ValueKind is JsonValueKind.True or JsonValueKind.False)
+                    incoming.Add(new(id,time,removed.ValueKind==JsonValueKind.True));
+        var (add,remove)=FavoriteSync.Merge(prefs.FavoriteMarks,incoming);
+        foreach(var id in remove)
+            foreach(var item in prefs.LiveFavorites.Where(x=>Id(x)==id).ToArray()){prefs.LiveFavorites.Remove(item);prefs.Favorites.Remove(item.Id);}
+        foreach(var id in add)
+        {
+            if(prefs.LiveFavorites.Any(x=>Id(x)==id))continue;
+            var found=findCatalogItem?.Invoke(id);
+            // A title this computer's catalog does not know yet cannot be listed here; forget its mark so it is offered again at the next sync.
+            if(found==null){prefs.FavoriteMarks.Remove(id);continue;}
+            prefs.LiveFavorites.Add(found);prefs.Favorites.Add(found.Id);
+        }
+        prefs.Save();
+        return new{marks=prefs.FavoriteMarks.Values.Select(x=>new{id=x.Id,at=x.At,removed=x.Removed}).ToArray()};
     }
     object[] Remember(IEnumerable<MediaItem> items)=>items.Where(x=>!HiddenCatalog.Hidden(x,prefs,CatalogChoices.Genres)).Take(60).Select(item=>
     {

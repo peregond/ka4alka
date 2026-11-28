@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Computer
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Home
@@ -59,6 +60,7 @@ private val destinations = listOf(
     Destination(Screen.Search, "Поиск", Icons.Filled.Search),
     Destination(Screen.Saved, "Сохранённое", Icons.Filled.Favorite),
     Destination(Screen.Downloads, "Загрузки", Icons.Filled.Download),
+    Destination(Screen.Computer, "Компьютер", Icons.Filled.Computer),
     Destination(Screen.Settings, "Настройки", Icons.Filled.Settings),
 )
 
@@ -94,6 +96,7 @@ fun AppShell(vm: AppViewModel) {
                 is LibraryState.Failed -> when (screen) {
                     Screen.Settings -> SettingsScreen(vm)
                     Screen.Downloads -> DownloadsScreen(vm)
+                    Screen.Computer -> ComputerScreen(vm)
                     else -> Message("Нет связи с библиотекой", state.reason + "\nПроверь интернет — каталог загрузится сам, когда связь появится. Перезапусти приложение, чтобы попробовать сразу.")
                 }
                 is LibraryState.Ready -> when (screen) {
@@ -103,10 +106,21 @@ fun AppShell(vm: AppViewModel) {
                     Screen.Search -> SearchScreen(vm, state.library)
                     Screen.Saved -> SavedScreen(vm, state.library)
                     Screen.Downloads -> DownloadsScreen(vm)
+                    Screen.Computer -> ComputerScreen(vm)
                     Screen.Settings -> SettingsScreen(vm)
                     is Screen.Detail -> DetailScreen(vm, state.library, screen.id)
                     Screen.Player -> Unit
                 }
+            }
+        }
+        val tip by vm.linkTip.collectAsStateWithLifecycleCompat()
+        if (tip) LinkTipDialog(vm)
+        val computer by vm.computer.collectAsStateWithLifecycleCompat()
+        val note = computer.message
+        if (note != null && screen !is Screen.Computer) {
+            LaunchedEffect(note) { delay(5000); vm.clearComputerMessage() }
+            Box(Modifier.align(Alignment.BottomCenter).padding(bottom = 36.dp).clip(RoundedCornerShape(24.dp)).background(Color(0xF2232B27)).padding(horizontal = 28.dp, vertical = 16.dp)) {
+                Text(note, color = Color.White, style = MaterialTheme.typography.titleSmall)
             }
         }
         // The rail stays on every page (also on a title page), so the left strip is never empty.

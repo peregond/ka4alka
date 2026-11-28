@@ -192,6 +192,8 @@ public class Preferences
     public List<HiddenCatalogTitle> HiddenTitles {get;set;}=[];
     public HashSet<int> Favorites {get;set;}=[];
     public List<MediaItem> LiveFavorites {get;set;}=[];
+    // Per-title change marks used to merge the favourites with another device (see FavoriteSync).
+    public Dictionary<string,FavoriteMark> FavoriteMarks {get;set;}=[];
     public static string DataDir=>Environment.GetEnvironmentVariable("KACHALKA_DATA") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"Kachalka");
     public static Preferences Load()
     {

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Runs inside the Android TV emulator: walks through the app with remote keys and saves screenshots.
-set -u  # screenshots, fifteenth pass
+set -u  # screenshots, eighteenth pass
 out="${1:-shots}"; apk="$2"; mkdir -p "$out"
 adb install -r "$apk" >/dev/null
 adb shell settings put global window_animation_scale 0; adb shell settings put global transition_animation_scale 0; adb shell settings put global animator_duration_scale 0
@@ -9,7 +9,10 @@ key() { for k in "$@"; do adb shell input keyevent "$k"; sleep 0.8; done; }
 go() { adb shell am start -n cc.ka4alka.tv/.MainActivity --es screen "$1" >/dev/null; sleep "${2:-6}"; }
 adb shell am start -n cc.ka4alka.tv/.MainActivity >/dev/null
 shot 01-loading 3
-sleep 40
+sleep 14
+shot 01b-tip 2
+key KEYCODE_BACK
+sleep 26
 shot 02-home 3
 key KEYCODE_DPAD_CENTER
 sleep 30
@@ -31,5 +34,6 @@ go search 6; shot 10-search 2
 adb shell input text "matrica"; sleep 2; shot 11-search-typed 3
 go saved 6; shot 12-saved 2
 go downloads 6; shot 13-downloads 2
+go computer 8; shot 15-computer 3
 go settings 6; shot 14-settings 2
 adb logcat -d -s AndroidRuntime:E 2>/dev/null | tail -30 > "$out/crash.txt"
