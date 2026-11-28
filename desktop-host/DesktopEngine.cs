@@ -361,7 +361,10 @@ sealed class DesktopEngine:IAsyncDisposable
         {
             token.ThrowIfCancellationRequested();
             var result=await catalog.Handle(method,args,token);
-            if(method is "add" or "control")Event("downloads",Downloads());return result;
+            if(method is "add" or "control")Event("downloads",Downloads());
+            // A favourite changed from the TV: the window keeps its own copy of the saved ids.
+            else if(method is "saved")Event("personal",Settings());
+            return result;
         },context),devicesFile:PhoneDevicesFile,mediaResolver:catalog.Media);
         try{server.Start();phoneCatalog=catalog;phone=server;}
         catch{await server.DisposeAsync();catalog.Dispose();throw;}

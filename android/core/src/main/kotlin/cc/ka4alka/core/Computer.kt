@@ -209,7 +209,8 @@ class RemoteFileSource(
     override val length: Long,
     override val contentType: String,
 ) : StreamSource, AutoCloseable {
-    private var socket: Socket? = null
+    @Volatile private var socket: Socket? = null
+    @Volatile private var closed = false
     private var input: java.io.InputStream? = null
     private var next = -1L
 
@@ -217,10 +218,12 @@ class RemoteFileSource(
 
     @Synchronized
     override fun read(position: Long, buffer: ByteArray, offset: Int, length: Int): Int {
+        if (closed) throw java.io.IOException("closed")
         if (input == null || position != next) {
             closeConnection()
             val (s, i) = client.openRange(downloadId, index, position)
             socket = s; input = i; next = position
+            if (closed) { closeConnection(); throw java.io.IOException("closed") }
         }
         var total = 0
         while (total < length) {
@@ -234,5 +237,6 @@ class RemoteFileSource(
     }
 
     private fun closeConnection() { try { socket?.close() } catch (_: Exception) {}; socket = null; input = null; next = -1 }
-    @Synchronized override fun close() = closeConnection()
+    /** Not synchronized on purpose: a read blocked on the network holds the monitor, and closing the socket is what unblocks it. */
+    override fun close() { closed = true; try { socket?.close() } catch (_: Exception) {} }
 }
