@@ -20,6 +20,8 @@ import java.util.concurrent.TimeUnit
 /** An error to show to the user as is (the computer's own message when it sent one). */
 class ComputerException(message: String, val unauthorized: Boolean = false) : IOException(message)
 
+data class ComputerFile(val index: Int, val name: String, val size: Long, val complete: Boolean)
+
 data class ComputerDownload(
     val id: String, val title: String, val status: String, val statusKind: String, val progress: Double,
     val paused: Boolean, val complete: Boolean, val downloadRate: Long, val totalBytes: Long,
@@ -93,9 +95,10 @@ class ComputerClient(val host: String, val port: Int = PORT, var token: String? 
         status == 200 && body.contains("Качалка · Remote")
     } catch (e: Exception) { false }
 
-    /** Trades the code shown on the computer for a session token. */
-    fun pair(code: String): String {
-        val result = post("/pair", """{"code":"${code.filter { it.isDigit() }}"}""")
+    /** Trades the code shown on the computer for a token. With [remember] the computer keeps this device for 90 days. */
+    fun pair(code: String, remember: Boolean = true, deviceName: String = "Android TV"): String {
+        val name = deviceName.filter { it.isLetterOrDigit() || it == ' ' || it == '-' }.take(40).ifBlank { "Android TV" }
+        val result = post("/pair", """{"code":"${code.filter { it.isDigit() }}","remember":$remember,"name":"$name"}""")
         val value = (result["token"] as? JsonPrimitive)?.contentOrNull ?: throw ComputerException("Компьютер не принял код.")
         token = value
         return value
@@ -116,6 +119,54 @@ class ComputerClient(val host: String, val port: Int = PORT, var token: String? 
             fun flag(k: String) = (o[k] as? JsonPrimitive)?.booleanOrNull ?: false
             ComputerDownload(text("id"), text("title"), text("status"), text("statusKind"), num("progress"), flag("paused"), flag("complete"), num("downloadRate").toLong(), num("totalBytes").toLong())
         }
+
+    /** The finished video files of a download on the computer. */
+    fun files(downloadId: String): List<ComputerFile> =
+        ((post("/api/files", """{"id":"${downloadId.filter { it.isLetterOrDigit() }}"}""")["items"] as? JsonArray) ?: JsonArray(emptyList())).mapNotNull { row ->
+            val o = row as? JsonObject ?: return@mapNotNull null
+            val index = (o["index"] as? JsonPrimitive)?.doubleOrNull?.toInt() ?: return@mapNotNull null
+            ComputerFile(index, (o["name"] as? JsonPrimitive)?.contentOrNull.orEmpty(), (o["size"] as? JsonPrimitive)?.doubleOrNull?.toLong() ?: 0, (o["complete"] as? JsonPrimitive)?.booleanOrNull ?: false)
+        }
+
+    /** Opens a ranged read of one of the computer's files; the caller closes the socket. Returns the socket and the stream at the first byte. */
+    fun openRange(downloadId: String, index: Int, from: Long): Pair<Socket, java.io.InputStream> {
+        val socket = Socket()
+        try {
+            socket.connect(InetSocketAddress(host, port), timeoutMs)
+            socket.soTimeout = 60_000
+            val head = "GET /media/${downloadId.filter { it.isLetterOrDigit() }}/$index HTTP/1.1\r\nHost: $host:$port\r\nAuthorization: Bearer ${token.orEmpty()}\r\nRange: bytes=$from-\r\nConnection: close\r\n\r\n"
+            socket.getOutputStream().write(head.toByteArray(Charsets.ISO_8859_1)); socket.getOutputStream().flush()
+            val input = socket.getInputStream().buffered(64 * 1024)
+            val header = StringBuilder()
+            while (!header.endsWith("\r\n\r\n")) {
+                val b = input.read()
+                if (b < 0 || header.length > 16 * 1024) throw ComputerException("Компьютер оборвал передачу файла.")
+                header.append(b.toChar())
+            }
+            val status = header.toString().substringBefore("\r\n").split(' ').getOrNull(1)?.toIntOrNull()
+            if (status == 401) throw ComputerException("Подключение к компьютеру истекло.", unauthorized = true)
+            if (status != 200 && status != 206) throw ComputerException("Компьютер не отдал файл (код $status).")
+            return socket to input
+        } catch (e: Exception) {
+            try { socket.close() } catch (_: Exception) {}
+            throw if (e is ComputerException) e else ComputerException("Не получилось связаться с компьютером ($host).")
+        }
+    }
+
+    /** Sends this device's favourite marks and returns the computer's merged ones. */
+    fun saved(marks: List<FavoriteMark>): List<FavoriteMark> {
+        val body = buildString {
+            append("""{"marks":[""")
+            append(marks.joinToString(",") { """{"id":"${it.id}","at":${it.at},"removed":${it.removed}}""" })
+            append("]}")
+        }
+        return ((post("/api/saved", body)["marks"] as? JsonArray) ?: JsonArray(emptyList())).mapNotNull { row ->
+            val o = row as? JsonObject ?: return@mapNotNull null
+            val id = (o["id"] as? JsonPrimitive)?.contentOrNull ?: return@mapNotNull null
+            val at = (o["at"] as? JsonPrimitive)?.doubleOrNull?.toLong() ?: return@mapNotNull null
+            FavoriteMark(id, at, (o["removed"] as? JsonPrimitive)?.booleanOrNull ?: false)
+        }
+    }
 
     fun control(id: String, action: String) { require(action == "pause" || action == "resume"); post("/api/control", """{"id":"$id","action":"$action"}""") }
     fun logout() { try { post("/api/logout") } catch (_: Exception) {} ; token = null }
@@ -144,4 +195,44 @@ object LanScanner {
             return pool.invokeAll(tasks, 20, TimeUnit.SECONDS).mapNotNull { f -> try { if (f.isCancelled) null else f.get() } catch (e: Exception) { null } }
         } finally { pool.shutdownNow() }
     }
+}
+
+/**
+ * A file on the computer, readable through the stream server like a file of the local torrent:
+ * the player talks to the loopback server, which asks the computer for the bytes it needs. One ranged request is kept open while
+ * the player reads forward; a seek opens a new one.
+ */
+class RemoteFileSource(
+    private val client: ComputerClient,
+    private val downloadId: String,
+    private val index: Int,
+    override val length: Long,
+    override val contentType: String,
+) : StreamSource, AutoCloseable {
+    private var socket: Socket? = null
+    private var input: java.io.InputStream? = null
+    private var next = -1L
+
+    override fun await(start: Long, length: Long, timeoutMs: Long): Boolean = true // the computer's file is already complete
+
+    @Synchronized
+    override fun read(position: Long, buffer: ByteArray, offset: Int, length: Int): Int {
+        if (input == null || position != next) {
+            closeConnection()
+            val (s, i) = client.openRange(downloadId, index, position)
+            socket = s; input = i; next = position
+        }
+        var total = 0
+        while (total < length) {
+            val n = input!!.read(buffer, offset + total, length - total)
+            if (n < 0) break
+            total += n
+        }
+        next += total
+        if (total == 0) closeConnection()
+        return total
+    }
+
+    private fun closeConnection() { try { socket?.close() } catch (_: Exception) {}; socket = null; input = null; next = -1 }
+    @Synchronized override fun close() = closeConnection()
 }

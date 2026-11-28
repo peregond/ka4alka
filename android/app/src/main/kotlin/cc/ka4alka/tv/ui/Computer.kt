@@ -93,6 +93,7 @@ fun ComputerScreen(vm: AppViewModel) {
     var address by rememberSaveable { mutableStateOf("") }
     var code by rememberSaveable { mutableStateOf("") }
     LaunchedEffect(Unit) { if (!state.linked) vm.scanForComputers() }
+    state.choose?.let { ComputerChoiceDialog(vm, it) }
     LaunchedEffect(state.found) { if (address.isEmpty() && state.found.size == 1) address = state.found[0] }
 
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 56.dp, end = 56.dp, top = 36.dp, bottom = 80.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
@@ -105,7 +106,7 @@ fun ComputerScreen(vm: AppViewModel) {
         if (state.linked && !state.expired) {
             item { LinkedCard(vm, state.host.orEmpty()) }
             item { Text("Загрузки на компьютере", color = Color.White, style = MaterialTheme.typography.headlineSmall) }
-            if (state.downloads.isEmpty()) item { Text("Пока пусто. На карточке фильма нажми «На ПК» у нужной раздачи.", color = KD.textSecondary, style = MaterialTheme.typography.bodyLarge) }
+            if (state.downloads.isEmpty()) item { Text("Пока пусто. На карточке фильма нажми «На ПК» у нужной раздачи. Готовые фильмы можно смотреть прямо отсюда.", color = KD.textSecondary, style = MaterialTheme.typography.bodyLarge) }
             items(state.downloads, key = { it.id }) { row ->
                 Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(KD.surface).padding(20.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(18.dp)) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -113,7 +114,8 @@ fun ComputerScreen(vm: AppViewModel) {
                         LinearProgressIndicator(progress = { (row.progress / 100.0).toFloat().coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)), color = KD.accent, trackColor = KD.surfaceHigh)
                         Text(listOf(row.status, "${row.progress.toInt()}%", if (row.downloadRate > 0) formatSpeed(row.downloadRate.toInt()) else "").filter { it.isNotBlank() }.joinToString(" · "), color = KD.textSecondary, style = MaterialTheme.typography.bodyMedium)
                     }
-                    if (!row.complete) RoundButton(if (row.paused) Icons.Filled.PlayArrow else Icons.Filled.Pause, if (row.paused) "Продолжить" else "Пауза", onClick = { vm.computerControl(row.id, !row.paused) })
+                    if (row.complete) PillButton("Смотреть", onClick = { vm.watchOnComputer(row) }, icon = Icons.Filled.PlayArrow, primary = true)
+                    else RoundButton(if (row.paused) Icons.Filled.PlayArrow else Icons.Filled.Pause, if (row.paused) "Продолжить" else "Пауза", onClick = { vm.computerControl(row.id, !row.paused) })
                 }
             }
         } else {
@@ -144,6 +146,27 @@ fun ComputerScreen(vm: AppViewModel) {
             }
         }
         state.message?.let { item { Text(it, color = if (state.linked) KD.success else KD.warning, style = MaterialTheme.typography.bodyLarge) } }
+    }
+}
+
+/** The files of a finished download, when there is more than one to play (a season, say). */
+@Composable
+fun ComputerChoiceDialog(vm: AppViewModel, choice: cc.ka4alka.tv.ComputerChoice) {
+    Dialog(onDismissRequest = { vm.dismissComputerChoice() }) {
+        Column(Modifier.clip(RoundedCornerShape(28.dp)).background(KD.surface).padding(28.dp).width(720.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Что включить?", color = Color.White, style = MaterialTheme.typography.headlineSmall)
+            Text(choice.title, color = KD.textSecondary, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+            LazyColumn(Modifier.height(340.dp), verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(vertical = 6.dp)) {
+                items(choice.files, key = { it.index }) { file ->
+                    Focusable(onClick = { vm.chooseComputerFile(choice, file) }, modifier = Modifier.fillMaxWidth(), focusedScale = 1.02f) { focused ->
+                        Row(Modifier.fillMaxWidth().background(if (focused) KD.surfaceHigh else KD.background).padding(horizontal = 18.dp, vertical = 14.dp), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(file.name.substringAfterLast('/').substringAfterLast('\\'), color = Color.White, style = MaterialTheme.typography.titleSmall, maxLines = 1, modifier = Modifier.weight(1f))
+                            Text(formatBytes(file.size), color = KD.textSecondary, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

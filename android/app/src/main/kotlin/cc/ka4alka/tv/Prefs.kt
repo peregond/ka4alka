@@ -53,6 +53,11 @@ class Prefs(private val context: Context) {
         get() = store.getInt("linkTipShown", 0)
         set(value) { store.edit().putInt("linkTipShown", value).apply() }
 
+    /** The favourites marks exchanged with the computer (see FavoriteSync). */
+    var favoriteMarks: String?
+        get() = store.getString("favoriteMarks", null)
+        set(value) { store.edit().putString("favoriteMarks", value).apply() }
+
     fun position(key: String): Long = store.getLong("pos:$key", 0)
     fun setPosition(key: String, value: Long) { store.edit().putLong("pos:$key", value).apply() }
 

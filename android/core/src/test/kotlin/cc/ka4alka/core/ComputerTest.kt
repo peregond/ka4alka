@@ -16,6 +16,8 @@ class ComputerTest {
         val port get() = server.localPort
         val added = mutableListOf<String>()
         @Volatile var sessionToken = "T0KEN"
+        val movie = ByteArray(700_000) { (it * 7 + it / 13).toByte() }
+        @Volatile var lastPairBody = ""
         init {
             thread(isDaemon = true) {
                 while (!server.isClosed) {
@@ -37,12 +39,23 @@ class ComputerTest {
                 s.getOutputStream().write("HTTP/1.1 $code R\r\nContent-Type: $type\r\nContent-Length: ${bytes.size}\r\nConnection: close\r\n\r\n".toByteArray() + bytes)
             }
             if (headers["host"] != "127.0.0.1:$port") return reply(403, "Local origin required", "text/plain")
+            if (method == "GET" && path.startsWith("/media/")) {
+                if (headers["authorization"] != "Bearer $sessionToken") return reply(401, """{"error":"Pair again"}""")
+                if (path != "/media/abc/0") return reply(404, "Not found", "text/plain")
+                val from = Regex("bytes=(\\d+)-").find(headers["range"].orEmpty())?.groupValues?.get(1)?.toInt() ?: 0
+                val chunk = movie.copyOfRange(from, movie.size)
+                s.getOutputStream().write("HTTP/1.1 206 Partial Content\r\nContent-Length: ${chunk.size}\r\nContent-Range: bytes $from-${movie.size - 1}/${movie.size}\r\nConnection: close\r\n\r\n".toByteArray() + chunk)
+                return
+            }
             if (method == "GET") return reply(200, "<title>Качалка · Remote</title>", "text/html")
+            if (path == "/pair") lastPairBody = body
             if (path == "/pair") return if (body.contains("\"123456\"")) reply(200, """{"token":"$sessionToken"}""") else reply(401, """{"error":"Код неверен или истёк."}""")
             if (headers["authorization"] != "Bearer $sessionToken") return reply(401, """{"error":"Подключись заново"}""")
             when (path) {
                 "/api/add" -> { added.add(body); reply(200, """{"id":"d1"}""") }
                 "/api/downloads" -> reply(200, """{"items":[{"id":"d1","title":"Фильм","status":"Скачивается","statusKind":"downloading","progress":42.5,"paused":false,"complete":false,"downloadRate":1048576,"totalBytes":900000000}]}""")
+                "/api/files" -> reply(200, """{"items":[{"index":0,"name":"Фильм.mkv","size":${movie.size},"complete":true}]}""")
+                "/api/saved" -> reply(200, """{"marks":[{"id":"movies:z","at":5,"removed":false},{"id":"series:y","at":9,"removed":true}]}""")
                 "/api/control" -> reply(200, """{"id":"d1"}""")
                 else -> reply(404, "Not found", "text/plain")
             }
@@ -91,6 +104,50 @@ class ComputerTest {
             val found = LanScanner.scan(listOf("127.0.0."), desktop.port, 200) { ip -> ComputerClient(ip, desktop.port, null, 1000).isKachalka() }
             assertEquals(listOf("127.0.0.1"), found)
             assertTrue(LanScanner.scan(emptyList()).isEmpty())
+        }
+    }
+
+    @Test fun rememberingTheDeviceIsRequestedWhenPairing() {
+        FakeDesktop().use { desktop ->
+            ComputerClient("127.0.0.1", desktop.port).pair("123456", deviceName = "Гостиная <ТВ>")
+            assertTrue(desktop.lastPairBody.contains("\"remember\":true"))
+            assertTrue(desktop.lastPairBody.contains("\"name\":\"Гостиная ТВ\""), desktop.lastPairBody)
+        }
+    }
+
+    @Test fun listsFilesAndPlaysThemThroughTheStreamServerWithSeeking() {
+        FakeDesktop().use { desktop ->
+            val client = ComputerClient("127.0.0.1", desktop.port, token = "T0KEN")
+            val file = client.files("abc").single()
+            assertEquals("Фильм.mkv", file.name); assertEquals(700_000L, file.size); assertTrue(file.complete)
+            RemoteFileSource(client, "abc", file.index, file.size, "video/x-matroska").use { source ->
+                StreamServer(source, chunk = 64 * 1024).use { server ->
+                    fun get(range: String?): ByteArray {
+                        val c = java.net.URL(server.url).openConnection() as java.net.HttpURLConnection
+                        if (range != null) c.setRequestProperty("Range", range)
+                        return c.inputStream.readBytes()
+                    }
+                    assertTrue(get(null).contentEquals(desktop.movie))
+                    assertTrue(get("bytes=500000-500999").contentEquals(desktop.movie.copyOfRange(500_000, 501_000)))
+                    assertTrue(get("bytes=10-19").contentEquals(desktop.movie.copyOfRange(10, 20)))
+                    assertTrue(get("bytes=-100").contentEquals(desktop.movie.copyOfRange(699_900, 700_000)))
+                }
+            }
+        }
+    }
+
+    @Test fun anExpiredTokenIsReportedWhilePlaying() {
+        FakeDesktop().use { desktop ->
+            val client = ComputerClient("127.0.0.1", desktop.port, token = "OLD")
+            assertTrue(assertFailsWith<ComputerException> { client.openRange("abc", 0, 0) }.unauthorized)
+        }
+    }
+
+    @Test fun favouritesAreExchangedAsMarks() {
+        FakeDesktop().use { desktop ->
+            val client = ComputerClient("127.0.0.1", desktop.port, token = "T0KEN")
+            val back = client.saved(listOf(FavoriteMark("movies:a", 100, false)))
+            assertEquals(listOf(FavoriteMark("movies:z", 5, false), FavoriteMark("series:y", 9, true)), back)
         }
     }
 }
