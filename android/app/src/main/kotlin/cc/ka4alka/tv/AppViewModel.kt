@@ -5,6 +5,14 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import cc.ka4alka.core.AndroidManifest
+import cc.ka4alka.core.ComputerClient
+import cc.ka4alka.core.ComputerDownload
+import cc.ka4alka.core.ComputerException
+import cc.ka4alka.core.ComputerFile
+import cc.ka4alka.core.FavoriteSync
+import cc.ka4alka.core.RemoteFileSource
+import cc.ka4alka.core.VideoNames
+import cc.ka4alka.core.LanScanner
 import cc.ka4alka.core.DownloadPhase
 import cc.ka4alka.core.DownloadRecord
 import cc.ka4alka.core.DownloadState
@@ -36,6 +44,7 @@ sealed interface Screen {
     data object Search : Screen
     data object Saved : Screen
     data object Downloads : Screen
+    data object Computer : Screen
     data object Settings : Screen
     data class Detail(val id: String) : Screen
     data object Player : Screen
@@ -56,6 +65,22 @@ sealed interface Playback {
     data class Playing(val title: String, val url: String, val downloadId: String, val resumeKey: String) : Playback
     data class Failed(val message: String) : Playback
 }
+
+/** The computer this TV sends downloads to. */
+data class ComputerUi(
+    val host: String? = null,
+    val linked: Boolean = false,
+    val expired: Boolean = false,
+    val scanning: Boolean = false,
+    val found: List<String> = emptyList(),
+    val busy: Boolean = false,
+    val message: String? = null,
+    val downloads: List<ComputerDownload> = emptyList(),
+    /** A finished download with several video files: the user picks which one to play. */
+    val choose: ComputerChoice? = null,
+)
+
+data class ComputerChoice(val downloadId: String, val title: String, val files: List<ComputerFile>)
 
 sealed interface UpdateUi {
     data object Idle : UpdateUi
@@ -89,6 +114,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }.flowOn(Dispatchers.IO).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val computer = MutableStateFlow(
+        ComputerUi(host = app.prefs.computerHost, linked = app.prefs.computerHost != null && app.prefs.computerToken != null),
+    )
+    /** True while the one-time "you can download on your computer" hint is on screen. */
+    val linkTip = MutableStateFlow(false)
+    private var pendingAfterTip: (() -> Unit)? = null
+
+    private var remoteSource: RemoteFileSource? = null
+    private var syncJob: Job? = null
     private var stream: TorrentStream? = null
     private var server: StreamServer? = null
     private var playbackJob: Job? = null
@@ -96,6 +130,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     init {
         viewModelScope.launch { app.repository.load() }
         viewModelScope.launch { autoCheckUpdates() }
+        viewModelScope.launch { showLinkTipAtStart() }
+        viewModelScope.launch { pollComputer() }
+        viewModelScope.launch { delay(6000); syncFavorites() }
     }
 
     private fun engineReady(): Boolean = runCatching { app.ensureEngine(); true }.getOrDefault(false)
@@ -103,6 +140,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     // ---- navigation
 
     fun open(screen: Screen) {
+        if (screen == Screen.Saved) syncFavorites()
         if (screen.isTopLevel) { stack.clear(); stack.add(screen) } else stack.add(screen)
     }
 
@@ -110,7 +148,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun openByName(name: String?) {
         when (name) {
             "home" -> open(Screen.Home); "movies" -> open(Screen.Movies); "series" -> open(Screen.Series)
-            "search" -> open(Screen.Search); "saved" -> open(Screen.Saved); "downloads" -> open(Screen.Downloads); "settings" -> open(Screen.Settings)
+            "search" -> open(Screen.Search); "saved" -> open(Screen.Saved); "downloads" -> open(Screen.Downloads); "computer" -> open(Screen.Computer); "settings" -> open(Screen.Settings)
         }
     }
 
@@ -128,6 +166,37 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val next = if (id in saved.value) saved.value - id else saved.value + id
         saved.value = next
         app.prefs.saved = next
+        scheduleFavoriteSync()
+    }
+
+    // ---- favourites shared with the computer
+
+    private fun scheduleFavoriteSync() {
+        if (app.prefs.computerHost == null) return
+        syncJob?.cancel()
+        syncJob = viewModelScope.launch { delay(1500); syncFavorites() }
+    }
+
+    /** Exchanges favourite marks with the linked computer and applies what changed there. Quiet when there is no link or no network. */
+    fun syncFavorites() {
+        val link = client() ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val snapshot = saved.value
+                val marks = FavoriteSync.decode(app.prefs.favoriteMarks)
+                FavoriteSync.reconcile(marks, snapshot, System.currentTimeMillis())
+                val remote = link.saved(marks.values.toList())
+                // A favourite was changed while we waited: applying this answer would overwrite it. Start over instead.
+                if (saved.value != snapshot) { scheduleFavoriteSync(); return@launch }
+                val merged = FavoriteSync.merge(marks, remote)
+                val next = (saved.value + merged.add) - merged.remove.toSet()
+                saved.value = next
+                app.prefs.saved = next
+                app.prefs.favoriteMarks = FavoriteSync.encode(marks.values)
+            } catch (e: ComputerException) {
+                if (e.unauthorized) computer.value = computer.value.copy(expired = true)
+            }
+        }
     }
 
     // ---- title page data
@@ -255,7 +324,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private fun closeStream() {
         runCatching { server?.close() }
         runCatching { stream?.close() }
-        server = null; stream = null
+        runCatching { remoteSource?.close() }
+        server = null; stream = null; remoteSource = null
     }
 
     fun stopPlayback() {
@@ -323,6 +393,146 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val state = update.value
         if (state is UpdateUi.NeedsPermission && ApkInstaller.canInstall(app)) continueInstall(state.manifest, state.apk)
         UpdateEvents.failure?.let { update.value = UpdateUi.Failed(it); UpdateEvents.failure = null }
+    }
+
+    // ---- the computer on the home network
+
+    private fun client(): ComputerClient? {
+        val host = app.prefs.computerHost ?: return null
+        return ComputerClient(host, app.prefs.computerPort, app.prefs.computerToken)
+    }
+
+    fun scanForComputers() {
+        if (computer.value.scanning) return
+        computer.value = computer.value.copy(scanning = true, message = null)
+        viewModelScope.launch {
+            val found = withContext(Dispatchers.IO) { LanScanner.scan(LanScanner.localPrefixes()) }
+            computer.value = computer.value.copy(scanning = false, found = found,
+                message = if (found.isEmpty()) "Компьютеров с включённым доступом не нашлось. Включи его на компьютере (шаг 1) и поищи ещё раз или введи адрес вручную." else null)
+        }
+    }
+
+    /** [address] is what the user typed or picked; [code] is the six digits shown on the computer. */
+    fun linkComputer(address: String, code: String) {
+        val parsed = ComputerClient.parseAddress(address)
+        if (parsed == null) { computer.value = computer.value.copy(message = "Адрес выглядит неверно. Он должен быть вида 192.168.1.25 (его показывает компьютер)."); return }
+        if (code.count { it.isDigit() } != 6) { computer.value = computer.value.copy(message = "Код состоит из шести цифр. Его показывает компьютер."); return }
+        computer.value = computer.value.copy(busy = true, message = null)
+        viewModelScope.launch {
+            try {
+                val token = withContext(Dispatchers.IO) { ComputerClient(parsed.first, parsed.second).pair(code) }
+                app.prefs.computerHost = parsed.first; app.prefs.computerPort = parsed.second; app.prefs.computerToken = token
+                computer.value = computer.value.copy(host = parsed.first, linked = true, expired = false, busy = false, message = "Готово: компьютер подключён. Избранное синхронизируется.")
+                syncFavorites()
+            } catch (e: ComputerException) {
+                computer.value = computer.value.copy(busy = false, message = e.message)
+            }
+        }
+    }
+
+    fun unlinkComputer() {
+        val link = client()
+        viewModelScope.launch(Dispatchers.IO) { runCatching { link?.logout() } }
+        app.prefs.computerHost = null; app.prefs.computerToken = null
+        computer.value = ComputerUi(message = "Компьютер отключён.")
+    }
+
+    /** Sends a release to the linked computer's own download queue. */
+    fun sendToComputer(title: Title, release: Release) {
+        val link = client() ?: run { open(Screen.Computer); return }
+        computer.value = computer.value.copy(message = null)
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { link.add(release.magnet) }
+                computer.value = computer.value.copy(message = "«${title.title}» отправлено на компьютер ${link.host}.")
+            } catch (e: ComputerException) {
+                if (e.unauthorized) computer.value = computer.value.copy(expired = true, message = "Подключение к компьютеру истекло. Введи новый код.")
+                else computer.value = computer.value.copy(message = e.message)
+            }
+        }
+    }
+
+    /** Plays a finished download of the computer on this TV, over the home network. */
+    fun watchOnComputer(row: ComputerDownload) {
+        val link = client() ?: return
+        viewModelScope.launch {
+            try {
+                val files = withContext(Dispatchers.IO) { link.files(row.id).filter { it.complete } }
+                when {
+                    files.isEmpty() -> computer.value = computer.value.copy(message = "На компьютере пока нет готовых видеофайлов в этой загрузке.")
+                    files.size == 1 -> playFromComputer(row.title, link, row.id, files[0])
+                    else -> computer.value = computer.value.copy(choose = ComputerChoice(row.id, row.title, files))
+                }
+            } catch (e: ComputerException) {
+                if (e.unauthorized) computer.value = computer.value.copy(expired = true, message = "Подключение к компьютеру истекло. Введи новый код.")
+                else computer.value = computer.value.copy(message = e.message)
+            }
+        }
+    }
+
+    fun chooseComputerFile(choice: ComputerChoice, file: ComputerFile) {
+        computer.value = computer.value.copy(choose = null)
+        client()?.let { playFromComputer(choice.title, it, choice.downloadId, file) }
+    }
+
+    fun dismissComputerChoice() { computer.value = computer.value.copy(choose = null) }
+
+    private fun playFromComputer(title: String, link: ComputerClient, downloadId: String, file: ComputerFile) {
+        closeStream()
+        val source = RemoteFileSource(link, downloadId, file.index, file.size, VideoNames.contentType(file.name))
+        remoteSource = source
+        val started = StreamServer(source)
+        server = started
+        playback.value = Playback.Playing(title, started.url, "", "computer:$downloadId:${file.index}")
+        if (current !is Screen.Player) stack.add(Screen.Player)
+    }
+
+    fun clearComputerMessage() { computer.value = computer.value.copy(message = null) }
+
+    fun computerControl(id: String, pause: Boolean) {
+        val link = client() ?: return
+        viewModelScope.launch(Dispatchers.IO) { runCatching { link.control(id, if (pause) "pause" else "resume") } }
+    }
+
+    private suspend fun pollComputer() {
+        while (true) {
+            val link = if (current is Screen.Computer) client() else null
+            if (link != null) {
+                try {
+                    val rows = withContext(Dispatchers.IO) { link.downloads() }
+                    computer.value = computer.value.copy(downloads = rows, expired = false)
+                } catch (e: ComputerException) {
+                    if (e.unauthorized) computer.value = computer.value.copy(expired = true, downloads = emptyList())
+                }
+            }
+            delay(3000)
+        }
+    }
+
+    // ---- the one-time hint
+
+    private suspend fun showLinkTipAtStart() {
+        delay(9000)
+        if (!app.prefs.linkTipHidden && app.prefs.computerHost == null && app.prefs.linkTipShown < 2 && current !is Screen.Player) {
+            app.prefs.linkTipShown += 1
+            linkTip.value = true
+        }
+    }
+
+    /** Wraps a download: before the first one the hint may appear once, then the download goes on. */
+    fun downloadWithTip(action: () -> Unit) {
+        if (!app.prefs.linkTipHidden && app.prefs.computerHost == null && app.prefs.linkTipShown < 3) {
+            app.prefs.linkTipShown += 1
+            pendingAfterTip = action
+            linkTip.value = true
+        } else action()
+    }
+
+    fun closeLinkTip(hideForever: Boolean = false, setup: Boolean = false) {
+        if (hideForever) app.prefs.linkTipHidden = true
+        linkTip.value = false
+        pendingAfterTip?.invoke(); pendingAfterTip = null
+        if (setup) open(Screen.Computer)
     }
 
     override fun onCleared() { closeStream(); super.onCleared() }

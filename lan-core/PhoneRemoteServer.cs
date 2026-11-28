@@ -7,6 +7,12 @@ using System.Reflection;
 
 namespace Kachalka.Lan;
 
+/// <summary>A device the user chose to remember: only a hash of its token is kept, on disk, until it expires or is forgotten.</summary>
+public sealed record RememberedDevice(string Id, string Name, string Hash, DateTimeOffset Created, DateTimeOffset Expires, DateTimeOffset LastSeen);
+
+/// <summary>A file the server may stream to a paired device; the resolver decides which files exist, never the request.</summary>
+public sealed record MediaFile(string Path, string ContentType);
+
 /// <summary>Opt-in, local-subnet-only browser access. Credentials exist only in memory.</summary>
 public sealed class PhoneRemoteServer : IAsyncDisposable
 {
@@ -20,6 +26,11 @@ public sealed class PhoneRemoteServer : IAsyncDisposable
     readonly HashSet<Task> active = [];
     readonly Func<string, JsonElement, CancellationToken, Task<object>> handle;
     readonly TimeProvider clock;
+    readonly string? devicesFile;
+    readonly Func<string, int, MediaFile?>? media;
+    readonly List<RememberedDevice> devices = [];
+    public static readonly TimeSpan RememberFor = TimeSpan.FromDays(90);
+    public const int MaxRememberedDevices = 16;
     Task? accept;
     string? code;
     DateTimeOffset expires;
@@ -29,9 +40,11 @@ public sealed class PhoneRemoteServer : IAsyncDisposable
     public int Connected { get { lock (sync) { Prune(); return sessions.Count; } } }
 
     public PhoneRemoteServer(Func<string, JsonElement, CancellationToken, Task<object>> handler, int port = 45834,
-        bool allowLoopbackForTests = false, TimeProvider? timeProvider = null)
+        bool allowLoopbackForTests = false, TimeProvider? timeProvider = null, string? devicesFile = null, Func<string, int, MediaFile?>? mediaResolver = null)
     {
         handle = handler; testLoopback = allowLoopbackForTests; clock = timeProvider ?? TimeProvider.System;
+        this.devicesFile = devicesFile; media = mediaResolver;
+        devices.AddRange(LoadDevices(devicesFile));
         listener = new(allowLoopbackForTests ? IPAddress.Loopback : IPAddress.Any, port);
     }
     public void Start()
@@ -50,8 +63,93 @@ public sealed class PhoneRemoteServer : IAsyncDisposable
             return new { urls = Urls, code, expires, connected = Connected };
         }
     }
-    public object State() { lock (sync) return new { urls = Urls, code = expires > clock.GetUtcNow() ? code : null, expires, connected = Connected }; }
+    public object State() { lock (sync) { PruneDevices(); return new { urls = Urls, code = expires > clock.GetUtcNow() ? code : null, expires, connected = Connected, devices = devices.Select(x => new { x.Id, x.Name, x.Created, x.LastSeen, x.Expires }).ToArray() }; } }
     public void Revoke() { lock (sync) { sessions.Clear(); code = null; expires = default; } }
+    // ---- remembered devices
+
+    static readonly JsonSerializerOptions FileJson = new(JsonSerializerDefaults.Web);
+    sealed record DevicesFile(List<RememberedDevice>? Devices);
+
+    static List<RememberedDevice> LoadDevices(string? file)
+    {
+        try
+        {
+            if (file == null || !File.Exists(file) || new FileInfo(file).Length > 256 * 1024) return [];
+            var rows = JsonSerializer.Deserialize<DevicesFile>(File.ReadAllText(file), FileJson)?.Devices ?? [];
+            return rows.Where(x => x.Id?.Length is > 0 and <= 64 && x.Hash?.Length == 64).Take(MaxRememberedDevices).ToList();
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException) { return []; }
+    }
+
+    /// <summary>True when the file holds at least one device that has not expired: the host then starts the server without a pairing code.</summary>
+    public static bool HasRememberedDevices(string? file, TimeProvider? timeProvider = null) =>
+        LoadDevices(file).Any(x => x.Expires > (timeProvider ?? TimeProvider.System).GetUtcNow());
+
+    void SaveDevices()
+    {
+        if (devicesFile == null) return;
+        var directory = Path.GetDirectoryName(Path.GetFullPath(devicesFile));
+        if (directory != null) Directory.CreateDirectory(directory);
+        var temporary = devicesFile + ".tmp";
+        File.WriteAllText(temporary, JsonSerializer.Serialize(new DevicesFile(devices), FileJson));
+        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(temporary, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        File.Move(temporary, devicesFile, true);
+    }
+
+    static string HashOf(string token) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token))).ToLowerInvariant();
+
+    public IReadOnlyList<RememberedDevice> Devices() { lock (sync) { PruneDevices(); return devices.ToArray(); } }
+
+    /// <summary>Makes the device forget this computer's trust: its token stops working at once.</summary>
+    public bool Forget(string id)
+    {
+        lock (sync)
+        {
+            var removed = devices.RemoveAll(x => x.Id == id) > 0;
+            if (removed) SaveDevices();
+            return removed;
+        }
+    }
+
+    public void ForgetAllDevices() { lock (sync) { devices.Clear(); SaveDevices(); } }
+
+    void PruneDevices()
+    {
+        if (devices.RemoveAll(x => x.Expires <= clock.GetUtcNow()) > 0) SaveDevices();
+    }
+
+    bool IsAuthorized(string token)
+    {
+        lock (sync)
+        {
+            Prune();
+            if (sessions.ContainsKey(token)) return true;
+            PruneDevices();
+            var hash = HashOf(token);
+            var index = devices.FindIndex(x => CryptographicOperations.FixedTimeEquals(Encoding.ASCII.GetBytes(x.Hash), Encoding.ASCII.GetBytes(hash)));
+            if (index < 0) return false;
+            // The last-seen time is kept in memory and written with the next change, so reads never touch the disk.
+            devices[index] = devices[index] with { LastSeen = clock.GetUtcNow() };
+            return true;
+        }
+    }
+
+    string RememberDevice(string name)
+    {
+        var token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        var clean = new string(name.Where(c => !char.IsControl(c)).ToArray()).Trim();
+        if (clean.Length == 0) clean = "Устройство"; else if (clean.Length > 40) clean = clean[..40];
+        lock (sync)
+        {
+            PruneDevices();
+            while (devices.Count >= MaxRememberedDevices) devices.RemoveAt(0); // the oldest makes room
+            var now = clock.GetUtcNow();
+            devices.Add(new RememberedDevice(Guid.NewGuid().ToString("N"), clean, HashOf(token), now, now + RememberFor, now));
+            SaveDevices();
+        }
+        return token;
+    }
+
     void Prune() { foreach (var key in sessions.Where(x => x.Value <= clock.GetUtcNow()).Select(x => x.Key).ToArray()) sessions.Remove(key); }
     async Task Accept()
     {
@@ -101,6 +199,11 @@ public sealed class PhoneRemoteServer : IAsyncDisposable
                 if (host != $"{endpoint.Address}:{Port}" || headers.ContainsKey("Transfer-Encoding") ||
                     headers.TryGetValue("Origin", out var origin) && origin != "http://" + host)
                 { await Respond(stream, 403, "text/plain", "Local origin required", timeout.Token); return; }
+                if (request[0] == "GET" && request[1].StartsWith("/media/", StringComparison.Ordinal))
+                {
+                    await ServeMedia(stream, request[1], headers.GetValueOrDefault("Authorization", ""), headers.GetValueOrDefault("Range"), timeout);
+                    return;
+                }
                 if (request[0] == "GET")
                 {
                     var resource = request[1] switch { "/" => ("text/html; charset=utf-8", "phone.html"), "/app.js" => ("text/javascript; charset=utf-8", "phone.js"), "/style.css" => ("text/css; charset=utf-8", "phone.css"), _ => default };
@@ -118,6 +221,9 @@ public sealed class PhoneRemoteServer : IAsyncDisposable
                 if (request[1] == "/pair")
                 {
                     string? token = null; var remote = ((IPEndPoint)client.Client.RemoteEndPoint!).Address.ToString();
+                    // "remember" is only honoured when the host gave the server a place to keep remembered devices.
+                    var remember = devicesFile != null && document.RootElement.TryGetProperty("remember", out var asked) && asked.ValueKind == JsonValueKind.True;
+                    var deviceName = document.RootElement.TryGetProperty("name", out var named) && named.ValueKind == JsonValueKind.String ? named.GetString() ?? "" : "";
                     lock (sync)
                     {
                         Prune(); var tries = attempts.GetValueOrDefault(remote);
@@ -126,20 +232,29 @@ public sealed class PhoneRemoteServer : IAsyncDisposable
                             attempts[remote] = tries + 1;
                             if (document.RootElement.TryGetProperty("code", out var supplied) && supplied.ValueKind == JsonValueKind.String && code != null &&
                                 CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(code), Encoding.UTF8.GetBytes(supplied.GetString()!)))
-                            { token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)); sessions[token] = clock.GetUtcNow().AddHours(8); code = null; }
+                            {
+                                if (remember) token = RememberDevice(deviceName);
+                                else { token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)); sessions[token] = clock.GetUtcNow().AddHours(8); }
+                                code = null;
+                            }
                         }
                     }
-                    await Respond(stream, token == null ? 401 : 200, "application/json", JsonSerializer.Serialize(token == null ? (object)new { error = "Код неверен или истёк. Получи новый код на компьютере. / Get a new code on your computer." } : new { token }), timeout.Token); return;
+                    await Respond(stream, token == null ? 401 : 200, "application/json", JsonSerializer.Serialize(token == null ? (object)new { error = "Код неверен или истёк. Получи новый код на компьютере. / Get a new code on your computer." } : new { token, remembered = remember, expires = remember ? clock.GetUtcNow() + RememberFor : (DateTimeOffset?)null }), timeout.Token); return;
                 }
                 var bearer = headers.GetValueOrDefault("Authorization", "");
-                lock (sync) { Prune(); if (!bearer.StartsWith("Bearer ", StringComparison.Ordinal) || !sessions.ContainsKey(bearer[7..])) bearer = ""; }
+                if (!bearer.StartsWith("Bearer ", StringComparison.Ordinal) || !IsAuthorized(bearer[7..])) bearer = "";
                 if (bearer.Length == 0) { await Respond(stream, 401, "application/json", "{\"error\":\"Подключись заново / Pair again\"}", timeout.Token); return; }
                 if(request[1]=="/api/logout")
                 {
-                    lock(sync) sessions.Remove(bearer[7..]);
+                    lock(sync)
+                    {
+                        sessions.Remove(bearer[7..]);
+                        var hash = HashOf(bearer[7..]);
+                        if (devices.RemoveAll(x => x.Hash == hash) > 0) SaveDevices();
+                    }
                     await Respond(stream,200,"application/json","{}",timeout.Token);return;
                 }
-                var method = request[1] switch { "/api/catalog" => "catalog", "/api/releases" => "releases", "/api/add" => "add", "/api/downloads" => "downloads", "/api/control" => "control", _ => "" };
+                var method = request[1] switch { "/api/catalog" => "catalog", "/api/releases" => "releases", "/api/add" => "add", "/api/downloads" => "downloads", "/api/control" => "control", "/api/saved" => "saved", "/api/files" => "files", _ => "" };
                 if (method.Length == 0) { await Respond(stream, 404, "text/plain", "Not found", timeout.Token); return; }
                 timeout.CancelAfter(TimeSpan.FromSeconds(90));
                 // One browser operation at a time. Never accumulate expensive searches on the desktop UI.
@@ -147,7 +262,7 @@ public sealed class PhoneRemoteServer : IAsyncDisposable
                 try
                 {
                     // Recheck after the body has arrived so revocation takes effect before dispatch.
-                    lock (sync) if (!sessions.ContainsKey(bearer[7..])) throw new UnauthorizedAccessException();
+                    if (!IsAuthorized(bearer[7..])) throw new UnauthorizedAccessException();
                     var result = await handle(method, document.RootElement.Clone(), timeout.Token);
                     await Respond(stream, 200, "application/json", JsonSerializer.Serialize(result, new JsonSerializerOptions(JsonSerializerDefaults.Web)), timeout.Token);
                 }
@@ -174,6 +289,65 @@ public sealed class PhoneRemoteServer : IAsyncDisposable
                     }
                 }
                 catch(Exception error) when(error is SocketException or IOException or OperationCanceledException or ObjectDisposedException) { }
+            }
+        }
+    }
+    /// <summary>
+    /// Streams one file to a paired device with HTTP Range support (so the player can seek). Needs the same Bearer token as the API;
+    /// which file it is comes only from the resolver the host supplied, never from a path in the request.
+    /// </summary>
+    async Task ServeMedia(NetworkStream stream, string path, string authorization, string? range, CancellationTokenSource timeout)
+    {
+        if (!authorization.StartsWith("Bearer ", StringComparison.Ordinal) || !IsAuthorized(authorization[7..]))
+        { await Respond(stream, 401, "application/json", "{\"error\":\"Pair again\"}", timeout.Token); return; }
+        var parts = path.Split('/');
+        if (media == null || parts.Length != 4 || parts[2].Length is 0 or > 64 || !parts[2].All(char.IsAsciiLetterOrDigit) || !int.TryParse(parts[3], out var index) || index is < 0 or > 9999)
+        { await Respond(stream, 404, "text/plain", "Not found", timeout.Token); return; }
+        MediaFile? file;
+        try { file = media(parts[2], index); } catch (Exception error) when (error is IOException or ArgumentException or InvalidOperationException) { file = null; }
+        if (file == null || !File.Exists(file.Path)) { await Respond(stream, 404, "text/plain", "Not found", timeout.Token); return; }
+        FileStream input;
+        try { input = new FileStream(file.Path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 1, FileOptions.Asynchronous | FileOptions.SequentialScan); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { await Respond(stream, 404, "text/plain", "Not found", timeout.Token); return; }
+        await using (input)
+        {
+            var size = input.Length;
+            long start = 0, end = size - 1; var partial = false;
+            if (!string.IsNullOrEmpty(range))
+            {
+                var match = System.Text.RegularExpressions.Regex.Match(range, @"^\s*bytes\s*=\s*(\d*)\s*-\s*(\d*)\s*$");
+                if (!match.Success || match.Groups[1].Value.Length == 0 && match.Groups[2].Value.Length == 0)
+                { await Respond(stream, 416, "text/plain", "Range not satisfiable", timeout.Token); return; }
+                if (match.Groups[1].Value.Length == 0)
+                {
+                    if (!long.TryParse(match.Groups[2].Value, out var tail) || tail == 0) { await Respond(stream, 416, "text/plain", "Range not satisfiable", timeout.Token); return; }
+                    start = Math.Max(0, size - tail);
+                }
+                else
+                {
+                    if (!long.TryParse(match.Groups[1].Value, out start)) { await Respond(stream, 416, "text/plain", "Range not satisfiable", timeout.Token); return; }
+                    if (match.Groups[2].Value.Length > 0) { if (!long.TryParse(match.Groups[2].Value, out end)) { await Respond(stream, 416, "text/plain", "Range not satisfiable", timeout.Token); return; } end = Math.Min(end, size - 1); }
+                }
+                if (size == 0 || start >= size || end < start) { await Respond(stream, 416, "text/plain", "Range not satisfiable", timeout.Token); return; }
+                partial = true;
+            }
+            var length = size == 0 ? 0 : end - start + 1;
+            var head = $"HTTP/1.1 {(partial ? "206 Partial Content" : "200 OK")}\r\nContent-Type: {file.ContentType}\r\nContent-Length: {length}\r\nAccept-Ranges: bytes\r\n" +
+                       (partial ? $"Content-Range: bytes {start}-{end}/{size}\r\n" : "") +
+                       "Connection: close\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\n\r\n";
+            // Playback can last hours: only the writes are time-limited, so a player that stops reading cannot hold the connection forever.
+            timeout.CancelAfter(Timeout.InfiniteTimeSpan);
+            using (var first = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token)) { first.CancelAfter(TimeSpan.FromSeconds(30)); await stream.WriteAsync(Encoding.ASCII.GetBytes(head), first.Token); }
+            if (length == 0) return;
+            input.Seek(start, SeekOrigin.Begin);
+            var buffer = new byte[256 * 1024]; var remaining = length;
+            while (remaining > 0)
+            {
+                var read = await input.ReadAsync(buffer.AsMemory(0, (int)Math.Min(buffer.Length, remaining)), lifetime.Token);
+                if (read == 0) break;
+                using var write = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token); write.CancelAfter(TimeSpan.FromSeconds(30));
+                await stream.WriteAsync(buffer.AsMemory(0, read), write.Token);
+                remaining -= read;
             }
         }
     }

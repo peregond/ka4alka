@@ -24,6 +24,7 @@ public partial class MainWindow
         var stop=Button("Отключить все телефоны",()=>{});stop.Name="PhoneRemoteStop";stop.Margin=new(0,0,8,6);actions.Children.Add(stop);
         var info=new TextBox{IsReadOnly=true,TextWrapping=TextWrapping.Wrap,BorderThickness=new(0),Background=System.Windows.Media.Brushes.Transparent,Margin=new(0,6,0,0)};
         AutomationProperties.SetName(info,AppLanguage.T("Адрес и код подключения телефона"));panel.Children.Add(info);
+        var devicesPanel=new StackPanel{Margin=new(0,8,0,0)};panel.Children.Add(devicesPanel);
         var connect=new StackPanel{Margin=new(0,8,0,8),Visibility=Visibility.Collapsed};panel.Children.Add(connect);
         connect.Children.Add(Hint("Отсканируй камерой телефона. QR-код действует 2 минуты и только для одного подключения."));
         var qr=new Image{Width=216,Height=216,Stretch=Stretch.Uniform,HorizontalAlignment=HorizontalAlignment.Left,Margin=new(0,8,0,8)};
@@ -46,11 +47,23 @@ public partial class MainWindow
         void Refresh()
         {
             stop.IsEnabled=phoneRemote!=null;
-            if(phoneRemote==null){info.Text=AppLanguage.T("Доступ с телефона выключен.");connect.Visibility=Visibility.Collapsed;pairingCode=null;UpdateQr();return;}
+            if(phoneRemote==null){info.Text=AppLanguage.T("Доступ с телефона выключен.");connect.Visibility=Visibility.Collapsed;pairingCode=null;UpdateQr();devicesPanel.Children.Clear();return;}
             using var state=JsonDocument.Parse(JsonSerializer.Serialize(phoneRemote.State()));
             var root=state.RootElement;var code=root.GetProperty("code").GetString();
             var addresses=root.GetProperty("urls").EnumerateArray().Select(x=>x.GetString()!).ToArray();
             pairingCode=code;
+            // Devices that were asked to be remembered (a TV, say) reconnect by themselves until they expire or are forgotten here.
+            devicesPanel.Children.Clear();
+            var remembered=root.GetProperty("devices").EnumerateArray().ToArray();
+            if(remembered.Length>0)devicesPanel.Children.Add(Hint("Запомненные устройства"));
+            foreach(var device in remembered)
+            {
+                var deviceId=device.GetProperty("Id").GetString()!;var deviceName=device.GetProperty("Name").GetString()??"";
+                var row=new StackPanel{Orientation=Orientation.Horizontal,Margin=new(0,2,0,2)};
+                row.Children.Add(new TextBlock{Text=deviceName+AppLanguage.T(" · до ")+device.GetProperty("Expires").GetDateTimeOffset().ToLocalTime().ToString("d"),VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,12,0)});
+                var forget=Button("Забыть",()=>{phoneRemote?.Forget(deviceId);Refresh();});forget.Margin=new(0,0,0,0);
+                AutomationProperties.SetName(forget,AppLanguage.T("Забыть устройство ")+deviceName);row.Children.Add(forget);devicesPanel.Children.Add(row);
+            }
             if(addressBox.ItemsSource is not string[] current||!current.SequenceEqual(addresses))
             {
                 var selected=addressBox.SelectedItem as string;addressBox.ItemsSource=addresses;
@@ -68,38 +81,52 @@ public partial class MainWindow
             start.IsEnabled=false;
             try
             {
-                await phoneGate.WaitAsync();
-                try
-                {
-                    if(closing||closed)throw new OperationCanceledException();
-                    if(phoneRemote==null)
-                    {
-                        var catalog=new PhoneRemoteCatalog(downloads,prefs);
-                        var server=new PhoneRemoteServer((method,args,token)=>Dispatcher.InvokeAsync(async()=>
-                        {
-                            token.ThrowIfCancellationRequested();if(closing||closed)throw new OperationCanceledException(token);
-                            var result=await catalog.Handle(method,args,token);
-                            if(method is "add" or "control"){SyncTimer();if(section=="Загрузки")Render();}return result;
-                        }).Task.Unwrap());
-                        try{server.Start();phoneCatalog=catalog;phoneRemote=server;}
-                        catch{await server.DisposeAsync();catalog.Dispose();throw;}
-                    }
-                    phoneRemote.OpenPairing();Refresh();
-                }
-                finally{phoneGate.Release();}
+                await StartPhoneRemoteServerAsync();
+                phoneRemote?.OpenPairing();Refresh();
             }
             catch(Exception error){info.Text=AppLanguage.T("Не удалось включить доступ с телефона: ")+error.Message;}
             finally{start.IsEnabled=true;}
         };
-        stop.Click+=async(_,_)=>{stop.IsEnabled=false;await StopPhoneRemoteAsync();Refresh();};
+        stop.Click+=async(_,_)=>{stop.IsEnabled=false;await StopPhoneRemoteAsync(true);Refresh();};
         Refresh();
     }
-    async Task StopPhoneRemoteAsync()
+    static string PhoneDevicesFile=>Path.Combine(Preferences.DataDir,"phone-devices.json");
+
+    /// <summary>Starts the access server (without opening a pairing code). Also used at launch when a device was remembered, so the TV or phone can reconnect by itself.</summary>
+    async Task StartPhoneRemoteServerAsync()
+    {
+        await phoneGate.WaitAsync();
+        try
+        {
+            if(closing||closed)throw new OperationCanceledException();
+            if(phoneRemote!=null)return;
+            var catalog=new PhoneRemoteCatalog(downloads,prefs,id=>sharedCatalog.All.FirstOrDefault(x=>OnlineIndexClient.IdFor(x)==id));
+            var server=new PhoneRemoteServer((method,args,token)=>Dispatcher.InvokeAsync(async()=>
+            {
+                token.ThrowIfCancellationRequested();if(closing||closed)throw new OperationCanceledException(token);
+                var result=await catalog.Handle(method,args,token);
+                if(method is "add" or "control"){SyncTimer();if(section=="Загрузки")Render();}return result;
+            }).Task.Unwrap(),devicesFile:PhoneDevicesFile,mediaResolver:catalog.Media);
+            try{server.Start();phoneCatalog=catalog;phoneRemote=server;}
+            catch{await server.DisposeAsync();catalog.Dispose();throw;}
+        }
+        finally{phoneGate.Release();}
+    }
+
+    async Task StartRememberedPhoneAccessAsync()
+    {
+        try{if(PhoneRemoteServer.HasRememberedDevices(PhoneDevicesFile))await StartPhoneRemoteServerAsync();}
+        catch(Exception error)when(error is not OutOfMemoryException){DiagnosticLog.Write("phone-remembered-start-failed",new{Error=error.GetType().Name});}
+    }
+
+    async Task StopPhoneRemoteAsync(bool forgetDevices=false)
     {
         await phoneGate.WaitAsync();
         try
         {
             var server=phoneRemote;phoneRemote=null;
+            // Only the explicit "Disconnect all" revokes remembered devices; closing the app must keep them.
+            if(forgetDevices)server?.ForgetAllDevices();
             if(server!=null)await server.DisposeAsync();phoneCatalog?.Dispose();phoneCatalog=null;
         }
         finally{phoneGate.Release();}

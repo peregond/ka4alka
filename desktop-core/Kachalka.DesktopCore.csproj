@@ -42,6 +42,7 @@
     <Compile Include="../native/GameReleaseInfo.cs" Link="GameReleaseInfo.cs" />
     <Compile Include="../native/GameReleaseSources.cs" Link="GameReleaseSources.cs" />
     <Compile Include="../native/GameStore.cs" Link="GameStore.cs" />
+    <Compile Include="../native/FavoriteSync.cs" Link="FavoriteSync.cs" />
     <Compile Include="../native/HiddenCatalog.cs" Link="HiddenCatalog.cs" />
     <Compile Include="../native/ImdbSuggestions.cs" Link="ImdbSuggestions.cs" />
     <Compile Include="../native/IndexRelays.cs" Link="IndexRelays.cs" />

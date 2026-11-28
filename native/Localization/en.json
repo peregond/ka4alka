@@ -1627,5 +1627,9 @@
   "Новости Качалки": "News from Ka4alka",
   "Повторить": "Try again",
   "Открыть на GitHub": "Open on GitHub",
-  "Не удалось загрузить описание. Проверь соединение или открой страницу выпуска.": "The release notes could not be loaded. Check the connection or open the release page."
+  "Не удалось загрузить описание. Проверь соединение или открой страницу выпуска.": "The release notes could not be loaded. Check the connection or open the release page.",
+  "Запомненные устройства": "Remembered devices",
+  "Забыть устройство ": "Forget device ",
+  "Устройство": "Device",
+  " · до ": " · until "
 }
