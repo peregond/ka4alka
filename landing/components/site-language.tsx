@@ -2,7 +2,8 @@
 
 import "./site-language.css";
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { Check } from "lucide-react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { languageStorageKey, readPreference, resolveLanguage, translate, type LanguagePreference, type SiteLanguage } from "@/lib/site-language";
 
 const LanguageContext = createContext({ language: "ru" as SiteLanguage, preference: "auto" as LanguagePreference, setPreference: (_value: LanguagePreference) => {} });
@@ -36,9 +37,63 @@ export function useSiteLanguage() {
 
 export function LanguageSwitcher() {
   const { preference, setPreference, t } = useSiteLanguage();
-  return <label className="site-language-switcher"><span aria-hidden="true">🌐</span><select aria-label={t("Язык")} value={preference} onChange={event => setPreference(readPreference(event.target.value))}>
-    <option value="auto">{t("Автоматически")}</option><option value="ru">Русский</option><option value="en">English</option><option value="es">Español</option>
-  </select></label>;
+  const details = useRef<HTMLDetailsElement>(null);
+  const trigger = useRef<HTMLElement>(null);
+  const choices = [
+    { value: "auto", label: t("Автоматически") },
+    { value: "ru", label: "Русский", lang: "ru" },
+    { value: "en", label: "English", lang: "en" },
+    { value: "es", label: "Español", lang: "es" },
+  ] as const;
+
+  useEffect(() => {
+    function dismiss(event: PointerEvent) {
+      const menu = details.current;
+      if (menu?.open && event.target instanceof Node && !menu.contains(event.target)) menu.open = false;
+    }
+
+    document.addEventListener("pointerdown", dismiss);
+    return () => document.removeEventListener("pointerdown", dismiss);
+  }, []);
+
+  function closeMenu() {
+    if (details.current) details.current.open = false;
+    trigger.current?.focus();
+  }
+
+  return <details
+    ref={details}
+    className="site-language-switcher"
+    onKeyDown={event => {
+      if (event.key === "Escape" && event.currentTarget.open) {
+        event.preventDefault();
+        closeMenu();
+      }
+    }}
+    onBlur={event => {
+      if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) {
+        event.currentTarget.open = false;
+      }
+    }}
+  >
+    <summary ref={trigger} aria-label={t("Язык")}>
+      <span aria-hidden="true">🌐</span>
+    </summary>
+    <div className="site-language-options" role="group" aria-label={t("Язык")}>
+      {choices.map(choice => <button
+        key={choice.value}
+        type="button"
+        aria-pressed={preference === choice.value}
+        onClick={() => {
+          setPreference(choice.value);
+          closeMenu();
+        }}
+      >
+        <span lang={"lang" in choice ? choice.lang : undefined}>{choice.label}</span>
+        {preference === choice.value && <Check size={16} aria-hidden="true" />}
+      </button>)}
+    </div>
+  </details>;
 }
 
 export function LocalizedMetadata({ title, description }: { title: string; description?: string }) {

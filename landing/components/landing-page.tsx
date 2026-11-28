@@ -7,7 +7,7 @@ import { SitePlatformProvider, PlatformSwitcher, useSitePlatform } from "@/compo
 import { PlatformDownload } from "@/components/platform-download";
 import type { AppRelease } from "@/lib/app-release";
 import { appScreenshot } from "@/lib/app-screenshots";
-import { LanguageSwitcher, LocalizedMetadata, useSiteLanguage } from "@/components/site-language";
+import { LocalizedMetadata, useSiteLanguage } from "@/components/site-language";
 
 function SavedHeartIcon() {
   return <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 21 C9 18 3 14 3 8 C3 2 10 2 12 7 C14 2 21 2 21 8 C21 14 15 18 12 21 Z" /></svg>;
@@ -28,10 +28,6 @@ function LandingContent({ release }: { release: AppRelease }) {
     <ScrollHeader />
     <main id="main">
       <section className="hero landing-hero" aria-labelledby="hero-title">
-        <div className="hero-top section-wrap">
-          <span className="brand"><img src="/brand/logo.png" width="36" height="36" alt="" />{t("Качалка")}</span>
-          <div className="hero-language"><LanguageSwitcher /></div>
-        </div>
         <div className="section-wrap">
           <h1 id="hero-title">{t("Твой вечер.")}<br /><span>{t("Играй, смотри, качай.")}</span></h1>
           <p className="hero-description">

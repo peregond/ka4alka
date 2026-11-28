@@ -15,11 +15,14 @@ export function ScrollHeader() {
     return () => window.removeEventListener("scroll", update);
   }, []);
 
-  return <header className="site-header" data-visible={visible} inert={!visible}>
-    <div className="nav-inner">
-      <a className="brand" href="#" aria-label={t("Качалка — на главную")}><img src="/brand/logo.png" width="40" height="40" alt="" /><span>{t("Качалка")}</span></a>
-      <nav className="desktop-nav" aria-label={t("Основная навигация")}><a href="#features">{t("Возможности")}</a><a href="#interface">{t("Интерфейс")}</a><a href="#installation">{t("Установка")}</a></nav>
-      <div className="header-actions"><LanguageSwitcher /><a className="button button-small" href="#download"><ArrowDownToLine size={16} aria-hidden="true" />{t("Скачать")}</a></div>
+  return <header className="site-header" data-visible={visible}>
+    <div className="nav-inner section-wrap">
+      <a className="brand" href="#" aria-label={t("Качалка — на главную")}><img src="/brand/logo.png" width="36" height="36" alt="" /><span>{t("Качалка")}</span></a>
+      <nav className="desktop-nav" inert={!visible} aria-label={t("Основная навигация")}><a href="#features">{t("Возможности")}</a><a href="#interface">{t("Интерфейс")}</a><a href="#installation">{t("Установка")}</a></nav>
+      <div className="header-actions">
+        <a className="button button-small header-download" href="#download" inert={!visible}><ArrowDownToLine size={16} aria-hidden="true" />{t("Скачать")}</a>
+        <LanguageSwitcher />
+      </div>
     </div>
   </header>;
 }
