@@ -44,7 +44,13 @@ static class PhoneDevicesTests
                     token=json.RootElement.GetProperty("token").GetString()!;
                     Check(json.RootElement.GetProperty("remembered").GetBoolean(),"the answer says the device is remembered");
                 }
-                Check(!File.ReadAllText(devicesFile).Contains(token)&&File.ReadAllText(devicesFile).Contains("Гостиная ТВ"),"only a hash of the token is stored");
+                // JSON escapes non-ASCII text, so the stored name is read back through the parser rather than searched for.
+                using (var stored=JsonDocument.Parse(File.ReadAllText(devicesFile)))
+                {
+                    var row=stored.RootElement.GetProperty("devices")[0];
+                    var expected=Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(token))).ToLowerInvariant();
+                    Check(!File.ReadAllText(devicesFile).Contains(token)&&row.GetProperty("hash").GetString()==expected&&row.GetProperty("name").GetString()=="Гостиная ТВ","only a hash of the token is stored");
+                }
                 Check(server.Devices().Count==1&&server.Devices()[0].Name=="Гостиная ТВ","the device is listed");
                 // Without "remember" the usual short session is used and nothing is stored.
                 using (var plain=await Post("/pair",new{code=Code()})){Check(plain.IsSuccessStatusCode&&server.Devices().Count==1,"a plain pairing is not remembered");}
