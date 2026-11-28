@@ -148,7 +148,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun openByName(name: String?) {
         when (name) {
             "home" -> open(Screen.Home); "movies" -> open(Screen.Movies); "series" -> open(Screen.Series)
-            "search" -> open(Screen.Search); "saved" -> open(Screen.Saved); "downloads" -> open(Screen.Downloads); "settings" -> open(Screen.Settings)
+            "search" -> open(Screen.Search); "saved" -> open(Screen.Saved); "downloads" -> open(Screen.Downloads); "computer" -> open(Screen.Computer); "settings" -> open(Screen.Settings)
         }
     }
 

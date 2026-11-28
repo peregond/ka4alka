@@ -186,7 +186,7 @@ private fun LinkedCard(vm: AppViewModel, host: String) {
 @Composable
 fun LinkTipDialog(vm: AppViewModel) {
     Dialog(onDismissRequest = { vm.closeLinkTip() }) {
-        Column(Modifier.clip(RoundedCornerShape(28.dp)).background(KD.surface).padding(32.dp).width(640.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(Modifier.clip(RoundedCornerShape(28.dp)).background(KD.surface).padding(32.dp).width(760.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                 Icon(Icons.Filled.Download, null, tint = KD.accent, modifier = Modifier.size(32.dp))
                 Text("Скачивайте на компьютер", color = Color.White, style = MaterialTheme.typography.headlineSmall)
@@ -198,7 +198,7 @@ fun LinkTipDialog(vm: AppViewModel) {
             Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 PillButton("Настроить", onClick = { vm.closeLinkTip(setup = true) }, primary = true)
                 PillButton("Не сейчас", onClick = { vm.closeLinkTip() })
-                PillButton("Больше не показывать", onClick = { vm.closeLinkTip(hideForever = true) })
+                PillButton("Не напоминать", onClick = { vm.closeLinkTip(hideForever = true) })
             }
         }
     }
