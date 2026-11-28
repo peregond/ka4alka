@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Computer
@@ -43,7 +44,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -68,22 +75,28 @@ fun Step(number: Int, icon: ImageVector, title: String, text: String, compact: B
     }
 }
 
-/** A text box the remote can focus; the system keyboard opens on OK. */
+/**
+ * A text box for the remote. Landing on it with the arrow keys only highlights it; the keyboard opens when OK is pressed,
+ * so moving around the page never throws a keyboard over it.
+ */
 @Composable
 fun FieldBox(value: String, onChange: (String) -> Unit, hint: String, modifier: Modifier = Modifier, numeric: Boolean = false) {
-    var focused by remember { mutableStateOf(false) }
-    Box(
-        modifier.clip(RoundedCornerShape(16.dp)).background(KD.surface)
-            .border(if (focused) androidx.compose.foundation.BorderStroke(3.dp, Color.White) else androidx.compose.foundation.BorderStroke(0.dp, Color.Transparent), RoundedCornerShape(16.dp))
-            .padding(horizontal = 20.dp, vertical = 14.dp),
-    ) {
-        if (value.isEmpty()) Text(hint, color = KD.textTertiary, style = MaterialTheme.typography.titleMedium)
-        BasicTextField(
-            value = value, onValueChange = onChange, singleLine = true,
-            textStyle = MaterialTheme.typography.titleMedium.copy(color = Color.White), cursorBrush = SolidColor(KD.accent),
-            keyboardOptions = KeyboardOptions(keyboardType = if (numeric) KeyboardType.Number else KeyboardType.Uri),
-            modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused },
-        )
+    var editing by remember { mutableStateOf(false) }
+    val requester = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    LaunchedEffect(editing) { if (editing) { runCatching { requester.requestFocus() }; keyboard?.show() } }
+    Focusable(onClick = { editing = true }, modifier = modifier, shape = RoundedCornerShape(16.dp), focusedScale = 1.0f) { _ ->
+        Box(Modifier.background(KD.surface).padding(horizontal = 20.dp, vertical = 14.dp)) {
+            if (value.isEmpty()) Text(hint, color = KD.textTertiary, style = MaterialTheme.typography.titleMedium)
+            BasicTextField(
+                value = value, onValueChange = onChange, singleLine = true,
+                textStyle = MaterialTheme.typography.titleMedium.copy(color = Color.White), cursorBrush = SolidColor(KD.accent),
+                keyboardOptions = KeyboardOptions(keyboardType = if (numeric) KeyboardType.Number else KeyboardType.Uri, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { editing = false; keyboard?.hide() }),
+                modifier = Modifier.fillMaxWidth().focusRequester(requester).focusProperties { canFocus = editing }
+                    .onFocusChanged { if (!it.isFocused && editing) editing = false },
+            )
+        }
     }
 }
 
@@ -152,7 +165,7 @@ fun ComputerScreen(vm: AppViewModel) {
 /** The files of a finished download, when there is more than one to play (a season, say). */
 @Composable
 fun ComputerChoiceDialog(vm: AppViewModel, choice: cc.ka4alka.tv.ComputerChoice) {
-    Dialog(onDismissRequest = { vm.dismissComputerChoice() }) {
+    Dialog(onDismissRequest = { vm.dismissComputerChoice() }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Column(Modifier.clip(RoundedCornerShape(28.dp)).background(KD.surface).padding(28.dp).width(720.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("Что включить?", color = Color.White, style = MaterialTheme.typography.headlineSmall)
             Text(choice.title, color = KD.textSecondary, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
@@ -185,7 +198,7 @@ private fun LinkedCard(vm: AppViewModel, host: String) {
 /** The one-time hint: you can download on a computer instead. Easy to close, never repeated once dismissed for good. */
 @Composable
 fun LinkTipDialog(vm: AppViewModel) {
-    Dialog(onDismissRequest = { vm.closeLinkTip() }) {
+    Dialog(onDismissRequest = { vm.closeLinkTip() }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Column(Modifier.clip(RoundedCornerShape(28.dp)).background(KD.surface).padding(32.dp).width(760.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                 Icon(Icons.Filled.Download, null, tint = KD.accent, modifier = Modifier.size(32.dp))
