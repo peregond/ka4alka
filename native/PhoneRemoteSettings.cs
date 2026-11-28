@@ -87,7 +87,7 @@ public partial class MainWindow
             catch(Exception error){info.Text=AppLanguage.T("Не удалось включить доступ с телефона: ")+error.Message;}
             finally{start.IsEnabled=true;}
         };
-        stop.Click+=async(_,_)=>{stop.IsEnabled=false;await StopPhoneRemoteAsync();Refresh();};
+        stop.Click+=async(_,_)=>{stop.IsEnabled=false;await StopPhoneRemoteAsync(true);Refresh();};
         Refresh();
     }
     static string PhoneDevicesFile=>Path.Combine(Preferences.DataDir,"phone-devices.json");
@@ -119,14 +119,14 @@ public partial class MainWindow
         catch(Exception error)when(error is not OutOfMemoryException){DiagnosticLog.Write("phone-remembered-start-failed",new{Error=error.GetType().Name});}
     }
 
-    async Task StopPhoneRemoteAsync()
+    async Task StopPhoneRemoteAsync(bool forgetDevices=false)
     {
         await phoneGate.WaitAsync();
         try
         {
             var server=phoneRemote;phoneRemote=null;
-            // "Disconnect all" also makes every remembered device forget this computer.
-            server?.ForgetAllDevices();
+            // Only the explicit "Disconnect all" revokes remembered devices; closing the app must keep them.
+            if(forgetDevices)server?.ForgetAllDevices();
             if(server!=null)await server.DisposeAsync();phoneCatalog?.Dispose();phoneCatalog=null;
         }
         finally{phoneGate.Release();}

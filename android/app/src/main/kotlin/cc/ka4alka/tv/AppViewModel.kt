@@ -182,9 +182,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val link = client() ?: return
         viewModelScope.launch(Dispatchers.IO) {
             try {
+                val snapshot = saved.value
                 val marks = FavoriteSync.decode(app.prefs.favoriteMarks)
-                FavoriteSync.reconcile(marks, saved.value, System.currentTimeMillis())
+                FavoriteSync.reconcile(marks, snapshot, System.currentTimeMillis())
                 val remote = link.saved(marks.values.toList())
+                // A favourite was changed while we waited: applying this answer would overwrite it. Start over instead.
+                if (saved.value != snapshot) { scheduleFavoriteSync(); return@launch }
                 val merged = FavoriteSync.merge(marks, remote)
                 val next = (saved.value + merged.add) - merged.remove.toSet()
                 saved.value = next
@@ -428,7 +431,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun unlinkComputer() {
-        viewModelScope.launch(Dispatchers.IO) { runCatching { client()?.logout() } }
+        val link = client()
+        viewModelScope.launch(Dispatchers.IO) { runCatching { link?.logout() } }
         app.prefs.computerHost = null; app.prefs.computerToken = null
         computer.value = ComputerUi(message = "Компьютер отключён.")
     }
