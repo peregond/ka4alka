@@ -32,6 +32,27 @@ class Prefs(private val context: Context) {
         get() = store.getLong("lastUpdateCheck", 0)
         set(value) { store.edit().putLong("lastUpdateCheck", value).apply() }
 
+    var computerHost: String?
+        get() = store.getString("computerHost", null)
+        set(value) { store.edit().putString("computerHost", value).apply() }
+
+    var computerPort: Int
+        get() = store.getInt("computerPort", 45834)
+        set(value) { store.edit().putInt("computerPort", value).apply() }
+
+    var computerToken: String?
+        get() = store.getString("computerToken", null)
+        set(value) { store.edit().putString("computerToken", value).apply() }
+
+    /** The "download on your computer" hint: how many times it was shown and whether the user asked not to see it again. */
+    var linkTipHidden: Boolean
+        get() = store.getBoolean("linkTipHidden", false)
+        set(value) { store.edit().putBoolean("linkTipHidden", value).apply() }
+
+    var linkTipShown: Int
+        get() = store.getInt("linkTipShown", 0)
+        set(value) { store.edit().putInt("linkTipShown", value).apply() }
+
     fun position(key: String): Long = store.getLong("pos:$key", 0)
     fun setPosition(key: String, value: Long) { store.edit().putLong("pos:$key", value).apply() }
 

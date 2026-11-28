@@ -5,6 +5,10 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import cc.ka4alka.core.AndroidManifest
+import cc.ka4alka.core.ComputerClient
+import cc.ka4alka.core.ComputerDownload
+import cc.ka4alka.core.ComputerException
+import cc.ka4alka.core.LanScanner
 import cc.ka4alka.core.DownloadPhase
 import cc.ka4alka.core.DownloadRecord
 import cc.ka4alka.core.DownloadState
@@ -36,6 +40,7 @@ sealed interface Screen {
     data object Search : Screen
     data object Saved : Screen
     data object Downloads : Screen
+    data object Computer : Screen
     data object Settings : Screen
     data class Detail(val id: String) : Screen
     data object Player : Screen
@@ -56,6 +61,18 @@ sealed interface Playback {
     data class Playing(val title: String, val url: String, val downloadId: String, val resumeKey: String) : Playback
     data class Failed(val message: String) : Playback
 }
+
+/** The computer this TV sends downloads to. */
+data class ComputerUi(
+    val host: String? = null,
+    val linked: Boolean = false,
+    val expired: Boolean = false,
+    val scanning: Boolean = false,
+    val found: List<String> = emptyList(),
+    val busy: Boolean = false,
+    val message: String? = null,
+    val downloads: List<ComputerDownload> = emptyList(),
+)
 
 sealed interface UpdateUi {
     data object Idle : UpdateUi
@@ -89,6 +106,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }.flowOn(Dispatchers.IO).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val computer = MutableStateFlow(
+        ComputerUi(host = app.prefs.computerHost, linked = app.prefs.computerHost != null && app.prefs.computerToken != null),
+    )
+    /** True while the one-time "you can download on your computer" hint is on screen. */
+    val linkTip = MutableStateFlow(false)
+    private var pendingAfterTip: (() -> Unit)? = null
+
     private var stream: TorrentStream? = null
     private var server: StreamServer? = null
     private var playbackJob: Job? = null
@@ -96,6 +120,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     init {
         viewModelScope.launch { app.repository.load() }
         viewModelScope.launch { autoCheckUpdates() }
+        viewModelScope.launch { showLinkTipAtStart() }
+        viewModelScope.launch { pollComputer() }
     }
 
     private fun engineReady(): Boolean = runCatching { app.ensureEngine(); true }.getOrDefault(false)
@@ -323,6 +349,109 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val state = update.value
         if (state is UpdateUi.NeedsPermission && ApkInstaller.canInstall(app)) continueInstall(state.manifest, state.apk)
         UpdateEvents.failure?.let { update.value = UpdateUi.Failed(it); UpdateEvents.failure = null }
+    }
+
+    // ---- the computer on the home network
+
+    private fun client(): ComputerClient? {
+        val host = app.prefs.computerHost ?: return null
+        return ComputerClient(host, app.prefs.computerPort, app.prefs.computerToken)
+    }
+
+    fun scanForComputers() {
+        if (computer.value.scanning) return
+        computer.value = computer.value.copy(scanning = true, message = null)
+        viewModelScope.launch {
+            val found = withContext(Dispatchers.IO) { LanScanner.scan(LanScanner.localPrefixes()) }
+            computer.value = computer.value.copy(scanning = false, found = found,
+                message = if (found.isEmpty()) "Компьютеров с включённым доступом не нашлось. Включи его на компьютере (шаг 1) и поищи ещё раз или введи адрес вручную." else null)
+        }
+    }
+
+    /** [address] is what the user typed or picked; [code] is the six digits shown on the computer. */
+    fun linkComputer(address: String, code: String) {
+        val parsed = ComputerClient.parseAddress(address)
+        if (parsed == null) { computer.value = computer.value.copy(message = "Адрес выглядит неверно. Он должен быть вида 192.168.1.25 (его показывает компьютер)."); return }
+        if (code.count { it.isDigit() } != 6) { computer.value = computer.value.copy(message = "Код состоит из шести цифр. Его показывает компьютер."); return }
+        computer.value = computer.value.copy(busy = true, message = null)
+        viewModelScope.launch {
+            try {
+                val token = withContext(Dispatchers.IO) { ComputerClient(parsed.first, parsed.second).pair(code) }
+                app.prefs.computerHost = parsed.first; app.prefs.computerPort = parsed.second; app.prefs.computerToken = token
+                computer.value = computer.value.copy(host = parsed.first, linked = true, expired = false, busy = false, message = "Готово: компьютер подключён.")
+            } catch (e: ComputerException) {
+                computer.value = computer.value.copy(busy = false, message = e.message)
+            }
+        }
+    }
+
+    fun unlinkComputer() {
+        viewModelScope.launch(Dispatchers.IO) { runCatching { client()?.logout() } }
+        app.prefs.computerHost = null; app.prefs.computerToken = null
+        computer.value = ComputerUi(message = "Компьютер отключён.")
+    }
+
+    /** Sends a release to the linked computer's own download queue. */
+    fun sendToComputer(title: Title, release: Release) {
+        val link = client() ?: run { open(Screen.Computer); return }
+        computer.value = computer.value.copy(message = null)
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { link.add(release.magnet) }
+                computer.value = computer.value.copy(message = "«${title.title}» отправлено на компьютер ${link.host}.")
+            } catch (e: ComputerException) {
+                if (e.unauthorized) computer.value = computer.value.copy(expired = true, message = "Подключение к компьютеру истекло. Введи новый код.")
+                else computer.value = computer.value.copy(message = e.message)
+            }
+        }
+    }
+
+    fun clearComputerMessage() { computer.value = computer.value.copy(message = null) }
+
+    fun computerControl(id: String, pause: Boolean) {
+        val link = client() ?: return
+        viewModelScope.launch(Dispatchers.IO) { runCatching { link.control(id, if (pause) "pause" else "resume") } }
+    }
+
+    private suspend fun pollComputer() {
+        while (true) {
+            val link = if (current is Screen.Computer) client() else null
+            if (link != null) {
+                try {
+                    val rows = withContext(Dispatchers.IO) { link.downloads() }
+                    computer.value = computer.value.copy(downloads = rows, expired = false)
+                } catch (e: ComputerException) {
+                    if (e.unauthorized) computer.value = computer.value.copy(expired = true, downloads = emptyList())
+                }
+            }
+            delay(3000)
+        }
+    }
+
+    // ---- the one-time hint
+
+    private suspend fun showLinkTipAtStart() {
+        delay(9000)
+        if (!app.prefs.linkTipHidden && app.prefs.computerHost == null && app.prefs.linkTipShown < 2 && current !is Screen.Player) {
+            app.prefs.linkTipShown += 1
+            linkTip.value = true
+        }
+    }
+
+    /** Wraps a download: before the first one the hint may appear once, then the download goes on. */
+    fun downloadWithTip(action: () -> Unit) {
+        if (!app.prefs.linkTipHidden && app.prefs.computerHost == null && app.prefs.linkTipShown < 3) {
+            app.prefs.linkTipShown += 1
+            pendingAfterTip = action
+            linkTip.value = true
+        } else action()
+    }
+
+    fun closeLinkTip(hideForever: Boolean = false, setup: Boolean = false) {
+        if (hideForever) app.prefs.linkTipHidden = true
+        linkTip.value = false
+        pendingAfterTip?.invoke(); pendingAfterTip = null
+        if (setup) open(Screen.Computer)
     }
 
     override fun onCleared() { closeStream(); super.onCleared() }
