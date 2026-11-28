@@ -596,9 +596,11 @@ struct CatalogFilter: Equatable {
             return false
         }
     }
-    @discardableResult func phone(_ action: String) async -> Bool {
+    @discardableResult func phone(_ action: String, id: String? = nil) async -> Bool {
         do {
-            phoneState = try await bridge.call("phone", ["action": .string(action)], as: PhoneResponse.self)
+            var parameters: [String: JSONValue] = ["action": .string(action)]
+            if let id { parameters["id"] = .string(id) }
+            phoneState = try await bridge.call("phone", parameters, as: PhoneResponse.self)
             return true
         } catch { fail(error); return false }
     }
