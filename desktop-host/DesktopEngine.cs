@@ -69,6 +69,7 @@ sealed class DesktopEngine:IAsyncDisposable
         switch(method)
         {
             case "bootstrap":
+                if(phone==null&&PhoneRemoteServer.HasRememberedDevices(PhoneDevicesFile)){try{await EnsurePhoneAsync();}catch(Exception error)when(error is not OutOfMemoryException){}}
                 warming??=Warm();return new{protocol=1,version=typeof(DesktopEngine).Assembly.GetName().Version?.ToString(3),settings=Settings(),genres=CatalogChoices.Genres.Select(Choice),countries=CatalogChoices.Countries.Select(Choice),gameGenres=GameGenres.All.Select(x=>new{key=x.Key,label=AppLanguage.T(x.Name)}),engineCreated=downloads.EngineCreated};
             case "gameShelves":return new{items=GameShelves.Home.Select(spec=>new{id=spec.Key,title=AppLanguage.T(spec.Title)})};
             case "gameShelf":
@@ -349,6 +350,22 @@ sealed class DesktopEngine:IAsyncDisposable
         if(p.TryGetProperty("lanEnabled",out var enabled)){prefs.LanEnabled=enabled.GetBoolean();if(prefs.LanEnabled)await EnsureLan(ct);else if(lan!=null){await lan.DisposeAsync();lan=null;}}
         await downloads.SetLimitsAsync(prefs.MaxDownloadKbps,prefs.MaxUploadKbps);prefs.Save();Event("personal",Settings());return Settings();
     }
+    static string PhoneDevicesFile=>Path.Combine(Preferences.DataDir,"phone-devices.json");
+    // Starts the access server without a pairing code; also called at launch when a device was remembered, so it can reconnect by itself.
+    async Task EnsurePhoneAsync()
+    {
+        if(phone!=null)return;
+        var context=SynchronizationContext.Current!;
+        var catalog=new PhoneRemoteCatalog(downloads,prefs,id=>shared.All.FirstOrDefault(x=>OnlineIndexClient.IdFor(x)==id));
+        var server=new PhoneRemoteServer((method,args,token)=>OnOwner(async()=>
+        {
+            token.ThrowIfCancellationRequested();
+            var result=await catalog.Handle(method,args,token);
+            if(method is "add" or "control")Event("downloads",Downloads());return result;
+        },context),devicesFile:PhoneDevicesFile,mediaResolver:catalog.Media);
+        try{server.Start();phoneCatalog=catalog;phone=server;}
+        catch{await server.DisposeAsync();catalog.Dispose();throw;}
+    }
     async Task<object> Phone(JsonElement p,CancellationToken ct)
     {
         if(shuttingDown)throw new OperationCanceledException(ct);
@@ -356,25 +373,15 @@ sealed class DesktopEngine:IAsyncDisposable
         if(action=="stop")
         {
             var server=phone;phone=null;var catalog=phoneCatalog;phoneCatalog=null;
+            server?.ForgetAllDevices();
             if(server!=null)await server.DisposeAsync();catalog?.Dispose();
             return new{running=false,urls=Array.Empty<string>(),code=(string?)null,connected=0};
         }
+        if(action=="forget"&&phone!=null)phone.Forget(S(p,"id"));
         if(action=="start")
         {
-            if(phone==null)
-            {
-                var context=SynchronizationContext.Current!;
-                var catalog=new PhoneRemoteCatalog(downloads,prefs);
-                var server=new PhoneRemoteServer((method,args,token)=>OnOwner(async()=>
-                {
-                    token.ThrowIfCancellationRequested();
-                    var result=await catalog.Handle(method,args,token);
-                    if(method is "add" or "control")Event("downloads",Downloads());return result;
-                },context));
-                try{server.Start();phoneCatalog=catalog;phone=server;}
-                catch{await server.DisposeAsync();catalog.Dispose();throw;}
-            }
-            phone.OpenPairing();
+            await EnsurePhoneAsync();
+            phone!.OpenPairing();
         }
         return phone==null?(object)new{running=false,urls=Array.Empty<string>(),code=(string?)null,connected=0}:new{running=true,state=phone.State()};
     }

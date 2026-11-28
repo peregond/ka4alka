@@ -13,6 +13,7 @@ ReleaseAudioTests.Run();
 BackroomsAudioTests.Run();
 await ReleaseAudioRulesTests.Run();
 SearchLanguageTests.Run();
+FavoriteSyncTests.Run();
 await UnifiedSearchTests.Run();
 await ImdbSuggestionTests.Run();
 await SearchIndexerTests.Run();

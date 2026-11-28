@@ -13,6 +13,7 @@ using Kachalka.Lan;
 
 if(args.Contains("--phone-browser")){await PhoneBrowserFixture.Run();return 0;}
 await PhoneRemoteTests.Run();
+await PhoneDevicesTests.Run();
 if(args.Contains("--phone"))return 0;
 
 // These checks use real TCP/TLS sessions and independent persisted identities.
